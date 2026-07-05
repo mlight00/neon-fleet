@@ -1,0 +1,13 @@
+# 원본 사운드 소스(대용량 WAV) — 게임은 assets/sound/*.ogg 사용
+docs/eleven_sfx/
+*.wav
+
+# AI 쇼케이스(별도 React 프로젝트) — 게임 배포에 불필요
+gemini/
+
+# 검수용 임시
+assets/styleC/_v3check/
+
+# 시스템/에디터
+.DS_Store
+node_modules/

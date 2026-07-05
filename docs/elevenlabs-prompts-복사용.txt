@@ -1,0 +1,107 @@
+네온 함대 — ElevenLabs 효과음 프롬프트 (한 번에 하나씩 복사)
+
+사용법:
+- 아래 "프롬프트:" 뒤의 영어 문장 "한 줄만" 복사해서 ElevenLabs 효과음 입력란에 붙여넣기.
+- 숫자·제목·파일명은 넣지 말 것 (영어 문장만!).
+- 기간(Duration): 아래 초 값으로 수동 설정하거나 "자동"으로 둬도 됨.
+- 생성 후 다운로드 → 파일명(nf_sfx_...)으로 저장.
+- 우선순위 높은 것부터: 1~3(무기) → 7,8,11(성장) → 5,6,17,18(폭발/보스).
+
+
+========== 1. 무기 (가장 중요, 짧고 강하게) ==========
+
+[1] 발칸 발사   파일명: nf_sfx_vulcan   기간 0.2초
+프롬프트:
+Heavy sci-fi pulse cannon shot, punchy blast with deep bass thump and metallic snap, dry, no reverb
+
+[2] 레이저 발사   파일명: nf_sfx_laser   기간 0.2초
+프롬프트:
+Sci-fi energy laser bolt, sharp electric zap with fast downward pitch and thick low end, dry, no reverb
+
+[3] 호밍 미사일 발사   파일명: nf_sfx_missile   기간 0.4초
+프롬프트:
+Sci-fi rocket launch, ignition click then thruster whoosh with low rumble, punchy, dry
+
+
+========== 2. 타격 / 폭발 ==========
+
+[4] 적 피격   파일명: nf_sfx_hit   기간 0.1초
+프롬프트:
+Tiny metallic bullet impact tick on metal armor, very short, dry, crisp
+
+[5] 소형 폭발   파일명: nf_sfx_explode_s   기간 0.4초
+프롬프트:
+Small sci-fi explosion, quick punchy blast with metallic debris and a low thump, dry
+
+[6] 대형 폭발   파일명: nf_sfx_explode_l   기간 0.8초
+프롬프트:
+Large heavy sci-fi explosion, deep booming blast with metal shrapnel and powerful low end
+
+[7] 크리스탈 파괴(보상)   파일명: nf_sfx_crystal   기간 0.7초
+프롬프트:
+Bright crystal shatter with an ascending sparkle chime, glassy and rewarding
+
+
+========== 3. 성장 / 선택 (기분 좋은 소리) ==========
+
+[8] 이득 게이트   파일명: nf_sfx_gate_good   기간 0.5초
+프롬프트:
+Positive power-up chime, quick bright ascending warp tone, energizing and clean
+
+[9] 손해 게이트   파일명: nf_sfx_gate_bad   기간 0.5초
+프롬프트:
+Negative warning tone, quick descending warp buzz, ominous
+
+[10] 아이템 획득   파일명: nf_sfx_pickup   기간 0.3초
+프롬프트:
+Short sci-fi item pickup blip, satisfying digital click with a soft hum
+
+[11] 함선 진화   파일명: nf_sfx_evolve   기간 1.5초
+프롬프트:
+Powerful sci-fi ship upgrade, rising metallic energy charge building into a bright triumphant burst, heroic
+
+[12] 강등   파일명: nf_sfx_demote   기간 0.8초
+프롬프트:
+Sci-fi power-down, descending failing energy tone, disappointing
+
+[13] 실드 획득   파일명: nf_sfx_shield_on   기간 0.6초
+프롬프트:
+Sci-fi energy shield activating, protective humming force field powering up
+
+[14] 실드 방어   파일명: nf_sfx_shield_pop   기간 0.5초
+프롬프트:
+Energy shield deflecting a hit, sharp electric zap and force field shatter
+
+
+========== 4. 위협 / 피해 ==========
+
+[15] 드론 손실   파일명: nf_sfx_damage   기간 0.4초
+프롬프트:
+Taking damage, dull heavy metallic crunch impact with a brief low alarm, dry
+
+[16] 적 발사 예고   파일명: nf_sfx_telegraph   기간 0.3초
+프롬프트:
+Short menacing alien weapon charge-up beep, tense warning
+
+[17] 보스 등장   파일명: nf_sfx_boss_in   기간 2초
+프롬프트:
+Massive alien mothership arrival, deep intimidating horn roar with heavy metallic rumble
+
+[18] 보스 격파   파일명: nf_sfx_boss_die   기간 3초
+프롬프트:
+Huge boss death, enormous chain of explosions with deep booms and debris, victorious
+
+
+========== 5. UI ==========
+
+[19] 버튼 클릭   파일명: nf_sfx_click   기간 0.2초
+프롬프트:
+Soft clean sci-fi interface button click, subtle and crisp
+
+[20] 격납고 구매   파일명: nf_sfx_buy   기간 0.6초
+프롬프트:
+Sci-fi upgrade purchase, metallic clank with a bright coin chime, satisfying
+
+[21] 출격   파일명: nf_sfx_start   기간 1초
+프롬프트:
+Spaceship fleet launch, powerful engine ignition whoosh taking off
