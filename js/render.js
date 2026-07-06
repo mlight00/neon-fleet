@@ -162,8 +162,8 @@ export function createStarfield(logicalW, count = 120) {
   };
 }
 
-/** 상단 HUD: 진행 바 + 보스 HP + 티어/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, count, tierName, tierMult, stage, weapon, weaponLv, shield }) {
+/** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
+export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, bossName, count, tierName, tierPower, nextCost, stage, weapon, weaponLv, shield }) {
   ctx.save();
   // 진행 바
   const barW = logicalW - 80;
@@ -181,13 +181,13 @@ export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, count, tierN
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillStyle = COLORS.text;
-    ctx.fillText('HIVE QUEEN', 60, 51);
+    ctx.fillText(bossName || 'BOSS', 60, 51);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#ff8080';
     ctx.fillText(`${Math.ceil(Math.max(0, bossHp)).toLocaleString()} / ${bossMax.toLocaleString()}`, logicalW - 60, 51);
   }
 
-  // 좌상단: 편대 수 + 티어(화력 배수) + 스테이지
+  // 좌상단: 편대 수 + 티어(기함 화력) + 진화 게이지 + 스테이지
   ctx.fillStyle = COLORS.text;
   ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'left';
@@ -195,12 +195,26 @@ export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, count, tierN
   if (tierName) {
     ctx.font = 'bold 11px sans-serif';
     ctx.fillStyle = COLORS.ally;
-    ctx.fillText(`${tierName} · 화력 x${tierMult}`, 12, 34);
+    ctx.fillText(tierPower > 0 ? `${tierName} · 기함 +${tierPower}` : tierName, 12, 34);
+  }
+  // 다음 진화 게이지: 드론을 모아 비용을 채우면 기함에 흡수·승급 (최고 티어면 MAX)
+  if (nextCost > 0) {
+    const gw = 86;
+    ctx.fillStyle = 'rgba(255,217,61,0.18)';
+    ctx.fillRect(12, 40, gw, 5);
+    ctx.fillStyle = COLORS.reward;
+    ctx.fillRect(12, 40, gw * Math.min(1, count / nextCost), 5);
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(`진화 ${count}/${nextCost}`, 12 + gw + 6, 45);
+  } else if (tierName) {
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillStyle = COLORS.reward;
+    ctx.fillText('최종 진화 MAX', 12, 45);
   }
   if (stage) {
     ctx.font = 'bold 11px sans-serif';
     ctx.fillStyle = COLORS.reward;
-    ctx.fillText(`STAGE ${stage}`, 12, 48);
+    ctx.fillText(`STAGE ${stage}`, 12, 59);
   }
 
   // 우상단: 무기 + 레벨 점 + 실드

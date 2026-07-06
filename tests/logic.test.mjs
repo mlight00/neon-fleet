@@ -24,40 +24,37 @@ test('stormDecay: 초당 비율 감소, 최소 0', () => {
   assert.equal(stormDecay(0, 1, 0.10), 0);
 });
 
-// ─── 진화 티어 (확장 설계 부록 §1) ───
-const { tierFor } = await import('../js/logic.js');
-const TH = [0, 30, 120, 320];
+// ─── 드론 소모형 진화 ───
+const { evolveStep } = await import('../js/logic.js');
+const COSTS = [0, 60, 140, 280];
+const RETAIN = 8;
+const RATIO = 0.25;
 
-test('tierFor: 임계값 도달 시 승급', () => {
-  assert.equal(tierFor(8, 0, TH, 0.6), 0);
-  assert.equal(tierFor(30, 0, TH, 0.6), 1);
-  assert.equal(tierFor(119, 1, TH, 0.6), 1);
-  assert.equal(tierFor(120, 1, TH, 0.6), 2);
-  assert.equal(tierFor(320, 2, TH, 0.6), 3);
+test('evolveStep: 비용 미달이면 아무 일도 없다', () => {
+  assert.deepEqual(evolveStep(59, 0, COSTS, RETAIN, RATIO), { tier: 0, count: 59, consumed: 0 });
+  assert.deepEqual(evolveStep(139, 1, COSTS, RETAIN, RATIO), { tier: 1, count: 139, consumed: 0 });
 });
 
-test('tierFor: 여러 단계 한 번에 승급 (x3 게이트)', () => {
-  assert.equal(tierFor(400, 0, TH, 0.6), 3);
+test('evolveStep: 비용 도달 시 1티어 승급 + 흡수량의 25%만 새 호위로 잔류', () => {
+  assert.deepEqual(evolveStep(60, 0, COSTS, RETAIN, RATIO), { tier: 1, count: 15, consumed: 45 });
+  assert.deepEqual(evolveStep(140, 1, COSTS, RETAIN, RATIO), { tier: 2, count: 35, consumed: 105 });
 });
 
-test('tierFor: 히스테리시스 — 임계값 바로 아래로 떨어져도 강등 안 됨', () => {
-  assert.equal(tierFor(119, 2, TH, 0.6), 2);  // 120 미만이지만 72 이상 → 유지
-  assert.equal(tierFor(73, 2, TH, 0.6), 2);
+test('evolveStep: 잔류가 기본 호위(retainBase)보다 작아질 수는 없다', () => {
+  // ratio 0이면 시작 드론 수만큼은 남는다
+  assert.deepEqual(evolveStep(60, 0, COSTS, RETAIN, 0), { tier: 1, count: 8, consumed: 52 });
 });
 
-test('tierFor: 60% 미만으로 떨어지면 강등', () => {
-  assert.equal(tierFor(71, 2, TH, 0.6), 1);   // 120*0.6=72 미만 → T2
-  assert.equal(tierFor(17, 2, TH, 0.6), 0);   // 30*0.6=18 미만 → 연쇄 강등 T1
-  assert.equal(tierFor(191, 3, TH, 0.6), 2);  // 320*0.6=192 미만 → T3
+test('evolveStep: 비용을 크게 초과해도(대형 크리스탈) 초과분까지 흡수되고 승급은 1단계만', () => {
+  assert.deepEqual(evolveStep(400, 0, COSTS, RETAIN, RATIO), { tier: 1, count: 100, consumed: 300 });
 });
 
-test('tierFor: 경계에서 승급/강등 반복 없음 (히스테리시스 불변식)', () => {
-  // 승급 직후 값이 강등 기준보다 항상 위: thresholds[t] >= thresholds[t]*0.6
-  for (let t = 1; t < TH.length; t++) {
-    const promoted = tierFor(TH[t], t - 1, TH, 0.6);
-    assert.equal(promoted, t);
-    assert.equal(tierFor(TH[t] - 1, promoted, TH, 0.6), t, `경계 ${TH[t]}에서 깜빡임`);
-  }
+test('evolveStep: 최고 티어에선 더 진화하지 않고 드론이 그대로 쌓인다', () => {
+  assert.deepEqual(evolveStep(999, 3, COSTS, RETAIN, RATIO), { tier: 3, count: 999, consumed: 0 });
+});
+
+test('evolveStep: 강등 없음 — 드론이 줄어도 티어 유지 (바친 재료는 돌려받지 않는다)', () => {
+  assert.deepEqual(evolveStep(3, 2, COSTS, RETAIN, RATIO), { tier: 2, count: 3, consumed: 0 });
 });
 
 // ─── 스테이지 난이도 스케일링 ───

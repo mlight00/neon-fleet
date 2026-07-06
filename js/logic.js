@@ -28,11 +28,6 @@ export function hangarCost(base, lv, growth) {
 }
 
 /**
- * 진화 티어 판정 (히스테리시스).
- * 승급: count가 임계값 도달 즉시. 강등: 현재 티어 임계값의 demoteRatio 미만일 때만.
- * → 승급 경계 바로 아래로 떨어져도 강등되지 않아 깜빡임이 없다.
- */
-/**
  * 스테이지별 난이도 배수 (스테이지 1 = 기본).
  * 적은 단단하고 빨라지고, 보상(크리스탈)도 소폭 올라 성장이 완전히 뒤처지진 않는다.
  */
@@ -48,13 +43,16 @@ export function stageMods(stage) {
   };
 }
 
-export function tierFor(count, currentTier, thresholds, demoteRatio) {
-  let promoted = 0;
-  for (let i = 0; i < thresholds.length; i++) {
-    if (count >= thresholds[i]) promoted = i;
-  }
-  if (promoted > currentTier) return promoted;
-  let tier = currentTier;
-  while (tier > 0 && count < thresholds[tier] * demoteRatio) tier--;
-  return tier;
+/**
+ * 드론 소모형 진화 판정.
+ * 다음 티어 비용(costs[tier+1])에 도달하면 모은 드론이 기함의 재료로 흡수되고 1티어 승급.
+ * 진화 후에는 흡수량의 retainRatio만큼(최소 retainBase)이 새 호위대로 재사출되고,
+ * 나머지는 소멸 — 다음 진화는 처음부터 다시 모은다. 연쇄 승급·강등 없음.
+ * 반환: { tier, count, consumed } — 진화가 없으면 입력 그대로, consumed 0.
+ */
+export function evolveStep(count, tier, costs, retainBase, retainRatio = 0) {
+  const cost = costs[tier + 1];
+  if (cost === undefined || count < cost) return { tier, count, consumed: 0 };
+  const kept = Math.min(count, Math.max(retainBase, Math.round(count * retainRatio)));
+  return { tier: tier + 1, count: kept, consumed: count - kept };
 }

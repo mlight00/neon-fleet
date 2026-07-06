@@ -3,11 +3,11 @@
 // world = { bal, input, squad, bullets, enemyBullets, entities, effects, addCoins,
 //           spawnEntity, spawnEnemyBullet, scrollSpeed, logicalW, logicalH, rng, phase }
 import { BAL } from './balance.js';
-import { applyGate, hitCrystal, tierFor } from './logic.js';
+import { applyGate, hitCrystal, evolveStep } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
-import { getSprite } from './sprites.js';
+import { getSprite, bossDefFor } from './sprites.js';
 import { sfx } from './audio.js';
 
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
@@ -139,26 +139,30 @@ export class Squad {
     world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[this.weapon]} Lv${this.weaponLv}!`, WEAPON_COLORS[this.weapon]);
   }
 
+  /** 총 화력 (드론 환산): 드론 수 + 기함에 흡수된 파워 */
+  get power() {
+    return this.count + BAL.evolution.shipPower[this.tier];
+  }
+
   checkEvolution(world) {
     const ev = BAL.evolution;
-    const next = tierFor(this.count, this.tier, ev.thresholds, ev.demoteRatio);
-    if (next > this.tier) {
-      this.tier = next;
-      world.effects.flash(0.5);
-      world.effects.ring(this.x, this.y, COLORS.ally, 0);
-      world.effects.ring(this.x, this.y, COLORS.ally, 0.1);
-      world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
-      // 뭐가 좋아졌는지 명시: 화력 배수 + 주포 수 (진화 체감의 핵심)
-      world.effects.text(this.x, this.y - 100, `${ev.names[next]}로 진화!`, COLORS.reward);
-      world.effects.text(this.x, this.y - 76, `화력 x${ev.dpsMult[next]} · 주포 ${SHIP_DEFS[next].mounts.length}문`, COLORS.ally);
-      this.evolvePunch = 0.35; // 스케일 펀치 타이머
-      sfx('evolve');
-    } else if (next < this.tier) {
-      this.tier = next;
-      this.flash = 0.3;
-      world.effects.text(this.x, this.y - 80, `강등... ${ev.names[next]}`, COLORS.danger);
-      sfx('demote');
-    }
+    const retain = world.stats?.startCount ?? BAL.squad.start;
+    const r = evolveStep(this.count, this.tier, ev.costs, retain, ev.retainRatio);
+    if (r.tier === this.tier) return;
+    this.tier = r.tier;
+    this.count = r.count;
+    // 드론을 전부 바친 직후 사고사 방지: 진화 에너지 방출 = 보호막 1회
+    this.shield = true;
+    world.effects.flash(0.5);
+    world.effects.ring(this.x, this.y, COLORS.ally, 0);
+    world.effects.ring(this.x, this.y, COLORS.ally, 0.1);
+    world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
+    // 드론이 재료로 흡수됐음을 명시 (소모형 진화 체감의 핵심)
+    world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수!`, COLORS.reward);
+    world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 진화!`, COLORS.reward);
+    world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.shipPower[r.tier]} · 주포 ${SHIP_DEFS[r.tier].mounts.length}문`, COLORS.ally);
+    this.evolvePunch = 0.35; // 스케일 펀치 타이머
+    sfx('evolve');
   }
 
   applyDelta(n, world, label) {
@@ -179,7 +183,7 @@ export class Squad {
     if (diff !== 0) this.applyDelta(diff, world, label);
   }
 
-  /** 접촉 피해 (크리처/운석): 실드 1회 무효 */
+  /** 접촉 피해 (크리처/운석): 실드 1회 무효. 1회 손실은 편대의 일정 비율까지만 (한 방 전멸 방지) */
   contactDamage(n, world) {
     if (this.shield) {
       this.shield = false;
@@ -188,7 +192,8 @@ export class Squad {
       sfx('shield_pop');
       return;
     }
-    this.applyDelta(-n, world);
+    const cap = Math.max(2, Math.ceil(this.count * BAL.squad.contactCapPct));
+    this.applyDelta(-Math.min(n, cap), world);
     sfx('damage');
   }
 
@@ -217,12 +222,12 @@ export class Squad {
   fire(dt, world) {
     const W = BAL.weapons;
     const powerMult = this.powerT > 0 ? BAL.powerModule.multiplier : 1;
-    const tierMult = BAL.evolution.dpsMult[this.tier];
     const lvCoef = W.lvCoef[this.weaponLv - 1];
     // 격납고 영구 강화(발사 속도/공격력)는 world.stats로 주입된다
     const fireRate = world.stats?.fireRate ?? BAL.squad.fireRate;
     const damage = world.stats?.damage ?? BAL.squad.damage;
-    const baseDps = this.count * fireRate * damage * tierMult * lvCoef * powerMult;
+    // 총 화력 = (드론 수 + 기함 파워): 진화로 드론을 바쳐도 화력이 기함에 저축되어 유지된다
+    const baseDps = this.power * fireRate * damage * lvCoef * powerMult;
 
     // 호위 드론 개별 사격: 드론이 2기 이상이면 총 화력의 30%를 드론들이 분담 발사
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
@@ -1481,7 +1486,12 @@ export class Weaver {
 
 // ───────────────────────── 보스: 하이브 퀸
 export class Boss {
-  constructor(logicalW, rateMult = 1) {
+  constructor(logicalW, rateMult = 1, stage = 1) {
+    // 스테이지별 보스: 로스터 순환. PNG가 아직 없으면 하이브 퀸 이미지로 폴백 (sprite() 참고)
+    const def = bossDefFor(stage);
+    this.spriteId = def.id;
+    this.name = def.name;
+    this.korName = def.korName;
     this.x = logicalW / 2;
     this.y = -100;
     this.targetY = BAL.boss.y;
@@ -1510,9 +1520,14 @@ export class Boss {
     const ratio = this.hp / this.maxHp;
     return ratio > 0.66 ? COLORS.enemy : ratio > 0.33 ? COLORS.enemyHigh : COLORS.danger;
   }
+  /** 이 보스의 스프라이트: 전용 PNG 우선, 없으면 하이브 퀸(B7)으로 폴백 */
+  sprite() {
+    return getSprite(this.spriteId) || getSprite('B7');
+  }
+
   /** 화면 크기·스프라이트에 맞춘 안전 배치 (상하좌우 잘림 방지 + 과대 축소) */
   layout(logicalH) {
-    const gem = getSprite('B7');
+    const gem = this.sprite();
     if (!gem) return { scale: 1, halfH: this.r, halfW: this.r * 1.6, safeY: BAL.boss.y };
     const maxH = logicalH * 0.22;                 // 보스 세로는 화면의 22% 이내 (기기별 과대 방지)
     const scale = Math.min(1, maxH / gem.logicalH);
@@ -1629,7 +1644,7 @@ export class Boss {
   draw(ctx) {
     if (this.dying) { this.drawDying(ctx, BAL.bossDeath.duration); return; }
     const pc = this.phaseColor();
-    const gem = getSprite('B7');
+    const gem = this.sprite();
     if (gem) {
       const sc = this.drawScale || 1;
       ctx.save();

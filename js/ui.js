@@ -24,10 +24,10 @@ export const ui = {
     panel(`
       <h1>NEON FLEET</h1>
       <p>네온 함대</p>
-      <p>좌우로 움직여 편대를 키우고<br>하이브 퀸을 격파하세요!</p>
+      <p>드론을 모아 기함에 바치면 진화!<br>트랙 끝의 보스를 격파하세요!</p>
       <p>📱 드래그 · 🖱 마우스 · ⌨ ←→</p>
       <p class="big">STAGE ${stage}</p>
-      ${best > 0 ? `<p>최고 편대 기록: ${best} · 코인 ${coins.toLocaleString()}</p>` : ''}
+      ${best > 0 ? `<p>최고 함대 화력: ${best.toLocaleString()} · 코인 ${coins.toLocaleString()}</p>` : ''}
       ${saveOk ? '' : '<p style="color:#ff3d71">⚠ 이 브라우저에선 기록 저장이 꺼져 있어요</p>'}
       <div class="btn-row">
         <button id="btn-start">출격</button>
@@ -96,14 +96,14 @@ export const ui = {
     document.getElementById('btn-back').addEventListener('click', onBack);
   },
 
-  showWin({ stage, count, coins, best, isRecord, topPercent, onNext, onHangar }) {
+  showWin({ stage, bossName, maxPower, coins, best, isRecord, topPercent, onNext, onHangar }) {
     panel(`
       <h2 style="color:#3ff5e0">STAGE ${stage} 클리어!</h2>
-      <p class="big">하이브 퀸 격파</p>
-      <p>남은 편대: <b>${count}</b>기 ${isRecord ? '<span class="record">★ 신기록!</span>' : ''}</p>
+      <p class="big">${bossName} 격파</p>
+      <p>최대 함대 화력: <b>${maxPower.toLocaleString()}</b> ${isRecord ? '<span class="record">★ 신기록!</span>' : ''}</p>
       <p>획득 코인: <b>🪙 +${coins.toLocaleString()}</b></p>
       <p class="big">전체 파일럿 상위 ${topPercent}%!</p>
-      ${best > 0 && !isRecord ? `<p>최고 기록: ${best}</p>` : ''}
+      ${best > 0 && !isRecord ? `<p>최고 기록: ${best.toLocaleString()}</p>` : ''}
       <p style="color:#ff9c41">다음 스테이지는 적이 더 강해집니다</p>
       <div class="btn-row">
         <button id="btn-retry">STAGE ${stage + 1} ▶</button>

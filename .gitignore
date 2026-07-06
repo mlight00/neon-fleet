@@ -11,3 +11,6 @@ assets/styleC/_v3check/
 # 시스템/에디터
 .DS_Store
 node_modules/
+
+# 로컬 미리보기 도구 설정
+.claude/

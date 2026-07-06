@@ -165,7 +165,7 @@ function newRun(stage) {
     phase: 'track', // track | boss | win | lose
     boss: null,
     endT: 0,        // 종료 연출 타이머
-    maxCount: squad.count,
+    maxPower: squad.power, // 최대 총화력 기록 (보스 HP 산정 + 최고 기록)
     scrollY: 0,     // 스타필드용 누적
   };
 }
@@ -188,7 +188,7 @@ function update(dt) {
   w.phase = r.phase;
   w.boss = r.boss;
   r.squad.update(dt, w);
-  r.maxCount = Math.max(r.maxCount, r.squad.count);
+  r.maxPower = Math.max(r.maxPower, r.squad.power);
 
   // 진행/스폰
   if (r.phase === 'track') {
@@ -239,9 +239,9 @@ function update(dt) {
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
       playBgm('boss'); // 보스 BGM으로 크로스페이드
-      r.boss = new Boss(LOGICAL_W, r.mods.enemyRate);
-      // 편대가 클수록 + 스테이지가 높을수록 보스도 강하게 (부록 §5)
-      r.boss.hp = r.boss.maxHp = Math.round(Math.max(BAL.boss.hp, r.maxCount * BAL.boss.hpPerDrone) * r.mods.boss);
+      r.boss = new Boss(LOGICAL_W, r.mods.enemyRate, r.stage);
+      // 함대가 강할수록 + 스테이지가 높을수록 보스도 강하게 (부록 §5)
+      r.boss.hp = r.boss.maxHp = Math.round(Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss);
     }
   } else if (r.phase === 'boss') {
     r.scrollY += 30 * dt;
@@ -357,8 +357,9 @@ function finishRun(win) {
   playBgm('title'); // 결과 화면 = 차분한 타이틀 BGM
   const r = run;
   const data = save.get();
-  const isRecord = r.maxCount > data.best;
-  const best = Math.max(data.best, r.maxCount);
+  // 최고 기록 = 그 판에서 찍은 최대 총화력 (드론 환산 — 소모형 진화라 편대 수보다 화력이 성과 지표)
+  const isRecord = r.maxPower > data.best;
+  const best = Math.max(data.best, r.maxPower);
 
   let coins = r.world.coins;
   const progress = Math.min(1, r.traveled / r.totalTrack);
@@ -369,8 +370,8 @@ function finishRun(win) {
   if (win) {
     // 클리어 → 다음 스테이지 해금 (더 어려운 판이 이어진다)
     save.set({ best, coins: data.coins + coins, stage: Math.max(data.stage, r.stage + 1) });
-    const topPercent = Math.max(1, Math.min(90, Math.round(90 - r.squad.count / 6)));
-    ui.showWin({ stage: r.stage, count: r.squad.count, coins, best, isRecord, topPercent, onNext: startPlay, onHangar: showHangar });
+    const topPercent = Math.max(1, Math.min(90, Math.round(90 - r.maxPower / 25)));
+    ui.showWin({ stage: r.stage, bossName: r.boss?.korName ?? '보스', maxPower: r.maxPower, coins, best, isRecord, topPercent, onNext: startPlay, onHangar: showHangar });
   } else {
     save.set({ best, coins: data.coins + coins });
     ui.showLose({ stage: r.stage, progress, coins, onRetry: startPlay, onHangar: showHangar });
@@ -441,9 +442,11 @@ function draw() {
       progress: Math.min(1, r.traveled / r.totalTrack),
       bossHp: r.boss ? Math.max(0, r.boss.hp) : 0,
       bossMax: r.boss && r.phase === 'boss' ? r.boss.maxHp : 0,
+      bossName: r.boss ? r.boss.name : '',
       count: r.squad.count,
       tierName: BAL.evolution.names[r.squad.tier],
-      tierMult: BAL.evolution.dpsMult[r.squad.tier],
+      tierPower: BAL.evolution.shipPower[r.squad.tier],
+      nextCost: BAL.evolution.costs[r.squad.tier + 1] ?? 0, // 0 = 최고 티어
       stage: r.stage,
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,

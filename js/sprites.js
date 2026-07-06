@@ -18,10 +18,25 @@ const RASTER_ART = {
     B1: 'assets/styleC/B1.png', B2: 'assets/styleC/B2.png',
     B3: 'assets/styleC/B3.png', B5: 'assets/styleC/B5.png',
     B7: 'assets/styleC/B7.png',
+    B8: 'assets/styleC/B8.png', B9: 'assets/styleC/B9.png',
+    B10: 'assets/styleC/B10.png', B11: 'assets/styleC/B11.png',
     C1: 'assets/styleC/C1.png', C2: 'assets/styleC/C2.png',
     // B4/B6/운석/파워모듈은 벡터 메탈 아트 유지 (추가 생성 시 교체)
   },
 };
+
+// 스테이지별 보스 로스터: 스테이지 s → ROSTER[(s-1) % 길이] 순환.
+// PNG가 아직 없는 보스는 자동으로 하이브 퀸 벡터 드로잉으로 폴백된다 (게임 안 깨짐).
+export const BOSS_ROSTER = [
+  { id: 'B7', name: 'HIVE QUEEN', korName: '하이브 퀸' },
+  { id: 'B8', name: 'REAPER LORD', korName: '리퍼 로드' },
+  { id: 'B9', name: 'VORTEX MAW', korName: '볼텍스 마우' },
+  { id: 'B10', name: 'OBSIDIAN CLAW', korName: '옵시디언 클로' },
+  { id: 'B11', name: 'VOID SERAPH', korName: '보이드 세라프' },
+];
+export function bossDefFor(stage) {
+  return BOSS_ROSTER[(Math.max(1, stage) - 1) % BOSS_ROSTER.length];
+}
 
 // 스타일별 배경 이미지 배열 (스테이지 진행에 따라 전환. 없으면 스타필드만)
 const BG_ART = { C: ['assets/styleC/bg1.png', 'assets/styleC/bg2.png', 'assets/styleC/bg3.png'] };
@@ -53,7 +68,7 @@ export const SPRITE_SIZES = {
   A1: 34, A2: 60, A3: 78, A4: 104, A5: 132, A6: 172, // 플레이어 함선 6티어
   B1: 30, B2: 46, B3: 66,                      // 샤드/리퍼/브루드
   B4: 36, B5: 42, B6: 38,                      // 저격/포탑/위버
-  B7: 150,                                     // 하이브 퀸 (보스) — 잘림 방지 위해 축소
+  B7: 150, B8: 150, B9: 150, B10: 150, B11: 150, // 스테이지 보스 5종 — 잘림 방지 위해 축소
   C1: 56, C2: 30, C3: 34, C4: 46,              // 크리스탈/캡슐/파워/운석
 };
 
