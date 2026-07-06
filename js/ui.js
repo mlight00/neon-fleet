@@ -114,14 +114,19 @@ export const ui = {
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
   },
 
-  /** 일시정지 오버레이 */
-  showPause({ onResume }) {
+  /** 일시정지 오버레이: 재개 또는 판 포기(끝내기) */
+  showPause({ onResume, onQuit }) {
     panel(`
       <h2>일시정지</h2>
       <p>계속하려면 아래 버튼 또는 <b>ESC</b></p>
-      <button id="btn-resume">계속하기</button>
+      <div class="btn-row">
+        <button id="btn-resume">게임 재개하기</button>
+        ${onQuit ? '<button id="btn-quit" class="sub-btn">끝내기</button>' : ''}
+      </div>
+      ${onQuit ? '<p><small>끝내도 이번 판에 모은 코인과 기록은 저장됩니다</small></p>' : ''}
     `);
     document.getElementById('btn-resume').addEventListener('click', onResume);
+    if (onQuit) document.getElementById('btn-quit').addEventListener('click', onQuit);
   },
 
   showLose({ stage, progress, coins, onRetry, onHangar }) {

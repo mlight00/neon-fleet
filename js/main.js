@@ -352,7 +352,7 @@ function update(dt) {
   }
 }
 
-function finishRun(win) {
+function finishRun(win, { toTitle = false } = {}) {
   state = 'done';
   playBgm('title'); // 결과 화면 = 차분한 타이틀 BGM
   const r = run;
@@ -374,6 +374,7 @@ function finishRun(win) {
     ui.showWin({ stage: r.stage, bossName: r.boss?.korName ?? '보스', maxPower: r.maxPower, coins, best, isRecord, topPercent, onNext: startPlay, onHangar: showHangar });
   } else {
     save.set({ best, coins: data.coins + coins });
+    if (toTitle) { showTitleScreen(); return; } // 자발적 '끝내기': 전멸 화면 없이 타이틀로
     ui.showLose({ stage: r.stage, progress, coins, onRetry: startPlay, onHangar: showHangar });
   }
 }
@@ -462,8 +463,14 @@ let paused = false;
 function togglePause() {
   if (state !== 'play') return;      // 플레이 중에만
   paused = !paused;
-  if (paused) ui.showPause({ onResume: togglePause });
+  if (paused) ui.showPause({ onResume: togglePause, onQuit: quitRun });
   else ui.hide();
+}
+
+/** 일시정지에서 '끝내기': 판을 포기하고 타이틀로. 모은 코인·최고 기록은 정산해 저장 */
+function quitRun() {
+  paused = false;
+  finishRun(false, { toTitle: true });
 }
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
