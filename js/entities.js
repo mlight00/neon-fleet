@@ -690,6 +690,68 @@ export class Crystal extends Scrolling {
   }
 }
 
+// ───────────────────────── 보급 수송선: 부수면 드론 지급 (파괴 = 드론 회수의 주력 공급원)
+export class DronePod extends Scrolling {
+  constructor(x, y, size) {
+    super(x, y);
+    const cfg = BAL.pod[size];
+    this.size = size;
+    this.hp = cfg.hp;
+    this.maxHp = cfg.hp;
+    this.reward = cfg.reward;
+    this.r = cfg.r;
+    this.baseX = x;
+    this.t = Math.random() * 10;
+  }
+  update(dt, world) {
+    this.scroll(dt, world);
+    this.t += dt;
+    this.x = this.baseX + Math.sin(this.t * BAL.pod.swayHz * Math.PI * 2) * BAL.pod.swayAmp;
+    if (this.offscreen(world)) this.dead = true;
+  }
+  hitByBullet(dmg, world) {
+    this.hp -= dmg;
+    if (this.hp <= 0 && !this.dead) {
+      this.dead = true;
+      world.effects.burst(this.x, this.y, COLORS.ally, 18, 200);
+      world.effects.ring(this.x, this.y, COLORS.ally);
+      world.squad.applyDelta(this.reward, world, '보급 확보!');
+      sfx('crystal');
+    }
+  }
+  draw(ctx) {
+    // 청록 육각 컨테이너 (크리스탈=노랑 육각과 색으로 구분) + 드론 아이콘 + 보상 숫자
+    const r = this.r;
+    glow(ctx, COLORS.ally, 12, (c) => {
+      c.fillStyle = 'rgba(63,245,224,0.14)';
+      c.strokeStyle = COLORS.ally;
+      c.lineWidth = 2;
+      c.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i * Math.PI) / 3;
+        const px = this.x + Math.cos(a) * r;
+        const py = this.y + Math.sin(a) * r * 0.82;
+        i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+      }
+      c.closePath(); c.fill(); c.stroke();
+    });
+    // 내용 표기: ▲ + 드론 수
+    ctx.font = `bold ${r >= 22 ? 15 : 12}px sans-serif`;
+    ctx.textAlign = 'center';
+    const label = `▲${this.reward}`;
+    ctx.strokeStyle = 'rgba(5,6,15,0.85)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(label, this.x, this.y + 4);
+    ctx.fillStyle = COLORS.ally;
+    ctx.fillText(label, this.x, this.y + 4);
+    // HP 바
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(this.x - r, this.y - r - 8, r * 2, 3);
+    ctx.fillStyle = COLORS.ally;
+    ctx.fillRect(this.x - r, this.y - r - 8, r * 2 * Math.max(0, this.hp / this.maxHp), 3);
+  }
+}
+
 // ───────────────────────── 워프 게이트 쌍 (기존 2레인)
 export class GatePair extends Scrolling {
   constructor(logicalW, y, left, right) {
@@ -1051,6 +1113,9 @@ export class Creature extends Scrolling {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.enemy, 12);
       world.addCoins(1);
+      // 격파 현상금: 중/대형은 드론 회수 (파괴 보상 확대)
+      const bounty = BAL.creature.bounty[this.size];
+      if (bounty > 0) world.squad.applyDelta(bounty, world);
       sfx(this.size === 'large' ? 'explode_l' : 'explode_s');
       // 분열: 파괴 시 소형 샤드를 사방으로 흩뿌림
       if (this.splits > 0) {
@@ -1276,7 +1341,18 @@ export class Sniper {
       this.fireT -= dt;
       if (this.fireT <= 0) {
         this.fireT = this.fireInterval;
-        world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, B.shotSpeed, { dmgPct: B.dmgPct, dmgMin: B.dmgMin }));
+        // 패턴 변주: 두 번에 한 번은 3점사 (연속 조준탄)
+        this.volley = (this.volley || 0) + 1;
+        this.queue = this.volley % 2 === 0 ? B.burstCount : 1;
+        this.queueT = 0;
+      }
+      if (this.queue > 0) {
+        this.queueT -= dt;
+        if (this.queueT <= 0) {
+          this.queueT = B.burstGap;
+          this.queue--;
+          world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, B.shotSpeed, { dmgPct: B.dmgPct, dmgMin: B.dmgMin }));
+        }
       }
       if (this.stayT <= 0) this.state = 'leave';
     } else {
@@ -1348,11 +1424,19 @@ export class Turret extends Scrolling {
       if (this.fireT <= 0) {
         this.fireT = this.fireInterval;
         const B = BAL.turret;
-        for (let i = 0; i < B.fanCount; i++) {
-          if (world.enemyBullets.length >= BAL.enemyShots.cap) break;
-          const deg = (i - (B.fanCount - 1) / 2) * B.fanDeg;
-          const a = (deg * Math.PI) / 180;
-          world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * B.shotSpeed, Math.cos(a) * B.shotSpeed, { r: 7, dmgPct: B.dmgPct, dmgMin: B.dmgMin }));
+        // 패턴 변주: 하방 부채꼴 ↔ 8방향 원형탄 번갈아
+        this.mode = ((this.mode || 0) + 1) % 2;
+        if (this.mode === 1) {
+          for (let i = 0; i < B.ringCount; i++) {
+            const a = (i / B.ringCount) * Math.PI * 2;
+            world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * B.ringSpeed, Math.cos(a) * B.ringSpeed, { r: 6, dmgPct: B.dmgPct, dmgMin: B.dmgMin }));
+          }
+        } else {
+          for (let i = 0; i < B.fanCount; i++) {
+            const deg = (i - (B.fanCount - 1) / 2) * B.fanDeg;
+            const a = (deg * Math.PI) / 180;
+            world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * B.shotSpeed, Math.cos(a) * B.shotSpeed, { r: 7, dmgPct: B.dmgPct, dmgMin: B.dmgMin }));
+          }
         }
       }
     }
@@ -1430,8 +1514,14 @@ export class Weaver {
     this.fireT -= dt;
     if (this.fireT <= 0 && this.x > 20 && this.x < this.logicalW - 20) {
       this.fireT = this.fireInterval;
-      if (world.enemyBullets.length < BAL.enemyShots.cap) {
-        world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, 0, BAL.weaver.shotSpeed, { r: 6, dmgPct: BAL.weaver.dmgPct, dmgMin: BAL.weaver.dmgMin }));
+      const B = BAL.weaver;
+      const o = { r: 6, dmgPct: B.dmgPct, dmgMin: B.dmgMin };
+      // 패턴 변주: N발마다 1발은 편대를 겨눈 조준탄 (커튼 사이의 변칙구)
+      this.shotN = (this.shotN || 0) + 1;
+      if (this.shotN % B.aimedEvery === 0) {
+        world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, B.shotSpeed, o));
+      } else {
+        world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, 0, B.shotSpeed, o));
       }
     }
     if ((this.dir > 0 && this.x > this.logicalW + 30) || (this.dir < 0 && this.x < -30)) this.dead = true;
@@ -1484,6 +1574,150 @@ export class Weaver {
   }
 }
 
+// ───────────────────────── 중간보스: 직전 스테이지 보스가 일반 적처럼 트랙을 지나간다 (스테이지 2+)
+// 화면 상단 고정이 아니라 천천히 하강·통과. 격파 = 드론 대량 회수, 놓치면 그냥 지나감.
+export class MidBoss extends Scrolling {
+  constructor(logicalW, stage, power) {
+    super(logicalW / 2, -90);
+    const M = BAL.midboss;
+    this.def = bossDefFor(Math.max(1, stage - 1)); // 직전 스테이지의 보스
+    this.pattern = BAL.bossPatterns[this.def.id] ?? { kind: 'brood' };
+    this.stage = stage;
+    this.hp = this.maxHp = Math.round(Math.max(M.hpMin, power * M.hpPerPower));
+    this.r = M.radius;
+    this.logicalW = logicalW;
+    this.baseX = logicalW / 2;
+    this.shotT = M.shotInterval * 0.7;
+    this.contactCd = 0;
+    this.isEnemy = true;
+    this.t = 0;
+  }
+  sprite() { return getSprite(this.def.id) || getSprite('B7'); }
+
+  update(dt, world) {
+    const M = BAL.midboss;
+    this.t += dt;
+    // 스크롤보다 느리게 하강 → 화면에 ~7초 머물다 지나간다
+    this.y += (world.scrollSpeed * M.speedRatio + M.ownSpeed) * dt;
+    this.x = this.baseX + Math.sin(this.t * M.swayHz * Math.PI * 2) * M.swayAmp;
+    if (this.contactCd > 0) this.contactCd -= dt;
+
+    // 화면 크기에 맞춘 렌더 스케일 (보스의 60% 안팎)
+    const gem = this.sprite();
+    if (gem) this.drawScale = Math.min(0.8, (world.logicalH * 0.13) / gem.logicalH);
+
+    // 서명 공격 (본 보스의 약화판)
+    this.shotT -= dt;
+    if (this.shotT <= 0 && this.y > 40 && this.y < world.logicalH * 0.75) {
+      this.shotT = M.shotInterval;
+      this.fireLite(world);
+    }
+
+    // 접촉: 서로 아프고 통과 (중간보스는 부딪혀도 죽지 않는다)
+    if (this.contactCd <= 0 && circleHit(this.x, this.y, this.r, world.squad.x, world.squad.y, world.squad.hitRadius)) {
+      this.contactCd = M.contactCooldown;
+      world.squad.contactDamage(Math.round(world.squad.count * M.contactPct), world);
+      world.effects.burst(this.x, this.y + this.r, COLORS.danger, 18);
+      this.hp -= M.contactSelfDmg;
+      if (this.hp <= 0) this.die(world);
+    }
+
+    if (this.offscreen(world, 110)) this.dead = true; // 보상 없이 통과
+  }
+
+  /** 본 보스 서명 공격의 약화판 */
+  fireLite(world) {
+    const M = BAL.midboss;
+    const o = { r: 6, dmgPct: M.dmgPct, dmgMin: M.dmgMin };
+    const spawn = (a, speed, sx = this.x, sy = this.y + this.r * 0.6) =>
+      world.spawnEnemyBullet(new EnemyShot(sx, sy, Math.sin(a) * speed, Math.cos(a) * speed, o));
+    switch (this.pattern.kind) {
+      case 'crescent': // 5방향 넓은 참격
+        for (let i = 0; i < 5; i++) spawn(((i - 2) * 16 * Math.PI) / 180, 215);
+        break;
+      case 'spiral': { // 좁은 3연발 쓸기
+        const base = Math.sin(this.t * 1.4) * 0.9;
+        for (const d of [-0.24, 0, 0.24]) spawn(base + d, 170);
+        break;
+      }
+      case 'pincer': { // 좌우에서 교차 2쌍
+        for (const side of [-1, 1]) {
+          spawn((side * -20 * Math.PI) / 180, 220, this.x + side * this.r, this.y + this.r * 0.4);
+          spawn((side * -36 * Math.PI) / 180, 220, this.x + side * this.r, this.y + this.r * 0.4);
+        }
+        break;
+      }
+      case 'ring': // 8방향 원형탄
+        for (let i = 0; i < 8; i++) spawn((i / 8) * Math.PI * 2 + this.t, 150, this.x, this.y);
+        break;
+      default: { // brood: 소형 크리처 2기 사출
+        const hpMult = world.stageMods?.enemyHp ?? 1;
+        for (const dx of [-14, 14]) {
+          const c = new Creature(this.x + dx, this.y + this.r * 0.7, 'small');
+          c.hp = c.maxHp = Math.round(c.hp * hpMult);
+          world.spawnEntity(c);
+        }
+      }
+    }
+  }
+
+  hitByBullet(dmg, world) {
+    this.hp -= dmg;
+    if (this.hp <= 0) this.die(world);
+  }
+
+  die(world) {
+    if (this.dead) return;
+    this.dead = true;
+    const M = BAL.midboss;
+    world.effects.burst(this.x, this.y, COLORS.danger, 40, 260);
+    world.effects.burst(this.x, this.y, COLORS.reward, 24, 200);
+    world.effects.ring(this.x, this.y, COLORS.reward);
+    world.effects.flash(0.25);
+    const drones = M.rewardDrones + M.rewardDronesPerStage * (this.stage - 1);
+    world.squad.applyDelta(drones, world, `${this.def.korName} 격파!`);
+    world.addCoins(M.coin);
+    sfx('explode_l');
+  }
+
+  draw(ctx) {
+    const gem = this.sprite();
+    const sc = this.drawScale || 0.55;
+    let halfH = this.r;
+    if (gem) {
+      halfH = (gem.logicalH * sc) / 2;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(Math.sin(this.t * 1.1) * 0.06); // 유영감
+      blit(ctx, gem, 0, 0, sc);
+      ctx.restore();
+    } else {
+      glow(ctx, COLORS.enemyHigh, 18, (c) => {
+        c.fillStyle = '#2a1038';
+        c.strokeStyle = COLORS.enemyHigh;
+        c.lineWidth = 3;
+        c.beginPath();
+        c.ellipse(this.x, this.y, this.r * 1.3, this.r * 0.6, 0, 0, Math.PI * 2);
+        c.fill(); c.stroke();
+      });
+    }
+    // 이름 + HP 바 (머리 위)
+    const w = 84;
+    const by = this.y - halfH - 12;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(5,6,15,0.85)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(this.def.korName, this.x, by - 4);
+    ctx.fillStyle = COLORS.enemyHigh;
+    ctx.fillText(this.def.korName, this.x, by - 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(this.x - w / 2, by, w, 4);
+    ctx.fillStyle = COLORS.danger;
+    ctx.fillRect(this.x - w / 2, by, w * Math.max(0, this.hp / this.maxHp), 4);
+  }
+}
+
 // ───────────────────────── 보스: 하이브 퀸
 export class Boss {
   constructor(logicalW, rateMult = 1, stage = 1) {
@@ -1492,6 +1726,8 @@ export class Boss {
     this.spriteId = def.id;
     this.name = def.name;
     this.korName = def.korName;
+    // 보스별 고유 공격 패턴 (부채꼴 슬롯이 kind별 서명기로 대체된다)
+    this.pattern = BAL.bossPatterns[def.id] ?? { kind: 'brood' };
     this.x = logicalW / 2;
     this.y = -100;
     this.targetY = BAL.boss.y;
@@ -1499,9 +1735,10 @@ export class Boss {
     this.maxHp = BAL.boss.hp;
     this.r = BAL.boss.radius;
     this.rateMult = rateMult;                       // 스테이지 스케일 (작을수록 빠른 공격)
-    this.minionT = BAL.boss.minionInterval * rateMult;
-    this.shotT = BAL.boss.shotInterval * rateMult;
+    this.minionT = BAL.boss.minionInterval * rateMult * (this.pattern.minionMult ?? 1);
+    this.shotT = BAL.boss.shotInterval * rateMult * (this.pattern.shotMult ?? 1);
     this.fanT = BAL.boss.fanInterval * rateMult;
+    this.spiralA = 0;
     this.t = 0;
     this.dead = false;
     this.dying = false;   // 파괴 연출 중 (main.js 시퀀스가 deathT를 채운다)
@@ -1545,15 +1782,16 @@ export class Boss {
     this.targetY = L.safeY;
     if (this.y < this.targetY) { this.y += 120 * dt; return; }
     // 광폭화하면 더 크게, 빠르게 흔든다 — 단, 스프라이트가 화면 밖으로 나가지 않게 클램프
+    // (참격형 보스는 swayMult로 더 사납게 움직인다)
     const sway = this.enraged ? 0.22 : 0.16;
-    const swayHz = this.enraged ? 1.1 : 0.7;
+    const swayHz = (this.enraged ? 1.1 : 0.7) * (this.pattern.swayMult ?? 1);
     const margin = L.halfW + 10;
     const rawX = this.logicalW / 2 + Math.sin(this.t * swayHz) * this.logicalW * sway;
     this.x = Math.max(margin, Math.min(this.logicalW - margin, rawX));
 
     this.minionT -= dt;
     if (this.minionT <= 0) {
-      this.minionT = this.interval(BAL.boss.minionInterval);
+      this.minionT = this.interval(BAL.boss.minionInterval) * (this.pattern.minionMult ?? 1);
       const hpMult = world.stageMods?.enemyHp ?? 1;
       for (let i = 0; i < BAL.boss.minionCount; i++) {
         const off = (i - (BAL.boss.minionCount - 1) / 2) * (this.r + 10);
@@ -1564,17 +1802,59 @@ export class Boss {
     }
     this.shotT -= dt;
     if (this.shotT <= 0) {
-      this.shotT = this.interval(BAL.boss.shotInterval);
+      this.shotT = this.interval(BAL.boss.shotInterval) * (this.pattern.shotMult ?? 1);
       world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, { r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin }));
     }
-    // 5방향 부채꼴 패턴
+    // 서명 공격: 보스 종류별 고유 패턴 (기존 부채꼴 슬롯)
     this.fanT -= dt;
-    if (this.fanT <= 0) {
-      this.fanT = this.interval(BAL.boss.fanInterval);
-      for (let i = 0; i < BAL.boss.fanCount; i++) {
-        const deg = (i - (BAL.boss.fanCount - 1) / 2) * BAL.boss.fanDeg;
-        const a = (deg * Math.PI) / 180;
-        world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * BAL.boss.fanSpeed, Math.cos(a) * BAL.boss.fanSpeed, { r: 7, dmgPct: BAL.boss.fanDamagePct, dmgMin: BAL.boss.fanDamageMin }));
+    if (this.fanT <= 0) this.fireSignature(world);
+  }
+
+  /** 보스별 서명 공격. fanT를 스스로 재장전한다. */
+  fireSignature(world) {
+    const P = this.pattern;
+    const B = BAL.boss;
+    const fanOpts = { r: 7, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin };
+    switch (P.kind) {
+      case 'crescent': { // 리퍼 로드: 아래로 넓게 베어내리는 참격 볼리
+        this.fanT = this.interval(B.fanInterval);
+        for (let i = 0; i < P.volley; i++) {
+          const a = ((i - (P.volley - 1) / 2) * P.volleyDeg * Math.PI) / 180;
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * P.speed, Math.cos(a) * P.speed, fanOpts));
+        }
+        break;
+      }
+      case 'spiral': { // 볼텍스 마우: 좌우로 쓸어내는 연속 탄류 (소용돌이 분사)
+        this.fanT = this.interval(P.interval);
+        const a = (Math.sin(this.t * P.sweepHz * Math.PI * 2) * P.sweepDeg * Math.PI) / 180;
+        world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r * 0.5, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+        break;
+      }
+      case 'pincer': { // 옵시디언 클로: 좌우 집게에서 안쪽으로 교차하는 협공탄
+        this.fanT = this.interval(B.fanInterval);
+        const off = this.r * 1.25 * (this.drawScale || 1);
+        for (const side of [-1, 1]) {
+          for (let i = 0; i < P.pairs; i++) {
+            const a = (side * -(18 + i * 14) * Math.PI) / 180; // 안쪽으로 기울어진 각
+            world.spawnEnemyBullet(new EnemyShot(this.x + side * off, this.y + this.r * 0.6, Math.sin(a) * P.speed, Math.cos(a) * P.speed, fanOpts));
+          }
+        }
+        break;
+      }
+      case 'ring': { // 보이드 세라프: 회전 위상이 도는 깃털 원형탄
+        this.fanT = this.interval(B.fanInterval);
+        for (let i = 0; i < P.count; i++) {
+          const a = (i / P.count) * Math.PI * 2 + this.t;
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+        }
+        break;
+      }
+      default: { // 하이브 퀸(brood) 등: 기존 5방향 부채꼴 (산란은 minionMult가 담당)
+        this.fanT = this.interval(B.fanInterval);
+        for (let i = 0; i < B.fanCount; i++) {
+          const a = ((i - (B.fanCount - 1) / 2) * B.fanDeg * Math.PI) / 180;
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * B.fanSpeed, Math.cos(a) * B.fanSpeed, fanOpts));
+        }
       }
     }
   }

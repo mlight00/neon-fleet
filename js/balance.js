@@ -19,16 +19,30 @@ export const BAL = {
 
   bullet: { speed: 620, radius: 3, cap: 400 },
 
+  // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
+  spawn: { enemyMult: 2 },
+
   // 함선 진화 (드론 소모형): 비용에 도달하면 모은 드론 전량이 기함의 재료로 흡수된다.
   // 진화 후엔 기본 호위(시작 드론 수)만 재사출 — 다음 진화는 처음부터 다시 모은다.
   evolution: {
-    costs: [0, 60, 140, 280, 500, 800],          // costs[t] = 티어 t 도달 비용 (한 판에 2~3회 진화 사이클 목표)
+    // 파괴 보상(수송선·현상금) 추가로 드론 공급이 늘어난 만큼 비용 상향 (한 판에 2~3회 사이클 유지)
+    costs: [0, 80, 180, 360, 640, 1000],         // costs[t] = 티어 t 도달 비용
     names: ['스카웃', '인터셉터', '스트라이커', '커리어', '드레드노트', '타이탄'],
     // 기함 자체 화력 (드론 환산치): 흡수한 드론들이 기함 파워로 영구 전환된다.
     // 총 화력 = 드론 수 + shipPower[티어] → 진화 직후에도 화력이 꺾이지 않게 직전 비용 합산 수준으로 설정.
-    shipPower: [0, 65, 210, 490, 970, 1700],
+    shipPower: [0, 85, 275, 660, 1350, 2450],
     // 진화 후 재편성: 흡수량의 25%가 새 호위대로 재사출 (최소 시작 드론 수) — 나머지는 기함의 재료로 소멸
     retainRatio: 0.25,
+  },
+
+  // 보급 수송선: 부수면 그 자리에서 드론 지급 — "파괴 = 드론 회수"의 주력 공급원.
+  // 난이도(진행도)별로 단단해지고 보상도 커진다.
+  pod: {
+    perRun: 6,                                   // 한 판 배치 수 (진행도에 고르게)
+    small: { hp: 14, reward: 12, r: 15 },
+    mid:   { hp: 42, reward: 34, r: 19 },
+    large: { hp: 110, reward: 88, r: 24 },
+    swayAmp: 46, swayHz: 0.35,                   // 좌우로 천천히 흔들리며 하강
   },
 
   // 속성 무기 3종 (부록 §2): DPS 총량이 아니라 "모양"을 바꾼다
@@ -48,10 +62,13 @@ export const BAL = {
 
   // 사격형 적 (부록 §4): 적탄은 여유 1.2s+, % 피해, 상한 12발
   enemyShots: { cap: 12, telegraphTime: 0.4 },
-  // (사격형 적 HP·피해 1.3배 난이도 상향)
-  sniper: { hp: 33, enterSpeed: 300, hoverY: 180, stayTime: 5, fireInterval: 1.6, shotSpeed: 260, dmgPct: 0.078, dmgMin: 4, radius: 14 },
-  turret: { hp: 52, fireInterval: 2.3, shotSpeed: 190, fanDeg: 25, fanCount: 5, dmgPct: 0.052, dmgMin: 3, coin: 5, radius: 16 },
-  weaver: { hp: 13, y: 160, speed: 150, fireInterval: 0.55, shotSpeed: 260, dmgPct: 0.039, dmgMin: 3, radius: 11 },
+  // (사격형 적 HP·피해 1.3배 난이도 상향) — 패턴 다양화: 점사/원형탄/조준탄 변주
+  sniper: { hp: 33, enterSpeed: 300, hoverY: 180, stayTime: 5, fireInterval: 1.6, shotSpeed: 260, dmgPct: 0.078, dmgMin: 4, radius: 14,
+    burstCount: 3, burstGap: 0.11 },         // 두 번에 한 번 3점사
+  turret: { hp: 52, fireInterval: 2.3, shotSpeed: 190, fanDeg: 25, fanCount: 5, dmgPct: 0.052, dmgMin: 3, coin: 5, radius: 16,
+    ringCount: 8, ringSpeed: 150 },          // 부채꼴 ↔ 8방향 원형탄 번갈아
+  weaver: { hp: 13, y: 160, speed: 150, fireInterval: 0.55, shotSpeed: 260, dmgPct: 0.039, dmgMin: 3, radius: 11,
+    aimedEvery: 3 },                         // 3발마다 1발은 편대 조준탄
   brood: { spawnInterval: 2.5 },             // 브루드 캐리어 샤드 사출 주기
 
   powerModule: { duration: 10, multiplier: 2, radius: 14 },
@@ -74,6 +91,7 @@ export const BAL = {
     small: 12, mid: 46, large: 140,
     contactMult: 3,
     contactPct: { small: 0.05, mid: 0.10, large: 0.18 }, // 편대 %비례 피해 (대군 트리비얼 해결)
+    bounty: { small: 0, mid: 4, large: 12 },  // 격파 시 드론 회수 (파괴 보상 확대 — 소형은 코인만)
     radius: { small: 12, mid: 20, large: 32 },
     speed: 100,       // 하강 속도 (스크롤에 더해짐)
     homing: 60,       // 편대 방향 유도 속도
@@ -111,6 +129,29 @@ export const BAL = {
     failOverlayDelay: 0.5,  // 실패 후 오버레이까지(초)
     coinPerClear: 50,       // 클리어 보상 = 이 값 x 스테이지 번호
     coinPerProgress: 20,    // 실패 시 진행도 x 이 값
+  },
+
+  // 보스별 고유 공격 패턴 (스프라이트 ID 기준). fan(부채꼴) 슬롯이 kind별 서명기로 대체된다.
+  // shotMult/minionMult = 조준탄·소환 주기 배수 (클수록 느슨), tanky = 보스 HP 배수
+  bossPatterns: {
+    B7:  { kind: 'brood', minionMult: 0.55, shotMult: 1.25 },                        // 하이브 퀸: 산란 폭주 (소환 45% 더 자주)
+    B8:  { kind: 'crescent', volley: 7, volleyDeg: 15, speed: 235, swayMult: 1.7, shotMult: 1.1 }, // 리퍼 로드: 참격 부채 7연발 + 빠른 이동
+    B9:  { kind: 'spiral', interval: 0.16, sweepHz: 0.22, sweepDeg: 75, speed: 180, shotMult: 1.4 }, // 볼텍스 마우: 좌우로 쓸어내는 나선 탄류
+    B10: { kind: 'pincer', pairs: 3, speed: 240, tanky: 1.2, shotMult: 1.2 },        // 옵시디언 클로: 좌우 집게 협공탄 + 단단한 몸
+    B11: { kind: 'ring', count: 12, speed: 165, shotMult: 1.15 },                    // 보이드 세라프: 회전 깃털 원형탄
+  },
+
+  // 중간보스: 직전 스테이지 보스가 트랙 중반에 일반 적처럼 등장해 지나간다 (스테이지 2+).
+  // 격파 = 드론 대량 회수, 놓치면 그냥 통과 (패널티 없음)
+  midboss: {
+    progress: 0.55,          // 트랙 진행 55% 지점에서 등장
+    hpMin: 900, hpPerPower: 4, // HP = max(hpMin, 그 시점 최대 총화력 x 4) — 집중 사격 3~5초감
+    speedRatio: 0.35, ownSpeed: 42, // 하강 = 스크롤 x 비율 + 자체 속도 (화면 통과 약 7초)
+    swayAmp: 90, swayHz: 0.3,
+    shotInterval: 2.2, dmgPct: 0.06, dmgMin: 4,
+    contactPct: 0.25, contactSelfDmg: 250, contactCooldown: 1.0, // 부딪히면 서로 아프고 통과
+    rewardDrones: 40, rewardDronesPerStage: 10, coin: 30,
+    radius: 46,
   },
 
   // 보스 격파 연출: 파괴 애니메이션 → 우주선 통과 → 클리어
