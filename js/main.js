@@ -4,6 +4,7 @@ import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, PowerModule, Sniper, Turret, Weaver, Charger, Mine, MidBoss, Boss, createEffects } from './entities.js';
 import { maybeAffix } from './affixes.js';
+import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
@@ -91,12 +92,11 @@ window.addEventListener('keydown', firstGestureUnlock);
 // ───────────────────────── 판(run) 상태
 let state = 'title'; // title | play | done(오버레이 표시 중)
 let run = null;
+let drafting = false; // 모듈 드래프트 표시 중(게임 일시 정지)
 
-function newRun(stage) {
+// 원정(run) = 1스테이지부터 죽을 때까지 연속. 기함·드론·모듈이 누적된다.
+function newExpedition() {
   const rng = mulberry32((Math.random() * 2 ** 31) | 0);
-  const totalTrack = BAL.chunk.heightPx * BAL.chunk.perRun;
-  const mods = stageMods(stage);
-  // 격납고 영구 강화 적용
   const up = save.get().up;
   const H = BAL.hangar.upgrades;
   const stats = {
@@ -105,16 +105,52 @@ function newRun(stage) {
     damage: BAL.squad.damage + up.dmg * H.dmg.step,
     coinMult: 1 + up.coin * H.coin.step,
   };
-  // 스테이지가 오르면 hard 청크가 더 일찍 나온다
+  const squad = new Squad(LOGICAL_W, logicalH, stats.startCount);
+  const effects = createEffects();
+  const world = {
+    bal: BAL, input, squad, effects,
+    bullets: [], enemyBullets: [], entities: [],
+    scrollSpeed: BAL.scrollSpeed,
+    logicalW: LOGICAL_W,
+    get logicalH() { return logicalH; },
+    rng, coins: 0,
+    phase: 'track', boss: null,
+    stageMods: stageMods(1),
+    stats,
+    mfx: computeMfx([]),          // 모듈 효과 누적기 (빈 상태 = 중립)
+    addCoins(n) { this.coins += n; },
+    spawnEntity(e) { this.entities.push(e); },
+    spawnEnemyBullet(b) { if (this.enemyBullets.length < this.stageMods.shotCap) this.enemyBullets.push(b); },
+  };
+  run = {
+    world, squad, effects, rng,
+    stage: 1, mods: world.stageMods,
+    modules: [],                  // 뽑은 모듈 id 누적 (중복 = 스택)
+    pending: [], traveled: 0, totalTrack: 0,
+    phase: 'track', boss: null, endT: 0,
+    maxPower: squad.power, scrollY: 0,
+  };
+  buildStage(1);
+}
+
+// 한 스테이지의 트랙을 (재)구성. 기함·드론·모듈·코인은 유지, 스테이지별 요소만 리셋.
+function buildStage(stage) {
+  const r = run, w = r.world;
+  const mods = stageMods(stage);
+  r.stage = stage; r.mods = mods; w.stageMods = mods;
+  w.scrollSpeed = BAL.scrollSpeed;
+  w.entities.length = 0; w.bullets.length = 0; w.enemyBullets.length = 0;
+  r.boss = null; w.boss = null;
+  r.phase = 'track'; w.phase = 'track';
+  r.traveled = 0;
+  const totalTrack = BAL.chunk.heightPx * BAL.chunk.perRun;
+  r.totalTrack = totalTrack;
   const tb = BAL.chunk.tierBounds;
   const bounds = [Math.max(0.1, tb[0] - mods.tierShift), Math.max(0.35, tb[1] - mods.tierShift)];
-
-  // 판 시작 시 청크 10개를 미리 추첨해 아이템 스폰 목록 구성.
-  // 스테이지에 맞는 청크만(적 점진 도입 + 조합은 후반), 첫 2개는 안전 구간.
+  const rng = r.rng;
   const stageOk = (c) => chunkMinStage(c) <= stage;
   const pending = [];
   let prev = null;
-  // 고스테이지일수록 초반 안전 구간을 늘려 갓 출격한 소규모 편대의 즉사 방지
   const safeCount = Math.min(4, 2 + Math.floor((stage - 1) / 3));
   for (let i = 0; i < BAL.chunk.perRun; i++) {
     const tier = pickTier(i / BAL.chunk.perRun, bounds);
@@ -122,74 +158,94 @@ function newRun(stage) {
     const chunk = pickChunk(tier, rng, prev, filter);
     prev = chunk;
     for (const it of chunk.items) {
-      if (it.type === 'storm') continue; // 2차 범위
+      if (it.type === 'storm') continue;
       pending.push({ ...it, trackY: i * BAL.chunk.heightPx + it.y * BAL.chunk.heightPx });
     }
   }
-  // 무기 선택 게이트 (판 시작 직후) + 보너스 게이트 (진행 50%) 주입 (부록 §3)
-  pending.push({ type: 'weaponGate', trackY: 380 });
+  if (stage === 1) pending.push({ type: 'weaponGate', trackY: 380 }); // 무기는 원정당 1회 선택(이후 유지)
   pending.push({ type: 'bonusGate', trackY: totalTrack * BAL.bonusGate.progress });
-  // 보급 수송선: 진행도에 고르게 배치, 뒤로 갈수록 크고 단단하며 보상도 크다 (파괴 = 드론 회수)
   for (let i = 0; i < BAL.pod.perRun; i++) {
     const prog = (i + 0.6) / BAL.pod.perRun;
     const size = prog < bounds[0] ? 'small' : prog < bounds[1] ? 'mid' : 'large';
     pending.push({ type: 'dronePod', trackY: totalTrack * Math.min(0.96, prog), x: 0.18 + 0.64 * rng(), size });
   }
-  // 중간보스: 직전 스테이지 보스가 트랙 중반을 일반 적처럼 통과 (스테이지 2+)
   if (stage >= 2) pending.push({ type: 'midboss', trackY: totalTrack * BAL.midboss.progress });
   pending.sort((a, b) => a.trackY - b.trackY);
+  r.pending = pending;
+  r.squad.y = logicalH - 130;    // 연속 스테이지 진입 시 편대를 아래에서 다시 시작
+  r.squad.dead = false;
+}
 
-  const squad = new Squad(LOGICAL_W, logicalH, stats.startCount);
-  const effects = createEffects();
-
-  const world = {
-    bal: BAL,
-    input,
-    squad,
-    effects,
-    bullets: [],
-    enemyBullets: [],
-    entities: [],
-    scrollSpeed: BAL.scrollSpeed,
-    logicalW: LOGICAL_W,
-    get logicalH() { return logicalH; },
-    rng,
-    coins: 0,
-    phase: 'track', // 매 프레임 run.phase와 동기화 (호밍 표적용)
-    boss: null,
-    stageMods: mods,
-    stats,
-    addCoins(n) { this.coins += n; },
-    spawnEntity(e) { this.entities.push(e); },
-    spawnEnemyBullet(b) {
-      if (this.enemyBullets.length < this.stageMods.shotCap) this.enemyBullets.push(b);
-    },
-  };
-
-  run = {
-    world, squad, effects, rng, stage, mods,
-    pending,
-    traveled: 0,
-    totalTrack,
-    phase: 'track', // track | boss | win | lose
-    boss: null,
-    endT: 0,        // 종료 연출 타이머
-    maxPower: squad.power, // 최대 총화력 기록 (보스 HP 산정 + 최고 기록)
-    scrollY: 0,     // 스타필드용 누적
-  };
+// 보스 격파 → 다음 스테이지로 연속 진행 (기함·모듈 유지)
+function advanceStage() {
+  const r = run;
+  r.world.addCoins(BAL.run.coinPerClear * r.stage); // 클리어 코인 누적
+  const next = r.stage + 1;
+  const data = save.get();
+  if (next > data.stage) save.set({ stage: next });  // 최고 도달 스테이지 기록
+  buildStage(next);
+  playBgm('battle1');
+  r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `STAGE ${next}`, COLORS.reward);
+  r.effects.flash(0.3);
 }
 
 function startPlay() {
-  newRun(save.get().stage);
+  newExpedition();
   state = 'play';
+  drafting = false;
   ui.hide();
   sfx('start');
   playBgm('battle1'); // 전투 BGM으로 크로스페이드
 }
 
+// 모듈 효과 누적기 재계산 (모듈 획득 시)
+function recomputeMfx() {
+  run.world.mfx = computeMfx(run.modules);
+  run.squad.swarmPerDrone = run.world.mfx.swarmPerDrone;
+}
+
+// 진화/오버로드 시 모듈 드래프트 3장 표시 (게임 일시 정지)
+function openDraft() {
+  const r = run;
+  const opts = draftOptions(r.modules, r.rng, 3);
+  if (opts.length === 0) return; // 모든 모듈 만렙
+  drafting = true;
+  sfx('evolve');
+  ui.showDraft({
+    options: opts,
+    owned: moduleSummary(r.modules),
+    onPick(id) {
+      r.modules.push(id);
+      recomputeMfx();
+      drafting = false;
+      ui.hide();
+      sfx('buy');
+    },
+  });
+}
+
+// 적 격파 시: 폭발 탄두(광역) + 전리 회수(드론) 모듈
+function onEnemyKilled(e, w) {
+  const mfx = w.mfx; if (!mfx) return;
+  if (mfx.explodeRadius > 0) {
+    w.effects.burst(e.x, e.y, '#ff9c41', 12, 180);
+    w.effects.ring(e.x, e.y, '#ff9c41');
+    const dmg = Math.max(6, (e.maxHp || 20) * mfx.explodeDmgFrac);
+    const rr = mfx.explodeRadius;
+    for (const o of w.entities) {
+      if (o === e || o.dead || !o.hitByBullet) continue;
+      const dx = o.x - e.x, dy = o.y - e.y;
+      if (dx * dx + dy * dy <= (rr + (o.r || 0)) ** 2) o.hitByBullet(dmg, w);
+    }
+  }
+  if (mfx.killDroneChance > 0 && Math.random() < mfx.killDroneChance) {
+    w.squad.applyDelta(mfx.killDroneAmt, w);
+  }
+}
+
 // ───────────────────────── 업데이트
 function update(dt) {
-  if (state !== 'play') return;
+  if (state !== 'play' || drafting) return; // 드래프트 중엔 게임 정지
   const r = run;
   const w = r.world;
 
@@ -315,7 +371,7 @@ function update(dt) {
       r.effects.flash(0.4);
       sfx('evolve');
     }
-    if (r.squad.y < BAL.flythrough.exitY) { finishRun(true); return; }
+    if (r.squad.y < BAL.flythrough.exitY) { advanceStage(); return; }
   }
 
   // 개체 업데이트
@@ -330,7 +386,7 @@ function update(dt) {
     if (r.boss && !r.boss.dead && r.phase === 'boss') {
       const dx = b.x - r.boss.x, dy = b.y - r.boss.y;
       if (dx * dx + dy * dy <= (r.boss.r * 1.4) ** 2) {
-        r.boss.hitByBullet(b.damage, w);
+        r.boss.hitByBullet(b.damage * (w.mfx?.bossDmgMult ?? 1), w); // 사냥꾼 표식 모듈
         b.dead = true; // 보스는 관통 불가 (거대 표적)
         continue;
       }
@@ -341,7 +397,9 @@ function update(dt) {
       const rr = (e.r ?? 20) + b.r;
       const dx = b.x - e.x, dy = b.y - e.y;
       if (dx * dx + dy * dy <= rr * rr) {
-        e.hitByBullet(b.damage, w);
+        const wasAlive = !e.dead;
+        e.hitByBullet(e.def ? b.damage * (w.mfx?.bossDmgMult ?? 1) : b.damage, w); // 중간보스도 표식 적용
+        if (wasAlive && e.dead) onEnemyKilled(e, w);
         if (b.kind === 'homing') w.effects.burst(b.x, b.y, '#ff9c41', 8, 120); // 미사일 폭발
         if (b.pierce > 1) {
           b.pierce--;
@@ -366,35 +424,26 @@ function update(dt) {
     r.endT = BAL.run.failOverlayDelay;
   }
   if (r.phase === 'lose' && (r.endT -= dt) <= 0) {
-    finishRun(false);
+    endExpedition();
   }
+
+  // 진화/오버로드 발생 → 모듈 드래프트 (게임 일시 정지)
+  if (r.squad.pendingDraft) { r.squad.pendingDraft = false; openDraft(); }
 }
 
-function finishRun(win, { toTitle = false } = {}) {
+// 원정 종료 (사망 또는 끝내기): 코인·기록 정산 → 결과 화면
+function endExpedition({ toTitle = false } = {}) {
   state = 'done';
-  playBgm('title'); // 결과 화면 = 차분한 타이틀 BGM
+  drafting = false;
+  playBgm('title');
   const r = run;
   const data = save.get();
-  // 최고 기록 = 그 판에서 찍은 최대 총화력 (드론 환산 — 소모형 진화라 편대 수보다 화력이 성과 지표)
   const isRecord = r.maxPower > data.best;
   const best = Math.max(data.best, r.maxPower);
-
-  let coins = r.world.coins;
-  const progress = Math.min(1, r.traveled / r.totalTrack);
-  if (win) coins += BAL.run.coinPerClear * r.stage; // 클리어 보상은 스테이지 비례
-  else coins += Math.floor(progress * BAL.run.coinPerProgress);
-  coins = Math.round(coins * r.world.stats.coinMult); // 수익 회로 강화 적용
-
-  if (win) {
-    // 클리어 → 다음 스테이지 해금 (더 어려운 판이 이어진다)
-    save.set({ best, coins: data.coins + coins, stage: Math.max(data.stage, r.stage + 1) });
-    const topPercent = Math.max(1, Math.min(90, Math.round(90 - r.maxPower / 25)));
-    ui.showWin({ stage: r.stage, bossName: r.boss?.korName ?? '보스', maxPower: r.maxPower, coins, best, isRecord, topPercent, onNext: startPlay, onHangar: showHangar });
-  } else {
-    save.set({ best, coins: data.coins + coins });
-    if (toTitle) { showTitleScreen(); return; } // 자발적 '끝내기': 전멸 화면 없이 타이틀로
-    ui.showLose({ stage: r.stage, progress, coins, onRetry: startPlay, onHangar: showHangar });
-  }
+  const coins = Math.round(r.world.coins * r.world.stats.coinMult);
+  save.set({ best, coins: data.coins + coins, stage: Math.max(data.stage, r.stage) });
+  if (toTitle) { showTitleScreen(); return; }
+  ui.showLose({ stage: r.stage, maxPower: r.maxPower, coins, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
 }
 
 // ───────────────────────── 격납고 (영구 강화 상점)
@@ -457,6 +506,8 @@ function draw() {
     if (!r.squad.dead) r.squad.draw(ctx);
     r.effects.draw(ctx, LOGICAL_W, logicalH);
 
+    const evc = r.world.mfx?.evolveCostMult ?? 1;
+    const rawNext = BAL.evolution.costs[r.squad.tier + 1] ?? BAL.evolution.overloadCost;
     drawHUD(ctx, LOGICAL_W, {
       progress: Math.min(1, r.traveled / r.totalTrack),
       bossHp: r.boss ? Math.max(0, r.boss.hp) : 0,
@@ -464,12 +515,13 @@ function draw() {
       bossName: r.boss ? r.boss.name : '',
       count: r.squad.count,
       tierName: BAL.evolution.names[r.squad.tier],
-      tierPower: BAL.evolution.shipPower[r.squad.tier],
-      nextCost: BAL.evolution.costs[r.squad.tier + 1] ?? 0, // 0 = 최고 티어
+      tierPower: BAL.evolution.shipPower[r.squad.tier] + (r.squad.overloadPower || 0),
+      nextCost: Math.round(rawNext * evc),
       stage: r.stage,
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,
       shield: r.squad.shield,
+      modules: moduleSummary(r.modules),
     });
   }
 
@@ -479,16 +531,16 @@ function draw() {
 // ───────────────────────── 일시정지 (ESC)
 let paused = false;
 function togglePause() {
-  if (state !== 'play') return;      // 플레이 중에만
+  if (state !== 'play' || drafting) return;   // 플레이 중 + 드래프트 아닐 때만
   paused = !paused;
   if (paused) ui.showPause({ onResume: togglePause, onQuit: quitRun });
   else ui.hide();
 }
 
-/** 일시정지에서 '끝내기': 판을 포기하고 타이틀로. 모은 코인·최고 기록은 정산해 저장 */
+/** 일시정지에서 '끝내기': 원정을 포기하고 타이틀로. 모은 코인·최고 기록은 정산해 저장 */
 function quitRun() {
   paused = false;
-  finishRun(false, { toTitle: true });
+  endExpedition({ toTitle: true });
 }
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }
@@ -506,7 +558,7 @@ let last = performance.now();
 function frame(t) {
   const dt = Math.min((t - last) / 1000, 0.05);
   last = t;
-  if (!paused) update(dt);           // 일시정지 중엔 화면만 유지
+  if (!paused && !drafting) update(dt);   // 일시정지·드래프트 중엔 화면만 유지
   draw();
   requestAnimationFrame(frame);
 }

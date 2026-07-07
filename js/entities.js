@@ -140,30 +140,53 @@ export class Squad {
     world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[this.weapon]} Lv${this.weaponLv}!`, WEAPON_COLORS[this.weapon]);
   }
 
-  /** 총 화력 (드론 환산): 드론 수 + 기함에 흡수된 파워 */
+  /** 총 화력 (드론 환산): 드론 수 + 기함 흡수 파워(진화 + 오버로드) + 군체 의지(드론당) */
   get power() {
-    return this.count + BAL.evolution.shipPower[this.tier];
+    return this.count + BAL.evolution.shipPower[this.tier] + (this.overloadPower || 0) + (this.swarmPerDrone || 0) * this.count;
   }
 
   checkEvolution(world) {
     const ev = BAL.evolution;
+    const mfx = world.mfx || {};
     const retain = world.stats?.startCount ?? BAL.squad.start;
-    const r = evolveStep(this.count, this.tier, ev.costs, retain, ev.retainRatio);
-    if (r.tier === this.tier) return;
-    this.tier = r.tier;
-    this.count = r.count;
-    // 드론을 전부 바친 직후 사고사 방지: 진화 에너지 방출 = 보호막 1회
-    this.shield = true;
-    world.effects.flash(0.5);
-    world.effects.ring(this.x, this.y, COLORS.ally, 0);
-    world.effects.ring(this.x, this.y, COLORS.ally, 0.1);
-    world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
-    // 드론이 재료로 흡수됐음을 명시 (소모형 진화 체감의 핵심)
-    world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수!`, COLORS.reward);
-    world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 진화!`, COLORS.reward);
-    world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.shipPower[r.tier]} · 주포 ${SHIP_DEFS[r.tier].mounts.length}문`, COLORS.ally);
-    this.evolvePunch = 0.35; // 스케일 펀치 타이머
-    sfx('evolve');
+    const ratio = Math.min(0.9, ev.retainRatio + (mfx.retainBonus || 0));   // 잔존 편대 모듈
+    const costMult = mfx.evolveCostMult ?? 1;                               // 신속 진화 모듈
+    const costs = ev.costs.map((c) => Math.round(c * costMult));
+    const r = evolveStep(this.count, this.tier, costs, retain, ratio);
+    if (r.tier !== this.tier) {
+      this.tier = r.tier;
+      this.count = r.count;
+      this.shield = true;   // 드론을 바친 직후 사고사 방지: 진화 에너지 = 보호막 1회
+      world.effects.flash(0.5);
+      world.effects.ring(this.x, this.y, COLORS.ally, 0);
+      world.effects.ring(this.x, this.y, COLORS.ally, 0.1);
+      world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
+      world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수!`, COLORS.reward);
+      world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 진화!`, COLORS.reward);
+      world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.shipPower[r.tier]} · 주포 ${SHIP_DEFS[r.tier].mounts.length}문`, COLORS.ally);
+      this.evolvePunch = 0.35;
+      this.pendingDraft = true;   // 진화 → 모듈 드래프트 (main이 감지해 카드 3장 표시)
+      sfx('evolve');
+      return;
+    }
+    // 최고 티어 후 '오버로드': 더 모아 바치면 모듈 1개 더 + 기함 파워 (무한 성장)
+    if (this.tier >= ev.costs.length - 1) {
+      const oCost = Math.round(ev.overloadCost * costMult);
+      if (this.count >= oCost) {
+        const kept = Math.min(this.count, Math.max(retain, Math.round(this.count * ratio)));
+        const consumed = this.count - kept;
+        this.count = kept;
+        this.overloadPower = (this.overloadPower || 0) + ev.overloadPower;
+        this.shield = true;
+        this.evolvePunch = 0.3;
+        this.pendingDraft = true;
+        world.effects.flash(0.4);
+        world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
+        world.effects.text(this.x, this.y - 98, `오버로드! 드론 ${consumed}기 흡수`, COLORS.reward);
+        world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.overloadPower}`, COLORS.ally);
+        sfx('evolve');
+      }
+    }
   }
 
   applyDelta(n, world, label) {
@@ -193,7 +216,7 @@ export class Squad {
       sfx('shield_pop');
       return;
     }
-    const cap = Math.max(2, Math.ceil(this.count * BAL.squad.contactCapPct));
+    const cap = Math.max(2, Math.ceil(this.count * BAL.squad.contactCapPct * (world.mfx?.contactCapMult ?? 1)));
     this.applyDelta(-Math.min(n, cap), world);
     sfx('damage');
   }
@@ -216,17 +239,30 @@ export class Squad {
     if (this.evolvePunch > 0) this.evolvePunch -= dt;
     this.recoil *= Math.pow(0.001, dt); // ≈ *0.7 per frame @60fps
 
+    // 반응 실드 모듈: 보호막이 없을 때 주기적으로 재생성
+    const sr = world.mfx?.shieldRegen || 0;
+    if (sr > 0) {
+      if (this.shield) { this.shieldRegenT = 0; }
+      else if ((this.shieldRegenT = (this.shieldRegenT || 0) + dt) >= sr) {
+        this.shieldRegenT = 0; this.shield = true;
+        world.effects.ring(this.x, this.y, COLORS.gateGood);
+      }
+    }
+
     this.fire(dt, world);
   }
 
   /** 무기별 발사: 총 DPS는 동일 공식, 무기는 "모양"만 바꾼다 (부록 §2) */
   fire(dt, world) {
     const W = BAL.weapons;
+    const mfx = world.mfx || {};
     const powerMult = this.powerT > 0 ? BAL.powerModule.multiplier : 1;
     const lvCoef = W.lvCoef[this.weaponLv - 1];
-    // 격납고 영구 강화(발사 속도/공격력)는 world.stats로 주입된다
-    const fireRate = world.stats?.fireRate ?? BAL.squad.fireRate;
-    const damage = world.stats?.damage ?? BAL.squad.damage;
+    // 격납고 영구 강화 + 모듈(화력/연사)
+    const fireRate = (world.stats?.fireRate ?? BAL.squad.fireRate) * (mfx.fireRateMult ?? 1);
+    const damage = (world.stats?.damage ?? BAL.squad.damage) * (mfx.dmgMult ?? 1);
+    const pb = mfx.pierceBonus || 0;                                              // 관통 탄심 모듈
+    const crit = (d) => (mfx.crit && Math.random() < mfx.crit ? d * mfx.critMult : d); // 치명 회로 모듈
     // 총 화력 = (드론 수 + 기함 파워): 진화로 드론을 바쳐도 화력이 기함에 저축되어 유지된다
     const baseDps = this.power * fireRate * damage * lvCoef * powerMult;
 
@@ -243,7 +279,7 @@ export class Squad {
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
         if (alive < W.homing.cap) {
           const fan = (Math.random() - 0.5) * 240;
-          world.bullets.push(new HomingMissile(this.x, this.y - 14, fan, dps / W.homing.rate, this.weaponLv));
+          world.bullets.push(new HomingMissile(this.x, this.y - 14, fan, crit(dps / W.homing.rate), this.weaponLv));
           this.recoil = 1.5;
           sfx('missile'); // 쿨다운으로 스로틀됨
         }
@@ -260,13 +296,13 @@ export class Squad {
     while (this.fireAcc >= 1) {
       this.fireAcc -= 1;
       if (world.bullets.length >= BAL.bullet.cap) continue;
-      const dmg = dps / shotsPerSec;
+      const dmg = crit(dps / shotsPerSec);
       this.mountIdx = ((this.mountIdx || 0) + 1) % mounts.length;
       const m = mounts[this.mountIdx];
       if (isLaser) {
         // 고속 관통 볼트: 주포에서 곧게, 레벨이 오르면 굵고 화려하게
         world.bullets.push(new Bullet(this.x + m.x, this.y + m.y, dmg, {
-          vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1],
+          vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1] + pb,
           beamW: 3 + this.weaponLv * 1.5, lv: this.weaponLv,
         }));
         sfx('laser'); // 쿨다운으로 스로틀됨
@@ -276,7 +312,7 @@ export class Squad {
         const a = (Math.random() - 0.5) * 2 * spread;
         world.bullets.push(new Bullet(this.x + m.x, this.y + m.y, dmg, {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
-          lv: this.weaponLv,
+          pierce: pb > 0 ? 1 + pb : 0, lv: this.weaponLv,
         }));
         world.effects.burst(this.x + m.x, this.y + m.y - 4, '#ffffff', 1, 40);
         sfx('vulcan'); // 쿨다운으로 스로틀됨
@@ -651,7 +687,7 @@ export class Crystal extends Scrolling {
     if (res.broken) {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.reward, 20);
-      world.squad.applyDelta(res.reward, world);
+      world.squad.applyDelta(Math.round(res.reward * (world.mfx?.podRewardMult ?? 1)), world);
       sfx('crystal');
     }
   }
@@ -716,7 +752,7 @@ export class DronePod extends Scrolling {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.ally, 18, 200);
       world.effects.ring(this.x, this.y, COLORS.ally);
-      world.squad.applyDelta(this.reward, world, '보급 확보!');
+      world.squad.applyDelta(Math.round(this.reward * (world.mfx?.podRewardMult ?? 1)), world, '보급 확보!');
       sfx('crystal');
     }
   }

@@ -1,5 +1,6 @@
-// DOM 오버레이: 타이틀 / 결과(성공·실패) / 격납고 화면
+// DOM 오버레이: 타이틀 / 결과(성공·실패) / 격납고 / 모듈 드래프트 화면
 import { hangarCost } from './logic.js';
+import { MODULE_BY_ID } from './modules.js';
 import { sfx } from './audio.js';
 
 const overlay = document.getElementById('overlay');
@@ -24,9 +25,9 @@ export const ui = {
     panel(`
       <h1>NEON FLEET</h1>
       <p>네온 함대</p>
-      <p>드론을 모아 기함에 바치면 진화!<br>트랙 끝의 보스를 격파하세요!</p>
+      <p>드론을 바쳐 진화할 때마다 <b>모듈</b>을 골라<br>매 원정 다른 빌드로 끝까지 도전!</p>
       <p>📱 드래그 · 🖱 마우스 · ⌨ ←→</p>
-      <p class="big">STAGE ${stage}</p>
+      <p class="big">최고 도달 STAGE ${stage}</p>
       ${best > 0 ? `<p>최고 함대 화력: ${best.toLocaleString()} · 코인 ${coins.toLocaleString()}</p>` : ''}
       ${saveOk ? '' : '<p style="color:#ff3d71">⚠ 이 브라우저에선 기록 저장이 꺼져 있어요</p>'}
       <div class="btn-row">
@@ -129,18 +130,49 @@ export const ui = {
     if (onQuit) document.getElementById('btn-quit').addEventListener('click', onQuit);
   },
 
-  showLose({ stage, progress, coins, onRetry, onHangar }) {
+  showLose({ stage, maxPower = 0, coins, best = 0, isRecord, modules = [], onRetry, onHangar }) {
+    const mods = modules.length
+      ? `<p style="font-size:16px;letter-spacing:2px;margin-top:6px">${modules.map((m) => m.icon + (m.count > 1 ? m.count : '')).join(' ')}</p>` : '';
     panel(`
-      <h2 style="color:#ff3d71">편대 전멸...</h2>
-      <p>STAGE ${stage} — 진행도 <b>${Math.round(progress * 100)}%</b>에서 격추</p>
-      ${coins > 0 ? `<p>위로 코인: <b>🪙 +${coins.toLocaleString()}</b></p>` : ''}
-      <p style="color:#9fb8d8"><small>막히면 격납고에서 함대를 강화하세요</small></p>
+      <h2 style="color:#ff3d71">원정 종료</h2>
+      <p class="big">STAGE ${stage} 도달</p>
+      <p>최대 함대 화력: <b>${maxPower.toLocaleString()}</b> ${isRecord ? '<span class="record">★ 신기록!</span>' : ''}</p>
+      ${mods}
+      ${coins > 0 ? `<p>획득 코인: <b>🪙 +${coins.toLocaleString()}</b></p>` : ''}
+      ${best > 0 && !isRecord ? `<p>최고 기록: ${best.toLocaleString()}</p>` : ''}
+      <p style="color:#9fb8d8"><small>죽으면 처음부터 — 격납고 강화로 더 멀리</small></p>
       <div class="btn-row">
-        <button id="btn-retry">다시 도전</button>
+        <button id="btn-retry">새 원정</button>
         ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고</button>' : ''}
       </div>
     `);
     document.getElementById('btn-retry').addEventListener('click', onRetry);
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
+  },
+
+  /** 진화 모듈 드래프트: 3장 중 택1 (게임 일시 정지 중) */
+  showDraft({ options, owned = [], onPick }) {
+    const RARE = { common: '#3ff5e0', rare: '#ffd93d' };
+    const cards = options.map((id) => {
+      const m = MODULE_BY_ID[id];
+      const have = owned.find((o) => o.id === id);
+      return `
+        <button class="draft-card" data-id="${id}" style="flex:1;min-width:92px;max-width:130px;padding:12px 6px;border:2px solid ${RARE[m.rarity]};background:rgba(255,255,255,0.05);border-radius:12px;display:flex;flex-direction:column;gap:5px;align-items:center;cursor:pointer">
+          <div style="font-size:30px;line-height:1">${m.icon}</div>
+          <div style="font-weight:bold;font-size:13px;color:${RARE[m.rarity]}">${m.name}${have ? ` ×${have.count}` : ''}</div>
+          <div style="font-size:10.5px;color:#9fb8d8;line-height:1.3">${m.desc}</div>
+        </button>`;
+    }).join('');
+    const ownedRow = owned.length
+      ? `<p style="font-size:15px;letter-spacing:2px;margin-top:8px;opacity:0.85">${owned.map((o) => o.icon + (o.count > 1 ? o.count : '')).join(' ')}</p>` : '';
+    panel(`
+      <h2 style="color:#ffd93d">진화 · 모듈 선택</h2>
+      <p><small>하나를 골라 함대를 강화 — 원정 내내 유지·중첩됩니다</small></p>
+      <div style="display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap">${cards}</div>
+      ${ownedRow}
+    `);
+    overlay.querySelectorAll('.draft-card').forEach((b) => {
+      b.addEventListener('click', () => onPick(b.dataset.id));
+    });
   },
 };

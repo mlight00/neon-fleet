@@ -17,3 +17,6 @@ node_modules/
 
 # 보스 원본 이미지 작업 폴더 (대용량 원본 — 게임은 assets/styleC만 사용)
 작업중_보스이미지/
+
+# 로컬 no-cache 개발 서버 (배포 무관)
+dev-server.py

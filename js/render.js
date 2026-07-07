@@ -163,7 +163,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, bossName, count, tierName, tierPower, nextCost, stage, weapon, weaponLv, shield }) {
+export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, bossName, count, tierName, tierPower, nextCost, stage, weapon, weaponLv, shield, modules = [] }) {
   ctx.save();
   // 진행 바
   const barW = logicalW - 80;
@@ -215,6 +215,19 @@ export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, bossName, co
     ctx.font = 'bold 11px sans-serif';
     ctx.fillStyle = COLORS.reward;
     ctx.fillText(`STAGE ${stage}`, 12, 59);
+  }
+  // 보유 모듈 아이콘 줄 (빌드가 커지는 게 보인다)
+  if (modules && modules.length) {
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COLORS.text;
+    let mx = 12;
+    for (const m of modules) {
+      const label = m.count > 1 ? `${m.icon}${m.count}` : m.icon;
+      ctx.fillText(label, mx, 76);
+      mx += ctx.measureText(label).width + 6;
+      if (mx > logicalW - 24) break;
+    }
   }
 
   // 우상단: 무기 + 레벨 점 + 실드
