@@ -76,7 +76,7 @@ export const CHUNKS = [
     items: [
       { type: 'crystal', x: 0.28, y: 0.25, value: 15 },
       { type: 'crystal', x: 0.72, y: 0.25, value: 12 },
-      { type: 'gatePair', y: 0.7, left: { op: '+', value: 10 }, right: { op: '+', value: 5 } },
+      { type: 'crystal', x: 0.5, y: 0.7, value: 22 },
     ],
   },
   {
@@ -89,7 +89,8 @@ export const CHUNKS = [
   {
     tier: 'easy', name: 'e-mul-gate',
     items: [
-      { type: 'gatePair', y: 0.35, left: { op: 'x', value: 2 }, right: { op: '+', value: 5 } },
+      // 리스크-리워드: 항상 마이너스 포함 (x2 vs -6)
+      { type: 'gatePair', y: 0.35, left: { op: 'x', value: 2 }, right: { op: '-', value: 6 } },
       { type: 'crystal', x: 0.35, y: 0.75, value: 18 },
     ],
   },
@@ -151,7 +152,7 @@ export const CHUNKS = [
       { type: 'creature', x: 0.45, y: 0.28, size: 'small' },
       { type: 'creature', x: 0.65, y: 0.2, size: 'small' },
       { type: 'creature', x: 0.85, y: 0.28, size: 'small' },
-      { type: 'gatePair', y: 0.72, left: { op: '+', value: 15 }, right: { op: 'x', value: 2 } },
+      { type: 'crystal', x: 0.5, y: 0.72, value: 40 },
     ],
   },
   {
@@ -172,11 +173,11 @@ export const CHUNKS = [
     ],
   },
   {
-    tier: 'mid', name: 'm-weaver-gate',
+    tier: 'mid', name: 'm-weaver-crystal',
     items: [
-      // 탄 커튼 사이로 게이트 고르기
+      // 탄 커튼 사이로 크리스탈 확보
       { type: 'weaver', x: 0, y: 0.15 },
-      { type: 'gatePair', y: 0.7, left: { op: '+', value: 15 }, right: { op: 'x', value: 2 } },
+      { type: 'crystal', x: 0.5, y: 0.7, value: 45 },
     ],
   },
   {

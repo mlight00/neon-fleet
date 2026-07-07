@@ -21,7 +21,7 @@ export const BAL = {
 
   // 경제 조정: 드론 획득 총량 배수 (크리스탈·수송선). 낮추면 진화가 느려지고 난이도가 오른다.
   // enemyHpPowerScale: 적 HP를 함대 화력(maxPower)에 비례시키는 기준. 작을수록 적이 더 단단.
-  economy: { droneGainMult: 0.7, enemyHpPowerScale: 120 },
+  economy: { droneGainMult: 0.7, enemyHpPowerScale: 70 },
 
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
   spawn: { enemyMult: 2 },
@@ -127,8 +127,8 @@ export const BAL = {
   meteor: { radius: 22, hpMin: 8, hpMax: 25, coin: 2 },
 
   boss: {
-    hp: 3000,          // 최소 HP (약한 함대도 보스를 깰 수 있게 하한 하향 — 진행 보장)
-    hpPerPower: 14,    // 보스 등장 시 max(hp, 최대 총화력 x 이 값) — 어떤 함대든 보스전 10초 안팎 유지
+    hp: 3500,          // 최소 HP
+    hpPerPower: 22,    // 보스 등장 시 max(hp, 최대 총화력 x 이 값) — 보스전 더 길고 위협적으로
     radius: 60,
     y: 130,                 // 보스 구간에서 화면 상단 고정 y
     minionInterval: 2.7,    // 소형 크리처 소환 주기(초)
