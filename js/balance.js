@@ -23,6 +23,16 @@ export const BAL = {
   // enemyHpPowerScale: 적 HP를 함대 화력(maxPower)에 비례시키는 기준. 작을수록 적이 더 단단.
   economy: { droneGainMult: 0.7, enemyHpPowerScale: 70 },
 
+  // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
+  charge: {
+    stageTime: 0.5,                    // 단계당 충전 시간(초)
+    maxStage: 3,                       // 기본 최대 단계 (과부하 모듈로 +1)
+    minStageToFire: 1,                 // 이 단계 미만이면 발사 안 함 (오클릭 안전)
+    blastCoef: 1.4,                    // 랜스 피해 = power × blastCoef × stageMult[stage]
+    stageMult: [0, 1, 2.4, 4.2, 6.5],  // stage 1..4 (index 0 미사용)
+    width: [0, 26, 40, 56, 78],        // 빔 반폭 by stage
+  },
+
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
   spawn: { enemyMult: 2 },
 

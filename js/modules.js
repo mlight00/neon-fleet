@@ -17,6 +17,10 @@ export const MODULE_DEFS = [
   { id: 'armor',  name: '위상 장갑',   icon: '🧊', desc: '접촉 피해 −25%',          rarity: 'common', max: 2, apply: (m) => { m.contactCapMult *= 0.7; } },
   { id: 'shieldregen', name: '반응 실드', icon: '🔵', desc: '주기적으로 보호막 생성', rarity: 'rare', max: 3, apply: (m) => { m.shieldRegen = m.shieldRegen ? m.shieldRegen * 0.7 : 9; } },
   { id: 'swarm',  name: '군체 의지',   icon: '🐝', desc: '드론 1기당 화력 +0.4',    rarity: 'rare',   max: 5, apply: (m) => { m.swarmPerDrone += 0.4; } },
+  // 차지 랜스 특화
+  { id: 'chgPower', name: '충전 증폭', icon: '🔆', desc: '차지 랜스 위력 +40%',      rarity: 'common', max: 4, apply: (m) => { m.chargeMult *= 1.4; } },
+  { id: 'chgSpeed', name: '신속 충전', icon: '⏩', desc: '충전 속도 +35%',           rarity: 'common', max: 3, apply: (m) => { m.chargeSpeed *= 1.35; } },
+  { id: 'chgMax',   name: '과부하',     icon: '⚡', desc: '차지 최대 단계 +1 (초대박)', rarity: 'rare',   max: 2, apply: (m) => { m.chargeMaxBonus += 1; } },
 ];
 
 export const MODULE_BY_ID = Object.fromEntries(MODULE_DEFS.map((m) => [m.id, m]));
@@ -27,6 +31,7 @@ export function baseMfx() {
     dmgMult: 1, fireRateMult: 1, pierceBonus: 0, crit: 0, critMult: 2, bossDmgMult: 1,
     podRewardMult: 1, evolveCostMult: 1, retainBonus: 0, killDroneChance: 0, killDroneAmt: 2,
     contactCapMult: 1, shieldRegen: 0, swarmPerDrone: 0, explodeRadius: 0, explodeDmgFrac: 0,
+    chargeMult: 1, chargeSpeed: 1, chargeMaxBonus: 0,
   };
 }
 

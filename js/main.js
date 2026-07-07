@@ -570,6 +570,19 @@ pauseBtn.title = '일시정지 (ESC)';
 pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePause(); });
 document.getElementById('stage').appendChild(pauseBtn);
 
+// 차지 버튼 (모바일: 홀드로 충전. 데스크톱은 마우스 좌클릭으로도 충전 가능)
+const chargeBtn = document.createElement('button');
+chargeBtn.id = 'charge-btn';
+chargeBtn.textContent = '⚡';
+chargeBtn.title = '차지 (홀드)';
+chargeBtn.style.cssText = 'position:fixed;right:18px;bottom:26px;width:66px;height:66px;border-radius:50%;font-size:30px;background:rgba(63,245,224,0.15);border:2px solid #3ff5e0;color:#3ff5e0;z-index:15;touch-action:none;user-select:none;cursor:pointer';
+const setCharge = (v) => (e) => { e.preventDefault(); e.stopPropagation(); input.charging = v; };
+chargeBtn.addEventListener('pointerdown', setCharge(true));
+chargeBtn.addEventListener('pointerup', setCharge(false));
+chargeBtn.addEventListener('pointerleave', setCharge(false));
+chargeBtn.addEventListener('pointercancel', setCharge(false));
+document.getElementById('stage').appendChild(chargeBtn);
+
 // ───────────────────────── 루프
 let last = performance.now();
 function frame(t) {

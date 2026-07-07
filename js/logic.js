@@ -27,6 +27,12 @@ export function hangarCost(base, lv, growth) {
   return Math.round(base * Math.pow(growth, lv));
 }
 
+/** 차지 랜스 단계: 누적 충전 시간 → 단계(0=미충전, maxStage 상한). */
+export function chargeStageFor(charge, stageTime, maxStage) {
+  if (charge <= 0 || stageTime <= 0) return 0;
+  return Math.min(maxStage, Math.floor(charge / stageTime));
+}
+
 /**
  * 스테이지별 난이도 배수 (스테이지 1 = 기본).
  * 적은 단단하고 빨라지고, 보상(크리스탈)도 소폭 올라 성장이 완전히 뒤처지진 않는다.

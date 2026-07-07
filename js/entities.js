@@ -3,7 +3,7 @@
 // world = { bal, input, squad, bullets, enemyBullets, entities, effects, addCoins,
 //           spawnEntity, spawnEnemyBullet, scrollSpeed, logicalW, logicalH, rng, phase }
 import { BAL } from './balance.js';
-import { applyGate, hitCrystal, evolveStep } from './logic.js';
+import { applyGate, hitCrystal, evolveStep, chargeStageFor } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
@@ -97,6 +97,9 @@ export class Squad {
     this.shield = false;
     this.evolvePunch = 0;
     this.dead = false;
+    this.charge = 0;          // 차지 랜스 누적 충전(초)
+    this.chargeStage = 0;     // 현재 충전 단계
+    this.wasCharging = false;
     this._offsets = Squad.formationOffsets(BAL.squad.drawCap);
   }
 
@@ -247,7 +250,51 @@ export class Squad {
       }
     }
 
-    this.fire(dt, world);
+    this.updateCharge(dt, world);   // 차지 랜스 (홀드 시 자동사격 대신 충전)
+  }
+
+  /** 차지 랜스: 홀드 시 자동사격 정지·에너지 충전, 놓으면 그 단계의 랜스 발사 */
+  updateCharge(dt, world) {
+    const ch = BAL.charge;
+    const charging = !!(world.input && world.input.charging) && !this.dead;
+    const maxStage = ch.maxStage + (world.mfx?.chargeMaxBonus || 0);
+    if (charging) {
+      this.charge += dt * (world.mfx?.chargeSpeed || 1);
+      const st = chargeStageFor(this.charge, ch.stageTime, maxStage);
+      if (st > this.chargeStage) {          // 단계 상승 연출
+        this.chargeStage = st;
+        world.effects.ring(this.x, this.y, st >= 3 ? COLORS.reward : COLORS.ally, 0);
+        sfx('shield_on');
+      }
+    } else {
+      if (this.wasCharging && this.chargeStage >= ch.minStageToFire) this.fireLance(world, this.chargeStage);
+      this.charge = 0;
+      this.chargeStage = 0;
+    }
+    this.wasCharging = charging;
+    if (!charging) this.fire(dt, world);    // 충전 안 할 때만 자동사격
+  }
+
+  /** 차지 랜스 발사: 정면 세로 컬럼을 관통하는 대미지 + 스펙터클 */
+  fireLance(world, stage) {
+    const ch = BAL.charge;
+    const mfx = world.mfx || {};
+    const halfW = ch.width[Math.min(stage, ch.width.length - 1)];
+    const dmg = this.power * ch.blastCoef * (ch.stageMult[Math.min(stage, ch.stageMult.length - 1)] || 1) * (mfx.dmgMult ?? 1) * (mfx.chargeMult ?? 1);
+    for (const e of world.entities) {       // 앞쪽 컬럼의 적 전부 관통
+      if (e.dead || !e.hitByBullet) continue;
+      if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) e.hitByBullet(dmg, world);
+    }
+    if (world.boss && !world.boss.dead && Math.abs(world.boss.x - this.x) <= halfW + world.boss.r) {
+      world.boss.hitByBullet(dmg * (mfx.bossDmgMult ?? 1), world);
+    }
+    for (const b of world.enemyBullets) if (Math.abs(b.x - this.x) <= halfW + 18) b.dead = true; // 경로 적탄 소멸
+    world.spawnEntity(new ChargeLance(this.x, this.y, halfW, stage));
+    world.effects.flash(0.3 + 0.12 * stage);
+    world.effects.ring(this.x, this.y, COLORS.ally);
+    world.effects.burst(this.x, this.y, COLORS.ally, 18 + stage * 8, 320);
+    this.recoil = 3 + stage;
+    sfx('laser');
   }
 
   /** 무기별 발사: 총 DPS는 동일 공식, 무기는 "모양"만 바꾼다 (부록 §2) */
@@ -404,6 +451,28 @@ export class Squad {
       glow(ctx, color, 8, (c) => { c.fillStyle = COLORS.text; c.fillText(`x${this.count}`, this.x, this.y - w * 0.8 - 14); });
     }
 
+    // 차지 랜스 충전 표시 (홀드 중 에너지가 모이는 게 보이게 — 단계·진행 아크)
+    if (this.charge > 0) {
+      const ch = BAL.charge;
+      const stg = this.chargeStage;
+      const col = stg >= 3 ? COLORS.reward : COLORS.ally;
+      const frac = Math.min(1, (this.charge % ch.stageTime) / ch.stageTime);
+      const rr = w + 14 + stg * 7;
+      ctx.save();
+      ctx.globalAlpha = 0.15 + 0.1 * stg + 0.08 * Math.sin(this.t * 22);
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(this.x, this.y, rr * 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = col; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(this.x, this.y, rr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
+      if (stg > 0) {
+        ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('⚡' + stg, this.x, this.y - rr - 6);
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
     // 파워/실드 링
     if (this.powerT > 0) {
       ctx.strokeStyle = COLORS.reward;
@@ -422,6 +491,34 @@ export class Squad {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
+  }
+}
+
+// ───────────────────────── 차지 랜스 비주얼 (피해는 발사 시점에 이미 적용됨 — 이건 연출)
+export class ChargeLance {
+  constructor(x, y, halfW, stage) {
+    this.x = x; this.baseY = y; this.halfW = halfW; this.stage = stage;
+    this.t = 0; this.life = 0.34; this.dead = false;
+  }
+  update(dt) { this.t += dt; if (this.t >= this.life) this.dead = true; }
+  draw(ctx) {
+    const p = Math.max(0, 1 - this.t / this.life);
+    const w = this.halfW * (0.7 + 0.5 * p);
+    const col = this.stage >= 3 ? COLORS.reward : COLORS.ally;
+    ctx.save();
+    glow(ctx, col, 26, (c) => {                 // 외곽 발광 빔
+      c.globalAlpha = 0.5 * p;
+      c.fillStyle = col;
+      c.fillRect(this.x - w, 0, w * 2, this.baseY);
+    });
+    ctx.globalAlpha = 0.85 * p;                  // 코어 백색
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(this.x - w * 0.4, 0, w * 0.8, this.baseY);
+    ctx.globalAlpha = p;                          // 발사구 충격 링
+    ctx.strokeStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(this.x, this.baseY, w * 1.4 * (1.3 - p), 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 }
 

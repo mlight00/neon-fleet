@@ -101,3 +101,16 @@ test('hangarCost: 레벨 0 = 기본가, 레벨마다 단조 증가', () => {
 test('hangarCost: 성장 배수 반영 (1.6^lv)', () => {
   assert.equal(hangarCost(100, 2, 1.6), 256);
 });
+
+// ─── 차지 랜스 단계 ───
+const { chargeStageFor } = await import('../js/logic.js');
+
+test('chargeStageFor: 충전 시간에 따라 단계 상승, maxStage 상한', () => {
+  assert.equal(chargeStageFor(0, 0.5, 3), 0);
+  assert.equal(chargeStageFor(0.4, 0.5, 3), 0);   // 1단 미달
+  assert.equal(chargeStageFor(0.5, 0.5, 3), 1);
+  assert.equal(chargeStageFor(1.2, 0.5, 3), 2);
+  assert.equal(chargeStageFor(1.6, 0.5, 3), 3);
+  assert.equal(chargeStageFor(9, 0.5, 3), 3);     // 상한 3
+  assert.equal(chargeStageFor(9, 0.5, 4), 4);     // 과부하 모듈 → 4단
+});
