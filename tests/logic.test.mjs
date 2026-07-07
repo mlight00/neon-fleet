@@ -71,10 +71,10 @@ test('stageMods: 스테이지 1은 기본값 (배수 1)', () => {
 
 test('stageMods: 스테이지가 오르면 적은 강하고 빠르게, 보상도 소폭 상승', () => {
   const m = stageMods(3);
-  assert.ok(Math.abs(m.enemyHp - 1.7) < 1e-9);
+  assert.ok(Math.abs(m.enemyHp - 4.8) < 1e-9);  // g=2: 1 + 2.4 + 1.4
   assert.ok(Math.abs(m.enemyRate - 0.84) < 1e-9);
   assert.ok(Math.abs(m.crystal - 2.0) < 1e-9);
-  assert.ok(Math.abs(m.boss - 2.0) < 1e-9);
+  assert.ok(Math.abs(m.boss - 1.7) < 1e-9);   // g=2: 1 + 0.7
 });
 
 test('stageMods: 고스테이지에서도 하한/상한 존중', () => {

@@ -687,7 +687,7 @@ export class Crystal extends Scrolling {
     if (res.broken) {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.reward, 20);
-      world.squad.applyDelta(Math.round(res.reward * (world.mfx?.podRewardMult ?? 1)), world);
+      world.squad.applyDelta(Math.round(res.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult), world);
       sfx('crystal');
     }
   }
@@ -752,7 +752,7 @@ export class DronePod extends Scrolling {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.ally, 18, 200);
       world.effects.ring(this.x, this.y, COLORS.ally);
-      world.squad.applyDelta(Math.round(this.reward * (world.mfx?.podRewardMult ?? 1)), world, '보급 확보!');
+      world.squad.applyDelta(Math.round(this.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult), world, '보급 확보!');
       sfx('crystal');
     }
   }

@@ -34,10 +34,10 @@ export function hangarCost(base, lv, growth) {
 export function stageMods(stage) {
   const g = Math.max(1, stage) - 1;
   return {
-    enemyHp: 1 + 0.35 * g,                     // 적 HP (접촉 피해도 함께 상승)
+    enemyHp: 1 + 1.2 * g + 0.35 * g * g,       // 적 HP (스테이지 비례 대폭 상향 — 플레이어 화력 성장 대응)
     enemyRate: Math.max(0.6, 1 - 0.08 * g),    // 적 발사 주기 배수 (작을수록 빠름)
     crystal: 1 + 0.5 * g,                      // 크리스탈 값 (스테이지↑ → 드론 획득↑, 상위 티어 도달)
-    boss: 1 + 0.5 * g,                         // 보스 HP
+    boss: 1 + 0.35 * g,                        // 보스 HP (완만하게 — 진화 화력 스파이크로 이미 커지므로)
     tierShift: Math.min(0.2, 0.05 * g),        // hard 청크가 더 일찍 나옴
     shotCap: Math.min(20, 12 + 2 * g),         // 동시 적탄 상한
   };

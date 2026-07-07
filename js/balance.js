@@ -19,6 +19,9 @@ export const BAL = {
 
   bullet: { speed: 620, radius: 3, cap: 400 },
 
+  // 경제 조정: 드론 획득 총량 배수 (크리스탈·수송선). 낮추면 진화가 느려지고 난이도가 오른다.
+  economy: { droneGainMult: 0.7 },
+
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
   spawn: { enemyMult: 2 },
 
@@ -32,13 +35,13 @@ export const BAL = {
       shield: { name: '보호막', icon: '◈', color: '#3fd0f5', charges: 1 },           // 첫 피격 무효
       split:  { name: '분열',   icon: '✶', color: '#b44cff', count: 2 },             // 죽으면 소형 분열
       toxic:  { name: '독성',   icon: '☣', color: '#7cff4c', contact: 1.7 },         // 접촉 피해 증가
-      elite:  { name: '엘리트', icon: '★', color: '#ffd93d', hp: 2.4, radius: 1.35, bounty: 10, coin: 8 }, // 단단·대박
+      elite:  { name: '엘리트', icon: '★', color: '#ffd93d', hp: 3.2, radius: 1.35, bounty: 6, coin: 8 }, // 단단·대박
       magnet: { name: '자성탄', icon: '◎', color: '#ff4cd2', homing: 3.2 },          // 탄이 편대 유도
     },
   },
 
   // 돌진병: 예고 후 편대를 향해 급강하 (회피 타이밍 게임)
-  charger: { hp: 30, enterSpeed: 95, dashSpeed: 540, telegraph: 0.7, hoverY: 150, contactPct: 0.14, contactMin: 6, coin: 4, bounty: 3, radius: 15 },
+  charger: { hp: 30, enterSpeed: 95, dashSpeed: 540, telegraph: 0.7, hoverY: 150, contactPct: 0.14, contactMin: 6, coin: 4, bounty: 2, radius: 15 },
   // 기뢰: 천천히 떠다니다 가까우면 폭발 (가만히 못 있게 만듦)
   mine: { hp: 10, descent: 55, sway: 34, swayHz: 0.4, armRadius: 115, fuse: 0.55, blastRadius: 92, dmgPct: 0.12, dmgMin: 8, coin: 3, radius: 13 },
 
@@ -46,7 +49,7 @@ export const BAL = {
   // 진화 후엔 기본 호위(시작 드론 수)만 재사출 — 다음 진화는 처음부터 다시 모은다.
   evolution: {
     // 파괴 보상(수송선·현상금) 추가로 드론 공급이 늘어난 만큼 비용 상향 (한 판에 2~3회 사이클 유지)
-    costs: [0, 80, 180, 360, 640, 1000],         // costs[t] = 티어 t 도달 비용
+    costs: [0, 110, 250, 500, 860, 1350],        // costs[t] = 티어 t 도달 비용 (진화 덜 자주 = 상향)
     names: ['스카웃', '인터셉터', '스트라이커', '커리어', '드레드노트', '타이탄'],
     // 기함 자체 화력 (드론 환산치): 흡수한 드론들이 기함 파워로 영구 전환된다.
     // 총 화력 = 드론 수 + shipPower[티어] → 진화 직후에도 화력이 꺾이지 않게 직전 비용 합산 수준으로 설정.
@@ -54,7 +57,7 @@ export const BAL = {
     // 진화 후 재편성: 흡수량의 25%가 새 호위대로 재사출 (최소 시작 드론 수) — 나머지는 기함의 재료로 소멸
     retainRatio: 0.25,
     // 최고 티어 후 '오버로드': 이만큼 더 모아 바치면 모듈 1개 더 획득 + 기함 파워 상승 (무한 성장 = 무한 심연 연결점)
-    overloadCost: 900,
+    overloadCost: 1200,
     overloadPower: 320,
   },
 
@@ -114,7 +117,7 @@ export const BAL = {
     small: 12, mid: 46, large: 140,
     contactMult: 3,
     contactPct: { small: 0.05, mid: 0.10, large: 0.18 }, // 편대 %비례 피해 (대군 트리비얼 해결)
-    bounty: { small: 0, mid: 4, large: 12 },  // 격파 시 드론 회수 (파괴 보상 확대 — 소형은 코인만)
+    bounty: { small: 0, mid: 2, large: 6 },   // 격파 시 드론 회수 (하향)
     radius: { small: 12, mid: 20, large: 32 },
     speed: 100,       // 하강 속도 (스크롤에 더해짐)
     homing: 60,       // 편대 방향 유도 속도
@@ -123,7 +126,7 @@ export const BAL = {
   meteor: { radius: 22, hpMin: 8, hpMax: 25, coin: 2 },
 
   boss: {
-    hp: 7000,          // 최소 HP (소모형 진화의 함대 화력 규모에 맞춤 — 보스전 10~14초 목표)
+    hp: 3000,          // 최소 HP (약한 함대도 보스를 깰 수 있게 하한 하향 — 진행 보장)
     hpPerPower: 14,    // 보스 등장 시 max(hp, 최대 총화력 x 이 값) — 어떤 함대든 보스전 10초 안팎 유지
     radius: 60,
     y: 130,                 // 보스 구간에서 화면 상단 고정 y
@@ -183,7 +186,7 @@ export const BAL = {
     swayAmp: 90, swayHz: 0.3,
     shotInterval: 2.2, dmgPct: 0.06, dmgMin: 4,
     contactPct: 0.25, contactSelfDmg: 250, contactCooldown: 1.0, // 부딪히면 서로 아프고 통과
-    rewardDrones: 40, rewardDronesPerStage: 10, coin: 30,
+    rewardDrones: 24, rewardDronesPerStage: 6, coin: 30,
     radius: 46,
   },
 
