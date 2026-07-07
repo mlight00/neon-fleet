@@ -34,16 +34,18 @@ export function pickChunk(tier, rng, prev, filterFn) {
   return candidates[Math.floor(rng() * candidates.length)];
 }
 
-/** 크리처가 없는 안전 청크인지 (판 초반 보장용) */
+// 위협 개체(초반 안전 구간에서 배제)
+const THREAT_TYPES = new Set(['creature', 'splitter', 'sniper', 'turret', 'weaver', 'charger', 'mine']);
+/** 위협 적이 없는 안전 청크인지 (판 초반 보장용) */
 export function isSafeChunk(chunk) {
-  return chunk.items.every((it) => it.type !== 'creature' && it.type !== 'splitter');
+  return chunk.items.every((it) => !THREAT_TYPES.has(it.type));
 }
 
 // 적 종류별 첫 등장 스테이지 (점진적 도입)
 const ENEMY_MIN_STAGE = {
   creature_small: 1, meteor: 1,
-  creature_mid: 2, weaver: 2,
-  sniper: 3,
+  creature_mid: 2, weaver: 2, mine: 2,
+  sniper: 3, charger: 3,
   creature_large: 4, turret: 4,
   splitter: 5,
 };
@@ -312,6 +314,62 @@ export const CHUNKS = [
       { type: 'weaver', x: 1, y: 0.45 },
       { type: 'creature', x: 0.5, y: 0.6, size: 'large' },
       { type: 'crystal', x: 0.5, y: 0.85, value: 300 },
+    ],
+  },
+
+  // ─── 신규 적: 돌진병 (스테이지 3+) ───
+  {
+    tier: 'mid', name: 'm-charger-bait',
+    items: [
+      // 대박 크리스탈이 미끼 — 줍는 사이 돌진병이 급강하
+      { type: 'crystal', x: 0.5, y: 0.55, value: 70 },
+      { type: 'charger', x: 0.5, y: 0.15 },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-charger-pair',
+    items: [
+      { type: 'charger', x: 0.3, y: 0.15 },
+      { type: 'charger', x: 0.7, y: 0.28 },
+      { type: 'crystal', x: 0.5, y: 0.7, value: 120 },
+    ],
+  },
+  // ─── 신규 적: 기뢰 (스테이지 2+) ───
+  {
+    tier: 'mid', name: 'm-minefield',
+    items: [
+      { type: 'mine', x: 0.3, y: 0.25 },
+      { type: 'mine', x: 0.62, y: 0.35 },
+      { type: 'crystal', x: 0.82, y: 0.6, value: 40 },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-mine-jackpot',
+    items: [
+      // 기뢰밭 한가운데 대박 — 조심히 뚫고 들어갈 것인가
+      { type: 'mine', x: 0.25, y: 0.25 },
+      { type: 'mine', x: 0.5, y: 0.2 },
+      { type: 'mine', x: 0.75, y: 0.25 },
+      { type: 'crystal', x: 0.5, y: 0.62, value: 250 },
+    ],
+  },
+  // ─── 신규 조합 (2종 이상 → 자동으로 상위 스테이지) ───
+  {
+    tier: 'hard', name: 'h-combo-charge-turret',
+    items: [
+      { type: 'turret', x: 0.5, y: 0.2 },
+      { type: 'charger', x: 0.25, y: 0.35 },
+      { type: 'charger', x: 0.75, y: 0.35 },
+      { type: 'crystal', x: 0.5, y: 0.72, value: 150 },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-combo-mine-sniper',
+    items: [
+      { type: 'sniper', x: 0.5, y: 0.12 },
+      { type: 'mine', x: 0.3, y: 0.4 },
+      { type: 'mine', x: 0.7, y: 0.4 },
+      { type: 'capsule', x: 0.5, y: 0.66, weapon: 'random' },
     ],
   },
 ];

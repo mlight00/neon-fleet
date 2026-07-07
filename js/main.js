@@ -2,7 +2,8 @@
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
-import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, PowerModule, Sniper, Turret, Weaver, MidBoss, Boss, createEffects } from './entities.js';
+import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, PowerModule, Sniper, Turret, Weaver, Charger, Mine, MidBoss, Boss, createEffects } from './entities.js';
+import { maybeAffix } from './affixes.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
@@ -211,17 +212,21 @@ function update(dt) {
       const mods = r.mods;
       // 스테이지 스케일: 적은 단단하고 빨라지고, 크리스탈은 소폭 커진다
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
+      // 적 스폰 헬퍼: 스테이지 스케일 + 변이(어픽스) 롤 + 등록
+      const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, r.stage, r.rng); w.entities.push(e); };
       // 적 항목은 enemyMult 배수만큼 복제 스폰: 복제본은 좌우 미러 + 세로로 살짝 시차
       const dup = BAL.spawn.enemyMult;
       if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal)));
       else if (it.type === 'gatePair') w.entities.push(new GatePair(LOGICAL_W, -60, it.left, it.right));
-      else if (it.type === 'creature') for (let k = 0; k < dup; k++) w.entities.push(scaleEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, it.size)));
-      else if (it.type === 'splitter') for (let k = 0; k < dup; k++) w.entities.push(scaleEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, 'mid', { splits: 3 })));
+      else if (it.type === 'creature') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, it.size), 'creature');
+      else if (it.type === 'splitter') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, 'mid', { splits: 3 }), 'creature');
       else if (it.type === 'meteor') w.entities.push(new Meteor(x, -60, r.rng));
       else if (it.type === 'power') w.entities.push(new PowerModule(x, -60));
-      else if (it.type === 'sniper') for (let k = 0; k < dup; k++) w.entities.push(scaleEnemy(new Sniper(k ? LOGICAL_W - x : x)));
-      else if (it.type === 'turret') for (let k = 0; k < dup; k++) w.entities.push(scaleEnemy(new Turret(k ? LOGICAL_W - x : x, -60 - 90 * k)));
-      else if (it.type === 'weaver') for (let k = 0; k < dup; k++) w.entities.push(scaleEnemy(new Weaver(k ? !(it.x < 0.5) : it.x < 0.5, LOGICAL_W)));
+      else if (it.type === 'sniper') for (let k = 0; k < dup; k++) spawnEnemy(new Sniper(k ? LOGICAL_W - x : x), 'sniper');
+      else if (it.type === 'turret') for (let k = 0; k < dup; k++) spawnEnemy(new Turret(k ? LOGICAL_W - x : x, -60 - 90 * k), 'turret');
+      else if (it.type === 'weaver') for (let k = 0; k < dup; k++) spawnEnemy(new Weaver(k ? !(it.x < 0.5) : it.x < 0.5, LOGICAL_W), 'weaver');
+      else if (it.type === 'charger') for (let k = 0; k < dup; k++) spawnEnemy(new Charger(k ? LOGICAL_W - x : x), 'charger');
+      else if (it.type === 'mine') for (let k = 0; k < dup; k++) spawnEnemy(new Mine(k ? LOGICAL_W - x : x), 'mine');
       else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size));
       else if (it.type === 'midboss') w.entities.push(new MidBoss(LOGICAL_W, r.stage, r.maxPower));
       else if (it.type === 'capsule') {
@@ -252,8 +257,9 @@ function update(dt) {
       sfx('boss_in');
       playBgm('boss'); // 보스 BGM으로 크로스페이드
       r.boss = new Boss(LOGICAL_W, r.mods.enemyRate, r.stage);
-      // 함대가 강할수록 + 스테이지가 높을수록 보스도 강하게 (부록 §5) + 패턴별 몸 보정(tanky)
-      r.boss.hp = r.boss.maxHp = Math.round(Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (r.boss.pattern.tanky ?? 1));
+      // 함대가 강할수록 + 스테이지가 높을수록 보스도 강하게 (부록 §5) + 패턴별 몸 보정(tanky) + 변주판 HP
+      const variantHp = 1 + BAL.bossVariant.hpPerLoop * r.boss.variantLevel;
+      r.boss.hp = r.boss.maxHp = Math.round(Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (r.boss.pattern.tanky ?? 1) * variantHp);
     }
   } else if (r.phase === 'boss') {
     r.scrollY += 30 * dt;

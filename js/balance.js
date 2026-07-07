@@ -22,6 +22,26 @@ export const BAL = {
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
   spawn: { enemyMult: 2 },
 
+  // 엘리트 변이(어픽스): 적에 특성을 붙여 같은 적을 다양하게. 색 오라+아이콘으로 표시.
+  // 로직은 affixes.js, 여기엔 수치·표시만. 스테이지 깊을수록 자주·중첩된다.
+  affix: {
+    baseChance: 0.08, chancePerStage: 0.06, chanceCap: 0.55,
+    twoAffixStage: 6,                                     // 이 스테이지부터 최대 2개 중첩
+    defs: {
+      swift:  { name: '가속',   icon: '»', color: '#ff9c41', spd: 1.6, fire: 0.7 },  // 빠른 이동/발사
+      shield: { name: '보호막', icon: '◈', color: '#3fd0f5', charges: 1 },           // 첫 피격 무효
+      split:  { name: '분열',   icon: '✶', color: '#b44cff', count: 2 },             // 죽으면 소형 분열
+      toxic:  { name: '독성',   icon: '☣', color: '#7cff4c', contact: 1.7 },         // 접촉 피해 증가
+      elite:  { name: '엘리트', icon: '★', color: '#ffd93d', hp: 2.4, radius: 1.35, bounty: 10, coin: 8 }, // 단단·대박
+      magnet: { name: '자성탄', icon: '◎', color: '#ff4cd2', homing: 3.2 },          // 탄이 편대 유도
+    },
+  },
+
+  // 돌진병: 예고 후 편대를 향해 급강하 (회피 타이밍 게임)
+  charger: { hp: 30, enterSpeed: 95, dashSpeed: 540, telegraph: 0.7, hoverY: 150, contactPct: 0.14, contactMin: 6, coin: 4, bounty: 3, radius: 15 },
+  // 기뢰: 천천히 떠다니다 가까우면 폭발 (가만히 못 있게 만듦)
+  mine: { hp: 10, descent: 55, sway: 34, swayHz: 0.4, armRadius: 115, fuse: 0.55, blastRadius: 92, dmgPct: 0.12, dmgMin: 8, coin: 3, radius: 13 },
+
   // 함선 진화 (드론 소모형): 비용에 도달하면 모은 드론 전량이 기함의 재료로 흡수된다.
   // 진화 후엔 기본 호위(시작 드론 수)만 재사출 — 다음 진화는 처음부터 다시 모은다.
   evolution: {
@@ -139,6 +159,16 @@ export const BAL = {
     B9:  { kind: 'spiral', interval: 0.16, sweepHz: 0.22, sweepDeg: 75, speed: 180, shotMult: 1.4 }, // 볼텍스 마우: 좌우로 쓸어내는 나선 탄류
     B10: { kind: 'pincer', pairs: 3, speed: 240, tanky: 1.2, shotMult: 1.2 },        // 옵시디언 클로: 좌우 집게 협공탄 + 단단한 몸
     B11: { kind: 'ring', count: 12, speed: 165, shotMult: 1.15 },                    // 보이드 세라프: 회전 깃털 원형탄
+  },
+
+  // 보스 변주: 로스터가 한 바퀴 돈 뒤(스테이지 6+) 같은 보스가 강화판으로 재등장.
+  // loop = floor((stage-1)/5). 같은 스프라이트로 시작부터 광폭 + 탄 추가 + 빠른 발사.
+  bossVariant: {
+    fromStage: 6, suffixes: ['', ' II', ' III', ' IV', ' V'],
+    hpPerLoop: 0.12,        // loop당 HP +12%
+    fasterPerLoop: 0.1,     // loop당 발사·소환 주기 배수 -0.1(빠름), minFaster 하한
+    minFaster: 0.55,
+    fanBonusPerLoop: 2,     // loop당 서명 공격 탄 수 +2
   },
 
   // 중간보스: 직전 스테이지 보스가 트랙 중반에 일반 적처럼 등장해 지나간다 (스테이지 2+).

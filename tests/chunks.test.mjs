@@ -16,7 +16,7 @@ test('청크 풀: easy≥5, mid≥6, hard≥4', () => {
 });
 
 test('청크 데이터 형식: 좌표는 0~1 비율, type은 알려진 것만', () => {
-  const known = new Set(['crystal', 'gatePair', 'creature', 'meteor', 'power', 'storm', 'sniper', 'turret', 'weaver', 'capsule', 'splitter']);
+  const known = new Set(['crystal', 'gatePair', 'creature', 'meteor', 'power', 'storm', 'sniper', 'turret', 'weaver', 'capsule', 'splitter', 'charger', 'mine']);
   for (const c of CHUNKS) {
     for (const it of c.items) {
       assert.ok(known.has(it.type), `unknown type ${it.type}`);

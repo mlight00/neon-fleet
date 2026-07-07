@@ -8,6 +8,7 @@ import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
 import { getSprite, bossDefFor } from './sprites.js';
+import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
 import { sfx } from './audio.js';
 
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
@@ -1079,10 +1080,11 @@ export class Creature extends Scrolling {
   }
   update(dt, world) {
     this.scroll(dt, world);
-    this.y += BAL.creature.speed * dt;
+    const spd = this.spdMult || 1;                    // 가속 변이
+    this.y += BAL.creature.speed * dt * spd;
     if (this.y > world.logicalH * 0.45) {
       const dir = Math.sign(world.squad.x - this.x);
-      this.x += dir * BAL.creature.homing * dt;
+      this.x += dir * BAL.creature.homing * dt * spd;
     }
     if (this.size === 'mid') this.x += Math.sin(this.wob) * 20 * dt; // 리퍼 지그재그
     this.wob += dt * 6;
@@ -1098,19 +1100,21 @@ export class Creature extends Scrolling {
     }
 
     if (circleHit(this.x, this.y, this.r, world.squad.x, world.squad.y, world.squad.hitRadius)) {
-      // 접촉 피해 = max(남은HP 기반, 편대 %비례) → 대군이어도 큰 피해
+      // 접촉 피해 = max(남은HP 기반, 편대 %비례) x 독성 변이 → 대군이어도 큰 피해
       const flat = Math.ceil(this.hp * BAL.creature.contactMult);
       const pct = Math.round(world.squad.count * BAL.creature.contactPct[this.size]);
-      world.squad.contactDamage(Math.max(flat, pct), world);
+      world.squad.contactDamage(Math.round(Math.max(flat, pct) * affixContactMult(this)), world);
       world.effects.burst(this.x, this.y, COLORS.danger, 16);
       this.dead = true;
     }
     if (this.offscreen(world)) this.dead = true;
   }
   hitByBullet(dmg, world) {
+    if (affixAbsorb(this, world)) return;    // 보호막 변이: 첫 피격 무효
     this.hp -= dmg;
     if (this.hp <= 0) {
       this.dead = true;
+      affixOnDeath(this, world);             // 엘리트 변이 보상
       world.effects.burst(this.x, this.y, COLORS.enemy, 12);
       world.addCoins(1);
       // 격파 현상금: 중/대형은 드론 회수 (파괴 보상 확대)
@@ -1138,7 +1142,7 @@ export class Creature extends Scrolling {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(Math.sin(this.wob) * 0.15);
-    blit(ctx, gem || getSwarmSprite(key), 0, 0);
+    blit(ctx, gem || getSwarmSprite(key), 0, 0, this.spriteScale || 1);
     ctx.restore();
     if (!gem) {
       // 폴백 아트 전용: 독성 녹색 코어 맥동 (Gemini 아트엔 자체 코어가 있음)
@@ -1157,6 +1161,7 @@ export class Creature extends Scrolling {
       ctx.fillStyle = COLORS.enemyCore;
       ctx.fillRect(this.x - this.r, this.y - this.r - 8, this.r * 2 * Math.max(0, this.hp / this.maxHp), 3);
     }
+    affixDraw(ctx, this);
   }
 }
 
@@ -1267,12 +1272,13 @@ export class PowerModule extends Scrolling {
 
 // ───────────────────────── 적탄 (조준탄/부채꼴탄/직하탄 공용, % 피해)
 export class EnemyShot {
-  constructor(x, y, vx, vy, { r = 8, dmgPct, dmgMin }) {
+  constructor(x, y, vx, vy, { r = 8, dmgPct, dmgMin, homing = 0 }) {
     this.x = x; this.y = y;
     this.vx = vx; this.vy = vy;
     this.r = r;
     this.dmgPct = dmgPct;
     this.dmgMin = dmgMin;
+    this.homing = homing;   // >0이면 매 프레임 편대 쪽으로 속도 방향을 서서히 튼다 (자성탄)
     this.dead = false;
   }
   static aimed(x, y, tx, ty, speed, opts) {
@@ -1280,6 +1286,14 @@ export class EnemyShot {
     return new EnemyShot(x, y, ((tx - x) / d) * speed, ((ty - y) / d) * speed, opts);
   }
   update(dt, world) {
+    if (this.homing) {
+      const dx = world.squad.x - this.x, dy = world.squad.y - this.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const sp = Math.hypot(this.vx, this.vy) || 1;
+      const kf = Math.min(1, this.homing * dt);
+      this.vx += ((dx / d) * sp - this.vx) * kf;
+      this.vy += ((dy / d) * sp - this.vy) * kf;
+    }
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     if (circleHit(this.x, this.y, this.r, world.squad.x, world.squad.y, world.squad.hitRadius)) {
@@ -1351,7 +1365,7 @@ export class Sniper {
         if (this.queueT <= 0) {
           this.queueT = B.burstGap;
           this.queue--;
-          world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, B.shotSpeed, { dmgPct: B.dmgPct, dmgMin: B.dmgMin }));
+          world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, B.shotSpeed, { dmgPct: B.dmgPct, dmgMin: B.dmgMin, homing: affixShotHoming(this) }));
         }
       }
       if (this.stayT <= 0) this.state = 'leave';
@@ -1361,9 +1375,11 @@ export class Sniper {
     }
   }
   hitByBullet(dmg, world) {
+    if (affixAbsorb(this, world)) return;
     this.hp -= dmg;
     if (this.hp <= 0) {
       this.dead = true;
+      affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemyMid, 14);
       world.addCoins(3);
       sfx('explode_s');
@@ -1401,6 +1417,7 @@ export class Sniper {
       ctx.fillStyle = COLORS.enemyCore;
       ctx.fillRect(this.x - this.r, this.y - this.r - 8, this.r * 2 * Math.max(0, this.hp / this.maxHp), 3);
     }
+    affixDraw(ctx, this);
   }
 }
 
@@ -1426,16 +1443,17 @@ export class Turret extends Scrolling {
         const B = BAL.turret;
         // 패턴 변주: 하방 부채꼴 ↔ 8방향 원형탄 번갈아
         this.mode = ((this.mode || 0) + 1) % 2;
+        const hom = affixShotHoming(this);   // 자성탄 변이
         if (this.mode === 1) {
           for (let i = 0; i < B.ringCount; i++) {
             const a = (i / B.ringCount) * Math.PI * 2;
-            world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * B.ringSpeed, Math.cos(a) * B.ringSpeed, { r: 6, dmgPct: B.dmgPct, dmgMin: B.dmgMin }));
+            world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * B.ringSpeed, Math.cos(a) * B.ringSpeed, { r: 6, dmgPct: B.dmgPct, dmgMin: B.dmgMin, homing: hom }));
           }
         } else {
           for (let i = 0; i < B.fanCount; i++) {
             const deg = (i - (B.fanCount - 1) / 2) * B.fanDeg;
             const a = (deg * Math.PI) / 180;
-            world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * B.shotSpeed, Math.cos(a) * B.shotSpeed, { r: 7, dmgPct: B.dmgPct, dmgMin: B.dmgMin }));
+            world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * B.shotSpeed, Math.cos(a) * B.shotSpeed, { r: 7, dmgPct: B.dmgPct, dmgMin: B.dmgMin, homing: hom }));
           }
         }
       }
@@ -1443,9 +1461,11 @@ export class Turret extends Scrolling {
     if (this.offscreen(world)) this.dead = true;
   }
   hitByBullet(dmg, world) {
+    if (affixAbsorb(this, world)) return;
     this.hp -= dmg;
     if (this.hp <= 0) {
       this.dead = true;
+      affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemyHigh, 16);
       world.addCoins(BAL.turret.coin);
       sfx('explode_l');
@@ -1454,7 +1474,7 @@ export class Turret extends Scrolling {
   draw(ctx) {
     const gem = getSprite('B5');
     if (gem) {
-      blit(ctx, gem, this.x, this.y);
+      blit(ctx, gem, this.x, this.y, this.spriteScale || 1);
     } else {
       // 폴백: 팔각 기단 + 하방 3포신
       ctx.save();
@@ -1488,6 +1508,7 @@ export class Turret extends Scrolling {
       ctx.fillStyle = COLORS.enemyCore;
       ctx.fillRect(this.x - this.r, this.y - this.r - 9, this.r * 2 * Math.max(0, this.hp / this.maxHp), 3);
     }
+    affixDraw(ctx, this);
   }
 }
 
@@ -1509,13 +1530,13 @@ export class Weaver {
   }
   update(dt, world) {
     this.t += dt;
-    this.x += this.dir * BAL.weaver.speed * dt;
+    this.x += this.dir * BAL.weaver.speed * dt * (this.spdMult || 1);   // 가속 변이
     this.y = BAL.weaver.y + Math.sin(this.t * 4) * 8;
     this.fireT -= dt;
     if (this.fireT <= 0 && this.x > 20 && this.x < this.logicalW - 20) {
       this.fireT = this.fireInterval;
       const B = BAL.weaver;
-      const o = { r: 6, dmgPct: B.dmgPct, dmgMin: B.dmgMin };
+      const o = { r: 6, dmgPct: B.dmgPct, dmgMin: B.dmgMin, homing: affixShotHoming(this) };
       // 패턴 변주: N발마다 1발은 편대를 겨눈 조준탄 (커튼 사이의 변칙구)
       this.shotN = (this.shotN || 0) + 1;
       if (this.shotN % B.aimedEvery === 0) {
@@ -1527,9 +1548,11 @@ export class Weaver {
     if ((this.dir > 0 && this.x > this.logicalW + 30) || (this.dir < 0 && this.x < -30)) this.dead = true;
   }
   hitByBullet(dmg, world) {
+    if (affixAbsorb(this, world)) return;
     this.hp -= dmg;
     if (this.hp <= 0) {
       this.dead = true;
+      affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemy, 10);
       world.addCoins(2);
       sfx('explode_s');
@@ -1540,6 +1563,7 @@ export class Weaver {
     ctx.fillRect(this.x - this.r, this.y - this.r - 8, this.r * 2, 3);
     ctx.fillStyle = COLORS.enemyCore;
     ctx.fillRect(this.x - this.r, this.y - this.r - 8, this.r * 2 * Math.max(0, this.hp / this.maxHp), 3);
+    affixDraw(ctx, this);
   }
   draw(ctx) {
     const gem = getSprite('B6');
@@ -1571,6 +1595,193 @@ export class Weaver {
     ctx.fill();
     ctx.globalAlpha = 1;
     this.drawHpBar(ctx);
+  }
+}
+
+// ───────────────────────── 돌진병: 예고 후 편대를 향해 급강하
+export class Charger extends Scrolling {
+  constructor(x) {
+    super(x, -40);
+    const C = BAL.charger;
+    this.hp = this.maxHp = C.hp;
+    this.r = C.radius;
+    this.state = 'enter';   // enter → telegraph → dash
+    this.teleT = C.telegraph;
+    this.aimX = x;
+    this.dashVX = 0; this.dashVY = 0;
+    this.isEnemy = true;
+    this.t = 0;
+  }
+  update(dt, world) {
+    this.t += dt;
+    const C = BAL.charger;
+    const spd = this.spdMult || 1;
+    if (this.state === 'enter') {
+      this.y += C.enterSpeed * dt * spd;
+      if (this.y >= C.hoverY) { this.y = C.hoverY; this.state = 'telegraph'; this.teleT = C.telegraph; }
+    } else if (this.state === 'telegraph') {
+      this.teleT -= dt;
+      this.aimX = world.squad.x;                 // 예고 중 편대 추적, 종료 순간 잠금
+      if (this.teleT <= 0) {
+        const dx = this.aimX - this.x, dy = (world.logicalH + 60) - this.y;
+        const d = Math.hypot(dx, dy) || 1;
+        this.dashVX = (dx / d) * C.dashSpeed;
+        this.dashVY = (dy / d) * C.dashSpeed;
+        this.state = 'dash';
+      }
+    } else {
+      this.x += this.dashVX * dt * spd;
+      this.y += this.dashVY * dt * spd;
+    }
+    if (circleHit(this.x, this.y, this.r, world.squad.x, world.squad.y, world.squad.hitRadius)) {
+      const dmg = Math.max(C.contactMin, Math.round(world.squad.count * C.contactPct));
+      world.squad.contactDamage(Math.round(dmg * affixContactMult(this)), world);
+      world.effects.burst(this.x, this.y, COLORS.danger, 16);
+      this.dead = true;
+    }
+    if (this.offscreen(world)) this.dead = true;
+  }
+  hitByBullet(dmg, world) {
+    if (affixAbsorb(this, world)) return;
+    this.hp -= dmg;
+    if (this.hp <= 0) {
+      this.dead = true;
+      affixOnDeath(this, world);
+      world.effects.burst(this.x, this.y, COLORS.enemyHigh, 14);
+      world.addCoins(BAL.charger.coin);
+      world.squad.applyDelta(BAL.charger.bounty, world);
+      if (this.splits > 0) {
+        for (let i = 0; i < this.splits; i++) {
+          const a = (i / this.splits) * Math.PI * 2;
+          world.spawnEntity(new Creature(this.x + Math.cos(a) * this.r, this.y + Math.sin(a) * this.r, 'small'));
+        }
+      }
+      sfx('explode_s');
+    }
+  }
+  draw(ctx) {
+    const s = this.spriteScale || 1;
+    // 예고선: 편대까지 붉은 조준선 (깜빡임)
+    if (this.state === 'telegraph') {
+      const p = 1 - this.teleT / BAL.charger.telegraph;
+      ctx.save();
+      ctx.globalAlpha = 0.25 + 0.5 * p;
+      ctx.strokeStyle = COLORS.danger;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      ctx.lineTo(this.aimX, this.y + 600);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    const ang = this.state === 'dash' ? Math.atan2(this.dashVX, this.dashVY) : 0;
+    ctx.rotate(ang * 0.5);
+    ctx.scale(s, s);
+    glow(ctx, COLORS.danger, 12, (c) => {
+      c.fillStyle = '#3a1020';
+      c.strokeStyle = COLORS.danger;
+      c.lineWidth = 2.5;
+      c.beginPath();
+      c.moveTo(0, this.r);                        // 앞(아래) 뾰족한 쐐기
+      c.lineTo(-this.r * 0.9, -this.r * 0.7);
+      c.lineTo(0, -this.r * 0.3);
+      c.lineTo(this.r * 0.9, -this.r * 0.7);
+      c.closePath(); c.fill(); c.stroke();
+    });
+    ctx.fillStyle = '#ffdf7a';
+    ctx.globalAlpha = 0.7 + 0.3 * Math.sin(this.t * 8);
+    ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(this.x - this.r, this.y - this.r - 8, this.r * 2, 3);
+    ctx.fillStyle = COLORS.danger;
+    ctx.fillRect(this.x - this.r, this.y - this.r - 8, this.r * 2 * Math.max(0, this.hp / this.maxHp), 3);
+    affixDraw(ctx, this);
+  }
+}
+
+// ───────────────────────── 기뢰: 천천히 떠다니다 가까우면 폭발
+export class Mine extends Scrolling {
+  constructor(x) {
+    super(x, -30);
+    const M = BAL.mine;
+    this.hp = this.maxHp = M.hp;
+    this.r = M.radius;
+    this.baseX = x;
+    this.state = 'idle';   // idle → armed → explode
+    this.fuseT = M.fuse;
+    this.isEnemy = true;
+    this.t = 0;
+  }
+  explode(world) {
+    if (this.dead) return;
+    this.dead = true;
+    const M = BAL.mine;
+    world.effects.burst(this.x, this.y, COLORS.danger, 30, 260);
+    world.effects.ring(this.x, this.y, COLORS.danger);
+    world.effects.flash(0.15);
+    const d = Math.hypot(world.squad.x - this.x, world.squad.y - this.y);
+    if (d <= M.blastRadius + world.squad.hitRadius) {
+      const dmg = Math.max(M.dmgMin, Math.round(world.squad.count * M.dmgPct));
+      world.squad.contactDamage(Math.round(dmg * affixContactMult(this)), world);
+    }
+    sfx('explode_l');
+  }
+  update(dt, world) {
+    this.t += dt;
+    const M = BAL.mine;
+    this.scroll(dt, world);
+    this.y += M.descent * dt * (this.spdMult || 1);
+    this.x = this.baseX + Math.sin(this.t * M.swayHz * Math.PI * 2) * M.sway;
+    const near = Math.hypot(world.squad.x - this.x, world.squad.y - this.y) <= M.armRadius;
+    if (this.state === 'idle' && near) { this.state = 'armed'; this.fuseT = M.fuse; }
+    if (this.state === 'armed') {
+      this.fuseT -= dt;
+      if (this.fuseT <= 0) { this.explode(world); return; }
+    }
+    if (this.offscreen(world)) this.dead = true;
+  }
+  hitByBullet(dmg, world) {
+    if (affixAbsorb(this, world)) return;
+    this.hp -= dmg;
+    if (this.hp <= 0) {
+      world.addCoins(BAL.mine.coin);             // 쏘아서 미리 터뜨리면 코인 (멀면 안전)
+      this.explode(world);
+    }
+  }
+  draw(ctx) {
+    const armed = this.state === 'armed';
+    const pulse = armed ? 0.5 + 0.5 * Math.sin(this.t * 20) : 0.4 + 0.3 * Math.sin(this.t * 3);
+    if (armed) {                                   // 폭발 반경 예고 링
+      ctx.save();
+      ctx.globalAlpha = 0.22 + 0.2 * Math.sin(this.t * 20);
+      ctx.strokeStyle = COLORS.danger;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(this.x, this.y, BAL.mine.blastRadius, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    glow(ctx, armed ? COLORS.danger : COLORS.enemyHigh, 12, (c) => {
+      c.strokeStyle = armed ? COLORS.danger : COLORS.enemyHigh;
+      c.fillStyle = 'rgba(40,16,40,0.85)';
+      c.lineWidth = 2;
+      c.beginPath(); c.arc(this.x, this.y, this.r, 0, Math.PI * 2); c.fill(); c.stroke();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        c.beginPath();
+        c.moveTo(this.x + Math.cos(a) * this.r, this.y + Math.sin(a) * this.r);
+        c.lineTo(this.x + Math.cos(a) * (this.r + 5), this.y + Math.sin(a) * (this.r + 5));
+        c.stroke();
+      }
+    });
+    ctx.fillStyle = armed ? COLORS.danger : '#ffdf7a';
+    ctx.globalAlpha = pulse;
+    ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    affixDraw(ctx, this);
   }
 }
 
@@ -1728,6 +1939,22 @@ export class Boss {
     this.korName = def.korName;
     // 보스별 고유 공격 패턴 (부채꼴 슬롯이 kind별 서명기로 대체된다)
     this.pattern = BAL.bossPatterns[def.id] ?? { kind: 'brood' };
+    // 보스 변주: 로스터 2회차부터(loop>0) 시작부터 광폭 + 탄 추가 + 빠른 발사
+    const V = BAL.bossVariant;
+    const loop = Math.floor((Math.max(1, stage) - 1) / 5);
+    this.variantLevel = stage >= V.fromStage ? loop : 0;
+    if (this.variantLevel > 0) {
+      const suffix = V.suffixes[Math.min(this.variantLevel, V.suffixes.length - 1)];
+      this.name += suffix;
+      this.korName += suffix;
+      this.variantFaster = Math.max(V.minFaster, 1 - V.fasterPerLoop * this.variantLevel);
+      this.variantFanBonus = V.fanBonusPerLoop * this.variantLevel;
+      this.variantAlwaysEnrage = true;
+    } else {
+      this.variantFaster = 1;
+      this.variantFanBonus = 0;
+      this.variantAlwaysEnrage = false;
+    }
     this.x = logicalW / 2;
     this.y = -100;
     this.targetY = BAL.boss.y;
@@ -1751,8 +1978,8 @@ export class Boss {
       size: 8 + Math.random() * 14,
     }));
   }
-  get enraged() { return this.hp <= this.maxHp * BAL.boss.enrageRatio; }
-  interval(base) { return base * this.rateMult * (this.enraged ? BAL.boss.enrageRate : 1); }
+  get enraged() { return this.variantAlwaysEnrage || this.hp <= this.maxHp * BAL.boss.enrageRatio; }
+  interval(base) { return base * this.rateMult * this.variantFaster * (this.enraged ? BAL.boss.enrageRate : 1); }
   phaseColor() {
     const ratio = this.hp / this.maxHp;
     return ratio > 0.66 ? COLORS.enemy : ratio > 0.33 ? COLORS.enemyHigh : COLORS.danger;
@@ -1814,27 +2041,33 @@ export class Boss {
   fireSignature(world) {
     const P = this.pattern;
     const B = BAL.boss;
+    const fb = this.variantFanBonus || 0;   // 변주판 추가 탄 수
     const fanOpts = { r: 7, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin };
     switch (P.kind) {
       case 'crescent': { // 리퍼 로드: 아래로 넓게 베어내리는 참격 볼리
         this.fanT = this.interval(B.fanInterval);
-        for (let i = 0; i < P.volley; i++) {
-          const a = ((i - (P.volley - 1) / 2) * P.volleyDeg * Math.PI) / 180;
+        const n = P.volley + fb;
+        for (let i = 0; i < n; i++) {
+          const a = ((i - (n - 1) / 2) * P.volleyDeg * Math.PI) / 180;
           world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * P.speed, Math.cos(a) * P.speed, fanOpts));
         }
         break;
       }
       case 'spiral': { // 볼텍스 마우: 좌우로 쓸어내는 연속 탄류 (소용돌이 분사)
         this.fanT = this.interval(P.interval);
-        const a = (Math.sin(this.t * P.sweepHz * Math.PI * 2) * P.sweepDeg * Math.PI) / 180;
-        world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r * 0.5, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+        const arms = 1 + Math.floor(fb / 3);   // 변주판은 나선 팔 수 증가
+        for (let k = 0; k < arms; k++) {
+          const a = (Math.sin(this.t * P.sweepHz * Math.PI * 2) * P.sweepDeg * Math.PI) / 180 + (k / arms) * Math.PI * 2;
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r * 0.5, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+        }
         break;
       }
       case 'pincer': { // 옵시디언 클로: 좌우 집게에서 안쪽으로 교차하는 협공탄
         this.fanT = this.interval(B.fanInterval);
         const off = this.r * 1.25 * (this.drawScale || 1);
+        const pairs = P.pairs + Math.floor(fb / 2);
         for (const side of [-1, 1]) {
-          for (let i = 0; i < P.pairs; i++) {
+          for (let i = 0; i < pairs; i++) {
             const a = (side * -(18 + i * 14) * Math.PI) / 180; // 안쪽으로 기울어진 각
             world.spawnEnemyBullet(new EnemyShot(this.x + side * off, this.y + this.r * 0.6, Math.sin(a) * P.speed, Math.cos(a) * P.speed, fanOpts));
           }
@@ -1843,16 +2076,18 @@ export class Boss {
       }
       case 'ring': { // 보이드 세라프: 회전 위상이 도는 깃털 원형탄
         this.fanT = this.interval(B.fanInterval);
-        for (let i = 0; i < P.count; i++) {
-          const a = (i / P.count) * Math.PI * 2 + this.t;
+        const n = P.count + fb;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + this.t;
           world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
         }
         break;
       }
       default: { // 하이브 퀸(brood) 등: 기존 5방향 부채꼴 (산란은 minionMult가 담당)
         this.fanT = this.interval(B.fanInterval);
-        for (let i = 0; i < B.fanCount; i++) {
-          const a = ((i - (B.fanCount - 1) / 2) * B.fanDeg * Math.PI) / 180;
+        const n = B.fanCount + fb;
+        for (let i = 0; i < n; i++) {
+          const a = ((i - (n - 1) / 2) * B.fanDeg * Math.PI) / 180;
           world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * B.fanSpeed, Math.cos(a) * B.fanSpeed, fanOpts));
         }
       }
