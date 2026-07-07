@@ -157,14 +157,13 @@ export class Squad {
       this.tier = r.tier;
       this.count = r.count;
       this.shield = true;   // 드론을 바친 직후 사고사 방지: 진화 에너지 = 보호막 1회
-      world.effects.flash(0.5);
+      // (화면 섬광·충격파·적탄 정화 '노바'는 모듈 선택 직후 main.evolutionNova에서 터진다)
       world.effects.ring(this.x, this.y, COLORS.ally, 0);
-      world.effects.ring(this.x, this.y, COLORS.ally, 0.1);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
       world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수!`, COLORS.reward);
       world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 진화!`, COLORS.reward);
       world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.shipPower[r.tier]} · 주포 ${SHIP_DEFS[r.tier].mounts.length}문`, COLORS.ally);
-      this.evolvePunch = 0.35;
+      this.evolvePunch = 0.5;
       this.pendingDraft = true;   // 진화 → 모듈 드래프트 (main이 감지해 카드 3장 표시)
       sfx('evolve');
       return;
@@ -178,9 +177,8 @@ export class Squad {
         this.count = kept;
         this.overloadPower = (this.overloadPower || 0) + ev.overloadPower;
         this.shield = true;
-        this.evolvePunch = 0.3;
+        this.evolvePunch = 0.5;
         this.pendingDraft = true;
-        world.effects.flash(0.4);
         world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
         world.effects.text(this.x, this.y - 98, `오버로드! 드론 ${consumed}기 흡수`, COLORS.reward);
         world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.overloadPower}`, COLORS.ally);

@@ -4,7 +4,7 @@ import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, PowerModule, Sniper, Turret, Weaver, Charger, Mine, MidBoss, Boss, createEffects } from './entities.js';
 import { maybeAffix } from './affixes.js';
-import { computeMfx, draftOptions, moduleSummary } from './modules.js';
+import { computeMfx, draftOptions, moduleSummary, MODULE_BY_ID } from './modules.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
@@ -204,6 +204,20 @@ function recomputeMfx() {
   run.squad.swarmPerDrone = run.world.mfx.swarmPerDrone;
 }
 
+// 진화·모듈 선택 직후: 화면 섬광 + 충격파 링 + 적탄 정화 + 기함 펄스 (업그레이드 손맛)
+function evolutionNova(r, moduleId) {
+  const w = r.world, sq = r.squad;
+  w.effects.flash(0.85);
+  for (let k = 0; k < 3; k++) w.effects.ring(sq.x, sq.y, k === 1 ? COLORS.reward : COLORS.ally, k * 0.07);
+  w.effects.burst(sq.x, sq.y, COLORS.ally, 48, 460);
+  w.effects.burst(sq.x, sq.y, '#ffffff', 26, 320);
+  for (const b of w.enemyBullets) b.dead = true;   // 화면의 적탄 전부 소멸 = 진화 정화
+  sq.evolvePunch = Math.max(sq.evolvePunch || 0, 0.7);
+  const m = MODULE_BY_ID[moduleId];
+  if (m) w.effects.text(sq.x, sq.y - 60, `${m.icon} ${m.name}!`, COLORS.reward);
+  sfx('evolve');
+}
+
 // 진화/오버로드 시 모듈 드래프트 3장 표시 (게임 일시 정지)
 function openDraft() {
   const r = run;
@@ -220,6 +234,7 @@ function openDraft() {
       drafting = false;
       ui.hide();
       sfx('buy');
+      evolutionNova(r, id);   // 선택 직후 노바 폭발 (업그레이드 손맛)
     },
   });
 }
@@ -267,7 +282,9 @@ function update(dt) {
       const x = (it.x ?? 0.5) * LOGICAL_W;
       const mods = r.mods;
       // 스테이지 스케일: 적은 단단하고 빨라지고, 크리스탈은 소폭 커진다
-      const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
+      // 적 HP = 기본 × 스테이지배수 × 화력비례(함대가 강할수록 적도 단단 → 즉사 방지, 늘 긴장)
+      const pf = 1 + Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale;
+      const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
       // 적 스폰 헬퍼: 스테이지 스케일 + 변이(어픽스) 롤 + 등록
       const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, r.stage, r.rng); w.entities.push(e); };
       // 적 항목은 enemyMult 배수만큼 복제 스폰: 복제본은 좌우 미러 + 세로로 살짝 시차

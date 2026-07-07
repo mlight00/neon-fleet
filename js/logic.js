@@ -34,7 +34,7 @@ export function hangarCost(base, lv, growth) {
 export function stageMods(stage) {
   const g = Math.max(1, stage) - 1;
   return {
-    enemyHp: 1 + 1.2 * g + 0.35 * g * g,       // 적 HP (스테이지 비례 대폭 상향 — 플레이어 화력 성장 대응)
+    enemyHp: 1 + 0.5 * g,                       // 적 HP 스테이지 배수 (주 난이도는 화력 비례 스케일이 담당 — main.js)
     enemyRate: Math.max(0.6, 1 - 0.08 * g),    // 적 발사 주기 배수 (작을수록 빠름)
     crystal: 1 + 0.5 * g,                      // 크리스탈 값 (스테이지↑ → 드론 획득↑, 상위 티어 도달)
     boss: 1 + 0.35 * g,                        // 보스 HP (완만하게 — 진화 화력 스파이크로 이미 커지므로)

@@ -20,7 +20,8 @@ export const BAL = {
   bullet: { speed: 620, radius: 3, cap: 400 },
 
   // 경제 조정: 드론 획득 총량 배수 (크리스탈·수송선). 낮추면 진화가 느려지고 난이도가 오른다.
-  economy: { droneGainMult: 0.7 },
+  // enemyHpPowerScale: 적 HP를 함대 화력(maxPower)에 비례시키는 기준. 작을수록 적이 더 단단.
+  economy: { droneGainMult: 0.7, enemyHpPowerScale: 120 },
 
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
   spawn: { enemyMult: 2 },
