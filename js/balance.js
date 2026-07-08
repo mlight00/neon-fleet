@@ -114,6 +114,16 @@ export const BAL = {
     aimedEvery: 3 },                         // 3발마다 1발은 편대 조준탄
   brood: { spawnInterval: 2.5 },             // 브루드 캐리어 샤드 사출 주기
 
+  // 신규 일반 적 6종 (스프라이트 B16~B21, PNG 없으면 코드 도형 폴백). 거동이 서로 확연히 다르게.
+  newEnemies: {
+    bomber:   { hp: 30, r: 20, hoverY: 150, enterSpeed: 150, stay: 4.5, fireInterval: 2.2, count: 7, spreadDeg: 62, speed: 120, dmgPct: 0.05, dmgMin: 4, coin: 4 }, // 광역 융단(넓은 하강 산탄)
+    zapper:   { hp: 26, r: 16, hoverY: 140, enterSpeed: 200, stay: 4.5, cycle: 2.2, charge: 0.9, beamShots: 9, beamGap: 0.045, speed: 320, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 세로 번개 기둥
+    orbiter:  { hp: 22, r: 15, orbitR: 66, hz: 0.5, descend: 52, fireInterval: 1.1, speed: 235, dmgPct: 0.04, dmgMin: 3, coin: 3 }, // 원 그리며 조준탄
+    shielder: { hp: 62, r: 20, hoverY: 162, enterSpeed: 170, stay: 6, shieldUp: 1.9, shieldDown: 1.5, fireInterval: 1.3, speed: 195, dmgPct: 0.05, dmgMin: 4, coin: 6 }, // 방패 주기 개폐
+    carrier:  { hp: 42, r: 24, hoverY: 128, enterSpeed: 140, stay: 6, spawnInterval: 2.6, spawnCount: 2, coin: 6 }, // 소형 드론 사출
+    blinker:  { hp: 20, r: 15, blink: 1.25, fireInterval: 1.25, speed: 265, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 순간이동+조준탄
+  },
+
   powerModule: { duration: 10, multiplier: 2, radius: 14 },
 
   crystal: {

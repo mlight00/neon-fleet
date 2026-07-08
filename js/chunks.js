@@ -35,7 +35,7 @@ export function pickChunk(tier, rng, prev, filterFn) {
 }
 
 // 위협 개체(초반 안전 구간에서 배제)
-const THREAT_TYPES = new Set(['creature', 'splitter', 'sniper', 'turret', 'weaver', 'charger', 'mine', 'debris']);
+const THREAT_TYPES = new Set(['creature', 'splitter', 'sniper', 'turret', 'weaver', 'charger', 'mine', 'debris', 'bomber', 'zapper', 'orbiter', 'shielder', 'carrier', 'blinker']);
 /** 위협 적이 없는 안전 청크인지 (판 초반 보장용) */
 export function isSafeChunk(chunk) {
   return chunk.items.every((it) => !THREAT_TYPES.has(it.type));
@@ -45,9 +45,10 @@ export function isSafeChunk(chunk) {
 const ENEMY_MIN_STAGE = {
   creature_small: 1, meteor: 1,
   creature_mid: 2, weaver: 2, mine: 2, debris: 2,
-  sniper: 3, charger: 3,
-  creature_large: 4, turret: 4,
-  splitter: 5,
+  sniper: 3, charger: 3, bomber: 3, orbiter: 3,
+  creature_large: 4, turret: 4, zapper: 4, carrier: 4,
+  splitter: 5, shielder: 5,
+  blinker: 6,
 };
 
 /**
@@ -421,6 +422,53 @@ export const CHUNKS = [
       { type: 'debris', x: 0.3, y: 0.58, size: 'big' },
       { type: 'debris', x: 0.72, y: 0.78, size: 'big' },
       { type: 'crystal', x: 0.5, y: 0.46, value: 60 },
+    ],
+  },
+
+  // ─── 신규 적 6종 도입 청크 (봄버·전격·궤도·방패·모선·점멸) ───
+  {
+    tier: 'mid', name: 'm-bomber-run',
+    items: [
+      { type: 'bomber', x: 0.35, y: 0.18 },
+      { type: 'crystal', x: 0.72, y: 0.62, value: 40 },
+    ],
+  },
+  {
+    tier: 'mid', name: 'm-orbiter-spin',
+    items: [
+      { type: 'orbiter', x: 0.4, y: 0.2 },
+      { type: 'crystal', x: 0.5, y: 0.72, value: 45 },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-zapper-lanes',
+    items: [
+      { type: 'zapper', x: 0.3, y: 0.2 },
+      { type: 'zapper', x: 0.7, y: 0.34 },
+      { type: 'crystal', x: 0.5, y: 0.74, value: 60 },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-carrier-nest',
+    items: [
+      { type: 'carrier', x: 0.5, y: 0.18 },
+      { type: 'crystal', x: 0.2, y: 0.6, value: 40 },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-shielder-guard',
+    items: [
+      // 방패병이 대박 크리스탈을 지킨다 — 방패 내려갈 때만 뚫림
+      { type: 'shielder', x: 0.5, y: 0.24 },
+      { type: 'crystal', x: 0.5, y: 0.62, value: 200 },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-blinker-ambush',
+    items: [
+      { type: 'blinker', x: 0.4, y: 0.2 },
+      { type: 'blinker', x: 0.6, y: 0.4 },
+      { type: 'capsule', x: 0.5, y: 0.68, weapon: 'random' },
     ],
   },
 ];

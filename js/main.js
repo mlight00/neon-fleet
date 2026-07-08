@@ -2,7 +2,7 @@
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
-import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, MidBoss, Boss, createEffects } from './entities.js';
+import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, createEffects } from './entities.js';
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary, MODULE_BY_ID } from './modules.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
@@ -326,6 +326,12 @@ function update(dt) {
       else if (it.type === 'weaver') for (let k = 0; k < dup; k++) spawnEnemy(new Weaver(k ? !(it.x < 0.5) : it.x < 0.5, LOGICAL_W), 'weaver');
       else if (it.type === 'charger') for (let k = 0; k < dup; k++) spawnEnemy(new Charger(k ? LOGICAL_W - x : x), 'charger');
       else if (it.type === 'mine') for (let k = 0; k < dup; k++) spawnEnemy(new Mine(k ? LOGICAL_W - x : x), 'mine');
+      else if (it.type === 'bomber') for (let k = 0; k < dup; k++) spawnEnemy(new Bomber(k ? LOGICAL_W - x : x), 'bomber');
+      else if (it.type === 'zapper') for (let k = 0; k < dup; k++) spawnEnemy(new Zapper(k ? LOGICAL_W - x : x), 'zapper');
+      else if (it.type === 'orbiter') for (let k = 0; k < dup; k++) spawnEnemy(new Orbiter(k ? LOGICAL_W - x : x), 'orbiter');
+      else if (it.type === 'shielder') spawnEnemy(new Shielder(x), 'shielder');       // 단일(주기 방패)
+      else if (it.type === 'carrier') spawnEnemy(new BroodCarrier(x), 'carrier');      // 단일(드론 사출)
+      else if (it.type === 'blinker') for (let k = 0; k < dup; k++) spawnEnemy(new Blinker(k ? LOGICAL_W - x : x, LOGICAL_W), 'blinker');
       else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size));
       else if (it.type === 'midboss') w.entities.push(new MidBoss(LOGICAL_W, r.stage, r.maxPower));
       else if (it.type === 'capsule') {

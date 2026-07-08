@@ -447,7 +447,7 @@ export class Squad {
 
     // 호위 드론 무리 (기함 반경 안쪽은 비움)
     const n = Math.min(this.count, BAL.squad.drawCap);
-    const scout = shipSprite(0);
+    const scout = shipSprite(0, this.weapon);
     for (let i = 0; i < n; i++) {
       const o = this._offsets[i];
       const ox = o.x * w;
@@ -468,7 +468,7 @@ export class Squad {
     const punch = this.evolvePunch > 0 ? 1 + 0.5 * (this.evolvePunch / 0.35) : 1;
     ctx.scale((1 - Math.abs(this.bank) * 0.25) * punch, punch);
     drawFlames(ctx, this.tier, this.t);
-    blit(ctx, shipSprite(this.tier), 0, 0);
+    blit(ctx, shipSprite(this.tier, this.weapon), 0, 0);
     drawDeckLights(ctx, this.tier, this.t);
     // 주포 마운트에 현재 무기 색 표시 — 어떤 무기인지 기체만 봐도 알 수 있게
     ctx.fillStyle = WEAPON_COLORS[this.weapon];
@@ -2220,6 +2220,158 @@ export class MidBoss extends Scrolling {
 }
 
 // ───────────────────────── 보스: 하이브 퀸
+// ═════════════ 신규 일반 적 6종 (거동 다양화) — 스프라이트 B16~B21, 없으면 코드 도형 폴백 ═════════════
+const NE = () => BAL.newEnemies;
+function drawEHp(ctx, e) {
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r * 2, 3);
+  ctx.fillStyle = COLORS.enemyCore;
+  ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r * 2 * Math.max(0, e.hp / e.maxHp), 3);
+}
+function enemyDie(e, world, color, coin) {
+  e.dead = true; affixOnDeath(e, world);
+  world.effects.burst(e.x, e.y, color, 14); world.addCoins(coin); sfx('explode_s');
+}
+
+// B16 봄버: 넓은 하강 산탄(융단) — 아래 방치 시 맞음
+export class Bomber {
+  constructor(x) { const c = NE().bomber; this.x = x; this.y = -30; this.hp = this.maxHp = c.hp; this.r = c.r; this.fireInterval = c.fireInterval; this.fireT = c.fireInterval; this.stayT = c.stay; this.state = 'enter'; this.isEnemy = true; this.dead = false; this.t = 0; }
+  update(dt, world) {
+    this.t += dt; const c = NE().bomber;
+    if (this.state === 'enter') { this.y += c.enterSpeed * dt; if (this.y >= c.hoverY) this.state = 'hover'; }
+    else if (this.state === 'hover') {
+      this.stayT -= dt; this.fireT -= dt;
+      if (this.fireT <= 0) {
+        this.fireT = this.fireInterval; const half = (c.spreadDeg * Math.PI / 180) / 2;
+        for (let i = 0; i < c.count; i++) { const a = -half + (i / (c.count - 1)) * 2 * half;
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * c.speed, Math.cos(a) * c.speed, { r: 7, dmgPct: c.dmgPct, dmgMin: c.dmgMin, homing: affixShotHoming(this), color: '#ff9c41', shape: 'ember' })); }
+      }
+      if (this.stayT <= 0) this.state = 'leave';
+    } else { this.y += c.enterSpeed * dt; if (this.y > world.logicalH + 40) this.dead = true; }
+  }
+  hitByBullet(dmg, world) { if (affixAbsorb(this, world)) return; this.hp -= dmg; if (this.hp <= 0) enemyDie(this, world, '#ff9c41', NE().bomber.coin); }
+  draw(ctx) {
+    const gem = getSprite('B16');
+    if (gem) blit(ctx, gem, this.x, this.y);
+    else { ctx.save(); ctx.translate(this.x, this.y); ctx.fillStyle = COLORS.enemyHigh; ctx.beginPath(); ctx.ellipse(0, 0, this.r, this.r * 0.7, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff9c41'; for (const dx of [-8, 0, 8]) { ctx.beginPath(); ctx.arc(dx, 6, 3, 0, Math.PI * 2); ctx.fill(); } ctx.restore(); }
+    if (this.state === 'hover' && this.fireT < BAL.enemyShots.telegraphTime) drawTelegraph(ctx, this.x, this.y, this.r, 1 - this.fireT / BAL.enemyShots.telegraphTime);
+    drawEHp(ctx, this); affixDraw(ctx, this);
+  }
+}
+
+// B17 전격병: 충전 → 세로 번개 기둥 (그 열은 피해야)
+export class Zapper {
+  constructor(x) { const c = NE().zapper; this.x = x; this.y = -30; this.hp = this.maxHp = c.hp; this.r = c.r; this.stayT = c.stay; this.cycleT = c.cycle; this.charging = 0; this.beamQ = 0; this.beamT = 0; this.state = 'enter'; this.isEnemy = true; this.dead = false; this.t = 0; }
+  update(dt, world) {
+    this.t += dt; const c = NE().zapper;
+    if (this.state === 'enter') { this.y += c.enterSpeed * dt; if (this.y >= c.hoverY) this.state = 'hover'; }
+    else if (this.state === 'hover') {
+      this.stayT -= dt;
+      if (this.charging > 0) { this.charging -= dt; if (this.charging <= 0) { this.beamQ = c.beamShots; this.beamT = 0; } }
+      else if (this.beamQ > 0) { this.beamT -= dt; if (this.beamT <= 0) { this.beamT = c.beamGap; this.beamQ--; world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, 0, c.speed, { r: 6, dmgPct: c.dmgPct, dmgMin: c.dmgMin, color: '#8fd4ff', shape: 'needle' })); } }
+      else { this.cycleT -= dt; if (this.cycleT <= 0) { this.cycleT = c.cycle; this.charging = c.charge; } }
+      if (this.stayT <= 0) this.state = 'leave';
+    } else { this.y += c.enterSpeed * dt; if (this.y > world.logicalH + 40) this.dead = true; }
+  }
+  hitByBullet(dmg, world) { if (affixAbsorb(this, world)) return; this.hp -= dmg; if (this.hp <= 0) enemyDie(this, world, '#8fd4ff', NE().zapper.coin); }
+  draw(ctx) {
+    const gem = getSprite('B17');
+    if (gem) blit(ctx, gem, this.x, this.y);
+    else { ctx.save(); ctx.translate(this.x, this.y); ctx.fillStyle = COLORS.enemyMid; ctx.beginPath(); ctx.moveTo(0, -this.r); ctx.lineTo(this.r * 0.7, 0); ctx.lineTo(0, this.r); ctx.lineTo(-this.r * 0.7, 0); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#8fd4ff'; ctx.lineWidth = 2; for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * this.r * 0.5, -this.r * 0.6); ctx.lineTo(s * this.r * 0.95, -this.r * 1.15); ctx.stroke(); } ctx.restore(); }
+    if (this.charging > 0) { ctx.save(); ctx.globalAlpha = 0.2 + 0.5 * (1 - this.charging / NE().zapper.charge); ctx.strokeStyle = '#8fd4ff'; ctx.lineWidth = this.r * 1.1; ctx.beginPath(); ctx.moveTo(this.x, this.y + this.r); ctx.lineTo(this.x, this.y + 500); ctx.stroke(); ctx.restore(); }
+    drawEHp(ctx, this); affixDraw(ctx, this);
+  }
+}
+
+// B18 궤도병: 원을 그리며 하강 + 조준탄 (맞추기 어려움)
+export class Orbiter {
+  constructor(x) { const c = NE().orbiter; this.cx = x; this.cy = -30; this.hp = this.maxHp = c.hp; this.r = c.r; this.a = Math.random() * Math.PI * 2; this.fireT = c.fireInterval; this.isEnemy = true; this.dead = false; this.t = 0; this.x = x; this.y = -30; }
+  update(dt, world) {
+    this.t += dt; const c = NE().orbiter;
+    this.cy += c.descend * dt; this.a += c.hz * Math.PI * 2 * dt;
+    const cxC = Math.max(c.orbitR, Math.min(world.logicalW - c.orbitR, this.cx));
+    this.x = cxC + Math.cos(this.a) * c.orbitR;
+    this.y = this.cy + Math.sin(this.a) * c.orbitR * 0.6;
+    this.fireT -= dt;
+    if (this.fireT <= 0 && this.y > 0) { this.fireT = c.fireInterval; world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y, world.squad.x, world.squad.y, c.speed, { dmgPct: c.dmgPct, dmgMin: c.dmgMin, homing: affixShotHoming(this), color: '#c86bff', shape: 'orb' })); }
+    if (this.cy > world.logicalH + 60) this.dead = true;
+  }
+  hitByBullet(dmg, world) { if (affixAbsorb(this, world)) return; this.hp -= dmg; if (this.hp <= 0) enemyDie(this, world, '#c86bff', NE().orbiter.coin); }
+  draw(ctx) {
+    const gem = getSprite('B18');
+    if (gem) blit(ctx, gem, this.x, this.y);
+    else { ctx.save(); ctx.translate(this.x, this.y); ctx.strokeStyle = COLORS.enemyMid; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, this.r, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = '#c86bff'; ctx.beginPath(); ctx.arc(0, 0, this.r * 0.4, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    drawEHp(ctx, this); affixDraw(ctx, this);
+  }
+}
+
+// B19 방패병: 앞 방패 주기 개폐 — 방패 올라간 동안 무적, 내려갔을 때만 타격
+export class Shielder {
+  constructor(x) { const c = NE().shielder; this.x = x; this.y = -30; this.hp = this.maxHp = c.hp; this.r = c.r; this.stayT = c.stay; this.fireT = c.fireInterval; this.shield = true; this.shieldT = c.shieldUp; this.state = 'enter'; this.isEnemy = true; this.dead = false; this.t = 0; }
+  update(dt, world) {
+    this.t += dt; const c = NE().shielder;
+    if (this.state === 'enter') { this.y += c.enterSpeed * dt; if (this.y >= c.hoverY) this.state = 'hover'; }
+    else if (this.state === 'hover') {
+      this.stayT -= dt; this.shieldT -= dt;
+      if (this.shieldT <= 0) { this.shield = !this.shield; this.shieldT = this.shield ? c.shieldUp : c.shieldDown; }
+      this.fireT -= dt; if (this.fireT <= 0) { this.fireT = c.fireInterval; world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, c.speed, { dmgPct: c.dmgPct, dmgMin: c.dmgMin, homing: affixShotHoming(this), color: '#57e0ff', shape: 'orb' })); }
+      if (this.stayT <= 0) this.state = 'leave';
+    } else { this.y += c.enterSpeed * dt; if (this.y > world.logicalH + 40) this.dead = true; }
+  }
+  hitByBullet(dmg, world) { if (this.shield) { world.effects.burst(this.x, this.y + this.r * 0.6, '#57e0ff', 2, 60); return; } if (affixAbsorb(this, world)) return; this.hp -= dmg; if (this.hp <= 0) enemyDie(this, world, '#57e0ff', NE().shielder.coin); }
+  draw(ctx) {
+    const gem = getSprite('B19');
+    if (gem) blit(ctx, gem, this.x, this.y);
+    else { ctx.save(); ctx.translate(this.x, this.y); ctx.fillStyle = COLORS.enemyHigh; ctx.beginPath(); ctx.arc(0, 0, this.r * 0.8, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    if (this.shield) { ctx.save(); ctx.globalAlpha = 0.55; ctx.strokeStyle = '#57e0ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(this.x, this.y + this.r * 0.3, this.r * 1.45, Math.PI * 0.12, Math.PI * 0.88); ctx.stroke(); ctx.restore(); }
+    drawEHp(ctx, this); affixDraw(ctx, this);
+  }
+}
+
+// B20 모선: 소형 드론 주기 사출 (수 압박)
+export class BroodCarrier {
+  constructor(x) { const c = NE().carrier; this.x = x; this.y = -30; this.hp = this.maxHp = c.hp; this.r = c.r; this.stayT = c.stay; this.spawnT = c.spawnInterval; this.state = 'enter'; this.isEnemy = true; this.dead = false; this.t = 0; }
+  update(dt, world) {
+    this.t += dt; const c = NE().carrier;
+    if (this.state === 'enter') { this.y += c.enterSpeed * dt; if (this.y >= c.hoverY) this.state = 'hover'; }
+    else if (this.state === 'hover') {
+      this.stayT -= dt; this.spawnT -= dt;
+      if (this.spawnT <= 0) { this.spawnT = c.spawnInterval; for (let i = 0; i < c.spawnCount; i++) { const off = (i - (c.spawnCount - 1) / 2) * (this.r + 8); world.spawnEntity(new Creature(this.x + off, this.y + this.r, 'small')); } }
+      if (this.stayT <= 0) this.state = 'leave';
+    } else { this.y += c.enterSpeed * dt; if (this.y > world.logicalH + 40) this.dead = true; }
+  }
+  hitByBullet(dmg, world) { if (affixAbsorb(this, world)) return; this.hp -= dmg; if (this.hp <= 0) enemyDie(this, world, COLORS.enemyHigh, NE().carrier.coin); }
+  draw(ctx) {
+    const gem = getSprite('B20');
+    if (gem) blit(ctx, gem, this.x, this.y);
+    else { ctx.save(); ctx.translate(this.x, this.y); ctx.fillStyle = COLORS.enemyHigh; ctx.beginPath(); ctx.ellipse(0, 0, this.r, this.r * 0.75, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = COLORS.enemyCore; for (const dx of [-9, 0, 9]) { ctx.beginPath(); ctx.arc(dx, 5, 3, 0, Math.PI * 2); ctx.fill(); } ctx.restore(); }
+    drawEHp(ctx, this); affixDraw(ctx, this);
+  }
+}
+
+// B21 점멸병: 순간이동하며 조준탄 (예측 불가)
+export class Blinker {
+  constructor(x, logicalW) { const c = NE().blinker; this.x = x; this.y = -30; this.hp = this.maxHp = c.hp; this.r = c.r; this.blinkT = c.blink; this.fireT = c.fireInterval; this.logicalW = logicalW; this.isEnemy = true; this.dead = false; this.t = 0; this.appearT = 0; }
+  update(dt, world) {
+    this.t += dt; const c = NE().blinker;
+    this.y += 28 * dt; this.appearT = Math.min(1, this.appearT + dt * 4);
+    this.blinkT -= dt;
+    if (this.blinkT <= 0) { this.blinkT = c.blink; this.x = 40 + Math.random() * (this.logicalW - 80); this.y = Math.max(60, Math.min(world.logicalH * 0.5, this.y + (Math.random() - 0.5) * 130)); this.appearT = 0; world.effects.burst(this.x, this.y, '#c86bff', 8, 120); }
+    this.fireT -= dt;
+    if (this.fireT <= 0 && this.appearT > 0.5) { this.fireT = c.fireInterval; world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y, world.squad.x, world.squad.y, c.speed, { dmgPct: c.dmgPct, dmgMin: c.dmgMin, homing: affixShotHoming(this), color: '#d08bff', shape: 'needle' })); }
+    if (this.y > world.logicalH + 60) this.dead = true;
+  }
+  hitByBullet(dmg, world) { if (affixAbsorb(this, world)) return; this.hp -= dmg; if (this.hp <= 0) enemyDie(this, world, '#c86bff', NE().blinker.coin); }
+  draw(ctx) {
+    ctx.save(); ctx.globalAlpha = 0.35 + 0.65 * this.appearT;
+    const gem = getSprite('B21');
+    if (gem) blit(ctx, gem, this.x, this.y);
+    else { ctx.translate(this.x, this.y); ctx.fillStyle = '#c86bff'; ctx.beginPath(); ctx.moveTo(0, -this.r); ctx.lineTo(this.r * 0.8, 0); ctx.lineTo(0, this.r); ctx.lineTo(-this.r * 0.8, 0); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    drawEHp(ctx, this); affixDraw(ctx, this);
+  }
+}
+
 export class Boss {
   constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1) {
     // 스테이지별 보스: 로스터 순환. PNG가 아직 없으면 하이브 퀸 이미지로 폴백 (sprite() 참고)

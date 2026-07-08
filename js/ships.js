@@ -181,9 +181,10 @@ export const SHIP_DEFS = [
 ];
 
 const spriteCache = [];
-export function shipSprite(tier) {
-  // Gemini 아트 스프라이트 우선, 로드 전/실패 시 기존 절차적 드로잉 폴백
-  const gem = getSprite('A' + (tier + 1));
+export function shipSprite(tier, weapon) {
+  // 무기별 함선 변형 우선(A{n}{V=발칸/L=레이저/H=호밍}) → 기존 A{n} → 절차적 드로잉 폴백
+  const wc = weapon === 'laser' ? 'L' : weapon === 'homing' ? 'H' : 'V';
+  const gem = getSprite('A' + (tier + 1) + wc) || getSprite('A' + (tier + 1));
   if (gem) return gem;
   if (!spriteCache[tier]) {
     const d = SHIP_DEFS[tier];

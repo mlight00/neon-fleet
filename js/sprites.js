@@ -33,6 +33,11 @@ export const BOSS_ROSTER = [
   { id: 'B9', name: 'VORTEX MAW', korName: '볼텍스 마우' },
   { id: 'B10', name: 'OBSIDIAN CLAW', korName: '옵시디언 클로' },
   { id: 'B11', name: 'VOID SERAPH', korName: '보이드 세라프' },
+  // 신규 보스 4종 (PNG 없으면 하이브 퀸 벡터로 폴백, 공격 패턴은 balance.bossPatterns)
+  { id: 'B12', name: 'PRISM TYRANT', korName: '프리즘 타이런트' },
+  { id: 'B13', name: 'TIDAL LEVIATHAN', korName: '타이달 리바이어던' },
+  { id: 'B14', name: 'STORMBRINGER', korName: '스톰브링어' },
+  { id: 'B15', name: 'OPTIC WARDEN', korName: '옵틱 워든' },
 ];
 export function bossDefFor(stage) {
   return BOSS_ROSTER[(Math.max(1, stage) - 1) % BOSS_ROSTER.length];
@@ -69,8 +74,21 @@ export const SPRITE_SIZES = {
   B1: 30, B2: 46, B3: 66,                      // 샤드/리퍼/브루드
   B4: 36, B5: 42, B6: 38,                      // 저격/포탑/위버
   B7: 150, B8: 150, B9: 150, B10: 150, B11: 150, // 스테이지 보스 5종 — 잘림 방지 위해 축소
+  B12: 150, B13: 150, B14: 150, B15: 150,      // 신규 보스 4종
+  B16: 46, B17: 42, B18: 40, B19: 48, B20: 52, B21: 40, // 신규 일반 적 6종
   C1: 56, C2: 30, C3: 34, C4: 46,              // 크리스탈/캡슐/파워/운석
 };
+
+// 무기별 함선 변형 슬롯 A{1..6}{V=발칸/L=레이저/H=호밍} + 신규 적/보스 PNG 슬롯 자동 등록.
+// 파일이 있으면 자동 사용, 없으면 loadSprite가 404→코드/기존 스프라이트 폴백(게임 안 깨짐).
+const SHIP_TIER_SIZE = [34, 60, 78, 104, 132, 172];
+for (let t = 1; t <= 6; t++) for (const w of ['V', 'L', 'H']) {
+  RASTER_ART.C['A' + t + w] = `assets/styleC/A${t}${w}.png`;
+  SPRITE_SIZES['A' + t + w] = SHIP_TIER_SIZE[t - 1];
+}
+for (const id of ['B12', 'B13', 'B14', 'B15', 'B16', 'B17', 'B18', 'B19', 'B20', 'B21']) {
+  RASTER_ART.C[id] = `assets/styleC/${id}.png`;
+}
 
 const cache = new Map(); // key: `${style}:${id}` → canvas | null(로드 실패)
 
