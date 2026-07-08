@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyGate, hitCrystal, stormDecay, scaleGate } from '../js/logic.js';
+import { applyGate, hitCrystal, stormDecay, scaleGate, generateSectorMap } from '../js/logic.js';
+import { mulberry32 } from '../js/chunks.js';
 
 test('applyGate: 덧셈/곱셈/뺄셈/나눗셈, 최소 0, 나눗셈 내림', () => {
   assert.equal(applyGate(10, { op: '+', value: 5 }), 15);
@@ -12,6 +13,26 @@ test('applyGate: 덧셈/곱셈/뺄셈/나눗셈, 최소 0, 나눗셈 내림', ()
 test('applyGate: 0기에서 좋은 게이트를 받으면 살아난다', () => {
   assert.equal(applyGate(0, { op: '+', value: 5 }), 5);
   assert.equal(applyGate(0, { op: 'x', value: 3 }), 0);
+});
+
+test('generateSectorMap: 열 구조·보스 1개·도달성·정비 보장', () => {
+  for (const seed of [1, 42, 777, 2024]) {
+    const m = generateSectorMap(2, mulberry32(seed), 5);
+    assert.equal(m.cols.length, 6, '열 = depth+1');
+    assert.equal(m.cols[0].length, 1); assert.equal(m.cols[0][0].type, 'combat'); // 진입
+    assert.equal(m.cols[5].length, 1); assert.equal(m.cols[5][0].type, 'boss');   // 보스
+    // 보스 정확히 1개
+    const bosses = m.cols.flat().filter((n) => n.type === 'boss');
+    assert.equal(bosses.length, 1);
+    // 모든 non-첫열 노드는 이전 열에서 최소 1개 incoming (도달성)
+    for (let c = 1; c < m.cols.length; c++) for (let r = 0; r < m.cols[c].length; r++) {
+      assert.ok(m.cols[c - 1].some((n) => n.next.includes(r)), `col${c} row${r} 도달불가(seed${seed})`);
+    }
+    // 보스 직전 열에 정비 노드 보장
+    assert.ok(m.cols[4].some((n) => n.type === 'repair'), `보스직전 정비 없음(seed${seed})`);
+    // 모든 중간 노드는 타입이 배정됨
+    for (let c = 1; c < 5; c++) for (const n of m.cols[c]) assert.ok(n.type, 'type 미배정');
+  }
 });
 
 test('scaleGate: 정액(+/−)은 스테이지마다 커지고, 비율(×/÷)은 원본 유지', () => {

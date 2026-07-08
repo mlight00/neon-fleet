@@ -6,7 +6,7 @@ import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor,
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary, MODULE_BY_ID } from './modules.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
-import { stageMods, hangarCost, scaleGate } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -128,93 +128,143 @@ function newExpedition() {
     stage: 1, mods: world.stageMods,
     modules: [],                  // 뽑은 모듈 id 누적 (중복 = 스택)
     pending: [], traveled: 0, totalTrack: 0,
-    phase: 'track', boss: null, endT: 0,
+    phase: 'track', boss: null, bosses: [], endT: 0,
     maxPower: squad.power, scrollY: 0,
+    sector: 1, map: null, node: null, done: [], isBossNode: false,   // 섹터 분기 맵
   };
-  buildStage(1);
+  startSector(1);
 }
 
-// 한 스테이지의 트랙을 (재)구성. 기함·드론·모듈·코인은 유지, 스테이지별 요소만 리셋.
-function buildStage(stage) {
+// ── 섹터 분기 맵 ─────────────────────────────────────────────
+/** 섹터 시작: 맵 생성 → 맵 화면 */
+function startSector(sector) {
+  const r = run;
+  r.sector = sector;
+  r.map = generateSectorMap(sector, r.rng, BAL.sector.depth);
+  r.node = null; r.done = [];
+  const d = save.get();
+  if (sector > (d.stage || 0)) save.set({ stage: sector });   // 최고 도달 섹터 기록
+  enterSectorMap();
+}
+
+/** 맵 화면(갈림길 선택). 게임 정지 상태(state='map'). */
+function enterSectorMap() {
+  const r = run;
+  state = 'map';
+  playBgm('title');
+  ui.showSectorMap({
+    map: r.map, currentId: r.node ? r.node.id : null, doneIds: r.done,
+    sector: r.sector, coins: r.world.coins, onPick: enterNode,
+  });
+}
+
+/** 노드 진입: 타입별 인카운터로 분기 */
+function enterNode(node) {
+  const r = run;
+  r.stage = (r.sector - 1) * (BAL.sector.depth + 1) + node.col + 1;   // 난이도 카운터(기존 스케일 재활용)
+  r.node = node;
+  if (node.type === 'repair') { enterRepair(node); return; }
+  buildEncounter(node);
+  state = 'play'; drafting = false; ui.hide();
+  playBgm('battle1'); sfx('start');
+  const label = { combat: '교전', elite: '정예 교전', hazard: '위험 지대', supply: '보급', boss: '섹터 보스' }[node.type] || '교전';
+  r.effects.text(LOGICAL_W / 2, logicalH * 0.4, label, node.type === 'boss' ? COLORS.danger : COLORS.reward);
+  r.effects.flash(0.3);
+}
+
+/** 정비 노드: 드론 회복 + 무료 모듈 1장 (트랙 없음) → 맵 복귀 */
+function enterRepair(node) {
+  const r = run;
+  const heal = Math.max(BAL.sector.repairMin, Math.round(r.squad.count * BAL.sector.repairPct));
+  r.squad.applyDelta(heal, r.world);
+  sfx('pickup');
+  const opts = draftOptions(r.modules, r.rng, 3);
+  if (opts.length) {
+    drafting = true; state = 'map';
+    ui.showDraft({
+      options: opts, owned: moduleSummary(r.modules),
+      onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); completeNode(node); },
+    });
+  } else { completeNode(node); }
+}
+
+/** 노드 인카운터 트랙 구성 (타입별 청크 필터·길이·보스 게이트). r.stage는 enterNode에서 설정됨. */
+function buildEncounter(node) {
   const r = run, w = r.world;
+  const stage = r.stage;
   const mods = stageMods(stage);
-  r.stage = stage; r.mods = mods; w.stageMods = mods;
+  r.mods = mods; w.stageMods = mods;
+  r.isBossNode = node.type === 'boss';
   w.scrollSpeed = BAL.scrollSpeed;
   w.entities.length = 0; w.bullets.length = 0; w.enemyBullets.length = 0;
   r.boss = null; w.boss = null; r.bosses = []; w.bosses = [];
   r.phase = 'track'; w.phase = 'track';
-  r.traveled = 0;
-  const totalTrack = BAL.chunk.heightPx * BAL.chunk.perRun;
+  r.traveled = 0; r.clearShown = false;
+  const perRun = (node.type === 'hazard' || node.type === 'supply' || node.type === 'boss') ? BAL.sector.shortLen : BAL.sector.combatLen;
+  const totalTrack = BAL.chunk.heightPx * perRun;
   r.totalTrack = totalTrack;
   const tb = BAL.chunk.tierBounds;
   const bounds = [Math.max(0.1, tb[0] - mods.tierShift), Math.max(0.35, tb[1] - mods.tierShift)];
   const rng = r.rng;
   const stageOk = (c) => chunkMinStage(c) <= stage;
+  const has = (c, ...t) => c.items.some((it) => t.includes(it.type));
+  const filt = node.type === 'supply' ? (c) => stageOk(c) && isSafeChunk(c) && has(c, 'crystal', 'capsule')
+    : node.type === 'hazard' ? (c) => stageOk(c) && has(c, 'debris', 'mine')
+      : stageOk;
   const pending = [];
   let prev = null;
-  const safeCount = Math.min(4, 2 + Math.floor((stage - 1) / 3));
-  for (let i = 0; i < BAL.chunk.perRun; i++) {
-    const tier = pickTier(i / BAL.chunk.perRun, bounds);
-    const filter = i < safeCount ? (c) => stageOk(c) && isSafeChunk(c) : stageOk;
-    const chunk = pickChunk(tier, rng, prev, filter);
+  const safeCount = node.type === 'boss' ? 1 : Math.min(3, 1 + Math.floor((stage - 1) / 4));
+  for (let i = 0; i < perRun; i++) {
+    const tier = pickTier(i / perRun, bounds);
+    const f = i < safeCount ? (c) => filt(c) && isSafeChunk(c) : filt;
+    const chunk = pickChunk(tier, rng, prev, f);
     prev = chunk;
     for (const it of chunk.items) {
       if (it.type === 'storm') continue;
       pending.push({ ...it, trackY: i * BAL.chunk.heightPx + it.y * BAL.chunk.heightPx });
     }
   }
-  if (stage === 1) pending.push({ type: 'weaponGate', trackY: 380 }); // 무기는 원정당 1회 선택(이후 유지)
-  pending.push({ type: 'bonusGate', trackY: totalTrack * BAL.bonusGate.progress });
-  for (let i = 0; i < BAL.pod.perRun; i++) {
-    const prog = (i + 0.6) / BAL.pod.perRun;
-    const size = prog < bounds[0] ? 'small' : prog < bounds[1] ? 'mid' : 'large';
-    pending.push({ type: 'dronePod', trackY: totalTrack * Math.min(0.96, prog), x: 0.18 + 0.64 * rng(), size });
+  if (r.sector === 1 && node.col === 0) pending.push({ type: 'weaponGate', trackY: 380 }); // 무기 선택 1회(첫 노드)
+  if (node.type === 'combat' || node.type === 'elite' || node.type === 'supply') {
+    pending.push({ type: 'bonusGate', trackY: totalTrack * BAL.bonusGate.progress });
+    for (let i = 0; i < BAL.pod.perRun; i++) {
+      const prog = (i + 0.6) / BAL.pod.perRun;
+      const size = prog < bounds[0] ? 'small' : prog < bounds[1] ? 'mid' : 'large';
+      pending.push({ type: 'dronePod', trackY: totalTrack * Math.min(0.96, prog), x: 0.18 + 0.64 * rng(), size });
+    }
   }
-  if (stage >= 2) pending.push({ type: 'midboss', trackY: totalTrack * BAL.midboss.progress });
+  if (node.type === 'elite') pending.push({ type: 'midboss', trackY: totalTrack * BAL.midboss.progress }); // 정예=미니보스
   pending.sort((a, b) => a.trackY - b.trackY);
   r.pending = pending;
-  r.squad.y = logicalH - 130;    // 연속 스테이지 진입 시 편대를 아래에서 다시 시작
+  r.squad.y = logicalH - 130;
   r.squad.dead = false;
 }
 
-// 보스 격파 → 다음 스테이지로 연속 진행 (기함·모듈 유지)
-// 보스 격파 → 성과 요약 화면 + 여유 시간, 준비되면 다음 스테이지로
-function advanceStage() {
-  const r = run;
-  r.world.addCoins(BAL.run.coinPerClear * r.stage); // 클리어 코인 누적
-  const next = r.stage + 1;
-  const data = save.get();
-  if (next > data.stage) save.set({ stage: next });  // 최고 도달 스테이지 기록
-  betweenStages = true;
-  playBgm('title');                                   // 잠시 차분한 BGM
-  ui.showStageClear({
-    stage: r.stage,
-    nextStage: next,
-    bossName: r.boss?.korName ?? '보스',
-    power: Math.round(r.maxPower),
-    drones: r.squad.count,
-    tierName: BAL.evolution.names[r.squad.tier],
-    coins: r.world.coins,
-    modules: moduleSummary(r.modules),
-    onNext() {
-      betweenStages = false;
-      ui.hide();
-      buildStage(next);
-      playBgm('battle1');
-      r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `STAGE ${next}`, COLORS.reward);
-      r.effects.flash(0.3);
-    },
-  });
+/** 인카운터 클리어(트랙/보스 종료) → 코인 + 노드 완료 */
+function onEncounterClear() {
+  run.world.addCoins(BAL.run.coinPerClear * run.stage);
+  completeNode(run.node);
 }
 
+/** 노드 완료 → 맵 복귀, 보스 노드면 다음 섹터 */
+function completeNode(node) {
+  const r = run;
+  if (node && !r.done.includes(node.id)) r.done.push(node.id);
+  if (node && node.type === 'boss') {
+    r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `섹터 ${r.sector} 클리어!`, COLORS.reward);
+    startSector(r.sector + 1);
+  } else {
+    enterSectorMap();
+  }
+}
+
+// (구 advanceStage 제거 — 섹터 맵의 onEncounterClear/completeNode가 진행을 담당)
+
 function startPlay() {
-  newExpedition();
-  state = 'play';
   drafting = false;
   betweenStages = false;
-  ui.hide();
   sfx('start');
-  playBgm('battle1'); // 전투 BGM으로 크로스페이드
+  newExpedition();   // → startSector(1) → enterSectorMap(): 섹터 맵 화면(state='map'). 노드 선택 시 전투 시작.
 }
 
 // 모듈 효과 누적기 재계산 (모듈 획득 시)
@@ -356,7 +406,10 @@ function update(dt) {
       }
     }
 
-    if (r.traveled >= r.totalTrack && r.pending.length === 0) {
+    if (r.traveled >= r.totalTrack && r.pending.length === 0 && !r.isBossNode) {
+      // 비보스 노드: 보스 없이 통과 연출 → 맵 복귀
+      r.phase = 'flythrough'; r.flyV = BAL.flythrough.startV; r.clearShown = true;
+    } else if (r.traveled >= r.totalTrack && r.pending.length === 0) {
       r.phase = 'boss';
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
@@ -425,14 +478,14 @@ function update(dt) {
     for (const b of r.bosses) b.deathT += dt;
     r.squad.update(dt, w);
     // 보스 위치를 지나는 순간 "STAGE CLEAR" 배너
-    if (!r.clearShown && r.squad.y < r.boss.y + 30) {
+    if (!r.clearShown && r.boss && r.squad.y < r.boss.y + 30) {
       r.clearShown = true;
       r.effects.text(LOGICAL_W / 2, logicalH * 0.42, 'STAGE CLEAR!', COLORS.ally);
       r.effects.ring(LOGICAL_W / 2, logicalH * 0.42, COLORS.ally);
       r.effects.flash(0.4);
       sfx('evolve');
     }
-    if (r.squad.y < BAL.flythrough.exitY) { advanceStage(); return; }
+    if (r.squad.y < BAL.flythrough.exitY) { onEncounterClear(); return; }
   }
 
   // 개체 업데이트
@@ -510,7 +563,7 @@ function endExpedition({ toTitle = false } = {}) {
   const coins = Math.round(r.world.coins * r.world.stats.coinMult);
   save.set({ best, coins: data.coins + coins, stage: Math.max(data.stage, r.stage) });
   if (toTitle) { showTitleScreen(); return; }
-  ui.showLose({ stage: r.stage, maxPower: r.maxPower, coins, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
+  ui.showLose({ stage: r.sector, maxPower: r.maxPower, coins, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
 }
 
 // ───────────────────────── 격납고 (영구 강화 상점)
@@ -597,7 +650,7 @@ function draw() {
       tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag + (r.squad.ascension ? ` ★${r.squad.ascension}` : ''),  // 기함 개성 + 무한 승천 별
       tierPower: BAL.evolution.shipPower[r.squad.tier] + (r.squad.overloadPower || 0),
       nextCost: Math.round(rawNext * evc),
-      stage: r.stage,
+      stage: r.sector,
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,
       shield: r.squad.shield,

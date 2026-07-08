@@ -73,3 +73,49 @@ export function evolveStep(count, tier, costs, retainBase, retainRatio = 0) {
   const kept = Math.min(count, Math.max(retainBase, Math.round(count * retainRatio)));
   return { tier: tier + 1, count: kept, consumed: count - kept };
 }
+
+/**
+ * 섹터 분기 맵 생성 (순수 함수, 시드 재현 가능).
+ * 반환 { sector, depth, cols }. cols=열 배열, 각 열=노드 배열.
+ * node = { id, col, row, type, next:[다음 열의 row 인덱스] }.
+ * col 0=진입(combat 1), col 1..depth-1=선택 노드 2~3, col depth=boss 1.
+ * type ∈ combat/elite/hazard/supply/repair/boss.
+ */
+export function generateSectorMap(sector, rng, depth = 5) {
+  const cols = [[{ col: 0, row: 0, type: 'combat' }]];
+  for (let c = 1; c < depth; c++) {
+    const n = 2 + (rng() < 0.5 ? 1 : 0);              // 2~3 노드
+    cols.push(Array.from({ length: n }, (_, r) => ({ col: c, row: r, type: null })));
+  }
+  cols.push([{ col: depth, row: 0, type: 'boss' }]);
+
+  // 타입 배정 (중간 열)
+  for (let c = 1; c < depth; c++) for (const node of cols[c]) {
+    const roll = rng();
+    node.type = roll < 0.12 ? 'hazard' : roll < 0.28 ? 'supply' : roll < 0.42 ? 'elite' : roll < 0.52 ? 'repair' : 'combat';
+  }
+  // 1열은 완만하게 (repair/elite 금지)
+  for (const node of cols[1]) if (node.type === 'repair' || node.type === 'elite') node.type = 'combat';
+  // 보스 직전 열엔 정비(repair) 최소 1개 보장
+  const pre = cols[depth - 1];
+  if (!pre.some((n) => n.type === 'repair')) pre[Math.floor(rng() * pre.length)].type = 'repair';
+
+  // 분기 엣지: 각 노드 → 다음 열 인접 row 1~2개
+  for (let c = 0; c < cols.length - 1; c++) {
+    const cur = cols[c], nxt = cols[c + 1];
+    for (let i = 0; i < cur.length; i++) {
+      const base = nxt.length === 1 ? 0 : Math.round((i / Math.max(1, cur.length - 1)) * (nxt.length - 1));
+      const t = new Set([base]);
+      if (nxt.length > 1 && rng() < 0.6) t.add(Math.max(0, Math.min(nxt.length - 1, base + (rng() < 0.5 ? -1 : 1))));
+      cur[i].next = [...t].sort((a, b) => a - b);
+    }
+    // 역연결 보장: 다음 열 모든 노드가 최소 1개 incoming
+    for (let j = 0; j < nxt.length; j++) if (!cur.some((n) => n.next.includes(j))) {
+      const near = Math.min(cur.length - 1, Math.round((j / Math.max(1, nxt.length - 1)) * (cur.length - 1)));
+      cur[near].next = [...new Set([...cur[near].next, j])].sort((a, b) => a - b);
+    }
+  }
+  let id = 0;
+  for (const col of cols) for (const node of col) node.id = id++;
+  return { sector, depth, cols };
+}

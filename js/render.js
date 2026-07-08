@@ -226,7 +226,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, tierName,
   if (stage) {
     ctx.font = 'bold 11px sans-serif';
     ctx.fillStyle = COLORS.reward;
-    ctx.fillText(`STAGE ${stage}`, 12, 59);
+    ctx.fillText(`섹터 ${stage}`, 12, 59);
   }
   // 보유 모듈 아이콘 줄 (빌드가 커지는 게 보인다)
   if (modules && modules.length) {

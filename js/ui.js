@@ -176,6 +176,65 @@ export const ui = {
     });
   },
 
+  /** 섹터 분기 맵: 갈림길에서 다음 노드를 고른다 (게임 일시 정지) */
+  showSectorMap({ map, currentId = null, doneIds = [], sector, coins = 0, onPick }) {
+    const META = {
+      combat: { icon: '⚔️', label: '교전', color: '#ff6b6b' },
+      elite: { icon: '☠️', label: '정예', color: '#ff4cd2' },
+      hazard: { icon: '☄️', label: '위험', color: '#ff9c41' },
+      supply: { icon: '💎', label: '보급', color: '#6fe3ff' },
+      repair: { icon: '🔧', label: '정비', color: '#7cff6b' },
+      boss: { icon: '👑', label: '보스', color: '#ffd93d' },
+    };
+    const W = 300, H = 430, mx = 46, my = 40, SP = 84;
+    const idToNode = {};
+    map.cols.forEach((col) => col.forEach((n) => { idToNode[n.id] = n; }));
+    const current = currentId != null ? idToNode[currentId] : null;
+    const reach = current ? current.next.map((r) => map.cols[current.col + 1][r]) : map.cols[0];
+    const reachIds = new Set(reach.map((n) => n.id));
+    const done = new Set(doneIds);
+    const pos = (node) => {
+      const n = map.cols[node.col].length;
+      return { x: W / 2 + (node.row - (n - 1) / 2) * SP, y: H - my - (node.col / map.depth) * (H - 2 * my) };
+    };
+    let lines = '';
+    for (const col of map.cols) for (const node of col) {
+      if (!node.next) continue;
+      const p = pos(node);
+      for (const r of node.next) {
+        const nn = map.cols[node.col + 1][r]; const q = pos(nn);
+        const active = reachIds.has(nn.id) && (current ? node.id === current.id : node.col === 0);
+        lines += `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" stroke="${active ? '#3ff5e0' : 'rgba(200,220,255,0.14)'}" stroke-width="${active ? 2.5 : 1.5}"/>`;
+      }
+    }
+    let nodes = '';
+    for (const col of map.cols) for (const node of col) {
+      const p = pos(node); const m = META[node.type];
+      const isReach = reachIds.has(node.id); const isDone = done.has(node.id);
+      const op = isDone ? 0.3 : isReach ? 1 : 0.62;
+      const bd = isReach ? '#3ff5e0' : m.color;
+      const glow = isReach ? 'box-shadow:0 0 12px #3ff5e0;' : '';
+      const st = `position:absolute;left:${p.x - 22}px;top:${p.y - 22}px;width:44px;height:44px;border-radius:50%;border:2px solid ${bd};background:rgba(10,16,28,0.9);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:${op};${glow}${isReach ? 'cursor:pointer' : 'cursor:default'}`;
+      nodes += isReach
+        ? `<button data-node="${node.id}" style="${st}" title="${m.label}">${m.icon}</button>`
+        : `<div style="${st}" title="${m.label}">${m.icon}</div>`;
+    }
+    const legend = Object.values(META).map((m) => `<span style="white-space:nowrap">${m.icon}${m.label}</span>`).join(' · ');
+    panel(`
+      <h2 style="color:#3ff5e0">섹터 ${sector} · 항로 선택</h2>
+      <p><small>빛나는 노드 중 하나를 골라 진격 (위 = 섹터 보스)</small></p>
+      <div style="position:relative;width:${W}px;height:${H}px;margin:6px auto">
+        <svg width="${W}" height="${H}" style="position:absolute;left:0;top:0;pointer-events:none">${lines}</svg>
+        ${nodes}
+      </div>
+      <p style="font-size:10.5px;color:#9fb8d8;line-height:1.6">${legend}</p>
+      <p><small>🪙 ${coins.toLocaleString()}</small></p>
+    `);
+    overlay.querySelectorAll('[data-node]').forEach((b) => {
+      b.addEventListener('click', () => onPick(idToNode[+b.dataset.node]));
+    });
+  },
+
   /** 스테이지 클리어 성과 요약 + 여유 시간 (준비되면 다음 스테이지) */
   showStageClear({ stage, nextStage, bossName, power, drones, tierName, coins, modules = [], onNext }) {
     const mods = modules.length

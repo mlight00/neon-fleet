@@ -214,6 +214,15 @@ export const BAL = {
     coinPerProgress: 20,    // 실패 시 진행도 x 이 값
   },
 
+  // 섹터 분기 맵 (슬레이 더 스파이어식)
+  sector: {
+    depth: 5,          // 열 깊이 (col 0 진입 ~ col 5 보스 = 6열)
+    combatLen: 7,      // 교전/정예 노드 트랙 청크 수
+    shortLen: 4,       // 위험/보급/보스 노드 트랙 청크 수
+    repairPct: 0.5,    // 정비 노드: 현재 드론의 이 비율만큼 회복(추가)
+    repairMin: 20,     // 정비 최소 회복량
+  },
+
   // 보스별 고유 공격 패턴 (스프라이트 ID 기준). fan(부채꼴) 슬롯이 kind별 서명기로 대체된다.
   // shotMult/minionMult = 조준탄·소환 주기 배수 (클수록 느슨), tanky = 보스 HP 배수
   bossPatterns: {
