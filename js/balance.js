@@ -222,6 +222,11 @@ export const BAL = {
     B9:  { kind: 'spiral', interval: 0.16, sweepHz: 0.22, sweepDeg: 75, speed: 180, shotMult: 1.4 }, // 볼텍스 마우: 좌우로 쓸어내는 나선 탄류
     B10: { kind: 'pincer', pairs: 3, speed: 240, tanky: 1.2, shotMult: 1.2 },        // 옵시디언 클로: 좌우 집게 협공탄 + 단단한 몸
     B11: { kind: 'ring', count: 12, speed: 165, shotMult: 1.15 },                    // 보이드 세라프: 회전 깃털 원형탄
+    // 신규 보스 4종
+    B12: { kind: 'cross', arms: 4, spinHz: 0.6, speed: 175, interval: 0.14, shotMult: 1.3 },              // 프리즘 타이런트: 회전 십자 빔
+    B13: { kind: 'wave', count: 7, spanW: 260, waveHz: 0.5, phase: 0.6, amp: 0.5, speed: 170, interval: 0.5, shotMult: 1.2 }, // 타이달 리바이어던: 파동 커튼
+    B14: { kind: 'rain', count: 4, speed: 150, interval: 0.35, shotMult: 1.3 },                            // 스톰브링어: 융단 폭격
+    B15: { kind: 'laserSweep', stack: 3, sweepHz: 0.35, sweepW: 200, speed: 340, interval: 0.05, shotMult: 1.4 }, // 옵틱 워든: 소탕 레이저
   },
 
   // 보스 변주: 로스터가 한 바퀴 돈 뒤(스테이지 6+) 같은 보스가 강화판으로 재등장.

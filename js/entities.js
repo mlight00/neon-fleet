@@ -2493,6 +2493,10 @@ export class Boss {
       pincer:   { color: '#ff9c41', shape: 'ember' },    // 옵시디언 클로: 용암 잉걸
       ring:     { color: '#a8f0ff', shape: 'ring' },     // 보이드 세라프: 창백한 고리
       brood:    { color: '#c86bff', shape: 'orb' },      // 하이브 퀸: 보라 구체
+      cross:      { color: '#8affff', shape: 'ring' },   // 프리즘 타이런트: 굴절 청록 고리
+      wave:       { color: '#57e0ff', shape: 'orb' },    // 타이달 리바이어던: 심해 파랑
+      rain:       { color: '#ffb347', shape: 'ember' },  // 스톰브링어: 폭격 잉걸
+      laserSweep: { color: '#57e0ff', shape: 'needle' }, // 옵틱 워든: 광학 바늘
     })[this.pattern.kind] || { color: COLORS.danger, shape: 'orb' };
   }
 
@@ -2539,6 +2543,43 @@ export class Boss {
         for (let i = 0; i < n; i++) {
           const a = (i / n) * Math.PI * 2 + this.t;
           world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+        }
+        break;
+      }
+      case 'cross': { // 프리즘 타이런트: 회전하는 십자(방사) 빔
+        this.fanT = this.interval(P.interval);
+        const arms = P.arms + Math.floor(fb / 2);
+        const base = this.t * (P.spinHz || 0.5) * Math.PI * 2;
+        for (let k = 0; k < arms; k++) {
+          const a = base + (k / arms) * Math.PI * 2;
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+        }
+        break;
+      }
+      case 'wave': { // 타이달 리바이어던: 가로로 퍼진 발사점에서 각도가 파동치는 커튼
+        this.fanT = this.interval(P.interval);
+        const n = P.count + fb;
+        for (let i = 0; i < n; i++) {
+          const px = this.x + ((i - (n - 1) / 2) / Math.max(1, n - 1)) * P.spanW;
+          const a = Math.sin(this.t * P.waveHz * Math.PI * 2 + i * P.phase) * P.amp;
+          world.spawnEnemyBullet(new EnemyShot(px, this.y + this.r * 0.4, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+        }
+        break;
+      }
+      case 'rain': { // 스톰브링어: 상단 무작위 위치에서 쏟아지는 융단 폭격
+        this.fanT = this.interval(P.interval);
+        const n = P.count + fb;
+        for (let i = 0; i < n; i++) {
+          const px = 30 + Math.random() * (world.logicalW - 60);
+          world.spawnEnemyBullet(new EnemyShot(px, this.y - this.r * 0.5, (Math.random() - 0.5) * 40, P.speed, { ...fanOpts, r: 7 }));
+        }
+        break;
+      }
+      case 'laserSweep': { // 옵틱 워든: 좌우로 쓸어가는 빠른 세로 탄기둥(소탕 레이저)
+        this.fanT = this.interval(P.interval);
+        const px = world.logicalW / 2 + Math.sin(this.t * P.sweepHz * Math.PI * 2) * P.sweepW;
+        for (let i = 0; i < P.stack + fb; i++) {
+          world.spawnEnemyBullet(new EnemyShot(px, this.y + this.r * 0.5 + i * 10, 0, P.speed, { ...fanOpts, r: 6 }));
         }
         break;
       }
