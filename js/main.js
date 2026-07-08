@@ -569,7 +569,7 @@ function draw() {
       bossMax: r.boss && r.phase === 'boss' ? r.boss.maxHp : 0,
       bossName: r.boss ? r.boss.name : '',
       count: r.squad.count,
-      tierName: BAL.evolution.names[r.squad.tier],
+      tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,  // 기함 개성 상시 표시
       tierPower: BAL.evolution.shipPower[r.squad.tier] + (r.squad.overloadPower || 0),
       nextCost: Math.round(rawNext * evc),
       stage: r.stage,

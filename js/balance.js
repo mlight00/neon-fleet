@@ -129,15 +129,16 @@ export const BAL = {
     flatScaleMax: 6,
   },
 
-  // 기함별 전투 개성 (진화 티어 0~6). 총 DPS(rate×dmg)는 완만히 증가하되 거동이 확연히 달라진다:
+  // 기함별 전투 개성 (진화 티어 0~6). 총 DPS(rate×dmg)는 완만히 증가하되 거동이 '확연히' 달라진다:
   //  rate=연사(탄 수), dmg=탄당 위력, spread=벌칸 확산, pierce=관통 보너스. 티어 초과 시 마지막 값 클램프.
+  //  차이를 확실히 느끼도록 극단적으로 벌렸다(연사 1.6↔0.8, 확산 0.4↔2.0, 관통 0↔3).
   shipTraits: [
-    { tag: '스카웃 · 민첩 정찰',   rate: 1.00, dmg: 1.00, spread: 1.0, pierce: 0 }, // T1 균형
-    { tag: '인터셉터 · 쾌속 연사', rate: 1.40, dmg: 0.85, spread: 1.1, pierce: 0 }, // T2 다발 속사
-    { tag: '스트라이커 · 집중 포화', rate: 1.05, dmg: 1.35, spread: 0.5, pierce: 0 }, // T3 좁고 묵직
-    { tag: '커리어 · 광역 산탄',   rate: 1.30, dmg: 0.95, spread: 1.7, pierce: 0 }, // T4 넓게 퍼붓기
-    { tag: '드레드노트 · 관통포',  rate: 0.90, dmg: 1.40, spread: 0.7, pierce: 1 }, // T5 열을 꿰뚫음
-    { tag: '타이탄 · 초중포',      rate: 0.80, dmg: 1.75, spread: 0.6, pierce: 2 }, // T6 대구경 관통
+    { tag: '스카웃 · 균형',            rate: 1.00, dmg: 1.00, spread: 1.0, pierce: 0 }, // T1 기본
+    { tag: '인터셉터 · 쾌속연사(탄막)',  rate: 1.65, dmg: 0.72, spread: 1.25, pierce: 0 }, // T2 탄을 쏟아붓는다
+    { tag: '스트라이커 · 집중포화(고화력)', rate: 0.95, dmg: 1.65, spread: 0.4, pierce: 0 }, // T3 좁고 묵직한 한 방
+    { tag: '커리어 · 광역산탄(넓게)',    rate: 1.45, dmg: 0.90, spread: 2.1, pierce: 0 }, // T4 부채꼴로 흩뿌림
+    { tag: '드레드노트 · 관통포(꿰뚫음)', rate: 0.85, dmg: 1.55, spread: 0.7, pierce: 2 }, // T5 적 3기 관통
+    { tag: '타이탄 · 초중포(관통·최대)',  rate: 0.78, dmg: 2.05, spread: 0.55, pierce: 3 }, // T6 4기 관통 대구경
   ],
 
   creature: {
