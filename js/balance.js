@@ -92,7 +92,7 @@ export const BAL = {
   weapons: {
     vulcan: { coef: 1.0, speed: 560, spreadDeg: [16, 20, 24] },       // Lv별 확산각
     laser: { coef: 1.15, speed: 900, pierce: [3, 3, 4], decay: 0.65 }, // 관통 수, 관통당 감쇠
-    homing: { coef: 0.7, rate: 12, speedFrom: 300, speedTo: 480, turnRate: 5, cap: 16 },
+    homing: { coef: 0.56, rate: 12, speedFrom: 300, speedTo: 480, turnRate: 5, cap: 16 }, // 자동조준=안빗나감 → 약 20% 너프(0.7→0.56)
     lvCoef: [1.0, 1.15, 1.3],
     maxLv: 3,
   },
