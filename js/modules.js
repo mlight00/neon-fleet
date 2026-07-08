@@ -7,7 +7,7 @@ export const MODULE_DEFS = [
   { id: 'dmg',    name: '화력 코어',   icon: '🔥', desc: '화력 +8%',               rarity: 'common', max: 6, apply: (m) => { m.dmgMult *= 1.08; } },
   { id: 'rate',   name: '연사 장치',   icon: '⚡', desc: '발사 속도 +8%',          rarity: 'common', max: 5, apply: (m) => { m.fireRateMult *= 1.08; } },
   { id: 'pierce', name: '관통 탄심',   icon: '🎯', desc: '탄이 적을 1기 더 관통',   rarity: 'common', max: 3, apply: (m) => { m.pierceBonus += 1; } },
-  { id: 'explode',name: '폭발 탄두',   icon: '💥', desc: '적 파괴 시 주변 폭발',     rarity: 'common', max: 3, apply: (m) => { m.explodeRadius += 46; m.explodeDmgFrac += 0.15; } },
+  { id: 'explode',name: '폭발 탄두',   icon: '💥', desc: '적 파괴 시 주변 약한 폭발', rarity: 'common', max: 3, apply: (m) => { m.explodeRadius += 46; m.explodeDmgFrac += 0.04; } },
   { id: 'crit',   name: '치명 회로',   icon: '✴️', desc: '5% 확률 치명타 ×2',       rarity: 'common', max: 4, apply: (m) => { m.crit += 0.05; } },
   { id: 'boss',   name: '사냥꾼 표식', icon: '☠️', desc: '보스·중간보스 피해 +10%', rarity: 'rare',   max: 3, apply: (m) => { m.bossDmgMult *= 1.10; } },
   { id: 'harvest',name: '수확 드론',   icon: '💠', desc: '크리스탈·수송선 보상 +30%',rarity: 'common', max: 4, apply: (m) => { m.podRewardMult *= 1.3; } },

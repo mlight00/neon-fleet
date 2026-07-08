@@ -264,7 +264,7 @@ function onEnemyKilled(e, w) {
   if (mfx.explodeRadius > 0) {
     w.effects.burst(e.x, e.y, '#ff9c41', 12, 180);
     w.effects.ring(e.x, e.y, '#ff9c41');
-    const dmg = Math.max(6, (e.maxHp || 20) * mfx.explodeDmgFrac);
+    const dmg = Math.max(2, (e.maxHp || 20) * mfx.explodeDmgFrac);
     const rr = mfx.explodeRadius;
     for (const o of w.entities) {
       if (o === e || o.dead || !o.hitByBullet) continue;
@@ -301,8 +301,8 @@ function update(dt) {
       const x = (it.x ?? 0.5) * LOGICAL_W;
       const mods = r.mods;
       // 스테이지 스케일: 적은 단단하고 빨라지고, 크리스탈은 소폭 커진다
-      // 적 HP = 기본 × 스테이지배수 × 화력비례(함대가 강할수록 적도 단단 → 즉사 방지, 늘 긴장)
-      const pf = 1 + Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale;
+      // 적 HP = 기본 × 스테이지배수 × 화력비례(상한 있음: 강해질수록 DPS가 앞서 쓸어버리는 손맛 — A2)
+      const pf = 1 + Math.min(BAL.economy.enemyHpPowerCap, Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale);
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
       // 적 스폰 헬퍼: 스테이지 스케일 + 변이(어픽스) 롤 + 등록
       const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, r.stage, r.rng); w.entities.push(e); };
@@ -351,7 +351,9 @@ function update(dt) {
       r.boss = new Boss(LOGICAL_W, r.mods.enemyRate, r.stage);
       // 함대가 강할수록 + 스테이지가 높을수록 보스도 강하게 (부록 §5) + 패턴별 몸 보정(tanky) + 변주판 HP
       const variantHp = 1 + BAL.bossVariant.hpPerLoop * r.boss.variantLevel;
-      r.boss.hp = r.boss.maxHp = Math.round(Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (r.boss.pattern.tanky ?? 1) * variantHp);
+      const rawHp = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (r.boss.pattern.tanky ?? 1) * variantHp;
+      const hpCap = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
+      r.boss.hp = r.boss.maxHp = Math.round(Math.min(rawHp, hpCap));
     }
   } else if (r.phase === 'boss') {
     r.scrollY += 30 * dt;

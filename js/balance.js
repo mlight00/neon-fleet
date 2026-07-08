@@ -9,6 +9,7 @@ export const BAL = {
     start: 8,        // 시작 드론 수
     fireRate: 2,     // 드론 1기당 초당 발사 수
     damage: 1,       // 탄환 1발 데미지
+    evolveInvuln: 0.8, // 진화 직후 무적 시간(초) — 파워 스파이크를 안전하게 만끽 (A3)
     drawCap: 60,     // 개별 드론 렌더 상한 (초과 시 무리 고정 + 숫자)
     contactCapPct: 0.6, // 접촉 1회 최대 손실 = 편대의 60% (소편대 한 방 전멸 방지)
     radius: 7,       // 드론 반지름
@@ -20,8 +21,9 @@ export const BAL = {
   bullet: { speed: 620, radius: 3, cap: 400 },
 
   // 경제 조정: 드론 획득 총량 배수 (크리스탈·수송선). 낮추면 진화가 느려지고 난이도가 오른다.
-  // enemyHpPowerScale: 적 HP를 함대 화력(maxPower)에 비례시키는 기준. 작을수록 적이 더 단단.
-  economy: { droneGainMult: 0.7, enemyHpPowerScale: 70 },
+  // enemyHpPowerScale: 적 HP를 함대 화력(maxPower)에 비례. 클수록 완만(내 DPS가 앞서 = 파워판타지).
+  // enemyHpPowerCap: 비례 상한 — 이 배수를 넘으면 더 안 단단해져 강해질수록 쓸어버리는 손맛 (STG rank 완화).
+  economy: { droneGainMult: 0.7, enemyHpPowerScale: 110, enemyHpPowerCap: 6 },
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
@@ -98,7 +100,7 @@ export const BAL = {
   bonusGate: { progress: 0.5, drones: 40 },
 
   // 사격형 적 (부록 §4): 적탄은 여유 1.2s+, % 피해, 상한 12발
-  enemyShots: { cap: 12, telegraphTime: 0.4 },
+  enemyShots: { cap: 12, telegraphTime: 0.55 },   // 예고 시간 확대 (A1: 회피 여유)
   // (사격형 적 HP·피해 1.3배 난이도 상향) — 패턴 다양화: 점사/원형탄/조준탄 변주
   sniper: { hp: 33, enterSpeed: 300, hoverY: 180, stayTime: 5, fireInterval: 1.6, shotSpeed: 260, dmgPct: 0.078, dmgMin: 4, radius: 14,
     burstCount: 3, burstGap: 0.11 },         // 두 번에 한 번 3점사
@@ -138,7 +140,8 @@ export const BAL = {
 
   boss: {
     hp: 3500,          // 최소 HP
-    hpPerPower: 22,    // 보스 등장 시 max(hp, 최대 총화력 x 이 값) — 보스전 더 길고 위협적으로
+    hpPerPower: 16,    // 보스 HP=max(hp, 최대화력 x 이 값) — 목표 처치시간에 맞춰 하향 (A4: 강한 함대는 녹임)
+    hpPerPowerCap: 40, // 화력 대비 보스 HP 상한 배수 — 과성장해도 보스전이 무한정 길어지지 않게
     radius: 60,
     y: 130,                 // 보스 구간에서 화면 상단 고정 y
     minionInterval: 2.7,    // 소형 크리처 소환 주기(초)

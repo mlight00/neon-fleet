@@ -100,6 +100,7 @@ export class Squad {
     this.charge = 0;          // 차지 랜스 누적 충전(초)
     this.chargeStage = 0;     // 현재 충전 단계
     this.wasCharging = false;
+    this.invulnT = 0;         // 진화 무적 잔여 시간(A3)
     this._offsets = Squad.formationOffsets(BAL.squad.drawCap);
   }
 
@@ -160,6 +161,7 @@ export class Squad {
       this.tier = r.tier;
       this.count = r.count;
       this.shield = true;   // 드론을 바친 직후 사고사 방지: 진화 에너지 = 보호막 1회
+      this.invulnT = BAL.squad.evolveInvuln;   // 진화 무적 (A3: 파워 스파이크를 안전하게)
       // (화면 섬광·충격파·적탄 정화 '노바'는 모듈 선택 직후 main.evolutionNova에서 터진다)
       world.effects.ring(this.x, this.y, COLORS.ally, 0);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
@@ -180,6 +182,7 @@ export class Squad {
         this.count = kept;
         this.overloadPower = (this.overloadPower || 0) + ev.overloadPower;
         this.shield = true;
+        this.invulnT = BAL.squad.evolveInvuln;   // 오버로드도 무적 (A3)
         this.evolvePunch = 0.5;
         this.pendingDraft = true;
         world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
@@ -210,6 +213,7 @@ export class Squad {
 
   /** 접촉 피해 (크리처/운석): 실드 1회 무효. 1회 손실은 편대의 일정 비율까지만 (한 방 전멸 방지) */
   contactDamage(n, world) {
+    if (this.invulnT > 0) return;   // 진화 무적 (A3)
     if (this.shield) {
       this.shield = false;
       world.effects.text(this.x, this.y - 40, 'SHIELD!', COLORS.gateGood);
@@ -236,6 +240,7 @@ export class Squad {
     this.bank += (bankTarget - this.bank) * Math.min(1, 10 * dt);
 
     if (this.powerT > 0) this.powerT -= dt;
+    if (this.invulnT > 0) this.invulnT -= dt;   // 진화 무적 감쇠 (A3)
     if (this.flash > 0) this.flash -= dt;
     if (this.evolvePunch > 0) this.evolvePunch -= dt;
     this.recoil *= Math.pow(0.001, dt); // ≈ *0.7 per frame @60fps
@@ -491,6 +496,15 @@ export class Squad {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
+    if (this.invulnT > 0) {   // 진화 무적 표시 (A3)
+      ctx.strokeStyle = '#ffffff';
+      ctx.globalAlpha = 0.25 + 0.3 * Math.abs(Math.sin(this.t * 26));
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, w + 26, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 }
 
@@ -545,32 +559,24 @@ export class Bullet {
   }
 
   drawLaser(ctx) {
+    // 이동 잔상까지 '하나로 이어진' 스트릭 — 느린 프레임에서 두 조각으로 갈라져 보이던 문제 해결
     const w = this.beamW;
     const L = 34 + this.lv * 8;
-    // 잔상 고스트
-    ctx.globalAlpha = 0.2;
+    const top = Math.min(this.y, this.prevY) - L / 2;
+    const bot = Math.max(this.y, this.prevY) + L / 2;
+    const h = bot - top;
+    ctx.globalAlpha = 0.4;                 // 청록 외피
     ctx.fillStyle = '#a8f0ff';
-    ctx.fillRect(this.x - w, this.prevY - L / 2, w * 2, L);
-    // 외피
-    ctx.globalAlpha = 0.45;
-    ctx.fillRect(this.x - w, this.y - L / 2, w * 2, L);
-    ctx.globalAlpha = 1;
+    ctx.fillRect(this.x - w, top, w * 2, h);
+    ctx.globalAlpha = 1;                   // 백열 코어
     ctx.fillStyle = '#ffffff';
-    if (this.lv === 1) {
-      // Lv1: 단일 코어 볼트
-      ctx.fillRect(this.x - w * 0.3, this.y - L / 2, w * 0.6, L);
-    } else if (this.lv === 2) {
-      // Lv2: 트윈 코어 (두 가닥이 나란히)
-      ctx.fillRect(this.x - w * 0.55, this.y - L / 2, w * 0.35, L);
-      ctx.fillRect(this.x + w * 0.2, this.y - L / 2, w * 0.35, L);
-    } else {
-      // Lv3: 극태 빔 — 굵은 코어 + 양옆 에너지 스파크 티끌
-      ctx.fillRect(this.x - w * 0.45, this.y - L / 2, w * 0.9, L);
-      ctx.fillStyle = '#a8f0ff';
-      const p = (this.y * 0.37) % L; // 결정적 스파크 위치 (프레임마다 흐르는 느낌)
-      ctx.fillRect(this.x - w - 3, this.y - L / 2 + p, 3, 5);
-      ctx.fillRect(this.x + w, this.y + L / 2 - p - 5, 3, 5);
+    const cw = this.lv >= 3 ? w * 0.9 : this.lv === 2 ? w * 0.7 : w * 0.5;
+    ctx.fillRect(this.x - cw / 2, top, cw, h);
+    if (this.lv >= 2) {                    // 진행 끝단 색 포인트
+      ctx.fillStyle = COLORS.ally;
+      ctx.fillRect(this.x - w, this.y - 2, w * 2, 4);
     }
+    ctx.globalAlpha = 1;
   }
 
   drawVulcan(ctx) {
@@ -1419,10 +1425,11 @@ export class EnemyShot {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     if (circleHit(this.x, this.y, this.r, world.squad.x, world.squad.y, world.squad.hitRadius)) {
+      this.dead = true;
+      if (world.squad.invulnT > 0) return;   // 진화 무적 (A3)
       const dmg = Math.max(this.dmgMin, Math.round(world.squad.count * this.dmgPct));
       world.squad.applyDelta(-dmg, world);
       world.effects.burst(this.x, this.y, COLORS.danger, 10);
-      this.dead = true;
     }
     if (this.y > world.logicalH + 30 || this.y < -40 || this.x < -30 || this.x > world.logicalW + 30) this.dead = true;
   }
@@ -1808,19 +1815,25 @@ export class Charger extends Scrolling {
   }
   draw(ctx) {
     const s = this.spriteScale || 1;
-    // 예고선: 편대까지 붉은 조준선 (깜빡임)
+    // 예고선: 편대까지 붉은 조준선 — 깜빡임 + 임박할수록 굵어짐 + 경고 링 (A1)
     if (this.state === 'telegraph') {
       const p = 1 - this.teleT / BAL.charger.telegraph;
+      const blink = 0.35 + 0.45 * Math.abs(Math.sin(this.t * 16));
       ctx.save();
-      ctx.globalAlpha = 0.25 + 0.5 * p;
+      ctx.globalAlpha = blink * (0.55 + 0.45 * p);
       ctx.strokeStyle = COLORS.danger;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 6]);
+      ctx.lineWidth = 2 + 2.5 * p;
+      ctx.setLineDash([8, 6]);
       ctx.beginPath();
       ctx.moveTo(this.x, this.y);
       ctx.lineTo(this.aimX, this.y + 600);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.globalAlpha = blink;   // 돌진 임박 경고 링
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r + 6 + (1 - p) * 10, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
     ctx.save();
