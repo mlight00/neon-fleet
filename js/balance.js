@@ -23,7 +23,7 @@ export const BAL = {
   // 경제 조정: 드론 획득 총량 배수 (크리스탈·수송선). 낮추면 진화가 느려지고 난이도가 오른다.
   // enemyHpPowerScale: 적 HP를 함대 화력(maxPower)에 비례. 클수록 완만(내 DPS가 앞서 = 파워판타지).
   // enemyHpPowerCap: 비례 상한 — 이 배수를 넘으면 더 안 단단해져 강해질수록 쓸어버리는 손맛 (STG rank 완화).
-  economy: { droneGainMult: 0.7, enemyHpPowerScale: 110, enemyHpPowerCap: 6 },
+  economy: { droneGainMult: 0.5, enemyHpPowerScale: 110, enemyHpPowerCap: 6 },   // 드론 획득 하향(0.7→0.5): 너무 쉽게 안 모이게
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
@@ -128,6 +128,17 @@ export const BAL = {
     flatScalePerStage: 0.6,
     flatScaleMax: 6,
   },
+
+  // 기함별 전투 개성 (진화 티어 0~6). 총 DPS(rate×dmg)는 완만히 증가하되 거동이 확연히 달라진다:
+  //  rate=연사(탄 수), dmg=탄당 위력, spread=벌칸 확산, pierce=관통 보너스. 티어 초과 시 마지막 값 클램프.
+  shipTraits: [
+    { tag: '스카웃 · 민첩 정찰',   rate: 1.00, dmg: 1.00, spread: 1.0, pierce: 0 }, // T1 균형
+    { tag: '인터셉터 · 쾌속 연사', rate: 1.40, dmg: 0.85, spread: 1.1, pierce: 0 }, // T2 다발 속사
+    { tag: '스트라이커 · 집중 포화', rate: 1.05, dmg: 1.35, spread: 0.5, pierce: 0 }, // T3 좁고 묵직
+    { tag: '커리어 · 광역 산탄',   rate: 1.30, dmg: 0.95, spread: 1.7, pierce: 0 }, // T4 넓게 퍼붓기
+    { tag: '드레드노트 · 관통포',  rate: 0.90, dmg: 1.40, spread: 0.7, pierce: 1 }, // T5 열을 꿰뚫음
+    { tag: '타이탄 · 초중포',      rate: 0.80, dmg: 1.75, spread: 0.6, pierce: 2 }, // T6 대구경 관통
+  ],
 
   creature: {
     // 등급별 HP. 접촉 피해 = max(남은HP x contactMult, 편대수 x contactPct) → 대군이어도 접촉이 아프다

@@ -209,8 +209,8 @@ export class Squad {
       world.effects.halo(this.x, this.y, COLORS.reward);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
       world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수!`, COLORS.reward);
-      world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 진화!`, COLORS.reward);
-      world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.shipPower[r.tier]} · 주포 ${SHIP_DEFS[r.tier].mounts.length}문`, COLORS.ally);
+      world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 진화! · 화력 +${ev.shipPower[r.tier]}`, COLORS.reward);
+      world.effects.text(this.x, this.y - 76, `『${BAL.shipTraits[Math.min(r.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally);
       this.evolvePunch = 0.5;
       this.pendingDraft = true;   // 진화 → 모듈 드래프트 (main이 감지해 카드 3장 표시)
       sfx('evolve');
@@ -328,7 +328,8 @@ export class Squad {
   fireLance(world, stage) {
     const ch = BAL.charge;
     const mfx = world.mfx || {};
-    const halfW = ch.width[Math.min(stage, ch.width.length - 1)];
+    const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];  // 기함 개성: 광역 기함일수록 랜스도 넓게
+    const halfW = ch.width[Math.min(stage, ch.width.length - 1)] * (0.7 + 0.3 * trait.spread);
     const dmg = this.power * ch.blastCoef * (ch.stageMult[Math.min(stage, ch.stageMult.length - 1)] || 1) * (mfx.dmgMult ?? 1) * (mfx.chargeMult ?? 1);
     for (const e of world.entities) {       // 앞쪽 컬럼의 적 전부 관통
       if (e.dead || !e.hitByBullet) continue;
@@ -360,6 +361,7 @@ export class Squad {
     const crit = (d) => (mfx.crit && Math.random() < mfx.crit ? d * mfx.critMult : d); // 치명 회로 모듈
     // 총 화력 = (드론 수 + 기함 파워): 진화로 드론을 바쳐도 화력이 기함에 저축되어 유지된다
     const baseDps = this.power * fireRate * damage * lvCoef * powerMult;
+    const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];  // 기함별 전투 개성
 
     // 호위 드론 개별 사격: 드론이 2기 이상이면 총 화력의 30%를 드론들이 분담 발사
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
@@ -368,13 +370,13 @@ export class Squad {
 
     if (this.weapon === 'homing') {
       const dps = baseDps * W.homing.coef * (1 - escortShare);
-      this.fireAcc += W.homing.rate * dt;
+      this.fireAcc += W.homing.rate * trait.rate * dt;   // 기함 개성: 연사
       while (this.fireAcc >= 1) {
         this.fireAcc -= 1;
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
         if (alive < W.homing.cap) {
           const fan = (Math.random() - 0.5) * 240;
-          world.bullets.push(new HomingMissile(this.x, this.y - 14, fan, crit(dps / W.homing.rate), this.weaponLv));
+          world.bullets.push(new HomingMissile(this.x, this.y - 14, fan, crit(dps / W.homing.rate * trait.dmg), this.weaponLv));
           world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 5);
           this.recoil = 1.5;
           sfx('missile'); // 쿨다운으로 스로틀됨
@@ -386,30 +388,31 @@ export class Squad {
     const isLaser = this.weapon === 'laser';
     const coef = isLaser ? W.laser.coef : W.vulcan.coef;
     const dps = baseDps * coef * (1 - escortShare);
-    const shotsPerSec = isLaser ? 18 : Math.min(25, Math.max(4, this.count * fireRate));
+    const shotsBase = isLaser ? 18 : Math.min(25, Math.max(4, this.count * fireRate));
+    const shotsPerSec = shotsBase * trait.rate;  // 기함 개성: 연사 (탄 수)
     this.fireAcc += shotsPerSec * dt;
     const mounts = SHIP_DEFS[this.tier].mounts; // 기함 주포 마운트 순환 발사 — 티어가 오르면 포문이 늘어난다
     while (this.fireAcc >= 1) {
       this.fireAcc -= 1;
       if (world.bullets.length >= BAL.bullet.cap) continue;
-      const dmg = crit(dps / shotsPerSec);
+      const dmg = crit(dps / shotsBase * trait.dmg);  // 기함 개성: 탄당 위력 (총 DPS = dps×rate×dmg)
       this.mountIdx = ((this.mountIdx || 0) + 1) % mounts.length;
       const m = mounts[this.mountIdx];
       if (isLaser) {
         // 고속 관통 볼트: 주포에서 곧게, 레벨이 오르면 굵고 화려하게
         world.bullets.push(new Bullet(this.x + m.x, this.y + m.y, dmg, {
-          vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1] + pb,
+          vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1] + pb + trait.pierce,
           beamW: 3 + this.weaponLv * 1.5, lv: this.weaponLv,
         }));
         world.effects.muzzle(this.x + m.x, this.y + m.y - 2, '#a8f0ff', 6);
         sfx('laser'); // 쿨다운으로 스로틀됨
       } else {
         // 발칸: 주포에서 확산 발사 + 머즐 플래시
-        const spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180;
+        const spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180 * trait.spread;  // 기함 개성: 확산
         const a = (Math.random() - 0.5) * 2 * spread;
         world.bullets.push(new Bullet(this.x + m.x, this.y + m.y, dmg, {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
-          pierce: pb > 0 ? 1 + pb : 0, lv: this.weaponLv,
+          pierce: (pb + trait.pierce) > 0 ? 1 + pb + trait.pierce : 0, lv: this.weaponLv,
         }));
         world.effects.muzzle(this.x + m.x, this.y + m.y - 2, COLORS.ally, 5);
         sfx('vulcan'); // 쿨다운으로 스로틀됨

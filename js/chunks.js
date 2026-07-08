@@ -115,10 +115,10 @@ export const CHUNKS = [
   {
     tier: 'mid', name: 'm-plus-or-minus',
     items: [
-      // 평평한 증감 — 값은 스테이지마다 커진다(main.scaleGate). +30 vs -25
-      { type: 'gatePair', y: 0.3, left: { op: '+', value: 30 }, right: { op: '-', value: 25 } },
-      { type: 'creature', x: 0.35, y: 0.7, size: 'small' },
-      { type: 'creature', x: 0.65, y: 0.7, size: 'small' },
+      // 평평한 증감(+30 vs -25, 스테이지 스케일). 이득(+, 왼쪽) 바 앞을 적이 지킨다 → 공짜 아님
+      { type: 'gatePair', y: 0.55, left: { op: '+', value: 30 }, right: { op: '-', value: 25 } },
+      { type: 'creature', x: 0.25, y: 0.2, size: 'small' },
+      { type: 'creature', x: 0.28, y: 0.38, size: 'small' },
     ],
   },
   {
@@ -133,9 +133,9 @@ export const CHUNKS = [
   {
     tier: 'mid', name: 'm-gain-or-halve',
     items: [
-      // 평평한 획득 vs 절반 상실 — 드론이 많을수록 ÷2가 치명적 → 반드시 + 쪽을 노려야 (+45 vs ÷2)
-      { type: 'gatePair', y: 0.4, left: { op: '+', value: 45 }, right: { op: '/', value: 2 } },
-      { type: 'creature', x: 0.5, y: 0.78, size: 'mid' },
+      // 평평한 획득 vs 절반 상실(+45 vs ÷2). 이득(+45, 왼쪽) 바 앞을 중형 적이 막는다
+      { type: 'gatePair', y: 0.55, left: { op: '+', value: 45 }, right: { op: '/', value: 2 } },
+      { type: 'creature', x: 0.25, y: 0.3, size: 'mid' },
     ],
   },
   {
@@ -212,9 +212,10 @@ export const CHUNKS = [
   {
     tier: 'hard', name: 'h-triple-or-third',
     items: [
-      // 대박 도박: 세 배 아니면 1/3 토막 (×3 vs ÷3)
-      { type: 'gatePair', y: 0.32, left: { op: 'x', value: 3 }, right: { op: '/', value: 3 } },
-      { type: 'creature', x: 0.4, y: 0.7, size: 'large' },
+      // 대박 도박 ×3 vs ÷3. 이득(×3, 왼쪽) 바 앞을 대형 적 + 기뢰가 지킨다 → 공짜 대박 없음
+      { type: 'gatePair', y: 0.6, left: { op: 'x', value: 3 }, right: { op: '/', value: 3 } },
+      { type: 'creature', x: 0.25, y: 0.32, size: 'large' },
+      { type: 'mine', x: 0.28, y: 0.12 },
     ],
   },
   {

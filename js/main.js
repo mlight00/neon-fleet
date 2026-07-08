@@ -541,8 +541,21 @@ function draw() {
 
   if (run) {
     const r = run;
-    for (const e of r.world.entities) e.draw(ctx);
-    if (r.boss && r.phase !== 'track') r.boss.draw(ctx);
+    // 상단 진입 페이드: 개체가 화면 위 경계(y=0)를 넘어 들어올 때 딱딱하게 '잘려' 보이지 않도록
+    // 경계에서 투명 → 스프라이트가 완전히 들어오면 불투명. (스프라이트 자체는 정상, 경계 클리핑이 원인)
+    for (const e of r.world.entities) {
+      const fz = (e.r || 24) * 2;                 // 페이드 구간 ≈ 스프라이트 상단이 경계를 통과할 때까지
+      if (e.y < fz) {
+        const a = e.y / fz;                       // y=0 → 0, y=fz → 1
+        if (a <= 0.02) continue;                  // 아직 화면 밖 → 그리지 않음
+        ctx.save(); ctx.globalAlpha = a; e.draw(ctx); ctx.restore();
+      } else e.draw(ctx);
+    }
+    if (r.boss && r.phase !== 'track') {
+      const b = r.boss, fz = (b.r || 40) * 2;
+      if (b.y > 0 && b.y < fz) { ctx.save(); ctx.globalAlpha = Math.max(0.05, b.y / fz); b.draw(ctx); ctx.restore(); }
+      else b.draw(ctx);
+    }
     for (const b of r.world.bullets) b.draw(ctx);
     for (const b of r.world.enemyBullets) b.draw(ctx);
     if (!r.squad.dead) r.squad.draw(ctx);
