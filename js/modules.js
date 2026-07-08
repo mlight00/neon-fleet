@@ -4,21 +4,21 @@
 
 // 각 모듈: apply(mfx)가 효과 누적기를 변형(스택마다 1회 호출). rarity: common(흔함)/rare(귀함).
 export const MODULE_DEFS = [
-  { id: 'dmg',    name: '화력 코어',   icon: '🔥', desc: '화력 +25%',              rarity: 'common', max: 6, apply: (m) => { m.dmgMult *= 1.25; } },
-  { id: 'rate',   name: '연사 장치',   icon: '⚡', desc: '발사 속도 +25%',         rarity: 'common', max: 5, apply: (m) => { m.fireRateMult *= 1.25; } },
+  { id: 'dmg',    name: '화력 코어',   icon: '🔥', desc: '화력 +8%',               rarity: 'common', max: 6, apply: (m) => { m.dmgMult *= 1.08; } },
+  { id: 'rate',   name: '연사 장치',   icon: '⚡', desc: '발사 속도 +8%',          rarity: 'common', max: 5, apply: (m) => { m.fireRateMult *= 1.08; } },
   { id: 'pierce', name: '관통 탄심',   icon: '🎯', desc: '탄이 적을 1기 더 관통',   rarity: 'common', max: 3, apply: (m) => { m.pierceBonus += 1; } },
-  { id: 'explode',name: '폭발 탄두',   icon: '💥', desc: '적 파괴 시 주변 폭발',     rarity: 'common', max: 3, apply: (m) => { m.explodeRadius += 46; m.explodeDmgFrac += 0.5; } },
-  { id: 'crit',   name: '치명 회로',   icon: '✴️', desc: '15% 확률 치명타 ×2',      rarity: 'common', max: 4, apply: (m) => { m.crit += 0.15; } },
-  { id: 'boss',   name: '사냥꾼 표식', icon: '☠️', desc: '보스·중간보스 피해 +35%', rarity: 'rare',   max: 3, apply: (m) => { m.bossDmgMult *= 1.35; } },
+  { id: 'explode',name: '폭발 탄두',   icon: '💥', desc: '적 파괴 시 주변 폭발',     rarity: 'common', max: 3, apply: (m) => { m.explodeRadius += 46; m.explodeDmgFrac += 0.15; } },
+  { id: 'crit',   name: '치명 회로',   icon: '✴️', desc: '5% 확률 치명타 ×2',       rarity: 'common', max: 4, apply: (m) => { m.crit += 0.05; } },
+  { id: 'boss',   name: '사냥꾼 표식', icon: '☠️', desc: '보스·중간보스 피해 +10%', rarity: 'rare',   max: 3, apply: (m) => { m.bossDmgMult *= 1.10; } },
   { id: 'harvest',name: '수확 드론',   icon: '💠', desc: '크리스탈·수송선 보상 +30%',rarity: 'common', max: 4, apply: (m) => { m.podRewardMult *= 1.3; } },
   { id: 'evolve', name: '신속 진화',   icon: '🌀', desc: '진화 비용 −15%',          rarity: 'common', max: 3, apply: (m) => { m.evolveCostMult *= 0.85; } },
   { id: 'retain', name: '잔존 편대',   icon: '♻️', desc: '진화 후 남는 드론 대폭↑', rarity: 'common', max: 3, apply: (m) => { m.retainBonus += 0.15; } },
   { id: 'scavenge',name: '전리 회수',  icon: '🧲', desc: '적 처치 시 드론 획득 확률',rarity: 'common', max: 4, apply: (m) => { m.killDroneChance += 0.12; } },
   { id: 'armor',  name: '위상 장갑',   icon: '🧊', desc: '접촉 피해 −25%',          rarity: 'common', max: 2, apply: (m) => { m.contactCapMult *= 0.7; } },
   { id: 'shieldregen', name: '반응 실드', icon: '🔵', desc: '주기적으로 보호막 생성', rarity: 'rare', max: 3, apply: (m) => { m.shieldRegen = m.shieldRegen ? m.shieldRegen * 0.7 : 9; } },
-  { id: 'swarm',  name: '군체 의지',   icon: '🐝', desc: '드론 1기당 화력 +0.4',    rarity: 'rare',   max: 5, apply: (m) => { m.swarmPerDrone += 0.4; } },
+  { id: 'swarm',  name: '군체 의지',   icon: '🐝', desc: '드론 1기당 화력 +0.12',   rarity: 'rare',   max: 5, apply: (m) => { m.swarmPerDrone += 0.12; } },
   // 차지 랜스 특화
-  { id: 'chgPower', name: '충전 증폭', icon: '🔆', desc: '차지 랜스 위력 +40%',      rarity: 'common', max: 4, apply: (m) => { m.chargeMult *= 1.4; } },
+  { id: 'chgPower', name: '충전 증폭', icon: '🔆', desc: '차지 랜스 위력 +12%',      rarity: 'common', max: 4, apply: (m) => { m.chargeMult *= 1.12; } },
   { id: 'chgSpeed', name: '신속 충전', icon: '⏩', desc: '충전 속도 +35%',           rarity: 'common', max: 3, apply: (m) => { m.chargeSpeed *= 1.35; } },
   { id: 'chgMax',   name: '과부하',     icon: '⚡', desc: '차지 최대 단계 +1 (초대박)', rarity: 'rare',   max: 2, apply: (m) => { m.chargeMaxBonus += 1; } },
 ];

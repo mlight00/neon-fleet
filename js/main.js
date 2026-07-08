@@ -93,6 +93,7 @@ window.addEventListener('keydown', firstGestureUnlock);
 let state = 'title'; // title | play | done(오버레이 표시 중)
 let run = null;
 let drafting = false; // 모듈 드래프트 표시 중(게임 일시 정지)
+let betweenStages = false; // 스테이지 클리어 요약 표시 중(게임 일시 정지)
 
 // 원정(run) = 1스테이지부터 죽을 때까지 연속. 기함·드론·모듈이 누적된다.
 function newExpedition() {
@@ -177,22 +178,40 @@ function buildStage(stage) {
 }
 
 // 보스 격파 → 다음 스테이지로 연속 진행 (기함·모듈 유지)
+// 보스 격파 → 성과 요약 화면 + 여유 시간, 준비되면 다음 스테이지로
 function advanceStage() {
   const r = run;
   r.world.addCoins(BAL.run.coinPerClear * r.stage); // 클리어 코인 누적
   const next = r.stage + 1;
   const data = save.get();
   if (next > data.stage) save.set({ stage: next });  // 최고 도달 스테이지 기록
-  buildStage(next);
-  playBgm('battle1');
-  r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `STAGE ${next}`, COLORS.reward);
-  r.effects.flash(0.3);
+  betweenStages = true;
+  playBgm('title');                                   // 잠시 차분한 BGM
+  ui.showStageClear({
+    stage: r.stage,
+    nextStage: next,
+    bossName: r.boss?.korName ?? '보스',
+    power: Math.round(r.maxPower),
+    drones: r.squad.count,
+    tierName: BAL.evolution.names[r.squad.tier],
+    coins: r.world.coins,
+    modules: moduleSummary(r.modules),
+    onNext() {
+      betweenStages = false;
+      ui.hide();
+      buildStage(next);
+      playBgm('battle1');
+      r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `STAGE ${next}`, COLORS.reward);
+      r.effects.flash(0.3);
+    },
+  });
 }
 
 function startPlay() {
   newExpedition();
   state = 'play';
   drafting = false;
+  betweenStages = false;
   ui.hide();
   sfx('start');
   playBgm('battle1'); // 전투 BGM으로 크로스페이드
@@ -260,7 +279,7 @@ function onEnemyKilled(e, w) {
 
 // ───────────────────────── 업데이트
 function update(dt) {
-  if (state !== 'play' || drafting) return; // 드래프트 중엔 게임 정지
+  if (state !== 'play' || drafting || betweenStages) return; // 드래프트·스테이지요약 중엔 게임 정지
   const r = run;
   const w = r.world;
 
@@ -452,6 +471,7 @@ function update(dt) {
 function endExpedition({ toTitle = false } = {}) {
   state = 'done';
   drafting = false;
+  betweenStages = false;
   playBgm('title');
   const r = run;
   const data = save.get();
@@ -548,7 +568,7 @@ function draw() {
 // ───────────────────────── 일시정지 (ESC)
 let paused = false;
 function togglePause() {
-  if (state !== 'play' || drafting) return;   // 플레이 중 + 드래프트 아닐 때만
+  if (state !== 'play' || drafting || betweenStages) return;   // 플레이 중 + 드래프트·요약 아닐 때만
   paused = !paused;
   if (paused) ui.showPause({ onResume: togglePause, onQuit: quitRun });
   else ui.hide();
@@ -588,7 +608,7 @@ let last = performance.now();
 function frame(t) {
   const dt = Math.min((t - last) / 1000, 0.05);
   last = t;
-  if (!paused && !drafting) update(dt);   // 일시정지·드래프트 중엔 화면만 유지
+  if (!paused && !drafting && !betweenStages) update(dt);   // 일시정지·드래프트·요약 중엔 화면만 유지
   draw();
   requestAnimationFrame(frame);
 }

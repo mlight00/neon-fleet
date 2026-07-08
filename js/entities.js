@@ -261,10 +261,10 @@ export class Squad {
     if (charging) {
       this.charge += dt * (world.mfx?.chargeSpeed || 1);
       const st = chargeStageFor(this.charge, ch.stageTime, maxStage);
-      if (st > this.chargeStage) {          // 단계 상승 연출
+      if (st > this.chargeStage) {          // 단계 상승 연출 + 사운드
         this.chargeStage = st;
         world.effects.ring(this.x, this.y, st >= 3 ? COLORS.reward : COLORS.ally, 0);
-        sfx('shield_on');
+        sfx(st >= maxStage ? 'charge_full' : 'charge_up');
       }
     } else {
       if (this.wasCharging && this.chargeStage >= ch.minStageToFire) this.fireLance(world, this.chargeStage);
@@ -294,7 +294,7 @@ export class Squad {
     world.effects.ring(this.x, this.y, COLORS.ally);
     world.effects.burst(this.x, this.y, COLORS.ally, 18 + stage * 8, 320);
     this.recoil = 3 + stage;
-    sfx('laser');
+    sfx('lance_fire');
   }
 
   /** 무기별 발사: 총 DPS는 동일 공식, 무기는 "모양"만 바꾼다 (부록 §2) */

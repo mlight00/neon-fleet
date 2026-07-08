@@ -25,11 +25,12 @@ const SFX_SAMPLES = {
   crystal: 2, gate_good: 2, gate_bad: 2, pickup: 2, evolve: 1, demote: 1,
   shield_on: 1, shield_pop: 2, damage: 2, telegraph: 1, boss_in: 1,
   boss_die: 1, click: 1, buy: 1,
+  charge_up: 4, charge_full: 4, lance_fire: 4,
 };
 // 연사·타격 계열은 피치를 랜덤 변조해 반복감을 없앤다 (연사 기관총 느낌)
 const SFX_PITCH = {
   vulcan: 0.12, laser: 0.10, missile: 0.08, hit: 0.15, tracer: 0.12,
-  explode_s: 0.10, explode_l: 0.06, damage: 0.08,
+  explode_s: 0.10, explode_l: 0.06, damage: 0.08, charge_up: 0.06,
 };
 const sampleBuffers = {}; // `${id}:${n}` → AudioBuffer | null
 let samplesReady = false;
@@ -265,6 +266,10 @@ const SFX = {
   click: (t) => { tone(t, { freq: 800, type: 'square', dur: 0.05, vol: 0.1 }); },
   buy: (t) => { tone(t, { freq: 600, freq2: 900, type: 'square', dur: 0.08, vol: 0.14 }); tone(t + 0.06, { freq: 1200, type: 'triangle', dur: 0.2, vol: 0.14 }); },
   start: (t) => { noise(t, { dur: 0.6, vol: 0.3, filter: 'bandpass', freq: 400, freqEnd: 1600, q: 0.7 }); tone(t, { freq: 160, freq2: 320, type: 'sawtooth', dur: 0.5, vol: 0.18 }); },
+  // 차지 랜스 (실샘플 우선, 아래는 폴백 합성음)
+  charge_up: (t) => { tone(t, { freq: 440, freq2: 880, type: 'triangle', dur: 0.18, vol: 0.13 }); },
+  charge_full: (t) => { tone(t, { freq: 660, freq2: 990, type: 'sine', dur: 0.5, vol: 0.16 }); noise(t, { dur: 0.4, vol: 0.07, filter: 'bandpass', freq: 2200, q: 2 }); },
+  lance_fire: (t) => { subPunch(t, { freq: 320, freq2: 70, dur: 0.4, vol: 0.5, sat: 8 }); noise(t, { dur: 0.5, vol: 0.3, filter: 'bandpass', freq: 1200, freqEnd: 3000, q: 0.7 }); tone(t, { freq: 1600, freq2: 300, type: 'sawtooth', dur: 0.3, vol: 0.12 }); },
 };
 
 // ── 실효과음 샘플 로드 (unlock 후 백그라운드)

@@ -20,10 +20,10 @@ test('computeMfx: 모듈 없으면 전부 중립', () => {
 });
 
 test('computeMfx: 스택은 곱/합으로 누적', () => {
-  assert.ok(Math.abs(computeMfx(['dmg', 'dmg']).dmgMult - 1.5625) < 1e-9);   // 1.25^2
+  assert.ok(Math.abs(computeMfx(['dmg', 'dmg']).dmgMult - 1.1664) < 1e-9);   // 1.08^2
   assert.equal(computeMfx(['pierce', 'pierce', 'pierce']).pierceBonus, 3);
-  assert.ok(Math.abs(computeMfx(['boss']).bossDmgMult - 1.35) < 1e-9);
-  assert.ok(Math.abs(computeMfx(['swarm', 'swarm']).swarmPerDrone - 0.8) < 1e-9);
+  assert.ok(Math.abs(computeMfx(['boss']).bossDmgMult - 1.10) < 1e-9);
+  assert.ok(Math.abs(computeMfx(['swarm', 'swarm']).swarmPerDrone - 0.24) < 1e-9);
   assert.ok(Math.abs(computeMfx(['evolve']).evolveCostMult - 0.85) < 1e-9);
   assert.ok(Math.abs(computeMfx(['shieldregen', 'shieldregen']).shieldRegen - 6.3) < 1e-9); // 9 * 0.7
 });
@@ -31,7 +31,7 @@ test('computeMfx: 스택은 곱/합으로 누적', () => {
 test('computeMfx: 폭발/치명/보상 누적', () => {
   const m = computeMfx(['explode', 'crit', 'crit', 'harvest']);
   assert.ok(m.explodeRadius > 0 && m.explodeDmgFrac > 0);
-  assert.ok(Math.abs(m.crit - 0.3) < 1e-9);
+  assert.ok(Math.abs(m.crit - 0.10) < 1e-9);
   assert.ok(Math.abs(m.podRewardMult - 1.3) < 1e-9);
 });
 

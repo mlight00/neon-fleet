@@ -175,4 +175,23 @@ export const ui = {
       b.addEventListener('click', () => onPick(b.dataset.id));
     });
   },
+
+  /** 스테이지 클리어 성과 요약 + 여유 시간 (준비되면 다음 스테이지) */
+  showStageClear({ stage, nextStage, bossName, power, drones, tierName, coins, modules = [], onNext }) {
+    const mods = modules.length
+      ? `<p style="font-size:15px;letter-spacing:2px;margin-top:4px">${modules.map((m) => m.icon + (m.count > 1 ? m.count : '')).join(' ')}</p>` : '';
+    panel(`
+      <h2 style="color:#3ff5e0">STAGE ${stage} 클리어!</h2>
+      <p class="big">${bossName} 격파</p>
+      <div style="margin:10px 0;line-height:1.8">
+        <div>함대 화력 <b>${power.toLocaleString()}</b></div>
+        <div>${tierName} · 드론 ${drones}기</div>
+        <div>원정 코인 <b>🪙 ${coins.toLocaleString()}</b></div>
+      </div>
+      ${mods ? '<p style="color:#9fb8d8"><small>보유 모듈</small></p>' + mods : ''}
+      <p style="color:#ff9c41"><small>다음 스테이지는 적이 더 강해집니다</small></p>
+      <button id="btn-next">STAGE ${nextStage} 출격 ▶</button>
+    `);
+    document.getElementById('btn-next').addEventListener('click', onNext);
+  },
 };
