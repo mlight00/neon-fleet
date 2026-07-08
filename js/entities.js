@@ -592,32 +592,21 @@ export class Bullet {
       ctx.fillRect(-4, -7.5, 2.6, 3.5);
       ctx.fillRect(1.4, -7.5, 2.6, 3.5);
     } else {
-      // Lv3: 대구경 작열탄 — 뾰족한 탄두 + 몸통 + 주황 꼬리 화염
-      ctx.fillStyle = '#ff9c41';
-      ctx.globalAlpha = 0.8;
+      // Lv3: 굵은 청록 에너지 볼트 — 단색 통일(적·로켓처럼 안 보이게) + 백열 코어
+      ctx.fillStyle = COLORS.ally;
+      ctx.globalAlpha = 0.9;
       ctx.beginPath();
-      ctx.moveTo(-2.2, 7);
-      ctx.lineTo(0, 13 + (this.y % 3)); // 꼬리 흔들림
-      ctx.lineTo(2.2, 7);
+      ctx.moveTo(0, -11);       // 위로 뾰족
+      ctx.lineTo(-3, -3);
+      ctx.lineTo(-3, 8);
+      ctx.lineTo(0, 11);
+      ctx.lineTo(3, 8);
+      ctx.lineTo(3, -3);
       ctx.closePath();
       ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.fillStyle = COLORS.ally;
-      ctx.beginPath();
-      ctx.moveTo(0, -10);
-      ctx.lineTo(-2.8, -5);
-      ctx.lineTo(-2.8, 7);
-      ctx.lineTo(2.8, 7);
-      ctx.lineTo(2.8, -5);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(0, -10);
-      ctx.lineTo(-2, -4);
-      ctx.lineTo(2, -4);
-      ctx.closePath();
-      ctx.fill();
+      ctx.fillStyle = '#ffffff';  // 백열 코어(세로 심)
+      ctx.fillRect(-1.2, -9, 2.4, 16);
     }
     ctx.restore();
   }
@@ -1403,13 +1392,15 @@ export class PowerModule extends Scrolling {
 
 // ───────────────────────── 적탄 (조준탄/부채꼴탄/직하탄 공용, % 피해)
 export class EnemyShot {
-  constructor(x, y, vx, vy, { r = 8, dmgPct, dmgMin, homing = 0 }) {
+  constructor(x, y, vx, vy, { r = 8, dmgPct, dmgMin, homing = 0, color = COLORS.danger, shape = 'orb' } = {}) {
     this.x = x; this.y = y;
     this.vx = vx; this.vy = vy;
     this.r = r;
     this.dmgPct = dmgPct;
     this.dmgMin = dmgMin;
     this.homing = homing;   // >0이면 매 프레임 편대 쪽으로 속도 방향을 서서히 튼다 (자성탄)
+    this.color = color;     // 발사체 색 (보스별 다양화)
+    this.shape = shape;     // orb | needle | ring | ember
     this.dead = false;
   }
   static aimed(x, y, tx, ty, speed, opts) {
@@ -1436,15 +1427,40 @@ export class EnemyShot {
     if (this.y > world.logicalH + 30 || this.y < -40 || this.x < -30 || this.x > world.logicalW + 30) this.dead = true;
   }
   draw(ctx) {
-    // 흰 코어 + danger 외피 (글로우 없음)
-    ctx.fillStyle = COLORS.danger;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r * 0.35, 0, Math.PI * 2);
-    ctx.fill();
+    const c = this.color;
+    if (this.shape === 'needle') {
+      // 바늘/파편: 진행 방향으로 길쭉한 마름모 (참격형)
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(Math.atan2(this.vx, -this.vy));
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.moveTo(0, -this.r * 1.9); ctx.lineTo(this.r * 0.7, 0); ctx.lineTo(0, this.r * 1.9); ctx.lineTo(-this.r * 0.7, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(-0.8, -this.r * 1.2, 1.6, this.r * 2.4);
+      ctx.restore();
+    } else if (this.shape === 'ring') {
+      // 고리: 속 빈 원 (깃털 원형탄)
+      ctx.strokeStyle = c; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = c; ctx.globalAlpha = 0.35;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (this.shape === 'ember') {
+      // 잉걸: 발광 코어 + 외곽 글로우 (용암탄)
+      glow(ctx, c, 10, (g) => {
+        g.fillStyle = c;
+        g.beginPath(); g.arc(this.x, this.y, this.r, 0, Math.PI * 2); g.fill();
+      });
+      ctx.fillStyle = '#fff3d0';
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.4, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // orb: 외피 + 흰 코어 (기본/조준탄)
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.35, 0, Math.PI * 2); ctx.fill();
+    }
   }
 }
 
@@ -2161,7 +2177,7 @@ export class Boss {
     this.shotT -= dt;
     if (this.shotT <= 0) {
       this.shotT = this.interval(BAL.boss.shotInterval) * (this.pattern.shotMult ?? 1);
-      world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, { r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin }));
+      world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, { r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin, color: this.shotStyle().color }));
     }
     // 서명 공격: 보스 종류별 고유 패턴 (기존 부채꼴 슬롯)
     this.fanT -= dt;
@@ -2169,11 +2185,23 @@ export class Boss {
   }
 
   /** 보스별 서명 공격. fanT를 스스로 재장전한다. */
+  /** 보스별 발사체 색·모양 (발사체 다양화) */
+  shotStyle() {
+    return ({
+      crescent: { color: '#ff6b9d', shape: 'needle' },  // 리퍼 로드: 분홍 참격 바늘
+      spiral:   { color: '#7cff4c', shape: 'ember' },    // 볼텍스 마우: 독성 녹색 플라스마
+      pincer:   { color: '#ff9c41', shape: 'ember' },    // 옵시디언 클로: 용암 잉걸
+      ring:     { color: '#a8f0ff', shape: 'ring' },     // 보이드 세라프: 창백한 고리
+      brood:    { color: '#c86bff', shape: 'orb' },      // 하이브 퀸: 보라 구체
+    })[this.pattern.kind] || { color: COLORS.danger, shape: 'orb' };
+  }
+
   fireSignature(world) {
     const P = this.pattern;
     const B = BAL.boss;
     const fb = this.variantFanBonus || 0;   // 변주판 추가 탄 수
-    const fanOpts = { r: 7, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin };
+    const st = this.shotStyle();
+    const fanOpts = { r: 7, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin, color: st.color, shape: st.shape };
     switch (P.kind) {
       case 'crescent': { // 리퍼 로드: 아래로 넓게 베어내리는 참격 볼리
         this.fanT = this.interval(B.fanInterval);
