@@ -224,14 +224,17 @@ export class Squad {
         const consumed = this.count - kept;
         this.count = kept;
         this.overloadPower = (this.overloadPower || 0) + ev.overloadPower;
+        this.ascension = (this.ascension || 0) + 1;   // 무한 승천 단계 (진화 종료 제거)
         this.shield = true;
         this.invulnT = BAL.squad.evolveInvuln;   // 오버로드도 무적 (A3)
         this.evolvePunch = 0.5;
         this.pendingDraft = true;
         world.effects.halo(this.x, this.y, COLORS.reward);
         world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
-        world.effects.text(this.x, this.y - 98, `오버로드! 드론 ${consumed}기 흡수`, COLORS.reward);
+        world.effects.text(this.x, this.y - 98, `승천 ★${this.ascension} · 드론 ${consumed}기 흡수`, COLORS.reward);
         world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.overloadPower}`, COLORS.ally);
+        // N회 승천마다 관통 +1 (눈에 보이는 무한 파워 성장)
+        if (this.ascension % BAL.evolution.ascensionPiercePerN === 0) world.effects.text(this.x, this.y - 54, '⟫ 관통 강화 +1', COLORS.ally);
         sfx('evolve');
       }
     }
@@ -362,6 +365,7 @@ export class Squad {
     // 총 화력 = (드론 수 + 기함 파워): 진화로 드론을 바쳐도 화력이 기함에 저축되어 유지된다
     const baseDps = this.power * fireRate * damage * lvCoef * powerMult;
     const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];  // 기함별 전투 개성
+    const ascPierce = Math.floor((this.ascension || 0) / BAL.evolution.ascensionPiercePerN);  // 무한 승천: N회마다 관통 +1
 
     // 호위 드론 개별 사격: 드론이 2기 이상이면 총 화력의 30%를 드론들이 분담 발사
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
@@ -401,7 +405,7 @@ export class Squad {
       if (isLaser) {
         // 고속 관통 볼트: 주포에서 곧게, 레벨이 오르면 굵고 화려하게
         world.bullets.push(new Bullet(this.x + m.x, this.y + m.y, dmg, {
-          vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1] + pb + trait.pierce,
+          vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1] + pb + trait.pierce + ascPierce,
           beamW: 3 + this.weaponLv * 1.5, lv: this.weaponLv,
         }));
         world.effects.muzzle(this.x + m.x, this.y + m.y - 2, '#a8f0ff', 6);
@@ -412,7 +416,7 @@ export class Squad {
         const a = (Math.random() - 0.5) * 2 * spread;
         world.bullets.push(new Bullet(this.x + m.x, this.y + m.y, dmg, {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
-          pierce: (pb + trait.pierce) > 0 ? 1 + pb + trait.pierce : 0, lv: this.weaponLv,
+          pierce: (pb + trait.pierce + ascPierce) > 0 ? 1 + pb + trait.pierce + ascPierce : 0, lv: this.weaponLv,
         }));
         world.effects.muzzle(this.x + m.x, this.y + m.y - 2, COLORS.ally, 5);
         sfx('vulcan'); // 쿨다운으로 스로틀됨
@@ -2217,7 +2221,7 @@ export class MidBoss extends Scrolling {
 
 // ───────────────────────── 보스: 하이브 퀸
 export class Boss {
-  constructor(logicalW, rateMult = 1, stage = 1) {
+  constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1) {
     // 스테이지별 보스: 로스터 순환. PNG가 아직 없으면 하이브 퀸 이미지로 폴백 (sprite() 참고)
     const def = bossDefFor(stage);
     this.spriteId = def.id;
@@ -2229,6 +2233,7 @@ export class Boss {
     const V = BAL.bossVariant;
     const loop = Math.floor((Math.max(1, stage) - 1) / 5);
     this.variantLevel = stage >= V.fromStage ? loop : 0;
+    this.loopHue = V.loopHues[loop % V.loopHues.length] || 0;   // 바퀴 색상 회전 (시각 변주)
     if (this.variantLevel > 0) {
       const suffix = V.suffixes[Math.min(this.variantLevel, V.suffixes.length - 1)];
       this.name += suffix;
@@ -2241,12 +2246,16 @@ export class Boss {
       this.variantFanBonus = 0;
       this.variantAlwaysEnrage = false;
     }
-    this.x = logicalW / 2;
+    // 무한 상승: 크기 스테이지 비례 성장 (다중 보스일 땐 sizeMul로 축소해 나란히 배치)
+    this.sizeScale = Math.min(BAL.boss.sizeScaleMax, 1 + BAL.boss.sizePerStage * (Math.max(1, stage) - 1)) * sizeMul;
+    this.homeX = logicalW / 2;   // 좌우 이동 기준 (다중 보스는 슬롯별로 재설정)
+    this.swayScale = 1;          // 좌우 이동 폭 배수 (다중 보스는 ÷보스수)
+    this.x = this.homeX;
     this.y = -100;
     this.targetY = BAL.boss.y;
     this.hp = BAL.boss.hp;
     this.maxHp = BAL.boss.hp;
-    this.r = BAL.boss.radius;
+    this.r = BAL.boss.radius * this.sizeScale;
     this.rateMult = rateMult;                       // 스테이지 스케일 (작을수록 빠른 공격)
     this.minionT = BAL.boss.minionInterval * rateMult * (this.pattern.minionMult ?? 1);
     this.shotT = BAL.boss.shotInterval * rateMult * (this.pattern.shotMult ?? 1);
@@ -2279,7 +2288,7 @@ export class Boss {
   layout(logicalH) {
     const gem = this.sprite();
     if (!gem) return { scale: 1, halfH: this.r, halfW: this.r * 1.6, safeY: BAL.boss.y };
-    const maxH = logicalH * 0.22;                 // 보스 세로는 화면의 22% 이내 (기기별 과대 방지)
+    const maxH = logicalH * 0.22 * (this.sizeScale || 1);  // 보스 세로 상한 (무한 상승: 크기 성장 반영)
     const scale = Math.min(1, maxH / gem.logicalH);
     const halfH = (gem.logicalH * scale) / 2;
     const halfW = (gem.logicalW * scale) / 2;
@@ -2299,7 +2308,7 @@ export class Boss {
     const sway = this.enraged ? 0.22 : 0.16;
     const swayHz = (this.enraged ? 1.1 : 0.7) * (this.pattern.swayMult ?? 1);
     const margin = L.halfW + 10;
-    const rawX = this.logicalW / 2 + Math.sin(this.t * swayHz) * this.logicalW * sway;
+    const rawX = this.homeX + Math.sin(this.t * swayHz) * this.logicalW * sway * this.swayScale;  // 다중 보스: 각자 슬롯(homeX) 기준, 폭 축소
     this.x = Math.max(margin, Math.min(this.logicalW - margin, rawX));
 
     this.minionT -= dt;
@@ -2472,7 +2481,9 @@ export class Boss {
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
+      if (this.loopHue) ctx.filter = `hue-rotate(${this.loopHue}deg)`;   // 바퀴 색상 변주
       blit(ctx, gem, 0, 0, sc);
+      if (this.loopHue) ctx.filter = 'none';
       // 산란낭 소환 예고 맥동 (스프라이트 알집 위치에 오버레이)
       const urgency = this.minionT < 1 ? 3 : 1;
       for (let i = 0; i < 3; i++) {

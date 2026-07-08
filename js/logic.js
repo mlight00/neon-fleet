@@ -51,7 +51,7 @@ export function chargeStageFor(charge, stageTime, maxStage) {
 export function stageMods(stage) {
   const g = Math.max(1, stage) - 1;
   return {
-    enemyHp: 1 + 0.5 * g,                       // 적 HP 스테이지 배수 (주 난이도는 화력 비례 스케일이 담당 — main.js)
+    enemyHp: 1 + 0.7 * g,                       // 적 HP 스테이지 배수 (주 난이도는 화력 비례 스케일 — main.js). 무한 상승: 소폭 상향
     enemyRate: Math.max(0.6, 1 - 0.08 * g),    // 적 발사 주기 배수 (작을수록 빠름)
     crystal: 1 + 0.5 * g,                      // 크리스탈 값 (스테이지↑ → 드론 획득↑, 상위 티어 도달)
     boss: 1 + 0.35 * g,                        // 보스 HP (완만하게 — 진화 화력 스파이크로 이미 커지므로)

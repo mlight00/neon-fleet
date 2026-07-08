@@ -302,12 +302,15 @@ function update(dt) {
       const mods = r.mods;
       // 스테이지 스케일: 적은 단단하고 빨라지고, 크리스탈은 소폭 커진다
       // 적 HP = 기본 × 스테이지배수 × 화력비례(상한 있음: 강해질수록 DPS가 앞서 쓸어버리는 손맛 — A2)
-      const pf = 1 + Math.min(BAL.economy.enemyHpPowerCap, Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale);
+      // 무한 상승: 화력 비례 HP 상한을 스테이지마다 올려 깊은 판에선 즉사(방치 클리어) 방지
+      const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (r.stage - 1);
+      const pf = 1 + Math.min(hpCapS, Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale);
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
       // 적 스폰 헬퍼: 스테이지 스케일 + 변이(어픽스) 롤 + 등록
       const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, r.stage, r.rng); w.entities.push(e); };
-      // 적 항목은 enemyMult 배수만큼 복제 스폰: 복제본은 좌우 미러 + 세로로 살짝 시차
-      const dup = BAL.spawn.enemyMult;
+      // 적 항목은 enemyMult 배수만큼 복제 스폰: 복제본은 좌우 미러 + 세로로 살짝 시차.
+      // 무한 상승: 스테이지가 깊을수록 복제 수↑ → 적이 많아 움직여야 생존
+      const dup = Math.min(BAL.spawn.enemyMultMax, BAL.spawn.enemyMult + Math.floor((r.stage - 1) / BAL.spawn.enemyMultStageStep));
       if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal)));
       else if (it.type === 'gatePair') {
         const gs = (g) => scaleGate(g, r.stage, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
@@ -570,7 +573,7 @@ function draw() {
       bossMax: r.boss && r.phase === 'boss' ? r.boss.maxHp : 0,
       bossName: r.boss ? r.boss.name : '',
       count: r.squad.count,
-      tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,  // 기함 개성 상시 표시
+      tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag + (r.squad.ascension ? ` ★${r.squad.ascension}` : ''),  // 기함 개성 + 무한 승천 별
       tierPower: BAL.evolution.shipPower[r.squad.tier] + (r.squad.overloadPower || 0),
       nextCost: Math.round(rawNext * evc),
       stage: r.stage,

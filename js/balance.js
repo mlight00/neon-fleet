@@ -23,7 +23,8 @@ export const BAL = {
   // 경제 조정: 드론 획득 총량 배수 (크리스탈·수송선). 낮추면 진화가 느려지고 난이도가 오른다.
   // enemyHpPowerScale: 적 HP를 함대 화력(maxPower)에 비례. 클수록 완만(내 DPS가 앞서 = 파워판타지).
   // enemyHpPowerCap: 비례 상한 — 이 배수를 넘으면 더 안 단단해져 강해질수록 쓸어버리는 손맛 (STG rank 완화).
-  economy: { droneGainMult: 0.5, enemyHpPowerScale: 110, enemyHpPowerCap: 6 },   // 드론 획득 하향(0.7→0.5): 너무 쉽게 안 모이게
+  // enemyHpCapPerStage: 화력 비례 HP 상한을 스테이지마다 이만큼 올림 → 깊은 판에선 즉사 안 함(무한 상승)
+  economy: { droneGainMult: 0.5, enemyHpPowerScale: 110, enemyHpPowerCap: 6, enemyHpCapPerStage: 1.2 },
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
@@ -36,7 +37,8 @@ export const BAL = {
   },
 
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
-  spawn: { enemyMult: 2 },
+  // 적 복제 수 = enemyMult + floor((stage-1)/stageStep), 상한 max. 깊은 판일수록 적이 많아 움직여야 생존.
+  spawn: { enemyMult: 2, enemyMultMax: 4, enemyMultStageStep: 3 },
 
   // 엘리트 변이(어픽스): 적에 특성을 붙여 같은 적을 다양하게. 색 오라+아이콘으로 표시.
   // 로직은 affixes.js, 여기엔 수치·표시만. 스테이지 깊을수록 자주·중첩된다.
@@ -72,6 +74,8 @@ export const BAL = {
     // 최고 티어 후 '오버로드': 이만큼 더 모아 바치면 모듈 1개 더 획득 + 기함 파워 상승 (무한 성장 = 무한 심연 연결점)
     overloadCost: 1200,
     overloadPower: 320,
+    // 무한 승천: 오버로드 = 『타이탄 ★N』 승천 단계. N회마다 관통 +1 (눈에 보이는 무한 성장).
+    ascensionPiercePerN: 3,
   },
 
   // 보급 수송선: 부수면 그 자리에서 드론 지급 — "파괴 = 드론 회수"의 주력 공급원.
@@ -182,6 +186,10 @@ export const BAL = {
     enrageRatio: 0.5,       // HP 50% 이하 광폭화
     enrageRate: 0.6,        // 광폭화 시 발사 주기 배수
     engageRange: 620,       // 편대와 이 거리 안이면 교전 시작
+    // 무한 상승: 보스 크기 스테이지 비례 증가 + 다중 보스(2~3기 동시)
+    sizePerStage: 0.06, sizeScaleMax: 1.7,   // 크기 = min(1.7, 1 + 0.06×(stage-1))
+    multiTotalMult: 1.4,                      // 다중 보스 총 HP 배수(각=이/보스수), 크기 fit 축소
+    multiFromStage2: 4, multiFromStage3: 8,   // stage≥4→2기, ≥8→3기
   },
 
   chunk: {
@@ -214,6 +222,8 @@ export const BAL = {
     fasterPerLoop: 0.1,     // loop당 발사·소환 주기 배수 -0.1(빠름), minFaster 하한
     minFaster: 0.55,
     fanBonusPerLoop: 2,     // loop당 서명 공격 탄 수 +2
+    // 바퀴마다 보스 색상 회전(hue-rotate deg) — loop 0=0(기본), 이후 순환. "5종 반복" 체감 완화.
+    loopHues: [0, 140, 260, 60, 200, 320],
   },
 
   // 중간보스: 직전 스테이지 보스가 트랙 중반에 일반 적처럼 등장해 지나간다 (스테이지 2+).
