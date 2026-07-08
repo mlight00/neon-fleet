@@ -35,11 +35,14 @@ export function createInput(canvas, logicalW) {
   window.addEventListener('blur', () => { input.charging = false; });
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') keyDir = -1;
-    else if (e.key === 'ArrowRight') keyDir = 1;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keyDir = -1;
+    else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keyDir = 1;
+    else if (e.key === ' ' || e.code === 'Space') { input.charging = true; e.preventDefault(); } // 스페이스바 홀드 = 차지 랜스 (키보드 플레이)
   });
   window.addEventListener('keyup', (e) => {
-    if ((e.key === 'ArrowLeft' && keyDir === -1) || (e.key === 'ArrowRight' && keyDir === 1)) keyDir = 0;
+    if ((e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') && keyDir === -1) keyDir = 0;
+    else if ((e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') && keyDir === 1) keyDir = 0;
+    else if (e.key === ' ' || e.code === 'Space') input.charging = false; // 놓으면 랜스 발사
   });
 
   /** 매 프레임 호출: 키보드 입력을 targetX에 반영 */

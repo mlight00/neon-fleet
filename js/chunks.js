@@ -35,7 +35,7 @@ export function pickChunk(tier, rng, prev, filterFn) {
 }
 
 // 위협 개체(초반 안전 구간에서 배제)
-const THREAT_TYPES = new Set(['creature', 'splitter', 'sniper', 'turret', 'weaver', 'charger', 'mine']);
+const THREAT_TYPES = new Set(['creature', 'splitter', 'sniper', 'turret', 'weaver', 'charger', 'mine', 'debris']);
 /** 위협 적이 없는 안전 청크인지 (판 초반 보장용) */
 export function isSafeChunk(chunk) {
   return chunk.items.every((it) => !THREAT_TYPES.has(it.type));
@@ -44,7 +44,7 @@ export function isSafeChunk(chunk) {
 // 적 종류별 첫 등장 스테이지 (점진적 도입)
 const ENEMY_MIN_STAGE = {
   creature_small: 1, meteor: 1,
-  creature_mid: 2, weaver: 2, mine: 2,
+  creature_mid: 2, weaver: 2, mine: 2, debris: 2,
   sniper: 3, charger: 3,
   creature_large: 4, turret: 4,
   splitter: 5,
@@ -391,6 +391,36 @@ export const CHUNKS = [
       { type: 'mine', x: 0.3, y: 0.4 },
       { type: 'mine', x: 0.7, y: 0.4 },
       { type: 'capsule', x: 0.5, y: 0.66, weapon: 'random' },
+    ],
+  },
+
+  // ─── 파괴 불가 장애물 (잔해/소행성) 도입: 스테이지 2+. 쏴도 안 부서짐 → 오직 회피 ───
+  {
+    tier: 'mid', name: 'm-debris-drift',
+    items: [
+      { type: 'debris', x: 0.3, y: 0.2, size: 'big' },
+      { type: 'debris', x: 0.7, y: 0.5, size: 'big' },
+      { type: 'crystal', x: 0.5, y: 0.82, value: 45 },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-debris-field',
+    items: [
+      { type: 'debris', x: 0.22, y: 0.15, size: 'big' },
+      { type: 'debris', x: 0.6, y: 0.32, size: 'huge' },
+      { type: 'debris', x: 0.38, y: 0.55, size: 'big' },
+      { type: 'debris', x: 0.78, y: 0.72, size: 'big' },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-debris-gauntlet',
+    items: [
+      // 지그재그로 표류 — 좌우로 피하며 통과, 가운데 보상
+      { type: 'debris', x: 0.25, y: 0.15, size: 'big' },
+      { type: 'debris', x: 0.75, y: 0.35, size: 'big' },
+      { type: 'debris', x: 0.3, y: 0.58, size: 'big' },
+      { type: 'debris', x: 0.72, y: 0.78, size: 'big' },
+      { type: 'crystal', x: 0.5, y: 0.46, value: 60 },
     ],
   },
 ];

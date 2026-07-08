@@ -154,6 +154,15 @@ export const BAL = {
 
   meteor: { radius: 22, hpMin: 8, hpMax: 25, coin: 2 },
 
+  // 파괴 불가 장애물(잔해/소행성) — 쏴도 안 부서짐, 오직 회피. 좌우로 표류하며 내려온다.
+  debris: {
+    rBig: 44, rHuge: 66,
+    rotSpeed: 0.9,        // 회전 (rad/s, ±)
+    drift: 62,            // 좌우 표류 속도 (px/s, ± / 벽에서 반사)
+    hitCooldown: 0.5,     // 접촉 재피해 간격 (오래 붙으면 계속 깎임)
+    contactPct: 0.22, contactMin: 4,  // 접촉 시 편대 %+정액 상실 (contactDamage 상한이 즉사 방지)
+  },
+
   boss: {
     hp: 3500,          // 최소 HP
     hpPerPower: 16,    // 보스 HP=max(hp, 최대화력 x 이 값) — 목표 처치시간에 맞춰 하향 (A4: 강한 함대는 녹임)

@@ -704,7 +704,7 @@ export class HomingMissile {
     // 우선순위: 크리처/사격형 적 > 크리스탈 > 운석 (최근접)
     let best = null, bestScore = -1e9;
     for (const e of world.entities) {
-      if (e.dead || !e.hitByBullet) continue;
+      if (e.dead || !e.hitByBullet || e.indestructible) continue;   // 파괴 불가 장애물은 표적 제외
       const d = Math.hypot(e.x - this.x, e.y - this.y);
       const prio = e.isEnemy ? 2000 : e.reward ? 800 : 400;
       const score = prio - d;
@@ -1406,6 +1406,77 @@ export class Meteor extends Scrolling {
       c.closePath(); c.fill(); c.stroke();
     });
     this.drawHpBar(ctx);
+  }
+}
+
+// ───────────────────────── 파괴 불가 장애물 (잔해/소행성) — 쏴도 안 부서짐, 오직 회피
+export class Debris extends Scrolling {
+  constructor(x, y, size = 'big') {
+    super(x, y);
+    const D = BAL.debris;
+    this.r = size === 'huge' ? D.rHuge : D.rBig;
+    this.indestructible = true;        // 호밍 미사일 표적 제외용
+    this.rot = Math.random() * Math.PI * 2;
+    this.rotSpeed = (Math.random() - 0.5) * 2 * D.rotSpeed;
+    this.drift = (Math.random() - 0.5) * 2 * D.drift;
+    this.hitCd = 0;
+    this.pulse = Math.random() * 6;
+    // 불규칙 바위 실루엣 + 크레이터 (생성 시 고정)
+    this.shape = [];
+    const n = 11;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const rr = 0.72 + 0.28 * Math.random();
+      this.shape.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+    this.craters = [];
+    for (let i = 0; i < 4; i++) this.craters.push([(Math.random() - 0.5) * 1.0, (Math.random() - 0.5) * 1.0, 0.1 + Math.random() * 0.15]);
+  }
+  hitByBullet(dmg, world) {
+    // 파괴 불가: 탄이 튕겨나감(클링 스파크), 피해 없음. (관통 탄은 통과 — 관통 기함의 이점)
+    world.effects.burst(this.x + (Math.random() - 0.5) * this.r, this.y - this.r * 0.35, '#aab4c4', 2, 70);
+  }
+  update(dt, world) {
+    this.scroll(dt, world);
+    this.pulse += dt;
+    this.rot += this.rotSpeed * dt;
+    this.x += this.drift * dt;
+    if (this.x < this.r || this.x > world.logicalW - this.r) this.drift *= -1;   // 벽에서 반사 → 화면 안에 머묾
+    this.x = Math.max(this.r, Math.min(world.logicalW - this.r, this.x));
+    this.hitCd -= dt;
+    if (this.hitCd <= 0 && circleHit(this.x, this.y, this.r * 0.82, world.squad.x, world.squad.y, world.squad.hitRadius)) {
+      const n = Math.ceil(world.squad.count * BAL.debris.contactPct) + BAL.debris.contactMin;
+      world.squad.contactDamage(n, world);       // contactDamage 상한이 한 방 즉사 방지
+      world.effects.burst(world.squad.x, world.squad.y, COLORS.danger, 16, 220);
+      world.effects.flash(0.18);
+      this.hitCd = BAL.debris.hitCooldown;
+      sfx('damage');
+    }
+    if (this.offscreen(world, this.r + 30)) this.dead = true;
+  }
+  draw(ctx) {
+    const r = this.r;
+    const pl = 0.5 + 0.5 * Math.sin(this.pulse * 3);   // 붉은 경고 테두리 맥동 (파괴 불가 = 피하라)
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rot);
+    ctx.beginPath();
+    this.shape.forEach(([x, y], i) => (i ? ctx.lineTo(x * r, y * r) : ctx.moveTo(x * r, y * r)));
+    ctx.closePath();
+    ctx.fillStyle = '#3b404b';
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = `rgba(255,90,70,${(0.45 + 0.4 * pl).toFixed(2)})`;
+    ctx.shadowColor = '#ff5a46';
+    ctx.shadowBlur = 8 + 8 * pl;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#2a2e37';                          // 크레이터
+    for (const [cx, cy, cr] of this.craters) { ctx.beginPath(); ctx.arc(cx * r, cy * r, cr * r, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(180,190,205,0.25)';         // 금속 하이라이트
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-r * 0.4, -r * 0.3); ctx.lineTo(r * 0.1, -r * 0.5); ctx.stroke();
+    ctx.restore();
   }
 }
 

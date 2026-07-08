@@ -2,7 +2,7 @@
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
-import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, PowerModule, Sniper, Turret, Weaver, Charger, Mine, MidBoss, Boss, createEffects } from './entities.js';
+import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, MidBoss, Boss, createEffects } from './entities.js';
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary, MODULE_BY_ID } from './modules.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
@@ -316,6 +316,7 @@ function update(dt) {
       else if (it.type === 'creature') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, it.size), 'creature');
       else if (it.type === 'splitter') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, 'mid', { splits: 3 }), 'creature');
       else if (it.type === 'meteor') w.entities.push(new Meteor(x, -60, r.rng));
+      else if (it.type === 'debris') w.entities.push(new Debris(x, -90, it.size));
       else if (it.type === 'power') w.entities.push(new PowerModule(x, -60));
       else if (it.type === 'sniper') for (let k = 0; k < dup; k++) spawnEnemy(new Sniper(k ? LOGICAL_W - x : x), 'sniper');
       else if (it.type === 'turret') for (let k = 0; k < dup; k++) spawnEnemy(new Turret(k ? LOGICAL_W - x : x, -60 - 90 * k), 'turret');
