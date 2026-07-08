@@ -6,7 +6,7 @@ import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor,
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary, MODULE_BY_ID } from './modules.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
-import { stageMods, hangarCost } from './logic.js';
+import { stageMods, hangarCost, scaleGate } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -309,7 +309,10 @@ function update(dt) {
       // 적 항목은 enemyMult 배수만큼 복제 스폰: 복제본은 좌우 미러 + 세로로 살짝 시차
       const dup = BAL.spawn.enemyMult;
       if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal)));
-      else if (it.type === 'gatePair') w.entities.push(new GatePair(LOGICAL_W, -60, it.left, it.right));
+      else if (it.type === 'gatePair') {
+        const gs = (g) => scaleGate(g, r.stage, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
+        w.entities.push(new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right)));
+      }
       else if (it.type === 'creature') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, it.size), 'creature');
       else if (it.type === 'splitter') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, 'mid', { splits: 3 }), 'creature');
       else if (it.type === 'meteor') w.entities.push(new Meteor(x, -60, r.rng));

@@ -123,6 +123,10 @@ export const BAL = {
   gate: {
     width: 110, height: 46,
     passFlashTime: 0.5,
+    // 평평한 +/− 게이트 값은 스테이지가 깊을수록 커진다(비율 ×/÷ 는 자기 스케일이라 그대로).
+    // → 스테이지마다 게이트의 체감 무게가 비슷하게 유지되고, 후반에도 감점이 유의미하다.
+    flatScalePerStage: 0.6,
+    flatScaleMax: 6,
   },
 
   creature: {

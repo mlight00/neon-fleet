@@ -10,6 +10,17 @@ export function applyGate(count, gate) {
   return Math.max(0, Math.round(n));
 }
 
+/**
+ * 게이트 값 스테이지 스케일: 평평한 +/− 는 스테이지가 깊을수록 값이 커진다.
+ * 비율(×/÷)은 자기 스케일(편대수에 비례)이라 원본 그대로 둔다.
+ * → 스테이지마다 게이트가 편대에 주는 체감이 비슷하게 유지된다. 순수 함수(테스트 가능).
+ */
+export function scaleGate(gate, stage, scalePerStage = 0.6, scaleMax = 6) {
+  if (gate.op === 'x' || gate.op === '/') return gate;
+  const f = Math.min(scaleMax, 1 + scalePerStage * Math.max(0, stage - 1));
+  return { op: gate.op, value: Math.max(1, Math.round(gate.value * f)) };
+}
+
 /** 크리스탈 피격: hp 감소, 0이 되면 broken과 함께 원래 보상 지급. */
 export function hitCrystal(crystal, damage) {
   const hp = Math.max(0, crystal.hp - damage);

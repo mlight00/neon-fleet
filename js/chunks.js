@@ -87,11 +87,11 @@ export const CHUNKS = [
     ],
   },
   {
-    tier: 'easy', name: 'e-mul-gate',
+    tier: 'easy', name: 'e-double-or-half',
     items: [
-      // 리스크-리워드: 항상 마이너스 포함 (x2 vs -6)
-      { type: 'gatePair', y: 0.35, left: { op: 'x', value: 2 }, right: { op: '-', value: 6 } },
-      { type: 'crystal', x: 0.35, y: 0.75, value: 18 },
+      // 두 배 아니면 절반 — 감점도 비율(÷2)이라 어느 판에서든 아프다 (x2 vs ÷2)
+      { type: 'gatePair', y: 0.35, left: { op: 'x', value: 2 }, right: { op: '/', value: 2 } },
+      { type: 'crystal', x: 0.35, y: 0.75, value: 16 },
     ],
   },
   {
@@ -113,9 +113,10 @@ export const CHUNKS = [
 
   // ─── MID (선택과 위협) ───
   {
-    tier: 'mid', name: 'm-tradeoff-gate',
+    tier: 'mid', name: 'm-plus-or-minus',
     items: [
-      { type: 'gatePair', y: 0.3, left: { op: '+', value: 20 }, right: { op: '-', value: 10 } },
+      // 평평한 증감 — 값은 스테이지마다 커진다(main.scaleGate). +30 vs -25
+      { type: 'gatePair', y: 0.3, left: { op: '+', value: 30 }, right: { op: '-', value: 25 } },
       { type: 'creature', x: 0.35, y: 0.7, size: 'small' },
       { type: 'creature', x: 0.65, y: 0.7, size: 'small' },
     ],
@@ -130,10 +131,19 @@ export const CHUNKS = [
     ],
   },
   {
-    tier: 'mid', name: 'm-x2-or-lose',
+    tier: 'mid', name: 'm-gain-or-halve',
     items: [
-      { type: 'gatePair', y: 0.4, left: { op: 'x', value: 2 }, right: { op: '-', value: 20 } },
+      // 평평한 획득 vs 절반 상실 — 드론이 많을수록 ÷2가 치명적 → 반드시 + 쪽을 노려야 (+45 vs ÷2)
+      { type: 'gatePair', y: 0.4, left: { op: '+', value: 45 }, right: { op: '/', value: 2 } },
       { type: 'creature', x: 0.5, y: 0.78, size: 'mid' },
+    ],
+  },
+  {
+    tier: 'mid', name: 'm-lesser-evil',
+    items: [
+      // 차악(次惡) — 양쪽 다 감점(절반 ÷2 vs 정액 -30). 편대 적으면 정액이, 많으면 절반이 더 손해
+      { type: 'gatePair', y: 0.32, left: { op: '/', value: 2 }, right: { op: '-', value: 30 } },
+      { type: 'creature', x: 0.5, y: 0.75, size: 'mid' },
     ],
   },
   {
@@ -200,10 +210,19 @@ export const CHUNKS = [
     ],
   },
   {
-    tier: 'hard', name: 'h-x3-gamble',
+    tier: 'hard', name: 'h-triple-or-third',
     items: [
-      { type: 'gatePair', y: 0.32, left: { op: 'x', value: 3 }, right: { op: '-', value: 50 } },
+      // 대박 도박: 세 배 아니면 1/3 토막 (×3 vs ÷3)
+      { type: 'gatePair', y: 0.32, left: { op: 'x', value: 3 }, right: { op: '/', value: 3 } },
       { type: 'creature', x: 0.4, y: 0.7, size: 'large' },
+    ],
+  },
+  {
+    tier: 'hard', name: 'h-lesser-evil',
+    items: [
+      // 후반 차악 — 둘 다 큰 손해(절반 ÷2 vs 정액 -60·스테이지 스케일). 현재 편대수 보고 덜 나쁜 쪽
+      { type: 'gatePair', y: 0.3, left: { op: '/', value: 2 }, right: { op: '-', value: 60 } },
+      { type: 'creature', x: 0.5, y: 0.72, size: 'large' },
     ],
   },
   {

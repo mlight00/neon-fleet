@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyGate, hitCrystal, stormDecay } from '../js/logic.js';
+import { applyGate, hitCrystal, stormDecay, scaleGate } from '../js/logic.js';
 
 test('applyGate: 덧셈/곱셈/뺄셈/나눗셈, 최소 0, 나눗셈 내림', () => {
   assert.equal(applyGate(10, { op: '+', value: 5 }), 15);
@@ -12,6 +12,26 @@ test('applyGate: 덧셈/곱셈/뺄셈/나눗셈, 최소 0, 나눗셈 내림', ()
 test('applyGate: 0기에서 좋은 게이트를 받으면 살아난다', () => {
   assert.equal(applyGate(0, { op: '+', value: 5 }), 5);
   assert.equal(applyGate(0, { op: 'x', value: 3 }), 0);
+});
+
+test('scaleGate: 정액(+/−)은 스테이지마다 커지고, 비율(×/÷)은 원본 유지', () => {
+  // 비율 연산(자기 스케일)은 손대지 않음
+  assert.deepEqual(scaleGate({ op: 'x', value: 2 }, 5, 0.6, 6), { op: 'x', value: 2 });
+  assert.deepEqual(scaleGate({ op: '/', value: 2 }, 8, 0.6, 6), { op: '/', value: 2 });
+  // 정액은 스테이지 1에서 원본, 깊을수록 커짐
+  assert.equal(scaleGate({ op: '-', value: 30 }, 1, 0.6, 6).value, 30);   // ×1.0
+  assert.equal(scaleGate({ op: '-', value: 30 }, 3, 0.6, 6).value, 66);   // ×2.2
+  assert.equal(scaleGate({ op: '+', value: 45 }, 2, 0.6, 6).value, 72);   // ×1.6
+  assert.equal(scaleGate({ op: '-', value: 10 }, 100, 0.6, 6).value, 60); // 상한 ×6
+});
+
+test('차악 게이트: 양쪽 다 감점이면 편대수에 따라 덜 나쁜 쪽이 갈린다', () => {
+  const half = { op: '/', value: 2 };   // 절반 상실 (비율)
+  const flat = { op: '-', value: 30 };  // 정액 상실
+  // 편대 적을 때(40): 절반=20손실 < 정액=30손실 → ÷2가 차악
+  assert.ok((40 - applyGate(40, half)) < (40 - applyGate(40, flat)));
+  // 편대 많을 때(200): 절반=100손실 > 정액=30손실 → -30이 차악
+  assert.ok((200 - applyGate(200, half)) > (200 - applyGate(200, flat)));
 });
 
 test('hitCrystal: 데미지 누적, 파괴 시 원래 값 보상', () => {
