@@ -23,3 +23,7 @@ dev-server.py
 
 # 스프라이트 중앙정렬 백업(로컬)
 assets/styleC/_backup_offcenter/
+
+# 아트 소스(나노바나나 원본) — 처리본만 assets/styleC 커밋
+작업중_아트에셋/
+assets/Gemini_Generated_Image_*.png
