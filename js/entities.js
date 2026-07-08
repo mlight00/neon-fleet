@@ -787,24 +787,29 @@ export class Crystal extends Scrolling {
   }
   draw(ctx) {
     const r = this.r;
-    const gem = getSprite('C1');
-    if (gem) {
-      blit(ctx, gem, this.x, this.y, (r * 2.3) / gem.logicalW);
-    } else {
-      glow(ctx, COLORS.reward, 14, (c) => {
-        c.fillStyle = 'rgba(255,217,61,0.18)';
-        c.strokeStyle = COLORS.reward;
-        c.lineWidth = 2;
-        c.beginPath();
-        for (let i = 0; i < 6; i++) {
-          const a = Math.PI / 6 + (i * Math.PI) / 3;
-          const px = this.x + Math.cos(a) * r;
-          const py = this.y + Math.sin(a) * r;
-          i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
-        }
-        c.closePath(); c.fill(); c.stroke();
-      });
-    }
+    // 단일 결정 젬 (기존 C1.png는 큰 결정+떨어진 작은 결정 2조각이라 '깨진/쪼개진' 것처럼 보였음 → 코드 단일 젬으로 교체)
+    glow(ctx, '#6fe3ff', 10, (c) => {
+      c.fillStyle = 'rgba(110,210,255,0.9)';
+      c.strokeStyle = '#dff6ff';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(this.x, this.y - r);
+      c.lineTo(this.x + r * 0.72, this.y - r * 0.2);
+      c.lineTo(this.x + r * 0.44, this.y + r);
+      c.lineTo(this.x - r * 0.44, this.y + r);
+      c.lineTo(this.x - r * 0.72, this.y - r * 0.2);
+      c.closePath(); c.fill(); c.stroke();
+    });
+    // 패싯 하이라이트 (단일 젬 컷)
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(this.x - r * 0.72, this.y - r * 0.2);
+    ctx.lineTo(this.x, this.y - r * 0.05);
+    ctx.lineTo(this.x + r * 0.72, this.y - r * 0.2);
+    ctx.moveTo(this.x, this.y - r);
+    ctx.lineTo(this.x, this.y + r);
+    ctx.stroke();
     // 숫자: 정수만 표시 (레이저 감쇠 등으로 소수가 될 수 있음) + 어두운 외곽선
     const num = String(Math.ceil(this.hp));
     ctx.font = `bold ${r >= 34 ? 18 : 15}px sans-serif`;
