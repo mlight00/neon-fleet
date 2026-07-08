@@ -16,7 +16,9 @@ export function createEffects() {
   const parts = [];
   const texts = [];
   const rings = [];
+  const flashes = [];   // 총구 섬광 + 진화 후광 (짧은 발광 스프라이트)
   let flashV = 0;
+  const TAU = Math.PI * 2;
   return {
     burst(x, y, color, n = 14, speed = 160) {
       for (let i = 0; i < n; i++) {
@@ -31,6 +33,17 @@ export function createEffects() {
     ring(x, y, color, delay = 0) {
       rings.push({ x, y, r: 20, life: 0.45 + delay, max: 0.45, color, delay });
     },
+    // 총구 섬광: 발사 순간 짧게 번쩍 (백열 코어 + 4갈래 별, 무기색)
+    muzzle(x, y, color, size = 5) {
+      flashes.push({ kind: 'muzzle', x, y, color, size, life: 0.08, max: 0.08, delay: 0 });
+    },
+    // 진화 후광: 층진 발광 링 + 중심 글로우 (진화 스펙터클)
+    halo(x, y, color) {
+      flashes.push({ kind: 'halo', x, y, color, size: 30, life: 0.5, max: 0.5, delay: 0 });
+      rings.push({ x, y, r: 24, life: 0.5, max: 0.5, color, delay: 0 });
+      rings.push({ x, y, r: 22, life: 0.55, max: 0.45, color: '#ffffff', delay: 0.08 });
+      rings.push({ x, y, r: 20, life: 0.62, max: 0.42, color, delay: 0.16 });
+    },
     flash(v = 0.5) { flashV = Math.max(flashV, v); },
     update(dt) {
       for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.life -= dt; }
@@ -40,17 +53,47 @@ export function createEffects() {
         r.life -= dt;
         r.r += (150 - r.r) * Math.min(1, 6 * dt) + 120 * dt;
       }
+      for (const f of flashes) { if (f.delay > 0) { f.delay -= dt; continue; } f.life -= dt; }
       flashV = Math.max(0, flashV - dt * 5);
       for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1);
       for (let i = texts.length - 1; i >= 0; i--) if (texts[i].life <= 0) texts.splice(i, 1);
       for (let i = rings.length - 1; i >= 0; i--) if (rings[i].life <= 0) rings.splice(i, 1);
+      for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].life <= 0) flashes.splice(i, 1);
     },
     draw(ctx, logicalW, logicalH) {
+      // 파티클: 가산 합성 — 겹칠수록 밝아져 타격 스파크·폭발이 실제로 '빛나' 보인다
+      ctx.globalCompositeOperation = 'lighter';
       for (const p of parts) {
-        ctx.globalAlpha = Math.max(0, p.life / p.max);
+        const k = Math.max(0, p.life / p.max);
+        ctx.globalAlpha = k;
         ctx.fillStyle = p.color;
-        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * (0.45 + k * 0.75), 0, TAU);
+        ctx.fill();
       }
+      // 총구 섬광 · 진화 후광 (가산)
+      for (const f of flashes) {
+        if (f.delay > 0) continue;
+        const k = Math.max(0, f.life / f.max);
+        if (f.kind === 'muzzle') {
+          const s = f.size * (0.7 + (1 - k) * 0.9);   // 짧게 커졌다 스러짐
+          ctx.globalAlpha = k;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.arc(f.x, f.y, s * 0.55, 0, TAU); ctx.fill();
+          ctx.strokeStyle = f.color; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(f.x - s * 1.7, f.y); ctx.lineTo(f.x + s * 1.7, f.y);
+          ctx.moveTo(f.x, f.y - s * 2.0); ctx.lineTo(f.x, f.y + s * 1.2);
+          ctx.stroke();
+        } else { // halo — 중심 발광 원반
+          const R = f.size * (1 + (1 - k) * 1.5);
+          ctx.globalAlpha = k * 0.4;
+          ctx.fillStyle = f.color;
+          ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, TAU); ctx.fill();
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
       for (const r of rings) {
         if (r.delay > 0) continue;
         ctx.globalAlpha = Math.max(0, r.life / r.max);
@@ -163,7 +206,7 @@ export class Squad {
       this.shield = true;   // 드론을 바친 직후 사고사 방지: 진화 에너지 = 보호막 1회
       this.invulnT = BAL.squad.evolveInvuln;   // 진화 무적 (A3: 파워 스파이크를 안전하게)
       // (화면 섬광·충격파·적탄 정화 '노바'는 모듈 선택 직후 main.evolutionNova에서 터진다)
-      world.effects.ring(this.x, this.y, COLORS.ally, 0);
+      world.effects.halo(this.x, this.y, COLORS.reward);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
       world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수!`, COLORS.reward);
       world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 진화!`, COLORS.reward);
@@ -185,6 +228,7 @@ export class Squad {
         this.invulnT = BAL.squad.evolveInvuln;   // 오버로드도 무적 (A3)
         this.evolvePunch = 0.5;
         this.pendingDraft = true;
+        world.effects.halo(this.x, this.y, COLORS.reward);
         world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
         world.effects.text(this.x, this.y - 98, `오버로드! 드론 ${consumed}기 흡수`, COLORS.reward);
         world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.overloadPower}`, COLORS.ally);
@@ -331,6 +375,7 @@ export class Squad {
         if (alive < W.homing.cap) {
           const fan = (Math.random() - 0.5) * 240;
           world.bullets.push(new HomingMissile(this.x, this.y - 14, fan, crit(dps / W.homing.rate), this.weaponLv));
+          world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 5);
           this.recoil = 1.5;
           sfx('missile'); // 쿨다운으로 스로틀됨
         }
@@ -356,6 +401,7 @@ export class Squad {
           vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1] + pb,
           beamW: 3 + this.weaponLv * 1.5, lv: this.weaponLv,
         }));
+        world.effects.muzzle(this.x + m.x, this.y + m.y - 2, '#a8f0ff', 6);
         sfx('laser'); // 쿨다운으로 스로틀됨
       } else {
         // 발칸: 주포에서 확산 발사 + 머즐 플래시
@@ -365,7 +411,7 @@ export class Squad {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
           pierce: pb > 0 ? 1 + pb : 0, lv: this.weaponLv,
         }));
-        world.effects.burst(this.x + m.x, this.y + m.y - 4, '#ffffff', 1, 40);
+        world.effects.muzzle(this.x + m.x, this.y + m.y - 2, COLORS.ally, 5);
         sfx('vulcan'); // 쿨다운으로 스로틀됨
       }
       this.recoil = 1.2;
