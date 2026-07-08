@@ -20,3 +20,6 @@ node_modules/
 
 # 로컬 no-cache 개발 서버 (배포 무관)
 dev-server.py
+
+# 스프라이트 중앙정렬 백업(로컬)
+assets/styleC/_backup_offcenter/

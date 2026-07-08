@@ -293,7 +293,8 @@ export class Squad {
     if (world.boss && !world.boss.dead && Math.abs(world.boss.x - this.x) <= halfW + world.boss.r) {
       world.boss.hitByBullet(dmg * (mfx.bossDmgMult ?? 1), world);
     }
-    for (const b of world.enemyBullets) if (Math.abs(b.x - this.x) <= halfW + 18) b.dead = true; // 경로 적탄 소멸
+    // 경로 적탄 소멸은 3단계 이상에서만 (1·2단계는 적탄 못 지움)
+    if (stage >= 3) for (const b of world.enemyBullets) if (Math.abs(b.x - this.x) <= halfW + 18) b.dead = true;
     world.spawnEntity(new ChargeLance(this.x, this.y, halfW, stage));
     world.effects.flash(0.3 + 0.12 * stage);
     world.effects.ring(this.x, this.y, COLORS.ally);

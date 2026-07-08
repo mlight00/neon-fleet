@@ -30,7 +30,7 @@ export const BAL = {
     stageTime: 0.5,                    // 단계당 충전 시간(초)
     maxStage: 3,                       // 기본 최대 단계 (과부하 모듈로 +1)
     minStageToFire: 1,                 // 이 단계 미만이면 발사 안 함 (오클릭 안전)
-    blastCoef: 1.4,                    // 랜스 피해 = power × blastCoef × stageMult[stage]
+    blastCoef: 0.47,                   // 랜스 피해 = power × blastCoef × stageMult[stage] (1/3로 너프)
     stageMult: [0, 1, 2.4, 4.2, 6.5],  // stage 1..4 (index 0 미사용)
     width: [0, 26, 40, 56, 78],        // 빔 반폭 by stage
   },
