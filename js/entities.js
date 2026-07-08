@@ -338,8 +338,8 @@ export class Squad {
       if (e.dead || !e.hitByBullet) continue;
       if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) e.hitByBullet(dmg, world);
     }
-    if (world.boss && !world.boss.dead && Math.abs(world.boss.x - this.x) <= halfW + world.boss.r) {
-      world.boss.hitByBullet(dmg * (mfx.bossDmgMult ?? 1), world);
+    if (world.bosses) for (const bo of world.bosses) {   // 랜스 컬럼 안의 모든 보스 타격
+      if (!bo.dead && Math.abs(bo.x - this.x) <= halfW + bo.r) bo.hitByBullet(dmg * (mfx.bossDmgMult ?? 1), world);
     }
     // 경로 적탄 소멸은 3단계 이상에서만 (1·2단계는 적탄 못 지움)
     if (stage >= 3) for (const b of world.enemyBullets) if (Math.abs(b.x - this.x) <= halfW + 18) b.dead = true;

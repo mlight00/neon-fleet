@@ -141,7 +141,7 @@ function buildStage(stage) {
   r.stage = stage; r.mods = mods; w.stageMods = mods;
   w.scrollSpeed = BAL.scrollSpeed;
   w.entities.length = 0; w.bullets.length = 0; w.enemyBullets.length = 0;
-  r.boss = null; w.boss = null;
+  r.boss = null; w.boss = null; r.bosses = []; w.bosses = [];
   r.phase = 'track'; w.phase = 'track';
   r.traveled = 0;
   const totalTrack = BAL.chunk.heightPx * BAL.chunk.perRun;
@@ -285,7 +285,7 @@ function update(dt) {
 
   input.tick(dt);
   w.phase = r.phase;
-  w.boss = r.boss;
+  w.boss = r.boss; w.bosses = r.bosses;
   r.squad.update(dt, w);
   r.maxPower = Math.max(r.maxPower, r.squad.power);
 
@@ -355,18 +355,29 @@ function update(dt) {
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
       playBgm('boss'); // 보스 BGM으로 크로스페이드
-      r.boss = new Boss(LOGICAL_W, r.mods.enemyRate, r.stage);
-      // 함대가 강할수록 + 스테이지가 높을수록 보스도 강하게 (부록 §5) + 패턴별 몸 보정(tanky) + 변주판 HP
-      const variantHp = 1 + BAL.bossVariant.hpPerLoop * r.boss.variantLevel;
-      const rawHp = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (r.boss.pattern.tanky ?? 1) * variantHp;
+      // 무한 상승: 스테이지가 깊을수록 보스 2~3기 동시 등장 (가로 슬롯 배치)
+      const bossN = r.stage >= BAL.boss.multiFromStage3 ? 3 : r.stage >= BAL.boss.multiFromStage2 ? 2 : 1;
       const hpCap = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
-      r.boss.hp = r.boss.maxHp = Math.round(Math.min(rawHp, hpCap));
+      const totalMult = bossN > 1 ? BAL.boss.multiTotalMult : 1;                 // 다중 총 HP 배수(각=이/보스수)
+      r.bosses = [];
+      for (let i = 0; i < bossN; i++) {
+        const b = new Boss(LOGICAL_W, r.mods.enemyRate, r.stage, bossN > 1 ? 0.72 : 1);
+        b.homeX = LOGICAL_W * (i + 1) / (bossN + 1);   // 가로 슬롯
+        b.x = b.homeX;
+        b.swayScale = 1 / bossN;                        // 좌우 폭 축소 → 겹침 방지
+        const variantHp = 1 + BAL.bossVariant.hpPerLoop * b.variantLevel;
+        const rawHp = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (b.pattern.tanky ?? 1) * variantHp;
+        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap));
+        r.bosses.push(b);
+      }
+      r.boss = r.bosses[0];   // 연출·클리어 배너 앵커용 선두
     }
   } else if (r.phase === 'boss') {
     r.scrollY += 30 * dt;
-    r.boss.update(dt, w);
-    if (r.boss.dead) {
-      // 파괴 연출 시작
+    for (const b of r.bosses) { if (b.dead) b.deathT += dt; else b.update(dt, w); }  // 죽은 보스는 페이드, 산 보스는 교전 지속
+    w.boss = r.bosses.find((b) => !b.dead) || r.bosses[0];   // 호밍 표적 = 살아있는 선두
+    if (r.bosses.every((b) => b.dead)) {
+      // 전원 격파 → 파괴 연출 시작
       r.phase = 'bossDeath';
       r.seqT = 0;
       r.chainT = 0;
@@ -376,13 +387,14 @@ function update(dt) {
   } else if (r.phase === 'bossDeath') {
     // 보스 위에서 연쇄 폭발이 터지며 파괴
     r.seqT += dt;
-    r.boss.deathT = r.seqT;
+    for (const b of r.bosses) b.deathT = r.seqT;
     r.scrollY += 30 * dt;
     r.chainT -= dt;
     if (r.chainT <= 0) {
       r.chainT = BAL.bossDeath.chainInterval;
-      const bx = r.boss.x + (Math.random() - 0.5) * r.boss.r * 2.4;
-      const by = r.boss.y + (Math.random() - 0.5) * r.boss.r * 1.4;
+      const ab = r.bosses[Math.floor(Math.random() * r.bosses.length)];  // 여러 보스 위로 폭발 분산
+      const bx = ab.x + (Math.random() - 0.5) * ab.r * 2.4;
+      const by = ab.y + (Math.random() - 0.5) * ab.r * 1.4;
       r.effects.burst(bx, by, COLORS.danger, 18, 220);
       r.effects.burst(bx, by, COLORS.reward, 10, 160);
       r.effects.ring(bx, by, Math.random() < 0.5 ? COLORS.reward : COLORS.danger);
@@ -392,9 +404,7 @@ function update(dt) {
     r.squad.update(dt, w); // 우주선은 사격하며 대기
     if (r.seqT >= BAL.bossDeath.duration) {
       // 마지막 대폭발 → 통과 시작
-      r.effects.burst(r.boss.x, r.boss.y, COLORS.reward, 60, 320);
-      r.effects.burst(r.boss.x, r.boss.y, '#ffffff', 30, 260);
-      r.effects.ring(r.boss.x, r.boss.y, COLORS.reward);
+      for (const b of r.bosses) { r.effects.burst(b.x, b.y, COLORS.reward, 40, 320); r.effects.burst(b.x, b.y, '#ffffff', 20, 260); r.effects.ring(b.x, b.y, COLORS.reward); }
       r.effects.flash(0.6);
       sfx('explode_l');
       r.phase = 'flythrough';
@@ -406,7 +416,7 @@ function update(dt) {
     r.flyV += BAL.flythrough.accel * dt;
     r.squad.y -= r.flyV * dt;
     r.scrollY += r.flyV * dt * 0.6; // 별이 빠르게 흐름
-    r.boss.deathT += dt;
+    for (const b of r.bosses) b.deathT += dt;
     r.squad.update(dt, w);
     // 보스 위치를 지나는 순간 "STAGE CLEAR" 배너
     if (!r.clearShown && r.squad.y < r.boss.y + 30) {
@@ -428,13 +438,18 @@ function update(dt) {
   // 아군 탄 vs 표적 (크리스탈/크리처/운석/보스). 레이저는 관통(횟수 차감 + 감쇠).
   for (const b of w.bullets) {
     if (b.dead) continue;
-    if (r.boss && !r.boss.dead && r.phase === 'boss') {
-      const dx = b.x - r.boss.x, dy = b.y - r.boss.y;
-      if (dx * dx + dy * dy <= (r.boss.r * 1.4) ** 2) {
-        r.boss.hitByBullet(b.damage * (w.mfx?.bossDmgMult ?? 1), w); // 사냥꾼 표식 모듈
-        b.dead = true; // 보스는 관통 불가 (거대 표적)
-        continue;
+    if (r.phase === 'boss') {
+      let hitBoss = false;
+      for (const bo of r.bosses) {
+        if (bo.dead) continue;
+        const dx = b.x - bo.x, dy = b.y - bo.y;
+        if (dx * dx + dy * dy <= (bo.r * 1.4) ** 2) {
+          bo.hitByBullet(b.damage * (w.mfx?.bossDmgMult ?? 1), w); // 사냥꾼 표식 모듈
+          b.dead = true; hitBoss = true; // 보스는 관통 불가 (거대 표적)
+          break;
+        }
       }
+      if (hitBoss) continue;
     }
     for (const e of w.entities) {
       if (e.dead || !e.hitByBullet) continue;
@@ -555,10 +570,12 @@ function draw() {
         ctx.save(); ctx.globalAlpha = a; e.draw(ctx); ctx.restore();
       } else e.draw(ctx);
     }
-    if (r.boss && r.phase !== 'track') {
-      const b = r.boss, fz = (b.r || 40) * 2;
-      if (b.y > 0 && b.y < fz) { ctx.save(); ctx.globalAlpha = Math.max(0.05, b.y / fz); b.draw(ctx); ctx.restore(); }
-      else b.draw(ctx);
+    if (r.bosses && r.bosses.length && r.phase !== 'track') {
+      for (const b of r.bosses) {
+        const fz = (b.r || 40) * 2;
+        if (b.y > 0 && b.y < fz) { ctx.save(); ctx.globalAlpha = Math.max(0.05, b.y / fz); b.draw(ctx); ctx.restore(); }
+        else b.draw(ctx);
+      }
     }
     for (const b of r.world.bullets) b.draw(ctx);
     for (const b of r.world.enemyBullets) b.draw(ctx);
@@ -569,9 +586,7 @@ function draw() {
     const rawNext = BAL.evolution.costs[r.squad.tier + 1] ?? BAL.evolution.overloadCost;
     drawHUD(ctx, LOGICAL_W, {
       progress: Math.min(1, r.traveled / r.totalTrack),
-      bossHp: r.boss ? Math.max(0, r.boss.hp) : 0,
-      bossMax: r.boss && r.phase === 'boss' ? r.boss.maxHp : 0,
-      bossName: r.boss ? r.boss.name : '',
+      bosses: r.phase === 'boss' ? r.bosses.map((b) => ({ hp: Math.max(0, b.hp), maxHp: b.maxHp, name: b.korName, dead: b.dead })) : [],
       count: r.squad.count,
       tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag + (r.squad.ascension ? ` ★${r.squad.ascension}` : ''),  // 기함 개성 + 무한 승천 별
       tierPower: BAL.evolution.shipPower[r.squad.tier] + (r.squad.overloadPower || 0),

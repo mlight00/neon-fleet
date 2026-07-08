@@ -163,7 +163,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, bossName, count, tierName, tierPower, nextCost, stage, weapon, weaponLv, shield, modules = [] }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, tierName, tierPower, nextCost, stage, weapon, weaponLv, shield, modules = [] }) {
   ctx.save();
   // 진행 바
   const barW = logicalW - 80;
@@ -172,19 +172,31 @@ export function drawHUD(ctx, logicalW, { progress, bossHp, bossMax, bossName, co
   ctx.fillStyle = COLORS.ally;
   ctx.fillRect(40, 14, barW * Math.min(1, progress), 6);
 
-  // 보스 HP (숫자는 정수 — 깎이는 게 바로 읽히게)
-  if (bossMax > 0) {
-    ctx.fillStyle = 'rgba(255,61,113,0.25)';
-    ctx.fillRect(60, 30, logicalW - 120, 10);
-    ctx.fillStyle = COLORS.danger;
-    ctx.fillRect(60, 30, (logicalW - 120) * Math.max(0, bossHp / bossMax), 10);
+  // 보스 HP — 다중 보스면 상단에 나란히 (각 보스 HP바), 1기면 이름·수치까지 표시
+  if (bosses.length) {
+    const n = bosses.length;
+    const totalW = logicalW - 120, gap = 6;
+    const bw = (totalW - gap * (n - 1)) / n;
+    for (let i = 0; i < n; i++) {
+      const bo = bosses[i], bx = 60 + i * (bw + gap);
+      ctx.fillStyle = 'rgba(255,61,113,0.25)';
+      ctx.fillRect(bx, 30, bw, 10);
+      ctx.fillStyle = bo.dead ? 'rgba(150,150,170,0.5)' : COLORS.danger;
+      ctx.fillRect(bx, 30, bw * Math.max(0, bo.hp / bo.maxHp), 10);
+    }
     ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'left';
     ctx.fillStyle = COLORS.text;
-    ctx.fillText(bossName || 'BOSS', 60, 51);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#ff8080';
-    ctx.fillText(`${Math.ceil(Math.max(0, bossHp)).toLocaleString()} / ${bossMax.toLocaleString()}`, logicalW - 60, 51);
+    if (n === 1) {
+      ctx.textAlign = 'left';
+      ctx.fillText(bosses[0].name || 'BOSS', 60, 51);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ff8080';
+      ctx.fillText(`${Math.ceil(bosses[0].hp).toLocaleString()} / ${bosses[0].maxHp.toLocaleString()}`, logicalW - 60, 51);
+    } else {
+      ctx.textAlign = 'center';
+      ctx.fillText(`보스 ${n}기 · ${bosses[0].name}`, logicalW / 2, 51);
+    }
+    ctx.textAlign = 'left';
   }
 
   // 좌상단: 편대 수 + 티어(기함 화력) + 진화 게이지 + 스테이지
