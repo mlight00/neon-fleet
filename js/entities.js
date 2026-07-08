@@ -209,7 +209,7 @@ export class Squad {
       world.effects.halo(this.x, this.y, COLORS.reward);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
       world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수!`, COLORS.reward);
-      world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 진화! · 화력 +${ev.shipPower[r.tier]}`, COLORS.reward);
+      world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 업그레이드! · 화력 +${ev.shipPower[r.tier]}`, COLORS.reward);
       world.effects.text(this.x, this.y - 76, `『${BAL.shipTraits[Math.min(r.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally);
       this.evolvePunch = 0.5;
       this.pendingDraft = true;   // 진화 → 모듈 드래프트 (main이 감지해 카드 3장 표시)

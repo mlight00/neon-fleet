@@ -266,7 +266,7 @@ export const BAL = {
       drones: { name: '시작 편대', desc: '출격 시 드론 수', base: 60, step: 2, unit: '기' },
       dmg: { name: '공격력', desc: '탄환 데미지', base: 90, step: 0.1, unit: '' },
       rate: { name: '발사 속도', desc: '드론당 초당 발사 수', base: 90, step: 0.2, unit: '/s' },
-      coin: { name: '수익 회로', desc: '코인 획득량', base: 50, step: 0.1, unit: 'x' },
+      coin: { name: '코인획득 증가', desc: '코인 획득량', base: 50, step: 0.1, unit: 'x' },
     },
   },
 };

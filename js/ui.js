@@ -25,7 +25,7 @@ export const ui = {
     panel(`
       <h1>NEON FLEET</h1>
       <p>네온 함대</p>
-      <p>드론을 바쳐 진화할 때마다 <b>모듈</b>을 골라<br>매 원정 다른 빌드로 끝까지 도전!</p>
+      <p>드론을 바쳐 업그레이드할 때마다 <b>모듈</b>을 골라<br>매 원정 다른 빌드로 끝까지 도전!</p>
       <p>📱 드래그 · 🖱 마우스 · ⌨ ←→</p>
       <p class="big">최고 도달 STAGE ${stage}</p>
       ${best > 0 ? `<p>최고 함대 화력: ${best.toLocaleString()} · 코인 ${coins.toLocaleString()}</p>` : ''}
@@ -166,7 +166,7 @@ export const ui = {
     const ownedRow = owned.length
       ? `<p style="font-size:15px;letter-spacing:2px;margin-top:8px;opacity:0.85">${owned.map((o) => o.icon + (o.count > 1 ? o.count : '')).join(' ')}</p>` : '';
     panel(`
-      <h2 style="color:#ffd93d">진화 · 모듈 선택</h2>
+      <h2 style="color:#ffd93d">업그레이드 · 모듈 선택</h2>
       <p><small>하나를 골라 함대를 강화 — 원정 내내 유지·중첩됩니다</small></p>
       <div style="display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap">${cards}</div>
       ${ownedRow}

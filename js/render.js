@@ -217,11 +217,11 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, tierName,
     ctx.fillStyle = COLORS.reward;
     ctx.fillRect(12, 40, gw * Math.min(1, count / nextCost), 5);
     ctx.font = 'bold 10px sans-serif';
-    ctx.fillText(`진화 ${count}/${nextCost}`, 12 + gw + 6, 45);
+    ctx.fillText(`업그레이드 ${count}/${nextCost}`, 12 + gw + 6, 45);
   } else if (tierName) {
     ctx.font = 'bold 10px sans-serif';
     ctx.fillStyle = COLORS.reward;
-    ctx.fillText('최종 진화 MAX', 12, 45);
+    ctx.fillText('최종 업그레이드 MAX', 12, 45);
   }
   if (stage) {
     ctx.font = 'bold 11px sans-serif';
