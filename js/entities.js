@@ -27,8 +27,16 @@ export function createEffects() {
         parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5, max: 0.5, color, size: 2 + Math.random() * 3 });
       }
     },
-    text(x, y, str, color) {
-      texts.push({ x, y, str, color, life: 0.9, max: 0.9 });
+    text(x, y, str, color, size = 20) {
+      // 최근 문구와 겹치면 위로 밀어 자동 스택 (업그레이드 등 여러 문구 동시 표시 시 중첩 방지)
+      let ny = y, moved = true, guard = 0;
+      while (moved && guard++ < 12) {
+        moved = false;
+        for (const t of texts) {
+          if (t.life > 0.35 && Math.abs(t.x - x) < 130 && Math.abs(t.y - ny) < 27) { ny = t.y - 28; moved = true; }
+        }
+      }
+      texts.push({ x, y: ny, str, color, size, life: 0.9, max: 0.9 });
     },
     ring(x, y, color, delay = 0) {
       rings.push({ x, y, r: 20, life: 0.45 + delay, max: 0.45, color, delay });
@@ -107,7 +115,7 @@ export function createEffects() {
       ctx.textAlign = 'center';
       for (const t of texts) {
         ctx.globalAlpha = Math.max(0, t.life / t.max);
-        ctx.font = 'bold 20px sans-serif';
+        ctx.font = `bold ${t.size || 20}px sans-serif`;
         glow(ctx, t.color, 8, (c) => { c.fillStyle = t.color; c.fillText(t.str, t.x, t.y); });
       }
       ctx.globalAlpha = 1;
@@ -208,9 +216,9 @@ export class Squad {
       // (화면 섬광·충격파·적탄 정화 '노바'는 모듈 선택 직후 main.evolutionNova에서 터진다)
       world.effects.halo(this.x, this.y, COLORS.reward);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
-      world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수!`, COLORS.reward);
-      world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]}로 업그레이드! · 화력 +${ev.shipPower[r.tier]}`, COLORS.reward);
-      world.effects.text(this.x, this.y - 76, `『${BAL.shipTraits[Math.min(r.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally);
+      world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수`, COLORS.reward, 15);
+      world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]} 업그레이드! · 화력 +${ev.shipPower[r.tier]}`, COLORS.reward, 18);
+      world.effects.text(this.x, this.y - 76, `『${BAL.shipTraits[Math.min(r.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally, 14);
       this.evolvePunch = 0.5;
       this.pendingDraft = true;   // 진화 → 모듈 드래프트 (main이 감지해 카드 3장 표시)
       sfx('evolve');
