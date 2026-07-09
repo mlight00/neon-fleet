@@ -1090,42 +1090,39 @@ export class Capsule extends Scrolling {
     if (this.offscreen(world)) this.dead = true;
   }
   draw(ctx) {
-    // 명백한 '파워업'으로: 맥동 후광 + 빛나는 칩 + 위로 떠오르는 화살표 + 무기 이름 (탄창 이미지 폐기 — 이득으로 안 읽혀 회피됨)
+    // 코믹 'POW!' 폭발 배지 = 누가 봐도 파워업 (탄창 이미지 회피 문제 해결)
     const color = WEAPON_COLORS[this.weapon];
-    const pulse = 0.5 + 0.5 * Math.sin(this.t * 5);
+    const pulse = 0.5 + 0.5 * Math.sin(this.t * 6);
     const bob = Math.sin(this.t * 3) * 2;
+    const R = this.r * (1.7 + pulse * 0.2);   // 폭발 바깥 반경 (크게 맥동)
     ctx.save();
     ctx.translate(this.x, this.y + bob);
-    // 1) 크게 맥동하는 후광 — 시선을 끈다
-    ctx.globalAlpha = 0.22 + 0.22 * pulse;
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(0, 0, this.r + 11 + pulse * 6, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-    // 2) 빛나는 칩 본체 (무기색 + 백열 코어)
-    glow(ctx, color, 16, (c) => {
-      c.fillStyle = color;
-      c.beginPath(); c.arc(0, 0, this.r, 0, Math.PI * 2); c.fill();
-      c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.stroke();
-      c.globalAlpha = 0.85; c.fillStyle = '#ffffff';
-      c.beginPath(); c.arc(0, -this.r * 0.28, this.r * 0.42, 0, Math.PI * 2); c.fill();
-      c.globalAlpha = 1;
-    });
-    // 3) 무기 이니셜 (칩 중앙, 어둡게 = 대비)
-    ctx.fillStyle = '#0a0e1c';
-    ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(WEAPON_LABELS[this.weapon][0], 0, 0.5);
-    ctx.textBaseline = 'alphabetic';
-    // 4) 위로 떠오르는 화살표 2개 — "주워라/강화" 신호
-    ctx.fillStyle = color; ctx.globalAlpha = 0.55 + 0.45 * pulse;
-    for (const dy of [0, 8]) {
-      const yy = -this.r - 9 - dy - pulse * 3;
-      ctx.beginPath(); ctx.moveTo(-6, yy + 6); ctx.lineTo(0, yy); ctx.lineTo(6, yy + 6); ctx.closePath(); ctx.fill();
+    // 1) 스타버스트 배지 (뾰족 폭발) — 살짝 흔들리는 회전 + 무기색 발광
+    ctx.save();
+    ctx.rotate(Math.sin(this.t * 2) * 0.14);
+    ctx.shadowColor = color; ctx.shadowBlur = 16;
+    ctx.beginPath();
+    const spikes = 11;
+    for (let i = 0; i < spikes * 2; i++) {
+      const rr = i % 2 === 0 ? R : R * 0.6;
+      const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+      const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     }
-    ctx.globalAlpha = 1;
-    // 5) 무기 이름 라벨 (아래) — 비게이머도 '무기'임을 즉시 인지
-    ctx.fillStyle = color;
-    ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(WEAPON_LABELS[this.weapon], 0, this.r + 15);
+    ctx.closePath();
+    ctx.fillStyle = '#ffd93d';                 // 금색 폭발 = 특별/보상
+    ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = color; ctx.stroke();   // 무기색 테두리
+    ctx.restore();
+    // 2) "POW!" 중앙 (굵게, 검정 외곽 → 어디서나 읽힘)
+    ctx.font = '900 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.strokeStyle = '#2a1030'; ctx.strokeText('POW!', 0, 0);
+    ctx.fillStyle = '#ffffff'; ctx.fillText('POW!', 0, 0);
+    ctx.textBaseline = 'alphabetic';
+    // 3) 무기 이름 (아래) — 어떤 무기인지
+    ctx.font = 'bold 11px sans-serif';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,14,28,0.85)'; ctx.strokeText(WEAPON_LABELS[this.weapon], 0, R + 13);
+    ctx.fillStyle = color; ctx.fillText(WEAPON_LABELS[this.weapon], 0, R + 13);
     ctx.restore();
   }
 }
