@@ -258,7 +258,44 @@ export class Squad {
     }
     if (label) world.effects.text(this.x, this.y - 64, label, COLORS.reward);
     this.checkEvolution(world);
-    if (before > 0 && this.count === 0) this.dead = true;
+    if (before > 0 && this.count === 0) this.onDronesDepleted(world);
+  }
+
+  /**
+   * 드론 전멸 순간의 '강등 안전망' (A안):
+   * 상위 파워 한 겹(승천 → 등급)을 잃고 편대를 재건해 생존한다.
+   * 최하 등급(스카웃)에서 전멸할 때만 진짜 사망 → 화력 등급이 곧 여분의 목숨.
+   */
+  onDronesDepleted(world) {
+    const ev = BAL.evolution;
+    const refill = world.stats?.startCount ?? BAL.squad.start;
+    const rescue = (tag, sub) => {
+      this.count = refill;
+      this.shield = true;
+      this.invulnT = BAL.squad.evolveInvuln;   // 재건 직후 잠깐 무적 (연쇄 전멸 방지)
+      this.flash = 0;
+      this.evolvePunch = 0.5;
+      world.effects.halo(this.x, this.y, COLORS.danger);
+      world.effects.burst(this.x, this.y, COLORS.danger, 20, 220);
+      world.effects.text(this.x, this.y - 40, tag, COLORS.danger, 17);
+      world.effects.text(this.x, this.y - 64, sub, COLORS.reward, 15);
+      sfx('evolve');
+    };
+    // 1) 승천(오버로드) 층이 있으면 그것부터 소모
+    if ((this.overloadPower || 0) > 0) {
+      this.overloadPower = 0;
+      this.ascension = 0;
+      rescue('⚠ 승천 해제 · 편대 재건', `드론 ${refill}기 긴급 사출`);
+      return;
+    }
+    // 2) 등급이 남아 있으면 한 단계 강등 후 재건
+    if (this.tier > 0) {
+      this.tier -= 1;
+      rescue(`⚠ ${ev.names[this.tier]}로 강등`, `드론 ${refill}기 긴급 사출`);
+      return;
+    }
+    // 3) 최하 등급에서 전멸 = 진짜 사망
+    this.dead = true;
   }
 
   setCount(n, world, label) {
