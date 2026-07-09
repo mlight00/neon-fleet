@@ -10,13 +10,65 @@ overlay?.addEventListener('click', (e) => {
   if (e.target.closest('button')) sfx('click');
 }, true);
 
+// ─── 키보드 방향키 메뉴 탐색 (일시정지 오버레이 전용: 섹터맵·드래프트) ───
+// 화면이 멈춘 선택 화면에서 마우스 없이 ←→(↑↓)로 이동, Space/Enter로 확정.
+let navState = null; // { buttons:[el], idx, onConfirm }
+function navHighlight() {
+  if (!navState) return;
+  navState.buttons.forEach((b, k) => {
+    const on = k === navState.idx;
+    b.style.boxShadow = on
+      ? '0 0 0 4px #ffffff, 0 0 22px 5px #3ff5e0' + (b._baseShadow ? ', ' + b._baseShadow : '')
+      : (b._baseShadow || '');
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+}
+function navMove(d) {
+  if (!navState || !navState.buttons.length) return;
+  navState.idx = (navState.idx + d + navState.buttons.length) % navState.buttons.length;
+  navHighlight();
+  sfx('click');
+}
+function clearNav() { navState = null; }
+/** 선택 가능한 버튼 목록에 키보드 탐색을 부착 (가운데 항목에 초기 포커스) */
+function attachKeyNav(buttons, onConfirm, initialIdx) {
+  const list = Array.from(buttons);
+  if (!list.length) { navState = null; return; }
+  list.forEach((b) => { b._baseShadow = b.style.boxShadow || ''; });
+  const mid = Math.floor((list.length - 1) / 2);
+  const idx = initialIdx == null ? mid : Math.max(0, Math.min(list.length - 1, initialIdx));
+  navState = { buttons: list, idx, onConfirm };
+  navHighlight();
+  // 마우스 hover와 동기화 → 키보드·마우스 혼용이 자연스럽게
+  list.forEach((b, k) => b.addEventListener('mousemove', () => {
+    if (navState && navState.idx !== k) { navState.idx = k; navHighlight(); }
+  }));
+}
+// 단일 캡처 핸들러: 메뉴가 열려 있을 때만 방향키·스페이스를 가로채 게임 입력(input.js)과의 충돌을 막는다.
+window.addEventListener('keydown', (e) => {
+  if (!navState) return;
+  const k = e.key;
+  const prev = k === 'ArrowLeft' || k === 'ArrowUp';
+  const next = k === 'ArrowRight' || k === 'ArrowDown';
+  const confirm = k === ' ' || k === 'Spacebar' || k === 'Enter' || e.code === 'Space';
+  if (!prev && !next && !confirm) return;   // ESC 등은 통과 (일시정지 등)
+  e.preventDefault();
+  e.stopImmediatePropagation();             // 게임 키 입력으로 전달 차단
+  if (e.repeat && confirm) return;          // 스페이스 오토리핏이 다음 화면을 오확정하지 않게
+  if (prev) navMove(-1);
+  else if (next) navMove(1);
+  else { const b = navState.buttons[navState.idx], cb = navState.onConfirm; clearNav(); cb(b); }
+}, true);
+
 function panel(html) {
+  clearNav();
   overlay.innerHTML = `<div class="panel">${html}</div>`;
   overlay.classList.remove('hidden');
 }
 
 export const ui = {
   hide() {
+    clearNav();
     overlay.classList.add('hidden');
     overlay.innerHTML = '';
   },
@@ -170,10 +222,12 @@ export const ui = {
       <p><small>하나를 골라 함대를 강화 — 원정 내내 유지·중첩됩니다</small></p>
       <div style="display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap">${cards}</div>
       ${ownedRow}
+      <p style="font-size:10.5px;color:#9fb8d8;margin-top:8px">🖱 클릭 · ⌨ ←→ 이동 · Space 선택</p>
     `);
     overlay.querySelectorAll('.draft-card').forEach((b) => {
       b.addEventListener('click', () => onPick(b.dataset.id));
     });
+    attachKeyNav(overlay.querySelectorAll('.draft-card'), (b) => onPick(b.dataset.id));
   },
 
   /** 섹터 분기 맵: 갈림길에서 다음 노드를 고른다 (게임 일시 정지) */
@@ -222,17 +276,19 @@ export const ui = {
     const legend = Object.values(META).map((m) => `<span style="white-space:nowrap">${m.icon}${m.label}</span>`).join(' · ');
     panel(`
       <h2 style="color:#3ff5e0">섹터 ${sector} · 항로 선택</h2>
-      <p><small>빛나는 노드 중 하나를 골라 진격 (위 = 섹터 보스)</small></p>
+      <p><small>빛나는 노드를 골라 진격 (위 = 섹터 보스)</small></p>
       <div style="position:relative;width:${W}px;height:${H}px;margin:6px auto">
         <svg width="${W}" height="${H}" style="position:absolute;left:0;top:0;pointer-events:none">${lines}</svg>
         ${nodes}
       </div>
       <p style="font-size:10.5px;color:#9fb8d8;line-height:1.6">${legend}</p>
-      <p><small>🪙 ${coins.toLocaleString()}</small></p>
+      <p style="font-size:10.5px;color:#9fb8d8">🖱 클릭 · ⌨ ←→ 이동 · Space 선택 &nbsp; 🪙 ${coins.toLocaleString()}</p>
     `);
+    const pickNode = (b) => onPick(idToNode[+b.dataset.node]);
     overlay.querySelectorAll('[data-node]').forEach((b) => {
-      b.addEventListener('click', () => onPick(idToNode[+b.dataset.node]));
+      b.addEventListener('click', () => pickNode(b));
     });
+    attachKeyNav(overlay.querySelectorAll('[data-node]'), pickNode);
   },
 
   /** 스테이지 클리어 성과 요약 + 여유 시간 (준비되면 다음 스테이지) */
