@@ -235,6 +235,16 @@ function buildEncounter(node) {
   }
   if (node.type === 'elite') pending.push({ type: 'midboss', trackY: totalTrack * BAL.midboss.progress }); // 정예=미니보스
   pending.sort((a, b) => a.trackY - b.trackY);
+  // 게이트류(전체폭 막대)가 화면에서 겹쳐 보이지 않게 최소 세로 간격 확보
+  const GATE_TYPES = new Set(['gatePair', 'bonusGate', 'weaponGate']);
+  const minGap = BAL.chunk.heightPx * 1.1;
+  let lastGateY = -Infinity;
+  for (const it of pending) {
+    if (!GATE_TYPES.has(it.type)) continue;
+    if (it.trackY - lastGateY < minGap) it.trackY = lastGateY + minGap;
+    lastGateY = it.trackY;
+  }
+  pending.sort((a, b) => a.trackY - b.trackY);   // 간격 조정 후 재정렬
   r.pending = pending;
   r.squad.y = logicalH - 130;
   r.squad.dead = false;
