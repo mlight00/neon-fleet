@@ -1501,29 +1501,41 @@ export class PowerModule extends Scrolling {
     if (this.offscreen(world)) this.dead = true;
   }
   draw(ctx) {
-    const gem = getSprite('C3');
-    if (gem) {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.spin * 0.5);
-      blit(ctx, gem, 0, 0);
-      ctx.restore();
-      return;
-    }
+    // 명백한 '일시 강화' 파워업: 금색 발광 구슬 + 흰 번개 ⚡ + "POWER ×2" (무기 캡슐의 POW!와 구분)
+    const pulse = 0.5 + 0.5 * Math.sin(this.spin * 1.6);
+    const R = this.r * (1.5 + pulse * 0.25);
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    // 후광
+    ctx.globalAlpha = 0.25 + 0.25 * pulse;
+    ctx.fillStyle = COLORS.reward;
+    ctx.beginPath(); ctx.arc(0, 0, R + 8 + pulse * 5, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    // 전기 구슬 (금 + 백열 코어)
     glow(ctx, COLORS.reward, 16, (c) => {
       c.fillStyle = COLORS.reward;
-      c.save();
-      c.translate(this.x, this.y);
-      c.rotate(this.spin);
-      c.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const a = (i / 10) * Math.PI * 2;
-        const rr = i % 2 === 0 ? this.r : this.r * 0.45;
-        i === 0 ? c.moveTo(Math.cos(a) * rr, Math.sin(a) * rr) : c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-      }
-      c.closePath(); c.fill();
-      c.restore();
+      c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.stroke();
+      c.globalAlpha = 0.85; c.fillStyle = '#fff8d0';
+      c.beginPath(); c.arc(0, -R * 0.25, R * 0.45, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
     });
+    // 번개 ⚡ (흰색 + 검정 외곽 → 어디서나 또렷)
+    const s = R * 0.95;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.18, -s * 0.85);
+    ctx.lineTo(-s * 0.38, s * 0.12);
+    ctx.lineTo(-s * 0.05, s * 0.12);
+    ctx.lineTo(-s * 0.18, s * 0.85);
+    ctx.lineTo(s * 0.42, -s * 0.18);
+    ctx.lineTo(s * 0.08, -s * 0.18);
+    ctx.closePath();
+    ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.strokeStyle = '#2a1030'; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    // "POWER ×2" 라벨 (아래)
+    ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,14,28,0.85)'; ctx.strokeText('POWER ×2', 0, R + 13);
+    ctx.fillStyle = COLORS.reward; ctx.fillText('POWER ×2', 0, R + 13);
+    ctx.restore();
   }
 }
 
