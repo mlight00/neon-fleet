@@ -1090,39 +1090,43 @@ export class Capsule extends Scrolling {
     if (this.offscreen(world)) this.dead = true;
   }
   draw(ctx) {
+    // 명백한 '파워업'으로: 맥동 후광 + 빛나는 칩 + 위로 떠오르는 화살표 + 무기 이름 (탄창 이미지 폐기 — 이득으로 안 읽혀 회피됨)
     const color = WEAPON_COLORS[this.weapon];
-    const gem = getSprite('C2');
-    if (gem) {
-      blit(ctx, gem, this.x, this.y);
-      // 무기 색 링 + 이니셜 (어떤 무기 캡슐인지 표시)
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.r + 5, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = color;
-      ctx.font = 'bold 12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(WEAPON_LABELS[this.weapon][0], this.x, this.y - this.r - 9);
-      return;
-    }
-    glow(ctx, color, 12, (c) => {
-      c.strokeStyle = color;
-      c.fillStyle = 'rgba(255,255,255,0.10)';
-      c.lineWidth = 2;
-      c.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (i * Math.PI) / 3;
-        const px = this.x + Math.cos(a) * this.r;
-        const py = this.y + Math.sin(a) * this.r;
-        i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
-      }
-      c.closePath(); c.fill(); c.stroke();
+    const pulse = 0.5 + 0.5 * Math.sin(this.t * 5);
+    const bob = Math.sin(this.t * 3) * 2;
+    ctx.save();
+    ctx.translate(this.x, this.y + bob);
+    // 1) 크게 맥동하는 후광 — 시선을 끈다
+    ctx.globalAlpha = 0.22 + 0.22 * pulse;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(0, 0, this.r + 11 + pulse * 6, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    // 2) 빛나는 칩 본체 (무기색 + 백열 코어)
+    glow(ctx, color, 16, (c) => {
       c.fillStyle = color;
-      c.font = 'bold 13px sans-serif';
-      c.textAlign = 'center';
-      c.fillText(WEAPON_LABELS[this.weapon][0], this.x, this.y + 4.5);
+      c.beginPath(); c.arc(0, 0, this.r, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.stroke();
+      c.globalAlpha = 0.85; c.fillStyle = '#ffffff';
+      c.beginPath(); c.arc(0, -this.r * 0.28, this.r * 0.42, 0, Math.PI * 2); c.fill();
+      c.globalAlpha = 1;
     });
+    // 3) 무기 이니셜 (칩 중앙, 어둡게 = 대비)
+    ctx.fillStyle = '#0a0e1c';
+    ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(WEAPON_LABELS[this.weapon][0], 0, 0.5);
+    ctx.textBaseline = 'alphabetic';
+    // 4) 위로 떠오르는 화살표 2개 — "주워라/강화" 신호
+    ctx.fillStyle = color; ctx.globalAlpha = 0.55 + 0.45 * pulse;
+    for (const dy of [0, 8]) {
+      const yy = -this.r - 9 - dy - pulse * 3;
+      ctx.beginPath(); ctx.moveTo(-6, yy + 6); ctx.lineTo(0, yy); ctx.lineTo(6, yy + 6); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // 5) 무기 이름 라벨 (아래) — 비게이머도 '무기'임을 즉시 인지
+    ctx.fillStyle = color;
+    ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(WEAPON_LABELS[this.weapon], 0, this.r + 15);
+    ctx.restore();
   }
 }
 
