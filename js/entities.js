@@ -170,7 +170,7 @@ export class Squad {
     if (this.weapon === weapon) {
       if (this.weaponLv < BAL.weapons.maxLv) {
         this.weaponLv++;
-        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} Lv${this.weaponLv}!`, WEAPON_COLORS[weapon]);
+        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[weapon]);
       } else {
         world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} MAX`, WEAPON_COLORS[weapon]);
       }
@@ -184,7 +184,7 @@ export class Squad {
 
   levelUp(world) {
     if (this.weaponLv < BAL.weapons.maxLv) this.weaponLv++;
-    world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[this.weapon]} Lv${this.weaponLv}!`, WEAPON_COLORS[this.weapon]);
+    world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[this.weapon]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[this.weapon]);
   }
 
   /** 총 화력 (드론 환산): 드론 수 + 기함 흡수 파워(진화 + 오버로드) + 군체 의지(드론당) */
@@ -1493,30 +1493,31 @@ export class PowerModule extends Scrolling {
     this.spin += dt * 4;
     if (circleHit(this.x, this.y, this.r + 6, world.squad.x, world.squad.y, world.squad.hitRadius)) {
       world.squad.powerT = BAL.powerModule.duration;
-      world.effects.text(world.squad.x, world.squad.y - 40, 'POWER x2!', COLORS.reward);
-      world.effects.burst(this.x, this.y, COLORS.reward, 18);
+      world.effects.text(world.squad.x, world.squad.y - 40, `⚡ 화력 ×2 · ${BAL.powerModule.duration}초!`, '#4cc9ff');
+      world.effects.burst(this.x, this.y, '#4cc9ff', 18);
       sfx('pickup');
       this.dead = true;
     }
     if (this.offscreen(world)) this.dead = true;
   }
   draw(ctx) {
-    // 명백한 '일시 강화' 파워업: 금색 발광 구슬 + 흰 번개 ⚡ + "POWER ×2" (무기 캡슐의 POW!와 구분)
+    // '일시 강화' 파워업: 전기 파란 발광 구슬 + 흰 번개 ⚡ + "×2 10초" (무기 캡슐=금색 POW! 와 색으로 구분)
+    const C = '#4cc9ff';   // 전기 파란색 (무기 캡슐의 금색과 대비)
     const pulse = 0.5 + 0.5 * Math.sin(this.spin * 1.6);
     const R = this.r * (1.5 + pulse * 0.25);
     ctx.save();
     ctx.translate(this.x, this.y);
     // 후광
     ctx.globalAlpha = 0.25 + 0.25 * pulse;
-    ctx.fillStyle = COLORS.reward;
+    ctx.fillStyle = C;
     ctx.beginPath(); ctx.arc(0, 0, R + 8 + pulse * 5, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
-    // 전기 구슬 (금 + 백열 코어)
-    glow(ctx, COLORS.reward, 16, (c) => {
-      c.fillStyle = COLORS.reward;
+    // 전기 구슬 (파랑 + 백열 코어)
+    glow(ctx, C, 16, (c) => {
+      c.fillStyle = C;
       c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.fill();
       c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.stroke();
-      c.globalAlpha = 0.85; c.fillStyle = '#fff8d0';
+      c.globalAlpha = 0.85; c.fillStyle = '#dff4ff';
       c.beginPath(); c.arc(0, -R * 0.25, R * 0.45, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
     });
     // 번개 ⚡ (흰색 + 검정 외곽 → 어디서나 또렷)
@@ -1529,12 +1530,12 @@ export class PowerModule extends Scrolling {
     ctx.lineTo(s * 0.42, -s * 0.18);
     ctx.lineTo(s * 0.08, -s * 0.18);
     ctx.closePath();
-    ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.strokeStyle = '#2a1030'; ctx.stroke();
+    ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0a2030'; ctx.stroke();
     ctx.fillStyle = '#ffffff'; ctx.fill();
-    // "POWER ×2" 라벨 (아래)
+    // "×2 10초" 라벨 (아래) — 일시적임을 명시
     ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,14,28,0.85)'; ctx.strokeText('POWER ×2', 0, R + 13);
-    ctx.fillStyle = COLORS.reward; ctx.fillText('POWER ×2', 0, R + 13);
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,14,28,0.85)'; ctx.strokeText('×2 · 10초', 0, R + 13);
+    ctx.fillStyle = C; ctx.fillText('×2 · 10초', 0, R + 13);
     ctx.restore();
   }
 }
