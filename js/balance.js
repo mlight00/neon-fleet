@@ -265,7 +265,7 @@ export const BAL = {
 
   // 보스 격파 연출: 파괴 애니메이션 → 우주선 통과 → 클리어
   bossDeath: { duration: 1.8, chainInterval: 0.13 }, // 연쇄 폭발 단계
-  flythrough: { startV: 140, accel: 1100, exitY: -90 }, // 우주선 상승 통과
+  flythrough: { startV: 140, accel: 1100, exitY: -90, invuln: 0.5 }, // 우주선 상승 통과 (invuln=클리어 통과 중 무적 유지 floor초)
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.
   hangar: {

@@ -455,6 +455,7 @@ function update(dt) {
     }
   } else if (r.phase === 'bossDeath') {
     // 보스 위에서 연쇄 폭발이 터지며 파괴
+    r.squad.invulnT = Math.max(r.squad.invulnT, BAL.flythrough.invuln);   // 클리어 연출 중 무적 (잔여 적 충돌 방지)
     r.seqT += dt;
     for (const b of r.bosses) b.deathT = r.seqT;
     r.scrollY += 30 * dt;
@@ -482,6 +483,7 @@ function update(dt) {
     }
   } else if (r.phase === 'flythrough') {
     // 우주선이 가속하며 보스 잔해를 뚫고 화면 위로 통과
+    r.squad.invulnT = Math.max(r.squad.invulnT, BAL.flythrough.invuln);   // 상단 통과 중 무적 유지 (남은 적과 충돌 피해 방지)
     r.flyV += BAL.flythrough.accel * dt;
     r.squad.y -= r.flyV * dt;
     r.scrollY += r.flyV * dt * 0.6; // 별이 빠르게 흐름
