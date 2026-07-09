@@ -265,7 +265,12 @@ const SFX = {
   boss_die: (t) => { noise(t, { dur: 1.4, vol: 0.5, filter: 'lowpass', freq: 1600, freqEnd: 100 }); tone(t, { freq: 140, freq2: 30, type: 'sine', dur: 1.3, vol: 0.4 }); },
   click: (t) => { tone(t, { freq: 800, type: 'square', dur: 0.05, vol: 0.1 }); },
   buy: (t) => { tone(t, { freq: 600, freq2: 900, type: 'square', dur: 0.08, vol: 0.14 }); tone(t + 0.06, { freq: 1200, type: 'triangle', dur: 0.2, vol: 0.14 }); },
-  start: (t) => { noise(t, { dur: 0.6, vol: 0.15, filter: 'bandpass', freq: 400, freqEnd: 1600, q: 0.7 }); tone(t, { freq: 160, freq2: 320, type: 'sawtooth', dur: 0.5, vol: 0.09 }); },  // 시작음 음량 절반(0.3→0.15, 0.18→0.09)
+  // 시작음: 거친 밴드패스 노이즈+톱니파 → 부드러운 삼각파 상승음 + 사인 베이스 + 약한 로우패스 스우시
+  start: (t) => {
+    tone(t, { freq: 200, freq2: 520, type: 'triangle', dur: 0.5, vol: 0.11 });   // 부드러운 상승 런치음
+    tone(t, { freq: 90, freq2: 150, type: 'sine', dur: 0.4, vol: 0.08 });         // 낮은 사인 베이스(묵직)
+    noise(t, { dur: 0.4, vol: 0.05, filter: 'lowpass', freq: 1400, freqEnd: 300, q: 0.4 }); // 부드러운 스우시(로우패스, 약하게)
+  },
   // 차지 랜스 (실샘플 우선, 아래는 폴백 합성음)
   charge_up: (t) => { tone(t, { freq: 440, freq2: 880, type: 'triangle', dur: 0.18, vol: 0.13 }); },
   charge_full: (t) => { tone(t, { freq: 660, freq2: 990, type: 'sine', dur: 0.5, vol: 0.16 }); noise(t, { dur: 0.4, vol: 0.07, filter: 'bandpass', freq: 2200, q: 2 }); },
