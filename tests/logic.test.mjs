@@ -167,6 +167,16 @@ test('은행 강등: 스택이 비면 안전 (음수·에러 없음)', () => {
   assert.deepEqual(bankDemote(0, []), { banked: 0, stack: [] });
 });
 
+// ─── 게이트 패러사이트 감염 반전 ───
+const { invertGateOp } = await import('../js/logic.js');
+test('invertGateOp: +N→-ceil(N/2), ×N→/N, -N·/N 유지', () => {
+  assert.deepEqual(invertGateOp({ op: '+', value: 40 }), { op: '-', value: 20 });
+  assert.deepEqual(invertGateOp({ op: '+', value: 45 }), { op: '-', value: 23 });   // ceil
+  assert.deepEqual(invertGateOp({ op: 'x', value: 2 }), { op: '/', value: 2 });
+  assert.deepEqual(invertGateOp({ op: '-', value: 30 }), { op: '-', value: 30 });    // 나쁜 건 유지
+  assert.deepEqual(invertGateOp({ op: '/', value: 2 }), { op: '/', value: 2 });
+});
+
 // ─── 기함 업그레이드 화력 불변식 (GPT 지적 #1 회귀 방지) ───
 const { BAL } = await import('../js/balance.js');
 test('기함 업그레이드는 화력을 감소시키지 않는다 (흡수 순양함 → 은행 + 보너스)', () => {

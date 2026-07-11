@@ -7,6 +7,7 @@ import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, evolutionDef } from './weapon-evolutions.js';
 import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
+import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
@@ -239,7 +240,7 @@ function buildEncounter(node) {
   if (node.type === 'elite') pending.push({ type: 'midboss', trackY: totalTrack * BAL.midboss.progress }); // 정예=미니보스
   pending.sort((a, b) => a.trackY - b.trackY);
   // 게이트류(전체폭 막대)가 화면에서 겹쳐 보이지 않게 최소 세로 간격 확보
-  const GATE_TYPES = new Set(['gatePair', 'bonusGate', 'weaponGate']);
+  const GATE_TYPES = new Set(['gatePair', 'bonusGate', 'weaponGate', 'corruptedGate']);
   const minGap = BAL.chunk.heightPx * 1.1;
   let lastGateY = -Infinity;
   for (const it of pending) {
@@ -398,6 +399,15 @@ function update(dt) {
           { kind: 'weaponLv' },
           { kind: 'shield' },
         ]));
+      }
+      // 대응형 신규 적 (고정 스탯 — 체력벽이 아니라 조준·수단 전환을 요구)
+      else if (it.type === 'prismWarden') w.entities.push(new PrismWarden(x));
+      else if (it.type === 'scavenger') w.entities.push(new Scavenger(x));
+      else if (it.type === 'corruptedGate') {
+        const gs = (g) => scaleGate(g, r.stage, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
+        const gate = new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right));
+        w.entities.push(gate);
+        w.entities.push(new GateParasite(gate, it.infectedLane ?? 0));
       }
     }
 

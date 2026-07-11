@@ -46,7 +46,7 @@ export function pickChunk(tier, rng, prev, filterFn) {
 }
 
 // 위협 개체(초반 안전 구간에서 배제)
-const THREAT_TYPES = new Set(['creature', 'splitter', 'sniper', 'turret', 'weaver', 'charger', 'mine', 'debris', 'bomber', 'zapper', 'orbiter', 'shielder', 'carrier', 'blinker']);
+const THREAT_TYPES = new Set(['creature', 'splitter', 'sniper', 'turret', 'weaver', 'charger', 'mine', 'debris', 'bomber', 'zapper', 'orbiter', 'shielder', 'carrier', 'blinker', 'prismWarden', 'scavenger']);
 /** 위협 적이 없는 안전 청크인지 (판 초반 보장용) */
 export function isSafeChunk(chunk) {
   return chunk.items.every((it) => !THREAT_TYPES.has(it.type));
@@ -60,6 +60,8 @@ const ENEMY_MIN_STAGE = {
   creature_large: 4, turret: 4, zapper: 4, carrier: 4,
   splitter: 5, shielder: 5,
   blinker: 6,
+  // 대응형 신규 적 (Phase 1)
+  prismWarden: 2, scavenger: 2, corruptedGate: 3,
 };
 
 /**
@@ -480,6 +482,51 @@ export const CHUNKS = [
       { type: 'blinker', x: 0.4, y: 0.2 },
       { type: 'blinker', x: 0.6, y: 0.4 },
       { type: 'capsule', x: 0.5, y: 0.68, weapon: 'random' },
+    ],
+  },
+
+  // ─── 대응형 신규 적 (Phase 1) ───
+  {
+    // 프리즘 워든: 정면 방어막 → 좌우 코어를 측면 이동으로 조준 (양측 보상)
+    tier: 'mid', name: 'm-prism-lane-choice',
+    items: [
+      { type: 'prismWarden', x: 0.5, y: 0.25 },
+      { type: 'crystal', x: 0.18, y: 0.6, value: 40 },
+      { type: 'crystal', x: 0.82, y: 0.6, value: 40 },
+    ],
+  },
+  {
+    // 스캐빈저 추격: 크리스탈을 훔치기 전에 잡을 것인가
+    tier: 'mid', name: 'm-scavenger-chase',
+    items: [
+      { type: 'crystal', x: 0.35, y: 0.35, value: 60 },
+      { type: 'crystal', x: 0.65, y: 0.4, value: 60 },
+      { type: 'scavenger', x: 0.5, y: 0.15 },
+    ],
+  },
+  {
+    // 감염 게이트 도입: 통과 전에 패러사이트를 정화할 것인가 (주변 위협 최소)
+    tier: 'mid', name: 'm-corrupted-gate-intro', minStage: 3,
+    items: [
+      { type: 'corruptedGate', y: 0.4, left: { op: '+', value: 40 }, right: { op: 'x', value: 2 }, infectedLane: 1 },
+    ],
+  },
+  {
+    // 프리즘 + 스캐빈저 혼합 (stage 5+)
+    tier: 'hard', name: 'h-prism-scavenger-mix', minStage: 5,
+    items: [
+      { type: 'prismWarden', x: 0.5, y: 0.2 },
+      { type: 'scavenger', x: 0.3, y: 0.1 },
+      { type: 'crystal', x: 0.2, y: 0.55, value: 80 },
+      { type: 'crystal', x: 0.8, y: 0.55, value: 80 },
+    ],
+  },
+  {
+    // 감염 게이트 + 수비 적 (stage 6+)
+    tier: 'hard', name: 'h-corrupted-gate-guard', minStage: 6,
+    items: [
+      { type: 'corruptedGate', y: 0.35, left: { op: 'x', value: 2 }, right: { op: '+', value: 50 }, infectedLane: 0 },
+      { type: 'sniper', x: 0.5, y: 0.7 },
     ],
   },
 ];

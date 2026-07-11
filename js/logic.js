@@ -72,6 +72,16 @@ export function bankDemote(banked, stack) {
   return { banked: Math.max(0, banked - g), stack: s };
 }
 
+/**
+ * 게이트 패러사이트 감염: 통과 시 게이트 연산 반전 (순수).
+ *  +N → -ceil(N/2) (이득이 손실로), ×N → /N, -N·/N 은 유지(나쁜 건 그대로).
+ */
+export function invertGateOp(gate) {
+  if (gate.op === '+') return { op: '-', value: Math.max(1, Math.ceil(gate.value / 2)) };
+  if (gate.op === 'x') return { op: '/', value: gate.value };
+  return { op: gate.op, value: gate.value };
+}
+
 /** 차지 랜스 단계: 누적 충전 시간 → 단계(0=미충전, maxStage 상한). */
 export function chargeStageFor(charge, stageTime, maxStage) {
   if (charge <= 0 || stageTime <= 0) return 0;

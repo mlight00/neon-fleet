@@ -16,7 +16,7 @@ test('청크 풀: easy≥5, mid≥6, hard≥4', () => {
 });
 
 test('청크 데이터 형식: 좌표는 0~1 비율, type은 알려진 것만', () => {
-  const known = new Set(['crystal', 'gatePair', 'creature', 'meteor', 'power', 'storm', 'sniper', 'turret', 'weaver', 'capsule', 'splitter', 'charger', 'mine', 'debris', 'bomber', 'zapper', 'orbiter', 'shielder', 'carrier', 'blinker']);
+  const known = new Set(['crystal', 'gatePair', 'creature', 'meteor', 'power', 'storm', 'sniper', 'turret', 'weaver', 'capsule', 'splitter', 'charger', 'mine', 'debris', 'bomber', 'zapper', 'orbiter', 'shielder', 'carrier', 'blinker', 'prismWarden', 'scavenger', 'corruptedGate']);
   for (const c of CHUNKS) {
     for (const it of c.items) {
       assert.ok(known.has(it.type), `unknown type ${it.type}`);
@@ -69,4 +69,18 @@ test('chunkMinStage: 3종 이상 조합 청크는 6스테이지 이후', () => {
 });
 test('chunkMinStage: 명시 minStage 우선', () => {
   assert.equal(chunkMinStage({ minStage: 9, items: [{ type: 'crystal', value: 1 }] }), 9);
+});
+
+test('chunkMinStage: 신규 적 도입 스테이지 (프리즘=2, 스캐빈저=2, 감염게이트=3)', () => {
+  assert.equal(chunkMinStage({ items: [{ type: 'prismWarden', x: 0.5, y: 0.2 }] }), 2);
+  assert.equal(chunkMinStage({ items: [{ type: 'scavenger', x: 0.5, y: 0.2 }] }), 2);
+  assert.equal(chunkMinStage({ items: [{ type: 'corruptedGate', y: 0.4, left: {}, right: {} }] }), 3);
+});
+
+test('신규 적 청크가 THREAT/최소스테이지 계약을 지킨다', () => {
+  const prism = CHUNKS.find((c) => c.name === 'm-prism-lane-choice');
+  assert.ok(prism && !isSafeChunk(prism), '프리즘 청크는 위협으로 분류');
+  assert.ok(chunkMinStage(prism) >= 2);
+  const gate = CHUNKS.find((c) => c.name === 'm-corrupted-gate-intro');
+  assert.ok(gate && chunkMinStage(gate) >= 3);
 });

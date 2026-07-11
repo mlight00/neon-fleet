@@ -3,7 +3,7 @@
 // world = { bal, input, squad, bullets, enemyBullets, entities, effects, addCoins,
 //           spawnEntity, spawnEnemyBullet, scrollSpeed, logicalW, logicalH, rng, phase }
 import { BAL } from './balance.js';
-import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, bankUpgrade, bankDemote } from './logic.js';
+import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, bankUpgrade, bankDemote, invertGateOp } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
@@ -1056,7 +1056,7 @@ export class HomingMissile {
 }
 
 // ───────────────────────── 스크롤 개체 공통
-class Scrolling {
+export class Scrolling {
   constructor(x, y) { this.x = x; this.y = y; this.dead = false; }
   scroll(dt, world) { this.y += world.scrollSpeed * dt; }
   offscreen(world, margin = 60) { return this.y > world.logicalH + margin; }
@@ -1194,6 +1194,7 @@ export class GatePair extends Scrolling {
     this.appliedSide = null;
     this.logicalW = logicalW;
     this.h = BAL.gate.height;
+    this.corruptSide = null;   // 게이트 패러사이트 감염 레인 (null|'left'|'right') — 살아있으면 통과 시 반전
   }
   static isGood(g) { return g.op === '+' || g.op === 'x'; }
   static label(g) { return `${g.op === 'x' ? '×' : g.op === '/' ? '÷' : g.op}${g.value}`; }
@@ -1214,7 +1215,8 @@ export class GatePair extends Scrolling {
       const { squad } = world;
       if (Math.abs(squad.y - this.y) < this.h / 2 + 8) {
         const side = squad.x < this.logicalW / 2 ? 'left' : 'right';
-        const gate = this[side];
+        let gate = this[side];
+        if (this.corruptSide === side) { gate = invertGateOp(gate); world.effects.text(squad.x, this.y - 20, '감염!', COLORS.gateBad, 14); }
         const next = applyGate(squad.count, gate);
         squad.setCount(next, world, GatePair.label(gate));
         this.applied = true;
@@ -2481,13 +2483,13 @@ export class MidBoss extends Scrolling {
 // ───────────────────────── 보스: 하이브 퀸
 // ═════════════ 신규 일반 적 6종 (거동 다양화) — 스프라이트 B16~B21, 없으면 코드 도형 폴백 ═════════════
 const NE = () => BAL.newEnemies;
-function drawEHp(ctx, e) {
+export function drawEHp(ctx, e) {
   ctx.fillStyle = 'rgba(255,255,255,0.25)';
   ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r * 2, 3);
   ctx.fillStyle = COLORS.enemyCore;
   ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r * 2 * Math.max(0, e.hp / e.maxHp), 3);
 }
-function enemyDie(e, world, color, coin) {
+export function enemyDie(e, world, color, coin) {
   e.dead = true; affixOnDeath(e, world);
   world.effects.burst(e.x, e.y, color, 14); world.addCoins(coin); sfx('explode_s');
 }
