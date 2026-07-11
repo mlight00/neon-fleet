@@ -3,7 +3,7 @@
 // world = { bal, input, squad, bullets, enemyBullets, entities, effects, addCoins,
 //           spawnEntity, spawnEnemyBullet, scrollSpeed, logicalW, logicalH, rng, phase }
 import { BAL } from './balance.js';
-import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship } from './logic.js';
+import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, bankUpgrade, bankDemote } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
@@ -233,8 +233,7 @@ export class Squad {
       // 흡수한 순양함 화력을 기함에 은행(+보너스) → 업그레이드가 항상 순 이득 (화력 손실 버그 해결)
       const gain = Math.round(need * E.cruiserPower * (E.upgradeBonus ?? 1.2));
       this.cruisers -= need;
-      this.banked = (this.banked || 0) + gain;
-      this.bankStack.push(gain);   // 강등 시 롤백용 (반복 적립 방지)
+      ({ banked: this.banked, stack: this.bankStack } = bankUpgrade(this.banked || 0, this.bankStack, gain));  // 은행 적립(+롤백 스택)
       this.tier += 1;
       this.shield = true;                        // 업그레이드 직후 사고사 방지
       this.invulnT = BAL.squad.evolveInvuln;     // 업그레이드 무적 (A3)
@@ -300,7 +299,7 @@ export class Squad {
     // 2) 등급이 남아 있으면 한 단계 강등 후 재건 (그 티어에서 은행된 화력도 롤백 → 강등→재업글 farming 차단)
     if (this.tier > 0) {
       this.tier -= 1;
-      if (this.bankStack.length) this.banked = Math.max(0, this.banked - this.bankStack.pop());
+      ({ banked: this.banked, stack: this.bankStack } = bankDemote(this.banked, this.bankStack));  // 그 티어 적립분 정확 롤백
       rescue(`⚠ ${ev.names[this.tier]}로 강등`, `드론 ${refill}기 긴급 사출`);
       return;
     }

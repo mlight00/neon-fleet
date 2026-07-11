@@ -59,6 +59,19 @@ export function canUpgradeFlagship(cruisers, tier, maxTier, cfg) {
   return tier < maxTier && cruisers >= cfg.cruisersPerFlagship;
 }
 
+/** 기함 업그레이드 시 흡수 화력을 은행에 적립 + 롤백용 스택에 기록 (순수). */
+export function bankUpgrade(banked, stack, gain) {
+  return { banked: banked + gain, stack: [...stack, gain] };
+}
+
+/** 강등 시 마지막 적립분을 정확히 롤백 (순수). 스택이 비면 무변, banked는 0 미만 불가. */
+export function bankDemote(banked, stack) {
+  if (!stack.length) return { banked, stack: stack.slice() };
+  const s = stack.slice();
+  const g = s.pop();
+  return { banked: Math.max(0, banked - g), stack: s };
+}
+
 /** 차지 랜스 단계: 누적 충전 시간 → 단계(0=미충전, maxStage 상한). */
 export function chargeStageFor(charge, stageTime, maxStage) {
   if (charge <= 0 || stageTime <= 0) return 0;
