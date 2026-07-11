@@ -84,20 +84,6 @@ export function stageMods(stage) {
 }
 
 /**
- * 드론 소모형 진화 판정.
- * 다음 티어 비용(costs[tier+1])에 도달하면 모은 드론이 기함의 재료로 흡수되고 1티어 승급.
- * 진화 후에는 흡수량의 retainRatio만큼(최소 retainBase)이 새 호위대로 재사출되고,
- * 나머지는 소멸 — 다음 진화는 처음부터 다시 모은다. 연쇄 승급·강등 없음.
- * 반환: { tier, count, consumed } — 진화가 없으면 입력 그대로, consumed 0.
- */
-export function evolveStep(count, tier, costs, retainBase, retainRatio = 0) {
-  const cost = costs[tier + 1];
-  if (cost === undefined || count < cost) return { tier, count, consumed: 0 };
-  const kept = Math.min(count, Math.max(retainBase, Math.round(count * retainRatio)));
-  return { tier: tier + 1, count: kept, consumed: count - kept };
-}
-
-/**
  * 섹터 분기 맵 생성 (순수 함수, 시드 재현 가능).
  * 반환 { sector, depth, cols }. cols=열 배열, 각 열=노드 배열.
  * node = { id, col, row, type, next:[다음 열의 row 인덱스] }.

@@ -78,7 +78,8 @@ export const ui = {
       <h1>NEON FLEET</h1>
       <p>네온 함대</p>
       <p>드론을 바쳐 업그레이드할 때마다 <b>모듈</b>을 골라<br>매 원정 다른 빌드로 끝까지 도전!</p>
-      <p>📱 드래그 · 🖱 마우스 · ⌨ ←→</p>
+      <p>📱 드래그 · 🖱 마우스 · ⌨ ←→ 로 이동</p>
+      <p><small>⚡ 꾹 누르면(홀드) 자동사격 멈추고 <b>차지 랜스</b> 충전 → 놓으면 정면 관통 발사</small></p>
       <p class="big">최고 도달 STAGE ${stage}</p>
       ${best > 0 ? `<p>최고 함대 화력: ${best.toLocaleString()} · 코인 ${coins.toLocaleString()}</p>` : ''}
       ${saveOk ? '' : '<p style="color:#ff3d71">⚠ 이 브라우저에선 기록 저장이 꺼져 있어요</p>'}
@@ -147,24 +148,6 @@ export const ui = {
       b.addEventListener('click', () => onBuy(b.dataset.key));
     });
     document.getElementById('btn-back').addEventListener('click', onBack);
-  },
-
-  showWin({ stage, bossName, maxPower, coins, best, isRecord, topPercent, onNext, onHangar }) {
-    panel(`
-      <h2 style="color:#3ff5e0">STAGE ${stage} 클리어!</h2>
-      <p class="big">${bossName} 격파</p>
-      <p>최대 함대 화력: <b>${maxPower.toLocaleString()}</b> ${isRecord ? '<span class="record">★ 신기록!</span>' : ''}</p>
-      <p>획득 코인: <b>🪙 +${coins.toLocaleString()}</b></p>
-      <p class="big">전체 파일럿 상위 ${topPercent}%!</p>
-      ${best > 0 && !isRecord ? `<p>최고 기록: ${best.toLocaleString()}</p>` : ''}
-      <p style="color:#ff9c41">다음 스테이지는 적이 더 강해집니다</p>
-      <div class="btn-row">
-        <button id="btn-retry">STAGE ${stage + 1} ▶</button>
-        ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고</button>' : ''}
-      </div>
-    `);
-    document.getElementById('btn-retry').addEventListener('click', onNext);
-    if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
   },
 
   /** 일시정지 오버레이: 재개 또는 판 포기(끝내기) */

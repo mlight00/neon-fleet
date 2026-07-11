@@ -12,7 +12,6 @@ export const MODULE_DEFS = [
   { id: 'boss',   name: '사냥꾼 표식', icon: '☠️', desc: '보스·중간보스 피해 +10%', rarity: 'rare',   max: 3, apply: (m) => { m.bossDmgMult *= 1.10; } },
   { id: 'harvest',name: '수확 드론',   icon: '💠', desc: '크리스탈·수송선 보상 +30%',rarity: 'common', max: 4, apply: (m) => { m.podRewardMult *= 1.3; } },
   { id: 'evolve', name: '신속 업그레이드', icon: '🌀', desc: '업그레이드 비용 −15%',  rarity: 'common', max: 3, apply: (m) => { m.evolveCostMult *= 0.85; } },
-  { id: 'retain', name: '잔존 편대',   icon: '♻️', desc: '업그레이드 후 남는 드론 대폭↑', rarity: 'common', max: 3, apply: (m) => { m.retainBonus += 0.15; } },
   { id: 'scavenge',name: '드론 회수',  icon: '🧲', desc: '적 처치 시 드론 획득 확률 증가', rarity: 'common', max: 4, apply: (m) => { m.killDroneChance += 0.12; } },
   { id: 'armor',  name: '위상 장갑',   icon: '🧊', desc: '접촉 피해 −25%',          rarity: 'common', max: 2, apply: (m) => { m.contactCapMult *= 0.7; } },
   { id: 'shieldregen', name: '반응 실드', icon: '🔵', desc: '주기적으로 보호막 생성', rarity: 'rare', max: 3, apply: (m) => { m.shieldRegen = m.shieldRegen ? m.shieldRegen * 0.7 : 9; } },
@@ -29,7 +28,7 @@ export const MODULE_BY_ID = Object.fromEntries(MODULE_DEFS.map((m) => [m.id, m])
 export function baseMfx() {
   return {
     dmgMult: 1, fireRateMult: 1, pierceBonus: 0, crit: 0, critMult: 2, bossDmgMult: 1,
-    podRewardMult: 1, evolveCostMult: 1, retainBonus: 0, killDroneChance: 0, killDroneAmt: 2,
+    podRewardMult: 1, evolveCostMult: 1, killDroneChance: 0, killDroneAmt: 2,
     contactCapMult: 1, shieldRegen: 0, swarmPerDrone: 0, explodeRadius: 0, explodeDmgFrac: 0,
     chargeMult: 1, chargeSpeed: 1, chargeMaxBonus: 0,
   };

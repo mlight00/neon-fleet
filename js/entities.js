@@ -3,7 +3,7 @@
 // world = { bal, input, squad, bullets, enemyBullets, entities, effects, addCoins,
 //           spawnEntity, spawnEnemyBullet, scrollSpeed, logicalW, logicalH, rng, phase }
 import { BAL } from './balance.js';
-import { applyGate, hitCrystal, evolveStep, chargeStageFor, dronesToCruisers, canUpgradeFlagship } from './logic.js';
+import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
@@ -218,7 +218,7 @@ export class Squad {
     const ev = BAL.evolution;
     const E = BAL.escort;
     const mfx = world.mfx || {};
-    const maxTier = ev.costs.length - 1;
+    const maxTier = ev.names.length - 1;
     // 1) 드론 → 순양함 자동 합체 (선택 없음)
     const m = dronesToCruisers(this.count, this.cruisers || 0, E);
     if (m.merged > 0) {
@@ -385,7 +385,14 @@ export class Squad {
     const mfx = world.mfx || {};
     const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];  // 기함 개성: 광역 기함일수록 랜스도 넓게
     const halfW = ch.width[Math.min(stage, ch.width.length - 1)] * (0.7 + 0.3 * trait.spread);
-    const dmg = this.power * ch.blastCoef * (ch.stageMult[Math.min(stage, ch.stageMult.length - 1)] || 1) * (mfx.dmgMult ?? 1) * (mfx.chargeMult ?? 1);
+    // 차지 피해도 자동사격과 같은 계수(발사속도·공격력·무기레벨·무기계수)로 스케일 → 강화할수록 같이 강해진다.
+    const W = BAL.weapons;
+    const fireRate = (world.stats?.fireRate ?? BAL.squad.fireRate) * (mfx.fireRateMult ?? 1);
+    const damage = (world.stats?.damage ?? BAL.squad.damage) * (mfx.dmgMult ?? 1);
+    const lvCoef = W.lvCoef[this.weaponLv - 1];
+    const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
+    const stageMult = ch.stageMult[Math.min(stage, ch.stageMult.length - 1)] || 1;
+    const dmg = this.power * ch.blastCoef * stageMult * fireRate * damage * lvCoef * wCoef * (mfx.chargeMult ?? 1);
     for (const e of world.entities) {       // 앞쪽 컬럼의 적 전부 관통
       if (e.dead || !e.hitByBullet) continue;
       if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) e.hitByBullet(dmg, world);
@@ -735,12 +742,12 @@ export class Bullet {
     const top = Math.min(this.y, this.prevY) - L / 2;
     const bot = Math.max(this.y, this.prevY) + L / 2;
     const h = bot - top;
-    ctx.globalAlpha = 0.4;                 // 청록 외피
+    ctx.globalAlpha = 0.22;                // 청록 외피 (중앙 가림 완화 — 적탄 가독성 위해 반투명 하향)
     ctx.fillStyle = '#a8f0ff';
     ctx.fillRect(this.x - w, top, w * 2, h);
-    ctx.globalAlpha = 1;                   // 백열 코어
+    ctx.globalAlpha = 0.75;                // 백열 코어 (살짝 반투명)
     ctx.fillStyle = '#ffffff';
-    const cw = this.lv >= 3 ? w * 0.9 : this.lv === 2 ? w * 0.7 : w * 0.5;
+    const cw = this.lv >= 3 ? w * 0.8 : this.lv === 2 ? w * 0.6 : w * 0.45;
     ctx.fillRect(this.x - cw / 2, top, cw, h);
     if (this.lv >= 2) {                    // 진행 끝단 색 포인트
       ctx.fillStyle = COLORS.ally;

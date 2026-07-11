@@ -65,38 +65,6 @@ test('stormDecay: 초당 비율 감소, 최소 0', () => {
   assert.equal(stormDecay(0, 1, 0.10), 0);
 });
 
-// ─── 드론 소모형 진화 ───
-const { evolveStep } = await import('../js/logic.js');
-const COSTS = [0, 60, 140, 280];
-const RETAIN = 8;
-const RATIO = 0.25;
-
-test('evolveStep: 비용 미달이면 아무 일도 없다', () => {
-  assert.deepEqual(evolveStep(59, 0, COSTS, RETAIN, RATIO), { tier: 0, count: 59, consumed: 0 });
-  assert.deepEqual(evolveStep(139, 1, COSTS, RETAIN, RATIO), { tier: 1, count: 139, consumed: 0 });
-});
-
-test('evolveStep: 비용 도달 시 1티어 승급 + 흡수량의 25%만 새 호위로 잔류', () => {
-  assert.deepEqual(evolveStep(60, 0, COSTS, RETAIN, RATIO), { tier: 1, count: 15, consumed: 45 });
-  assert.deepEqual(evolveStep(140, 1, COSTS, RETAIN, RATIO), { tier: 2, count: 35, consumed: 105 });
-});
-
-test('evolveStep: 잔류가 기본 호위(retainBase)보다 작아질 수는 없다', () => {
-  // ratio 0이면 시작 드론 수만큼은 남는다
-  assert.deepEqual(evolveStep(60, 0, COSTS, RETAIN, 0), { tier: 1, count: 8, consumed: 52 });
-});
-
-test('evolveStep: 비용을 크게 초과해도(대형 크리스탈) 초과분까지 흡수되고 승급은 1단계만', () => {
-  assert.deepEqual(evolveStep(400, 0, COSTS, RETAIN, RATIO), { tier: 1, count: 100, consumed: 300 });
-});
-
-test('evolveStep: 최고 티어에선 더 진화하지 않고 드론이 그대로 쌓인다', () => {
-  assert.deepEqual(evolveStep(999, 3, COSTS, RETAIN, RATIO), { tier: 3, count: 999, consumed: 0 });
-});
-
-test('evolveStep: 강등 없음 — 드론이 줄어도 티어 유지 (바친 재료는 돌려받지 않는다)', () => {
-  assert.deepEqual(evolveStep(3, 2, COSTS, RETAIN, RATIO), { tier: 2, count: 3, consumed: 0 });
-});
 
 // ─── 스테이지 난이도 스케일링 ───
 const { stageMods } = await import('../js/logic.js');

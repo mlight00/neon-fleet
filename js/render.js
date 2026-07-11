@@ -204,29 +204,32 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText(`드론 ${count}기 · 순양함 ${cruisers}`, 12, 28);
-  if (tierName) {
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillStyle = COLORS.ally;
-    ctx.fillText(tierPower > 0 ? `기함 ${tierName} · 화력 ${tierPower}` : `기함 ${tierName}`, 12, 42);
-  }
-  // 기함 업그레이드 게이지: 순양함을 모아 임계치를 채우면 기함 1단계 업그레이드(선택창)
-  if (upgradeMax > 0) {
-    const gw = 86;
-    ctx.fillStyle = 'rgba(255,217,61,0.18)';
-    ctx.fillRect(12, 48, gw, 5);
-    ctx.fillStyle = COLORS.reward;
-    ctx.fillRect(12, 48, gw * Math.min(1, upgradeCur / upgradeMax), 5);
-    ctx.font = 'bold 10px sans-serif';
-    ctx.fillText(`기함 강화까지 순양함 ${upgradeCur}/${upgradeMax}`, 12 + gw + 6, 53);
-  } else if (tierName) {
-    ctx.font = 'bold 10px sans-serif';
-    ctx.fillStyle = COLORS.reward;
-    ctx.fillText('기함 최종단계 (MAX)', 12, 53);
-  }
-  if (stage) {
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillStyle = COLORS.reward;
-    ctx.fillText(`섹터 ${stage}`, 12, 67);
+  // 보스전에는 상단이 보스 HP바·이름과 겹치므로 기함 상세줄을 숨긴다 (드론/순양함 줄만 유지)
+  if (!bosses.length) {
+    if (tierName) {
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillStyle = COLORS.ally;
+      ctx.fillText(tierPower > 0 ? `기함 ${tierName} · 화력 ${tierPower}` : `기함 ${tierName}`, 12, 42);
+    }
+    // 기함 업그레이드 게이지: 순양함을 모아 임계치를 채우면 기함 1단계 업그레이드
+    if (upgradeMax > 0) {
+      const gw = 86;
+      ctx.fillStyle = 'rgba(255,217,61,0.18)';
+      ctx.fillRect(12, 48, gw, 5);
+      ctx.fillStyle = COLORS.reward;
+      ctx.fillRect(12, 48, gw * Math.min(1, upgradeCur / upgradeMax), 5);
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(`기함 강화까지 순양함 ${upgradeCur}/${upgradeMax}`, 12 + gw + 6, 53);
+    } else if (tierName) {
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillStyle = COLORS.reward;
+      ctx.fillText('기함 최종단계 (MAX)', 12, 53);
+    }
+    if (stage) {
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillStyle = COLORS.reward;
+      ctx.fillText(`섹터 ${stage}`, 12, 67);
+    }
   }
   // 보유 모듈 아이콘 줄 (빌드가 커지는 게 보인다)
   if (modules && modules.length) {

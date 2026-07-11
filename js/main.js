@@ -4,7 +4,7 @@ import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, createEffects } from './entities.js';
 import { maybeAffix } from './affixes.js';
-import { computeMfx, draftOptions, moduleSummary, MODULE_BY_ID } from './modules.js';
+import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
@@ -260,12 +260,29 @@ function onEncounterClear() {
 function completeNode(node) {
   const r = run;
   if (node && !r.done.includes(node.id)) r.done.push(node.id);
-  if (node && node.type === 'boss') {
-    r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `섹터 ${r.sector} 클리어!`, COLORS.reward);
-    startSector(r.sector + 1);
-  } else {
-    enterSectorMap();
+  const proceed = () => {
+    if (node && node.type === 'boss') {
+      r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `섹터 ${r.sector} 클리어!`, COLORS.reward);
+      startSector(r.sector + 1);
+    } else {
+      enterSectorMap();
+    }
+  };
+  // 전투류 노드 완료 시 모듈 드래프트 1장 → 빌드를 초반부터 쌓게 (첫 전투 직후 첫 모듈)
+  // 정비 노드(자체 드래프트)·보스(다음 섹터로) 제외
+  const isEncounter = node && ['combat', 'elite', 'hazard', 'supply'].includes(node.type);
+  if (isEncounter) {
+    const opts = draftOptions(r.modules, r.rng, 3);
+    if (opts.length) {
+      drafting = true; state = 'map';
+      ui.showDraft({
+        options: opts, owned: moduleSummary(r.modules),
+        onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); proceed(); },
+      });
+      return;
+    }
   }
+  proceed();
 }
 
 // (구 advanceStage 제거 — 섹터 맵의 onEncounterClear/completeNode가 진행을 담당)
@@ -281,41 +298,6 @@ function startPlay() {
 function recomputeMfx() {
   run.world.mfx = computeMfx(run.modules);
   run.squad.swarmPerDrone = run.world.mfx.swarmPerDrone;
-}
-
-// 진화·모듈 선택 직후: 화면 섬광 + 충격파 링 + 적탄 정화 + 기함 펄스 (업그레이드 손맛)
-function evolutionNova(r, moduleId) {
-  const w = r.world, sq = r.squad;
-  w.effects.flash(0.85);
-  for (let k = 0; k < 3; k++) w.effects.ring(sq.x, sq.y, k === 1 ? COLORS.reward : COLORS.ally, k * 0.07);
-  w.effects.burst(sq.x, sq.y, COLORS.ally, 48, 460);
-  w.effects.burst(sq.x, sq.y, '#ffffff', 26, 320);
-  for (const b of w.enemyBullets) b.dead = true;   // 화면의 적탄 전부 소멸 = 진화 정화
-  sq.evolvePunch = Math.max(sq.evolvePunch || 0, 0.7);
-  const m = MODULE_BY_ID[moduleId];
-  if (m) w.effects.text(sq.x, sq.y - 60, `${m.icon} ${m.name}!`, COLORS.reward);
-  sfx('evolve');
-}
-
-// 진화/오버로드 시 모듈 드래프트 3장 표시 (게임 일시 정지)
-function openDraft() {
-  const r = run;
-  const opts = draftOptions(r.modules, r.rng, 3);
-  if (opts.length === 0) return; // 모든 모듈 만렙
-  drafting = true;
-  sfx('evolve');
-  ui.showDraft({
-    options: opts,
-    owned: moduleSummary(r.modules),
-    onPick(id) {
-      r.modules.push(id);
-      recomputeMfx();
-      drafting = false;
-      ui.hide();
-      sfx('buy');
-      evolutionNova(r, id);   // 선택 직후 노바 폭발 (업그레이드 손맛)
-    },
-  });
 }
 
 // 적 격파 시: 폭발 탄두(광역) + 전리 회수(드론) 모듈
@@ -559,7 +541,6 @@ function update(dt) {
   }
 
   // 진화/오버로드 발생 → 모듈 드래프트 (게임 일시 정지)
-  if (r.squad.pendingDraft) { r.squad.pendingDraft = false; openDraft(); }
 }
 
 // 원정 종료 (사망 또는 끝내기): 코인·기록 정산 → 결과 화면
@@ -602,6 +583,7 @@ function showHangar() {
 
 // ───────────────────────── 그리기
 function draw() {
+  syncPlayButtons();   // 상태에 따라 일시정지·차지 버튼 표시/숨김 (draw는 headless step에서도 호출됨)
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
@@ -655,7 +637,7 @@ function draw() {
     r.effects.draw(ctx, LOGICAL_W, logicalH);
 
     const evc = r.world.mfx?.evolveCostMult ?? 1;
-    const maxTier = BAL.evolution.costs.length - 1;
+    const maxTier = BAL.evolution.names.length - 1;
     const needCruisers = r.squad.tier < maxTier ? Math.max(1, Math.round(BAL.escort.cruisersPerFlagship * evc)) : 0;
     drawHUD(ctx, LOGICAL_W, {
       progress: Math.min(1, r.traveled / r.totalTrack),
@@ -714,6 +696,13 @@ chargeBtn.addEventListener('pointerup', setCharge(false));
 chargeBtn.addEventListener('pointerleave', setCharge(false));
 chargeBtn.addEventListener('pointercancel', setCharge(false));
 document.getElementById('stage').appendChild(chargeBtn);
+
+// 일시정지·차지 버튼은 실제 플레이 중(state='play')에만 표시 — 결과/맵/격납고 화면에선 숨김
+function syncPlayButtons() {
+  const d = state === 'play' ? '' : 'none';
+  if (pauseBtn.style.display !== d) pauseBtn.style.display = d;
+  if (chargeBtn.style.display !== d) chargeBtn.style.display = d;
+}
 
 // ───────────────────────── 루프
 let last = performance.now();
