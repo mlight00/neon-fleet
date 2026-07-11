@@ -646,6 +646,7 @@ function draw() {
       count: r.squad.count,
       cruisers: r.squad.cruisers || 0,
       tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,
+      shipName: BAL.evolution.names[Math.min(r.squad.tier, BAL.evolution.names.length - 1)],
       tierPower: Math.round(r.squad.banked || 0),
       upgradeCur: r.squad.cruisers || 0,   // 기함 업그레이드까지 모은 순양함
       upgradeMax: needCruisers,            // 필요한 순양함 (0 = 최종 티어)

@@ -163,7 +163,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, tierPower, upgradeCur = 0, upgradeMax = 0, stage, weapon, weaponLv, shield, modules = [] }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, tierPower, upgradeCur = 0, upgradeMax = 0, stage, weapon, weaponLv, shield, modules = [] }) {
   ctx.save();
   // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
@@ -203,8 +203,10 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   ctx.fillStyle = COLORS.text;
   ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(`드론 ${count}기 · 순양함 ${cruisers}`, 12, 28);
-  // 보스전에는 상단이 보스 HP바·이름과 겹치므로 기함 상세줄을 숨긴다 (드론/순양함 줄만 유지)
+  // 보스전에는 기함 상세줄이 보스 HP바·이름과 겹치므로, 함대 줄(보스 HP바보다 위)에 기함 이름만 짧게 붙인다.
+  const bossShip = bosses.length && shipName ? ` · 기함 ${shipName}` : '';
+  ctx.fillText(`드론 ${count}기 · 순양함 ${cruisers}${bossShip}`, 12, 28);
+  // 상세줄(트레잇·화력·게이지·섹터)은 보스전엔 숨김 (겹침 방지)
   if (!bosses.length) {
     if (tierName) {
       ctx.font = 'bold 11px sans-serif';
