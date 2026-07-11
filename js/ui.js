@@ -234,6 +234,24 @@ export const ui = {
     attachKeyNav(overlay.querySelectorAll('.evo-card'), (b) => onPick(b.dataset.id));
   },
 
+  /** 기함 교리 3택 (첫 업그레이드 1회). 게임 일시 정지. */
+  showDoctrineDraft({ options, onPick }) {
+    const cards = options.map((d) => `
+        <button class="doc-card" data-id="${d.id}" aria-label="${d.name}: ${d.desc}" style="flex:1;min-width:108px;max-width:160px;padding:14px 8px;border:2px solid #ffd93d;background:rgba(255,255,255,0.05);border-radius:14px;display:flex;flex-direction:column;gap:6px;align-items:center;cursor:pointer">
+          <div style="font-size:30px;line-height:1">${d.icon}</div>
+          <div style="font-weight:bold;font-size:14px;color:#ffd93d">${d.name}</div>
+          <div style="font-size:11px;color:#dfe9ff;line-height:1.3">${d.desc}</div>
+        </button>`).join('');
+    panel(`
+      <h2 style="color:#ffd93d">기함 교리 선택</h2>
+      <p><small>이번 원정의 함대 교리 — 한 번만 선택, 강등돼도 유지</small></p>
+      <div style="display:flex;gap:10px;justify-content:center;margin:14px 0;flex-wrap:wrap">${cards}</div>
+      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 · ⌨ ←→ 이동 · Space 선택</p>
+    `);
+    overlay.querySelectorAll('.doc-card').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
+    attachKeyNav(overlay.querySelectorAll('.doc-card'), (b) => onPick(b.dataset.id));
+  },
+
   /** 섹터 분기 맵: 갈림길에서 다음 노드를 고른다 (게임 일시 정지) */
   showSectorMap({ map, currentId = null, doneIds = [], sector, coins = 0, onPick }) {
     const META = {

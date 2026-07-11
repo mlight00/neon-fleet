@@ -56,3 +56,18 @@ test('doctrineIcon: id별 아이콘, 미선택이면 빈 문자열', () => {
   assert.equal(doctrineIcon(null), '');
   assert.equal(DOCTRINE_BY_ID.swarm.icon, '🐝');
 });
+
+test('위상 교리: 피격 반경이 하한(hitRadiusMin) 아래로 내려가지 않는다 (entities.hitRadius 공식 반영)', () => {
+  const p = CFG.phase;
+  const clamp = (base) => Math.max(p.hitRadiusMin, base + p.hitRadiusDelta);
+  assert.equal(clamp(15), 12);   // 스카웃 15-3=12=하한
+  assert.equal(clamp(13), 12);   // 13-3=10 → 하한 12로 클램프
+  assert.equal(clamp(30), 27);   // 큰 값은 -3만
+});
+
+test('교리는 서로 독립: 군체=순양함만, 랜스=차지만, 위상=피격만 (교차 보너스 없음)', () => {
+  const s = doctrineEffects('swarm', CFG), l = doctrineEffects('lance', CFG), p = doctrineEffects('phase', CFG);
+  assert.equal(s.chargeDmgMult, 1); assert.equal(s.hitRadiusDelta, 0);        // 군체는 차지·피격 불변
+  assert.equal(l.supportMult, 1); assert.equal(l.hitRadiusDelta, 0);          // 랜스는 순양함·피격 불변
+  assert.equal(p.supportMult, 1); assert.equal(p.chargeDmgMult, 1);           // 위상은 순양함·차지 불변
+});

@@ -6,6 +6,7 @@ import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor,
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, evolutionDef } from './weapon-evolutions.js';
+import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
@@ -547,10 +548,30 @@ function update(dt) {
     endExpedition();
   }
 
-  // 선택 요청 소비 (우선순위: 교리 > 무기 진화). 보스·연출 중엔 열지 않는다.
+  // 선택 요청 소비 (우선순위: 교리 > 무기 진화). 보스·연출 중엔 열지 않는다. 동시에 둘이 열리지 않음.
   if (r.phase === 'track' && !drafting) {
-    if (r.squad.pendingWeaponEvolution) openWeaponEvolution(r.squad.pendingWeaponEvolution);
+    if (r.squad.pendingDoctrine) openDoctrine();
+    else if (r.squad.pendingWeaponEvolution) openWeaponEvolution(r.squad.pendingWeaponEvolution);
   }
+}
+
+// 기함 교리 3택 (첫 업그레이드 1회). 게임 일시 정지.
+function openDoctrine() {
+  const r = run;
+  drafting = true;
+  sfx('evolve');
+  ui.showDoctrineDraft({
+    options: DOCTRINES,
+    onPick(id) {
+      r.squad.doctrine = id;
+      r.squad.pendingDoctrine = false;
+      drafting = false;
+      ui.hide();
+      sfx('buy');
+      r.effects.flash(0.7);
+      r.effects.text(r.squad.x, r.squad.y - 60, `${DOCTRINE_BY_ID[id].icon} ${DOCTRINE_BY_ID[id].name}!`, COLORS.reward, 18);
+    },
+  });
 }
 
 // 무기 진화 2택 선택창 (게임 일시 정지). 선택 시 해당 무기의 진화 확정.
@@ -677,6 +698,7 @@ function draw() {
       cruisers: r.squad.cruisers || 0,
       tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,
       shipName: BAL.evolution.names[Math.min(r.squad.tier, BAL.evolution.names.length - 1)],
+      doctrine: doctrineIcon(r.squad.doctrine),
       tierPower: Math.round(r.squad.banked || 0),
       upgradeCur: r.squad.cruisers || 0,   // 기함 업그레이드까지 모은 순양함
       upgradeMax: needCruisers,            // 필요한 순양함 (0 = 최종 티어)

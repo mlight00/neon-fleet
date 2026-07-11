@@ -10,6 +10,7 @@ import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
 import { getSprite, bossDefFor } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
 import { canEvolveWeapon } from './weapon-evolutions.js';
+import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { sfx } from './audio.js';
 
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
@@ -182,9 +183,10 @@ export class Squad {
     return Math.max(base, Math.min(BAL.squad.maxWidth, 12 * Math.sqrt(this.count)));
   }
   get hitRadius() {
-    // 치명 판정은 작고 일정하게 (탄막게임식): 진화해도 표적이 커지지 않아 회피가 가능하다.
-    // 편대 수·폭에 비례하던 옛 방식(최대 96px)은 '피할 수 없는 거대 표적'을 만들었다.
-    return 15 + this.tier * 2.2;   // T0 15 … T5 26
+    // 치명 판정은 작고 일정하게 (탄막게임식). 위상 기동 교리는 반경을 더 줄인다(하한 존중).
+    const base = 15 + this.tier * 2.2;   // T0 15 … T5 26
+    const E = doctrineEffects(this.doctrine, BAL.doctrine);
+    return Math.max(E.hitRadiusMin || 0, base + E.hitRadiusDelta);
   }
 
   setWeapon(weapon, world) {
@@ -230,6 +232,10 @@ export class Squad {
   get power() {
     return this.flagPower + this.supportPower;
   }
+  /** 보상 드론 획득 배수 (군체 교리 + 순양함 존재 시 +10%) */
+  get rewardGainMult() {
+    return (this.doctrine === 'swarm' && (this.cruisers || 0) > 0) ? 1 + BAL.doctrine.swarm.droneGainBonus : 1;
+  }
 
   checkEvolution(world) {
     const ev = BAL.evolution;
@@ -251,6 +257,7 @@ export class Squad {
       this.cruisers -= need;
       ({ banked: this.banked, stack: this.bankStack } = bankUpgrade(this.banked || 0, this.bankStack, gain));  // 은행 적립(+롤백 스택)
       this.tier += 1;
+      if (this.tier === 1 && !this.doctrine && !this.pendingDoctrine) this.pendingDoctrine = true;  // 첫 업그레이드(0→1) → 교리 선택
       this.shield = true;                        // 업그레이드 직후 사고사 방지
       this.invulnT = BAL.squad.evolveInvuln;     // 업그레이드 무적 (A3)
       this.evolvePunch = 0.5;
@@ -380,8 +387,9 @@ export class Squad {
     const ch = BAL.charge;
     const charging = !!(world.input && world.input.charging) && !this.dead;
     const maxStage = ch.maxStage + (world.mfx?.chargeMaxBonus || 0);
+    const chargeSpeedMul = doctrineEffects(this.doctrine, BAL.doctrine).chargeSpeedMult;  // 랜스 강습: 충전 속도↑
     if (charging) {
-      this.charge += dt * (world.mfx?.chargeSpeed || 1);
+      this.charge += dt * (world.mfx?.chargeSpeed || 1) * chargeSpeedMul;
       const st = chargeStageFor(this.charge, ch.stageTime, maxStage);
       if (st > this.chargeStage) {          // 단계 상승 연출 + 사운드
         this.chargeStage = st;
@@ -410,7 +418,8 @@ export class Squad {
     const lvCoef = W.lvCoef[this.weaponLv - 1];
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
     const stageMult = ch.stageMult[Math.min(stage, ch.stageMult.length - 1)] || 1;
-    const dmg = this.power * ch.blastCoef * stageMult * fireRate * damage * lvCoef * wCoef * (mfx.chargeMult ?? 1);
+    const chgDmgMul = doctrineEffects(this.doctrine, BAL.doctrine).chargeDmgMult;  // 랜스 강습: 차지 피해↑
+    const dmg = this.power * ch.blastCoef * stageMult * fireRate * damage * lvCoef * wCoef * (mfx.chargeMult ?? 1) * chgDmgMul;
     for (const e of world.entities) {       // 앞쪽 컬럼의 적 전부 관통
       if (e.dead || !e.hitByBullet) continue;
       if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) e.hitByBullet(dmg, world);
@@ -440,16 +449,18 @@ export class Squad {
     const damage = (world.stats?.damage ?? BAL.squad.damage) * (mfx.dmgMult ?? 1);
     const pb = mfx.pierceBonus || 0;
     const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult;
-    // 니들 개틀링: 치명 확률 가산
+    const dEff = doctrineEffects(this.doctrine, BAL.doctrine);   // 기함 교리 효과 (중립이면 전부 1/0)
+    // 니들 개틀링: 치명 확률 가산 / 위상 기동: 이동 뱅크에 비례한 피해 보너스(모든 탄에 적용)
     const needle = evo === 'vulcan_needle' ? WE.vulcan_needle : null;
     const critP = (mfx.crit || 0) + (needle ? needle.critBonus : 0);
-    const crit = (d) => (critP && Math.random() < critP ? d * (mfx.critMult || 2) : d);
-    // 호위함(순양함) 사격
-    this.fireSupport(dt, world, this.supportPower * fireRate * damage * lvCoef * powerMult, crit);
+    const phaseMul = phaseDamageMult(Math.abs(this.bank || 0), dEff.bankDmgMax);
+    const crit = (d) => (critP && Math.random() < critP ? d * (mfx.critMult || 2) : d) * phaseMul;
+    // 호위함(순양함) 사격 — 군체 교리는 순양함 화력 배수
+    this.fireSupport(dt, world, this.supportPower * dEff.supportMult * fireRate * damage * lvCoef * powerMult, crit);
     const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];
     const ascPierce = 0;
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
-    const escortShare = this.count > 1 ? 0.3 : 0;
+    const escortShare = this.count > 1 ? 0.3 + dEff.escortShareBonus : 0;   // 군체 교리: 드론 사격 비중↑
     this.fireEscort(dt, world, baseDps * wCoef * escortShare);
 
     if (this.weapon === 'homing') {
@@ -1065,7 +1076,7 @@ export class Crystal extends Scrolling {
     if (res.broken) {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.reward, 20);
-      world.squad.applyDelta(Math.round(res.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult), world);
+      world.squad.applyDelta(Math.round(res.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult * world.squad.rewardGainMult), world);
       sfx('crystal');
     }
   }
@@ -1135,7 +1146,7 @@ export class DronePod extends Scrolling {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.ally, 18, 200);
       world.effects.ring(this.x, this.y, COLORS.ally);
-      world.squad.applyDelta(Math.round(this.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult), world, '보급 확보!');
+      world.squad.applyDelta(Math.round(this.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult * world.squad.rewardGainMult), world, '보급 확보!');
       sfx('crystal');
     }
   }
