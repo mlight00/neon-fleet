@@ -1,6 +1,7 @@
-// DOM 오버레이: 타이틀 / 결과(성공·실패) / 격납고 / 모듈 드래프트 화면
+// DOM 오버레이: 타이틀 / 결과(성공·실패) / 격납고 / 모듈 드래프트 / 무기 진화 / 교리 화면
 import { hangarCost } from './logic.js';
 import { MODULE_BY_ID } from './modules.js';
+import { WEAPON_LABELS, WEAPON_COLORS } from './render.js';
 import { sfx } from './audio.js';
 
 const overlay = document.getElementById('overlay');
@@ -211,6 +212,26 @@ export const ui = {
       b.addEventListener('click', () => onPick(b.dataset.id));
     });
     attachKeyNav(overlay.querySelectorAll('.draft-card'), (b) => onPick(b.dataset.id));
+  },
+
+  /** 무기 진화 2택 (Lv3 후 같은 색 캡슐). 게임 일시 정지. */
+  showWeaponEvolution({ weapon, options, onPick }) {
+    const col = WEAPON_COLORS[weapon] || '#3ff5e0';
+    const cards = options.map((o) => `
+        <button class="evo-card" data-id="${o.id}" aria-label="${o.name}: ${o.shape}" style="flex:1;min-width:120px;max-width:180px;padding:14px 10px;border:2px solid ${col};background:rgba(255,255,255,0.05);border-radius:14px;display:flex;flex-direction:column;gap:6px;align-items:center;cursor:pointer">
+          <div style="font-weight:bold;font-size:15px;color:${col}">${o.name}</div>
+          <div style="font-size:12px;color:#dfe9ff;line-height:1.3">${o.shape}</div>
+          <div style="font-size:11px;color:#7cff9c">▲ ${o.pro}</div>
+          <div style="font-size:11px;color:#ff9c9c">▼ ${o.con}</div>
+        </button>`).join('');
+    panel(`
+      <h2 style="color:${col}">${WEAPON_LABELS[weapon] || '무기'} 진화</h2>
+      <p><small>공격 형태가 바뀝니다 — 원정 내내 유지, 무기당 1회</small></p>
+      <div style="display:flex;gap:12px;justify-content:center;margin:14px 0;flex-wrap:wrap">${cards}</div>
+      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 · ⌨ ←→ 이동 · Space 선택</p>
+    `);
+    overlay.querySelectorAll('.evo-card').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
+    attachKeyNav(overlay.querySelectorAll('.evo-card'), (b) => onPick(b.dataset.id));
   },
 
   /** 섹터 분기 맵: 갈림길에서 다음 노드를 고른다 (게임 일시 정지) */

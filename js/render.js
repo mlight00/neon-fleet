@@ -163,7 +163,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, tierPower, upgradeCur = 0, upgradeMax = 0, stage, weapon, weaponLv, shield, modules = [] }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, tierPower, upgradeCur = 0, upgradeMax = 0, stage, weapon, weaponLv, weaponEvo, shield, modules = [] }) {
   ctx.save();
   // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
@@ -247,13 +247,14 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
     }
   }
 
-  // 우상단: 무기 + 레벨 점 + 실드
+  // 우상단: 무기(+진화) + 레벨 점 + 실드
   if (weapon) {
     const color = WEAPON_COLORS[weapon];
     ctx.textAlign = 'right';
     ctx.font = 'bold 12px sans-serif';
     ctx.fillStyle = color;
-    ctx.fillText(WEAPON_LABELS[weapon] + (shield ? ' ⛨' : ''), logicalW - 12, 34);
+    const evoTag = weaponEvo ? ` · ${weaponEvo}` : '';
+    ctx.fillText(WEAPON_LABELS[weapon] + evoTag + (shield ? ' ⛨' : ''), logicalW - 12, 34);
     for (let i = 0; i < 3; i++) {
       ctx.globalAlpha = i < weaponLv ? 1 : 0.25;
       ctx.fillStyle = color;

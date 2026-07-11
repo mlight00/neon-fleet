@@ -4,16 +4,16 @@
 
 export const WEAPON_EVOLUTIONS = {
   vulcan: [
-    { id: 'vulcan_storm',  name: '폭풍 발칸',   shape: '적중 후 도탄',        pro: '다수전 특화',      con: '단일 표적 DPS 소폭↓' },
-    { id: 'vulcan_needle', name: '니들 개틀링', shape: '초고속 집중 사격',    pro: '단일 표적 특화',   con: '확산 거의 없음' },
+    { id: 'vulcan_storm',  name: '폭풍 발칸',   short: '폭풍',   shape: '적중 후 도탄',        pro: '다수전 특화',      con: '단일 표적 DPS 소폭↓' },
+    { id: 'vulcan_needle', name: '니들 개틀링', short: '니들',   shape: '초고속 집중 사격',    pro: '단일 표적 특화',   con: '확산 거의 없음' },
   ],
   laser: [
-    { id: 'laser_prism',  name: '프리즘 어레이', shape: '관통 후 좌우 분열',   pro: '다수전 특화',      con: '보스 분열 무효' },
-    { id: 'laser_cutter', name: '널 커터',       shape: '5탄마다 강화 절단탄', pro: '집중전·적탄 제거', con: '평상시 변화 적음' },
+    { id: 'laser_prism',  name: '프리즘 어레이', short: '프리즘', shape: '관통 후 좌우 분열',   pro: '다수전 특화',      con: '보스 분열 무효' },
+    { id: 'laser_cutter', name: '널 커터',       short: '커터',   shape: '5탄마다 강화 절단탄', pro: '집중전·적탄 제거', con: '평상시 변화 적음' },
   ],
   homing: [
-    { id: 'homing_wasp',  name: '와스프 스웜',  shape: '소형 미사일 3발',     pro: '분산 표적 특화',   con: '폭발 없음' },
-    { id: 'homing_siege', name: '시즈 토피도',  shape: '대형 폭발 미사일',    pro: '고화력·보스 특화', con: '느린 발사·기동' },
+    { id: 'homing_wasp',  name: '와스프 스웜',  short: '와스프', shape: '소형 미사일 3발',     pro: '분산 표적 특화',   con: '폭발 없음' },
+    { id: 'homing_siege', name: '시즈 토피도',  short: '시즈',   shape: '대형 폭발 미사일',    pro: '고화력·보스 특화', con: '느린 발사·기동' },
   ],
 };
 
@@ -38,4 +38,9 @@ export function evolutionDef(id) {
  */
 export function canEvolveWeapon(weapon, weaponLv, maxLv, evolutions) {
   return weaponLv >= maxLv && !!WEAPON_EVOLUTIONS[weapon] && !evolutions[weapon];
+}
+
+/** 널 커터: shotCount번째 레이저 탄이 강화 절단탄인가 (순수, every=5). */
+export function isCutterShot(shotCount, every) {
+  return every > 0 && shotCount % every === 0;
 }

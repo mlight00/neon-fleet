@@ -5,6 +5,7 @@ import { createStarfield, drawHUD, COLORS, glow } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, createEffects } from './entities.js';
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
+import { evolutionOptions, evolutionDef } from './weapon-evolutions.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
@@ -498,7 +499,9 @@ function update(dt) {
         if (bo.dead) continue;
         const dx = b.x - bo.x, dy = b.y - bo.y;
         if (dx * dx + dy * dy <= (bo.r * 1.4) ** 2) {
-          bo.hitByBullet(b.damage * (w.mfx?.bossDmgMult ?? 1), w); // 사냥꾼 표식 모듈
+          const siegeBonus = b.blast ? (1 + b.blast.bossBonus) : 1;  // 시즈 토피도 보스 직격 +15%
+          bo.hitByBullet(b.damage * (w.mfx?.bossDmgMult ?? 1) * siegeBonus, w, b);
+          b.onHit?.(bo, w);            // 시즈 폭발(도탄/분열은 보스전에서 대상 없음)
           b.dead = true; hitBoss = true; // 보스는 관통 불가 (거대 표적)
           break;
         }
@@ -512,7 +515,8 @@ function update(dt) {
       const dx = b.x - e.x, dy = b.y - e.y;
       if (dx * dx + dy * dy <= rr * rr) {
         const wasAlive = !e.dead;
-        e.hitByBullet(e.def ? b.damage * (w.mfx?.bossDmgMult ?? 1) : b.damage, w); // 중간보스도 표식 적용
+        e.hitByBullet(e.def ? b.damage * (w.mfx?.bossDmgMult ?? 1) : b.damage, w, b); // 탄환 문맥 전달(프리즘 코어 등)
+        b.onHit?.(e, w);   // 진화 온-히트(도탄/분열/폭발) — 각 1회, 비재귀
         if (wasAlive && e.dead) onEnemyKilled(e, w);
         if (b.kind === 'homing') w.effects.burst(b.x, b.y, '#ff9c41', 8, 120); // 미사일 폭발
         if (b.pierce > 1) {
@@ -526,6 +530,8 @@ function update(dt) {
       }
     }
   }
+  // 널 커터 강화탄: 경로 반경 안의 적탄 제거
+  for (const b of w.bullets) if (b.cutter) for (const eb of w.enemyBullets) if (!eb.dead && Math.hypot(eb.x - b.x, eb.y - b.y) <= b.cutter) eb.dead = true;
 
   // 정리
   w.entities = w.entities.filter((e) => !e.dead);
@@ -541,7 +547,31 @@ function update(dt) {
     endExpedition();
   }
 
-  // 진화/오버로드 발생 → 모듈 드래프트 (게임 일시 정지)
+  // 선택 요청 소비 (우선순위: 교리 > 무기 진화). 보스·연출 중엔 열지 않는다.
+  if (r.phase === 'track' && !drafting) {
+    if (r.squad.pendingWeaponEvolution) openWeaponEvolution(r.squad.pendingWeaponEvolution);
+  }
+}
+
+// 무기 진화 2택 선택창 (게임 일시 정지). 선택 시 해당 무기의 진화 확정.
+function openWeaponEvolution(weapon) {
+  const r = run;
+  const opts = evolutionOptions(weapon);
+  if (!opts.length) { r.squad.pendingWeaponEvolution = null; return; }
+  drafting = true;
+  sfx('evolve');
+  ui.showWeaponEvolution({
+    weapon, options: opts,
+    onPick(id) {
+      r.squad.weaponEvolutions[weapon] = id;
+      r.squad.pendingWeaponEvolution = null;
+      drafting = false;
+      ui.hide();
+      sfx('buy');
+      r.effects.flash(0.6);
+      r.effects.text(r.squad.x, r.squad.y - 60, `${opts.find((o) => o.id === id).name}!`, COLORS.reward, 18);
+    },
+  });
 }
 
 // 원정 종료 (사망 또는 끝내기): 코인·기록 정산 → 결과 화면
@@ -653,6 +683,7 @@ function draw() {
       stage: r.sector,
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,
+      weaponEvo: evolutionDef(r.squad.weaponEvolutions[r.squad.weapon])?.short,
       shield: r.squad.shield,
       modules: moduleSummary(r.modules),
     });
