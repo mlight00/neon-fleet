@@ -573,7 +573,8 @@ function endExpedition({ toTitle = false } = {}) {
   const isRecord = r.maxPower > data.best;
   const best = Math.max(data.best, r.maxPower);
   const coins = Math.round(r.world.coins * r.world.stats.coinMult);
-  save.set({ best, coins: data.coins + coins, stage: Math.max(data.stage, r.stage) });
+  // 기록 저장: '최고 도달 섹터'는 r.sector (표시용). r.stage는 내부 난이도 카운터라 저장하면 안 됨(오표시 원인).
+  save.set({ best, coins: data.coins + coins, stage: Math.max(data.stage, r.sector) });
   if (toTitle) { showTitleScreen(); return; }
   ui.showLose({ stage: r.sector, maxPower: r.maxPower, coins, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
 }
@@ -662,7 +663,7 @@ function draw() {
       count: r.squad.count,
       cruisers: r.squad.cruisers || 0,
       tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,
-      tierPower: BAL.evolution.shipPower[r.squad.tier],
+      tierPower: Math.round(r.squad.banked || 0),
       upgradeCur: r.squad.cruisers || 0,   // 기함 업그레이드까지 모은 순양함
       upgradeMax: needCruisers,            // 필요한 순양함 (0 = 최종 티어)
       stage: r.sector,

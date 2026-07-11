@@ -152,8 +152,9 @@ export class Squad {
     this.chargeStage = 0;     // 현재 충전 단계
     this.wasCharging = false;
     this.invulnT = 0;         // 진화 무적 잔여 시간(A3)
-    this.escorts = 0;         // 호위기 수 (드론 15기 합체)
-    this.cruisers = 0;        // 순양함 수 (호위기 4척 합체)
+    this.escorts = 0;         // (구 호위기 — 미사용)
+    this.cruisers = 0;        // 순양함 수 (드론 130기 합체)
+    this.banked = 0;          // 기함에 은행된 화력 (업그레이드 때 흡수한 순양함 화력 누적)
     this.supportAcc = 0;      // 호위함 사격 누적기
     this._offsets = Squad.formationOffsets(BAL.squad.drawCap);
   }
@@ -200,9 +201,9 @@ export class Squad {
     world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[this.weapon]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[this.weapon]);
   }
 
-  /** 기함 화력 (드론 환산): 드론 수 + 기함 진화 파워 + 군체 의지(드론당). 기함 본체 사격 기준. */
+  /** 기함 화력 (드론 환산): 드론 수 + 은행된 화력(흡수한 순양함) + 군체 의지(드론당). 기함 본체 사격 기준. */
   get flagPower() {
-    return this.count + BAL.evolution.shipPower[this.tier] + (this.swarmPerDrone || 0) * this.count;
+    return this.count + (this.banked || 0) + (this.swarmPerDrone || 0) * this.count;
   }
   /** 순양함 화력 (드론 환산): 순양함이 별도로 쏘는 화력. */
   get supportPower() {
@@ -228,7 +229,10 @@ export class Squad {
     // 2) 순양함이 임계치 이상이면 기함 1단계 업그레이드 (여기서만 선택창=모듈 드래프트가 뜬다)
     const need = Math.max(1, Math.round(E.cruisersPerFlagship * (mfx.evolveCostMult ?? 1)));  // 신속 진화 모듈
     if (canUpgradeFlagship(this.cruisers || 0, this.tier, maxTier, { cruisersPerFlagship: need })) {
+      // 흡수한 순양함 화력을 기함에 은행(+보너스) → 업그레이드가 항상 순 이득 (화력 손실 버그 해결)
+      const gain = Math.round(need * E.cruiserPower * (E.upgradeBonus ?? 1.2));
       this.cruisers -= need;
+      this.banked = (this.banked || 0) + gain;
       this.tier += 1;
       this.shield = true;                        // 업그레이드 직후 사고사 방지
       this.invulnT = BAL.squad.evolveInvuln;     // 업그레이드 무적 (A3)
@@ -236,7 +240,7 @@ export class Squad {
       // (선택창 제거: 기함 업그레이드는 자동. 모듈 드래프트는 정비 노드에서만 뜬다)
       world.effects.halo(this.x, this.y, COLORS.reward);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
-      world.effects.text(this.x, this.y - 98, `${ev.names[this.tier]} 업그레이드! · 화력 +${ev.shipPower[this.tier]}`, COLORS.reward, 18);
+      world.effects.text(this.x, this.y - 98, `${ev.names[this.tier]} 업그레이드! · 화력 +${gain}`, COLORS.reward, 18);
       world.effects.text(this.x, this.y - 76, `『${BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally, 14);
       sfx('evolve');
     }

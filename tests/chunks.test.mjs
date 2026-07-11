@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHUNKS, pickTier, pickChunk, mulberry32 } from '../js/chunks.js';
+import { CHUNKS, pickTier, pickChunk, mulberry32, isSafeChunk } from '../js/chunks.js';
 
 test('pickTier: 진행도에 따라 easy→mid→hard', () => {
   assert.equal(pickTier(0.0), 'easy');
@@ -36,6 +36,19 @@ test('pickChunk: 시드 고정 시 재현 가능, 직전 청크 연속 회피', 
     const c = pickChunk('mid', rng, prev);
     assert.notEqual(c, prev, '직전 청크가 연속으로 나오면 안 됨');
     prev = c;
+  }
+});
+
+// ─── 노드 타입 필터 보장 (GPT 지적 #3 회귀 방지: 조용한 일반 폴백 금지) ───
+test('pickChunk: 보급 필터는 항상 crystal/capsule 청크, 위험 필터는 항상 debris/mine 청크를 낸다', () => {
+  const supplyFilter = (c) => isSafeChunk(c) && c.items.some((it) => ['crystal', 'capsule'].includes(it.type));
+  const hazardFilter = (c) => c.items.some((it) => ['debris', 'mine'].includes(it.type));
+  const rng = mulberry32(2024);
+  for (const tier of ['easy', 'mid', 'hard']) {
+    for (let i = 0; i < 40; i++) {
+      assert.ok(supplyFilter(pickChunk(tier, rng, null, supplyFilter)), `보급 필터 위반 (${tier}, ${i})`);
+      assert.ok(hazardFilter(pickChunk(tier, rng, null, hazardFilter)), `위험 필터 위반 (${tier}, ${i})`);
+    }
   }
 });
 

@@ -23,12 +23,23 @@ export function pickTier(progress, bounds = BAL.chunk.tierBounds) {
   return 'hard';
 }
 
-/** tier 풀에서 추첨. 직전 청크(prev)는 피한다. filterFn으로 풀을 좁힐 수 있다. */
+/**
+ * tier 풀에서 추첨. 직전 청크(prev)는 피한다. filterFn으로 풀을 좁힐 수 있다.
+ * 노드 타입 신뢰: 현재 티어에 필터 통과 청크가 없으면 '조용히 일반 청크로 폴백'하지 않고
+ * 인접 티어(easy/mid/hard)에서 같은 필터를 만족하는 청크를 찾는다. 정말 하나도 없을 때만 원 풀 사용.
+ */
 export function pickChunk(tier, rng, prev, filterFn) {
-  let pool = CHUNKS.filter((c) => c.tier === tier);
+  const byTier = (t) => CHUNKS.filter((c) => c.tier === t);
+  let pool = byTier(tier);
   if (filterFn) {
-    const narrowed = pool.filter(filterFn);
-    if (narrowed.length > 0) pool = narrowed;
+    let narrowed = pool.filter(filterFn);
+    if (narrowed.length === 0) {
+      for (const t of ['easy', 'mid', 'hard']) {
+        const alt = byTier(t).filter(filterFn);
+        if (alt.length) { narrowed = alt; break; }
+      }
+    }
+    if (narrowed.length) pool = narrowed;   // 필터 만족 청크가 어딘가 있으면 반드시 그걸 쓴다
   }
   const candidates = pool.length > 1 ? pool.filter((c) => c !== prev) : pool;
   return candidates[Math.floor(rng() * candidates.length)];

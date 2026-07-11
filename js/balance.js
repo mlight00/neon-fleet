@@ -91,6 +91,7 @@ export const BAL = {
     cruiserFireRatio: 0.60,   // 표시/체감용: 기함 무기의 60% 위력으로 발사
     maxCruisers: 12,          // 순양함 최대 (성능·화면 상한)
     slotGap: 30,              // 순양함 편성 간격(px)
+    upgradeBonus: 1.25,       // 기함 업그레이드 시 흡수 순양함 화력 × 이 값을 기함에 은행 → 업그레이드가 항상 이득(+25%)
     // 최종 단계(타이탄+순양함 만석)에서 넘치는 드론은 체력이 아니라 포인트(코인)로 전환.
     dronePointCap: 300,       // 최종 상태에서 드론(체력) 상한 — 초과분은 포인트화
     coinPerExcessDrone: 0.5,  // 초과 드론 1기당 코인 (2기 = 1코인)
@@ -217,7 +218,8 @@ export const BAL = {
     // 무한 상승: 보스 크기 스테이지 비례 증가 + 다중 보스(2~3기 동시)
     sizePerStage: 0.06, sizeScaleMax: 1.7,   // 크기 = min(1.7, 1 + 0.06×(stage-1))
     multiTotalMult: 1.4,                      // 다중 보스 총 HP 배수(각=이/보스수), 크기 fit 축소
-    multiFromStage2: 4, multiFromStage3: 8,   // stage≥4→2기, ≥8→3기
+    // 첫 섹터 보스(내부 stage 6)는 단일로: 다중 보스는 섹터2 보스(stage12)+, 3기는 섹터3 보스(stage18)+
+    multiFromStage2: 8, multiFromStage3: 14,
   },
 
   chunk: {
@@ -259,7 +261,7 @@ export const BAL = {
   // 보스 변주: 로스터가 한 바퀴 돈 뒤(스테이지 6+) 같은 보스가 강화판으로 재등장.
   // loop = floor((stage-1)/5). 같은 스프라이트로 시작부터 광폭 + 탄 추가 + 빠른 발사.
   bossVariant: {
-    fromStage: 6, suffixes: ['', ' II', ' III', ' IV', ' V'],
+    fromStage: 13, suffixes: ['', ' II', ' III', ' IV', ' V'],   // 변이판은 섹터3 보스(stage18)+ (첫 보스는 기본형)
     hpPerLoop: 0.12,        // loop당 HP +12%
     fasterPerLoop: 0.1,     // loop당 발사·소환 주기 배수 -0.1(빠름), minFaster 하한
     minFaster: 0.55,
