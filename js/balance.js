@@ -69,6 +69,32 @@ export const BAL = {
     names: ['스카웃', '인터셉터', '스트라이커', '커리어', '드레드노트', '타이탄'],
   },
 
+  // ── NEON ADAPTATION Phase 1 ──────────────────────────────────
+  // 무기 진화(Lv3 후 같은 색 캡슐로 2택). 특정 무기 완전 면역 금지, 피해 감소 ≤70%.
+  weaponEvolution: {
+    duplicateReward: { drones: 20, coin: 10 },  // 이미 진화한 무기의 중복 캡슐 → 대체 보상
+    vulcan_storm:  { spread: 1.25, ricochetFrac: 0.45, ricochetRadius: 120 },                                  // 도탄(1회, 비재귀)
+    vulcan_needle: { spread: 0.35, rate: 1.45, critBonus: 0.08, sizeMult: 0.85 },                              // 집중 연사
+    laser_prism:   { splitFrac: 0.35, splitRadius: 150 },                                                       // 좌우 분열(보스 제외, 비재귀)
+    laser_cutter:  { every: 5, widthMult: 1.7, pierceBonus: 2, clearRadius: 18, dmgMult: 1.25 },               // 5탄마다 강화 절단탄
+    homing_wasp:   { count: 3, totalFrac: 1.15, cap: 24 },                                                      // 소형 3발(서로 다른 표적)
+    homing_siege:  { rateMult: 0.35, dmgMult: 3.2, sizeMult: 1.5, blastRadius: 70, blastFrac: 0.35, bossBonus: 0.15, speedMult: 0.8, turnMult: 0.7 }, // 대형 폭발
+  },
+
+  // 기함 교리(첫 업그레이드 1회 선택). 전문 분야 +20~25%, 비전문엔 직접 보너스 없음.
+  doctrine: {
+    swarm: { supportMult: 1.25, escortShareBonus: 0.10, droneGainBonus: 0.10 },
+    lance: { chargeSpeedMult: 1.20, chargeDmgMult: 1.15 },
+    phase: { hitRadiusDelta: -3, hitRadiusMin: 12, bankDmgMax: 0.20 },
+  },
+
+  // 대응형 신규 적 3종 (js/adaptive-enemies.js). 최소 두 가지 대응법 제공.
+  adaptiveEnemies: {
+    prismWarden:  { minStage: 2, hp: 70, r: 22, frontReduce: 0.70, coreHp: 22, coreOffset: 18, coin: 7, telegraph: 0.7 },
+    scavenger:    { minStage: 2, hp: 35, r: 17, approach: 150, flee: 260, stealR: 28, rewardMult: 1.5, coin: 5, stayTime: 1.2 },
+    gateParasite: { minStage: 3, hp: 45, r: 15, offsetY: 36, cleanseDrones: 10 },
+  },
+
   // 드론 합체 순양함: 드론이 자동으로 순양함으로 뭉쳐 기함과 같은 무기로 함께 쏜다(1척=cruiserPower 화력).
   //  드론 → (자동) 순양함 → (선택창) 기함 업그레이드. 강화 단계를 나눠 진행이 오래 이어진다.
   //  드론→순양함은 자동(게이트·선택 없음). 순양함이 모여 기함을 올릴 때만 선택창(모듈 드래프트)이 뜬다.

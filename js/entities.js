@@ -156,6 +156,11 @@ export class Squad {
     this.cruisers = 0;        // 순양함 수 (드론 130기 합체)
     this.banked = 0;          // 기함에 은행된 화력 (업그레이드 때 흡수한 순양함 화력 누적)
     this.bankStack = [];      // 업그레이드별 은행 증가분 (강등 시 정확히 롤백 → 반복 적립 방지)
+    // ── NEON ADAPTATION Phase 1: 원정 내부 상태 (중립 시작, 저장 안 함) ──
+    this.weaponEvolutions = { vulcan: null, laser: null, homing: null }; // 무기별 진화 id
+    this.pendingWeaponEvolution = null;   // 진화 선택 대기 무기 ('vulcan'|'laser'|'homing')
+    this.doctrine = null;                 // 'swarm'|'lance'|'phase'
+    this.pendingDoctrine = false;         // 교리 선택 대기
     this.supportAcc = 0;      // 호위함 사격 누적기
     this._offsets = Squad.formationOffsets(BAL.squad.drawCap);
   }
