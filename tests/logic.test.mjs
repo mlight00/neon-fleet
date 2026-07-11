@@ -110,19 +110,25 @@ test('stageMods: 스테이지 1은 기본값 (배수 1)', () => {
   assert.equal(m.tierShift, 0);
 });
 
-test('stageMods: 스테이지가 오르면 적은 강하고 빠르게, 보상도 소폭 상승', () => {
+test('stageMods: 스테이지가 오르면 적은 준지수로 단단·빠르게, 보상은 완만', () => {
   const m = stageMods(3);
-  assert.ok(Math.abs(m.enemyHp - 2.4) < 1e-9);  // g=2: 1 + 0.7×2 (무한 상승 상향)
-  assert.ok(Math.abs(m.enemyRate - 0.84) < 1e-9);
-  assert.ok(Math.abs(m.crystal - 2.0) < 1e-9);
-  assert.ok(Math.abs(m.boss - 1.7) < 1e-9);   // g=2: 1 + 0.7
+  assert.ok(Math.abs(m.enemyHp - 2.52) < 1e-9);  // g=2: 1 + 0.6×2 + 0.08×4
+  assert.ok(Math.abs(m.enemyRate - 0.86) < 1e-9); // g=2: 1 - 0.07×2
+  assert.ok(Math.abs(m.crystal - 1.36) < 1e-9);   // g=2: 1 + 0.18×2
+  assert.ok(Math.abs(m.boss - 2.16) < 1e-9);      // g=2: 1 + 0.5×2 + 0.04×4
+});
+
+test('stageMods: 준지수라 후반이 급격히 어려워진다 (제곱항)', () => {
+  const m10 = stageMods(10);   // g=9
+  assert.ok(Math.abs(m10.enemyHp - (1 + 0.6 * 9 + 0.08 * 81)) < 1e-9); // 12.88
+  assert.ok(m10.enemyHp > 2 * stageMods(6).enemyHp);  // 후반 가속 확인
 });
 
 test('stageMods: 고스테이지에서도 하한/상한 존중', () => {
   const m = stageMods(20);
-  assert.ok(m.enemyRate >= 0.6);
-  assert.ok(m.tierShift <= 0.2);
-  assert.ok(m.shotCap <= 20);
+  assert.ok(m.enemyRate >= 0.5);
+  assert.ok(m.tierShift <= 0.25);
+  assert.ok(m.shotCap <= 30);
 });
 
 // ─── 격납고 비용 곡선 ───
@@ -141,6 +147,26 @@ test('hangarCost: 레벨 0 = 기본가, 레벨마다 단조 증가', () => {
 
 test('hangarCost: 성장 배수 반영 (1.6^lv)', () => {
   assert.equal(hangarCost(100, 2, 1.6), 256);
+});
+
+// ─── 드론 합체 순양함 (자동) + 기함 업그레이드 판정 ───
+const { dronesToCruisers, canUpgradeFlagship } = await import('../js/logic.js');
+const CCFG = { dronesPerCruiser: 40, cruisersPerFlagship: 5, maxCruisers: 10 };
+
+test('dronesToCruisers: 40기당 순양함 1척, 남는 드론 유지', () => {
+  assert.deepEqual(dronesToCruisers(95, 0, CCFG), { count: 15, cruisers: 2, merged: 2 });
+  assert.deepEqual(dronesToCruisers(39, 0, CCFG), { count: 39, cruisers: 0, merged: 0 });
+});
+
+test('dronesToCruisers: 순양함 상한에서 멈춤 (드론은 남는다)', () => {
+  assert.deepEqual(dronesToCruisers(400, 9, CCFG), { count: 360, cruisers: 10, merged: 1 });
+  assert.deepEqual(dronesToCruisers(400, 10, CCFG), { count: 400, cruisers: 10, merged: 0 });
+});
+
+test('canUpgradeFlagship: 순양함 임계치 이상 + 최고 티어 미만이면 true', () => {
+  assert.equal(canUpgradeFlagship(5, 2, 5, CCFG), true);
+  assert.equal(canUpgradeFlagship(4, 2, 5, CCFG), false);   // 순양함 부족
+  assert.equal(canUpgradeFlagship(9, 5, 5, CCFG), false);   // 이미 최고 티어
 });
 
 // ─── 차지 랜스 단계 ───

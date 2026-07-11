@@ -163,14 +163,14 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, tierName, tierPower, nextCost, stage, weapon, weaponLv, shield, modules = [] }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, tierPower, upgradeCur = 0, upgradeMax = 0, stage, weapon, weaponLv, shield, modules = [] }) {
   ctx.save();
-  // 진행 바
+  // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.fillRect(40, 14, barW, 6);
+  ctx.fillRect(40, 8, barW, 5);
   ctx.fillStyle = COLORS.ally;
-  ctx.fillRect(40, 14, barW * Math.min(1, progress), 6);
+  ctx.fillRect(40, 8, barW * Math.min(1, progress), 5);
 
   // 보스 HP — 다중 보스면 상단에 나란히 (각 보스 HP바), 1기면 이름·수치까지 표시
   if (bosses.length) {
@@ -199,34 +199,34 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, tierName,
     ctx.textAlign = 'left';
   }
 
-  // 좌상단: 편대 수 + 티어(기함 화력) + 진화 게이지 + 스테이지
+  // 좌상단(진행바 아래): 함대 구성 + 기함 + 기함강화 게이지 + 섹터
   ctx.fillStyle = COLORS.text;
   ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(`▲ x${count}`, 12, 20);
+  ctx.fillText(`드론 ${count}기 · 순양함 ${cruisers}`, 12, 28);
   if (tierName) {
     ctx.font = 'bold 11px sans-serif';
     ctx.fillStyle = COLORS.ally;
-    ctx.fillText(tierPower > 0 ? `${tierName} · 기함 +${tierPower}` : tierName, 12, 34);
+    ctx.fillText(tierPower > 0 ? `기함 ${tierName} · 화력 ${tierPower}` : `기함 ${tierName}`, 12, 42);
   }
-  // 다음 진화 게이지: 드론을 모아 비용을 채우면 기함에 흡수·승급 (최고 티어면 MAX)
-  if (nextCost > 0) {
+  // 기함 업그레이드 게이지: 순양함을 모아 임계치를 채우면 기함 1단계 업그레이드(선택창)
+  if (upgradeMax > 0) {
     const gw = 86;
     ctx.fillStyle = 'rgba(255,217,61,0.18)';
-    ctx.fillRect(12, 40, gw, 5);
+    ctx.fillRect(12, 48, gw, 5);
     ctx.fillStyle = COLORS.reward;
-    ctx.fillRect(12, 40, gw * Math.min(1, count / nextCost), 5);
+    ctx.fillRect(12, 48, gw * Math.min(1, upgradeCur / upgradeMax), 5);
     ctx.font = 'bold 10px sans-serif';
-    ctx.fillText(`업그레이드 ${count}/${nextCost}`, 12 + gw + 6, 45);
+    ctx.fillText(`기함 강화까지 순양함 ${upgradeCur}/${upgradeMax}`, 12 + gw + 6, 53);
   } else if (tierName) {
     ctx.font = 'bold 10px sans-serif';
     ctx.fillStyle = COLORS.reward;
-    ctx.fillText('최종 업그레이드 MAX', 12, 45);
+    ctx.fillText('기함 최종단계 (MAX)', 12, 53);
   }
   if (stage) {
     ctx.font = 'bold 11px sans-serif';
     ctx.fillStyle = COLORS.reward;
-    ctx.fillText(`섹터 ${stage}`, 12, 59);
+    ctx.fillText(`섹터 ${stage}`, 12, 67);
   }
   // 보유 모듈 아이콘 줄 (빌드가 커지는 게 보인다)
   if (modules && modules.length) {
@@ -236,7 +236,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, tierName,
     let mx = 12;
     for (const m of modules) {
       const label = m.count > 1 ? `${m.icon}${m.count}` : m.icon;
-      ctx.fillText(label, mx, 76);
+      ctx.fillText(label, mx, 83);
       mx += ctx.measureText(label).width + 6;
       if (mx > logicalW - 24) break;
     }

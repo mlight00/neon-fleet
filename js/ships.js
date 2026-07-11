@@ -138,7 +138,7 @@ function drawCarrier(ctx) {
 
 // 티어별 정의: 스프라이트 크기, 노즐(화염), 주포 마운트(발사 위치 — 진화 체감의 핵심), 편대 이격 반경
 // 좌표는 Gemini 쇼케이스 data.ts의 turretCoords/engineCoords(%)를 로컬 px로 환산한 값.
-export const SHIP_DEFS = [
+const SHIP_DEFS_RAW = [
   {
     name: 'scout', w: 34, h: 34, draw: drawScout,
     nozzles: [{ x: 0, y: 12, len: 6 }],
@@ -179,6 +179,22 @@ export const SHIP_DEFS = [
     clearR: 64,
   },
 ];
+
+// 진화 크기 개편: 상위 티어일수록 기함이 화면을 가려 회피가 불가능했다.
+// 스카웃(T1)은 그대로 두고, 상위 티어의 스프라이트·주포·노즐·궤도 좌표를 같은 비율로 축소해
+// "진화해도 탄을 피할 수 있는" 크기로 유지한다. 비율 = 새 크기 / 기존 크기 (SPRITE_SIZES 기준).
+const SHIP_SCALE = [1.0, 0.73, 0.67, 0.58, 0.52, 0.44];
+export const SHIP_DEFS = SHIP_DEFS_RAW.map((d, t) => {
+  const s = SHIP_SCALE[t] ?? 1;
+  return {
+    ...d,
+    w: Math.round(d.w * s), h: Math.round(d.h * s),
+    clearR: Math.round(d.clearR * s),
+    mounts: d.mounts.map((m) => ({ x: m.x * s, y: m.y * s })),
+    nozzles: d.nozzles.map((n) => ({ x: n.x * s, y: n.y * s, len: n.len * s })),
+    deckLights: d.deckLights ? d.deckLights.map(([x, y]) => [x * s, y * s]) : undefined,
+  };
+});
 
 const spriteCache = [];
 export function shipSprite(tier, weapon) {

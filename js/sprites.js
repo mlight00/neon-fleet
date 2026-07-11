@@ -70,7 +70,7 @@ function loadBackground(style) {
 
 // 에셋별 인게임 크기(px, 논리 좌표) — viewBox 100 기준 전체가 이 크기로 스케일된다
 export const SPRITE_SIZES = {
-  A1: 34, A2: 60, A3: 78, A4: 104, A5: 132, A6: 172, // 플레이어 함선 6티어
+  A1: 34, A2: 44, A3: 52, A4: 60, A5: 68, A6: 76, // 플레이어 함선 6티어 (진화해도 회피 가능하게 상위 축소)
   B1: 30, B2: 46, B3: 66,                      // 샤드/리퍼/브루드
   B4: 36, B5: 42, B6: 38,                      // 저격/포탑/위버
   B7: 150, B8: 150, B9: 150, B10: 150, B11: 150, // 스테이지 보스 5종 — 잘림 방지 위해 축소
@@ -81,7 +81,7 @@ export const SPRITE_SIZES = {
 
 // 무기별 함선 변형 슬롯 A{1..6}{V=발칸/L=레이저/H=호밍} + 신규 적/보스 PNG 슬롯 자동 등록.
 // 파일이 있으면 자동 사용, 없으면 loadSprite가 404→코드/기존 스프라이트 폴백(게임 안 깨짐).
-const SHIP_TIER_SIZE = [34, 60, 78, 104, 132, 172];
+const SHIP_TIER_SIZE = [34, 44, 52, 60, 68, 76];
 for (let t = 1; t <= 6; t++) for (const w of ['V', 'L', 'H']) {
   RASTER_ART.C['A' + t + w] = `assets/styleC/A${t}${w}.png`;
   SPRITE_SIZES['A' + t + w] = SHIP_TIER_SIZE[t - 1];

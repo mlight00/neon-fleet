@@ -38,6 +38,27 @@ export function hangarCost(base, lv, growth) {
   return Math.round(base * Math.pow(growth, lv));
 }
 
+/**
+ * 드론 → 순양함 자동 합체 (순수, 선택 없음). 가능한 만큼 한 번에 뭉친다.
+ * cfg: { dronesPerCruiser, maxCruisers }
+ * 반환: { count, cruisers, merged } — merged = 이번에 새로 만든 순양함 수.
+ */
+export function dronesToCruisers(count, cruisers, cfg) {
+  let c = count, cr = cruisers, merged = 0;
+  while (c >= cfg.dronesPerCruiser && cr < cfg.maxCruisers) {
+    c -= cfg.dronesPerCruiser; cr += 1; merged += 1;
+  }
+  return { count: c, cruisers: cr, merged };
+}
+
+/**
+ * 기함 업그레이드 가능 여부 (순수). 순양함이 임계치 이상이고 최고 티어 미만이면 true.
+ * cfg: { cruisersPerFlagship }
+ */
+export function canUpgradeFlagship(cruisers, tier, maxTier, cfg) {
+  return tier < maxTier && cruisers >= cfg.cruisersPerFlagship;
+}
+
 /** 차지 랜스 단계: 누적 충전 시간 → 단계(0=미충전, maxStage 상한). */
 export function chargeStageFor(charge, stageTime, maxStage) {
   if (charge <= 0 || stageTime <= 0) return 0;
@@ -45,18 +66,20 @@ export function chargeStageFor(charge, stageTime, maxStage) {
 }
 
 /**
- * 스테이지별 난이도 배수 (스테이지 1 = 기본).
- * 적은 단단하고 빨라지고, 보상(크리스탈)도 소폭 올라 성장이 완전히 뒤처지진 않는다.
+ * 스테이지별 난이도 배수 (스테이지 1 = 기본). 뱀서류식 준지수 스케일.
+ * 핵심: 후반 난이도는 '적 체력'이 아니라 '밀도 + 적탄'으로 온다(main.js spawn·shotCap).
+ * 체력은 준지수(선형+제곱)로 올려 적이 화면 상단에서 즉사하지 않고 내려오게 하고,
+ * 크리스탈(드론 보상)은 완만히 올려 진화가 너무 빨리 끝나지 않게 한다.
  */
 export function stageMods(stage) {
   const g = Math.max(1, stage) - 1;
   return {
-    enemyHp: 1 + 0.7 * g,                       // 적 HP 스테이지 배수 (주 난이도는 화력 비례 스케일 — main.js). 무한 상승: 소폭 상향
-    enemyRate: Math.max(0.6, 1 - 0.08 * g),    // 적 발사 주기 배수 (작을수록 빠름)
-    crystal: 1 + 0.5 * g,                      // 크리스탈 값 (스테이지↑ → 드론 획득↑, 상위 티어 도달)
-    boss: 1 + 0.35 * g,                        // 보스 HP (완만하게 — 진화 화력 스파이크로 이미 커지므로)
-    tierShift: Math.min(0.2, 0.05 * g),        // hard 청크가 더 일찍 나옴
-    shotCap: Math.min(20, 12 + 2 * g),         // 동시 적탄 상한
+    enemyHp: 1 + 0.6 * g + 0.08 * g * g,        // 준지수: 적이 상단 즉사 대신 중앙까지 내려옴
+    enemyRate: Math.max(0.5, 1 - 0.07 * g),    // 적 발사 주기 배수 (작을수록 빠름) — 더 빠르게
+    crystal: 1 + 0.18 * g,                     // 드론 보상 완만 상승 (진화 감속)
+    boss: 1 + 0.5 * g + 0.04 * g * g,          // 보스 HP 준지수
+    tierShift: Math.min(0.25, 0.05 * g),       // hard 청크가 더 일찍 나옴
+    shotCap: Math.min(30, 12 + 2.5 * g),       // 동시 적탄 상한 — 탄막 밀도 상향
   };
 }
 

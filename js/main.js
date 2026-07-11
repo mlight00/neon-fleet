@@ -654,14 +654,17 @@ function draw() {
     r.effects.draw(ctx, LOGICAL_W, logicalH);
 
     const evc = r.world.mfx?.evolveCostMult ?? 1;
-    const rawNext = BAL.evolution.costs[r.squad.tier + 1] ?? BAL.evolution.overloadCost;
+    const maxTier = BAL.evolution.costs.length - 1;
+    const needCruisers = r.squad.tier < maxTier ? Math.max(1, Math.round(BAL.escort.cruisersPerFlagship * evc)) : 0;
     drawHUD(ctx, LOGICAL_W, {
       progress: Math.min(1, r.traveled / r.totalTrack),
       bosses: r.phase === 'boss' ? r.bosses.map((b) => ({ hp: Math.max(0, b.hp), maxHp: b.maxHp, name: b.korName, dead: b.dead })) : [],
       count: r.squad.count,
-      tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag + (r.squad.ascension ? ` ★${r.squad.ascension}` : ''),  // 기함 개성 + 무한 승천 별
-      tierPower: BAL.evolution.shipPower[r.squad.tier] + (r.squad.overloadPower || 0),
-      nextCost: Math.round(rawNext * evc),
+      cruisers: r.squad.cruisers || 0,
+      tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,
+      tierPower: BAL.evolution.shipPower[r.squad.tier],
+      upgradeCur: r.squad.cruisers || 0,   // 기함 업그레이드까지 모은 순양함
+      upgradeMax: needCruisers,            // 필요한 순양함 (0 = 최종 티어)
       stage: r.sector,
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,

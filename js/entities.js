@@ -3,7 +3,7 @@
 // world = { bal, input, squad, bullets, enemyBullets, entities, effects, addCoins,
 //           spawnEntity, spawnEnemyBullet, scrollSpeed, logicalW, logicalH, rng, phase }
 import { BAL } from './balance.js';
-import { applyGate, hitCrystal, evolveStep, chargeStageFor } from './logic.js';
+import { applyGate, hitCrystal, evolveStep, chargeStageFor, dronesToCruisers, canUpgradeFlagship } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
@@ -152,6 +152,9 @@ export class Squad {
     this.chargeStage = 0;     // 현재 충전 단계
     this.wasCharging = false;
     this.invulnT = 0;         // 진화 무적 잔여 시간(A3)
+    this.escorts = 0;         // 호위기 수 (드론 15기 합체)
+    this.cruisers = 0;        // 순양함 수 (호위기 4척 합체)
+    this.supportAcc = 0;      // 호위함 사격 누적기
     this._offsets = Squad.formationOffsets(BAL.squad.drawCap);
   }
 
@@ -171,7 +174,9 @@ export class Squad {
     return Math.max(base, Math.min(BAL.squad.maxWidth, 12 * Math.sqrt(this.count)));
   }
   get hitRadius() {
-    return Math.max(14, this.width * 0.8);
+    // 치명 판정은 작고 일정하게 (탄막게임식): 진화해도 표적이 커지지 않아 회피가 가능하다.
+    // 편대 수·폭에 비례하던 옛 방식(최대 96px)은 '피할 수 없는 거대 표적'을 만들었다.
+    return 15 + this.tier * 2.2;   // T0 15 … T5 26
   }
 
   setWeapon(weapon, world) {
@@ -195,55 +200,54 @@ export class Squad {
     world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[this.weapon]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[this.weapon]);
   }
 
-  /** 총 화력 (드론 환산): 드론 수 + 기함 흡수 파워(진화 + 오버로드) + 군체 의지(드론당) */
+  /** 기함 화력 (드론 환산): 드론 수 + 기함 진화 파워 + 군체 의지(드론당). 기함 본체 사격 기준. */
+  get flagPower() {
+    return this.count + BAL.evolution.shipPower[this.tier] + (this.swarmPerDrone || 0) * this.count;
+  }
+  /** 순양함 화력 (드론 환산): 순양함이 별도로 쏘는 화력. */
+  get supportPower() {
+    return (this.cruisers || 0) * BAL.escort.cruiserPower;
+  }
+  /** 총 화력 = 기함 + 순양함 (적 스케일·보스 HP·기록에 쓰는 함대 전체 화력) */
   get power() {
-    return this.count + BAL.evolution.shipPower[this.tier] + (this.overloadPower || 0) + (this.swarmPerDrone || 0) * this.count;
+    return this.flagPower + this.supportPower;
   }
 
   checkEvolution(world) {
     const ev = BAL.evolution;
+    const E = BAL.escort;
     const mfx = world.mfx || {};
-    const retain = world.stats?.startCount ?? BAL.squad.start;
-    const ratio = Math.min(0.9, ev.retainRatio + (mfx.retainBonus || 0));   // 잔존 편대 모듈
-    const costMult = mfx.evolveCostMult ?? 1;                               // 신속 진화 모듈
-    const costs = ev.costs.map((c) => Math.round(c * costMult));
-    const r = evolveStep(this.count, this.tier, costs, retain, ratio);
-    if (r.tier !== this.tier) {
-      this.tier = r.tier;
-      this.count = r.count;
-      this.shield = true;   // 드론을 바친 직후 사고사 방지: 진화 에너지 = 보호막 1회
-      this.invulnT = BAL.squad.evolveInvuln;   // 진화 무적 (A3: 파워 스파이크를 안전하게)
-      // (화면 섬광·충격파·적탄 정화 '노바'는 모듈 선택 직후 main.evolutionNova에서 터진다)
+    const maxTier = ev.costs.length - 1;
+    // 1) 드론 → 순양함 자동 합체 (선택 없음)
+    const m = dronesToCruisers(this.count, this.cruisers || 0, E);
+    if (m.merged > 0) {
+      this.count = m.count; this.cruisers = m.cruisers;
+      world.effects.text(this.x, this.y - 44, `순양함 +${m.merged}`, COLORS.ally, 14);
+      sfx('pickup');
+    }
+    // 2) 순양함이 임계치 이상이면 기함 1단계 업그레이드 (여기서만 선택창=모듈 드래프트가 뜬다)
+    const need = Math.max(1, Math.round(E.cruisersPerFlagship * (mfx.evolveCostMult ?? 1)));  // 신속 진화 모듈
+    if (canUpgradeFlagship(this.cruisers || 0, this.tier, maxTier, { cruisersPerFlagship: need })) {
+      this.cruisers -= need;
+      this.tier += 1;
+      this.shield = true;                        // 업그레이드 직후 사고사 방지
+      this.invulnT = BAL.squad.evolveInvuln;     // 업그레이드 무적 (A3)
+      this.evolvePunch = 0.5;
+      // (선택창 제거: 기함 업그레이드는 자동. 모듈 드래프트는 정비 노드에서만 뜬다)
       world.effects.halo(this.x, this.y, COLORS.reward);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
-      world.effects.text(this.x, this.y - 122, `드론 ${r.consumed}기 흡수`, COLORS.reward, 15);
-      world.effects.text(this.x, this.y - 98, `${ev.names[r.tier]} 업그레이드! · 화력 +${ev.shipPower[r.tier]}`, COLORS.reward, 18);
-      world.effects.text(this.x, this.y - 76, `『${BAL.shipTraits[Math.min(r.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally, 14);
-      this.evolvePunch = 0.5;
-      this.pendingDraft = true;   // 진화 → 모듈 드래프트 (main이 감지해 카드 3장 표시)
+      world.effects.text(this.x, this.y - 98, `${ev.names[this.tier]} 업그레이드! · 화력 +${ev.shipPower[this.tier]}`, COLORS.reward, 18);
+      world.effects.text(this.x, this.y - 76, `『${BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally, 14);
       sfx('evolve');
-      return;
     }
-    // 최고 티어 후 '오버로드': 더 모아 바치면 모듈 1개 더 + 기함 파워 (무한 성장)
-    if (this.tier >= ev.costs.length - 1) {
-      const oCost = Math.round(ev.overloadCost * costMult);
-      if (this.count >= oCost) {
-        const kept = Math.min(this.count, Math.max(retain, Math.round(this.count * ratio)));
-        const consumed = this.count - kept;
-        this.count = kept;
-        this.overloadPower = (this.overloadPower || 0) + ev.overloadPower;
-        this.ascension = (this.ascension || 0) + 1;   // 무한 승천 단계 (진화 종료 제거)
-        this.shield = true;
-        this.invulnT = BAL.squad.evolveInvuln;   // 오버로드도 무적 (A3)
-        this.evolvePunch = 0.5;
-        this.pendingDraft = true;
-        world.effects.halo(this.x, this.y, COLORS.reward);
-        world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
-        world.effects.text(this.x, this.y - 98, `승천 ★${this.ascension} · 드론 ${consumed}기 흡수`, COLORS.reward);
-        world.effects.text(this.x, this.y - 76, `기함 화력 +${ev.overloadPower}`, COLORS.ally);
-        // N회 승천마다 관통 +1 (눈에 보이는 무한 파워 성장)
-        if (this.ascension % BAL.evolution.ascensionPiercePerN === 0) world.effects.text(this.x, this.y - 54, '⟫ 관통 강화 +1', COLORS.ally);
-        sfx('evolve');
+    // 3) 최종 상태(타이탄 + 순양함 만석)에서 넘치는 드론은 체력이 아니라 포인트(코인)로 전환
+    if (this.tier >= maxTier && (this.cruisers || 0) >= E.maxCruisers && this.count > E.dronePointCap) {
+      const excess = this.count - E.dronePointCap;
+      this.count = E.dronePointCap;
+      const coins = Math.floor(excess * E.coinPerExcessDrone);
+      if (coins > 0 && world.addCoins) {
+        world.addCoins(coins);
+        world.effects.text(this.x, this.y - 44, `드론 ${excess}기 → +${coins} 포인트`, COLORS.reward, 14);
       }
     }
   }
@@ -281,11 +285,10 @@ export class Squad {
       world.effects.text(this.x, this.y - 64, sub, COLORS.reward, 15);
       sfx('evolve');
     };
-    // 1) 승천(오버로드) 층이 있으면 그것부터 소모
-    if ((this.overloadPower || 0) > 0) {
-      this.overloadPower = 0;
-      this.ascension = 0;
-      rescue('⚠ 승천 해제 · 편대 재건', `드론 ${refill}기 긴급 사출`);
+    // 1) 순양함이 있으면 1척을 희생해 편대 재건 (순양함 = 여분의 목숨)
+    if ((this.cruisers || 0) > 0) {
+      this.cruisers -= 1;
+      rescue('⚠ 순양함 1척 소멸 · 편대 재건', `드론 ${refill}기 긴급 사출`);
       return;
     }
     // 2) 등급이 남아 있으면 한 단계 강등 후 재건
@@ -407,10 +410,12 @@ export class Squad {
     const damage = (world.stats?.damage ?? BAL.squad.damage) * (mfx.dmgMult ?? 1);
     const pb = mfx.pierceBonus || 0;                                              // 관통 탄심 모듈
     const crit = (d) => (mfx.crit && Math.random() < mfx.crit ? d * mfx.critMult : d); // 치명 회로 모듈
-    // 총 화력 = (드론 수 + 기함 파워): 진화로 드론을 바쳐도 화력이 기함에 저축되어 유지된다
-    const baseDps = this.power * fireRate * damage * lvCoef * powerMult;
+    // 기함 본체 화력 (호위함은 별도 사격 — 이중 계산 방지 위해 flagPower 사용)
+    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult;
+    // 호위함(호위기·순양함) 사격: 기함과 같은 무기를 supportPower 비례로 발사
+    this.fireSupport(dt, world, this.supportPower * fireRate * damage * lvCoef * powerMult, crit);
     const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];  // 기함별 전투 개성
-    const ascPierce = Math.floor((this.ascension || 0) / BAL.evolution.ascensionPiercePerN);  // 무한 승천: N회마다 관통 +1
+    const ascPierce = 0;  // (구 무한 승천 관통 보너스 — 승천 시스템 제거로 0)
 
     // 호위 드론 개별 사격: 드론이 2기 이상이면 총 화력의 30%를 드론들이 분담 발사
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
@@ -485,6 +490,53 @@ export class Squad {
     }
   }
 
+  /** 합체 유닛 목록(순양함 먼저, 안쪽 배치) */
+  supportUnits() {
+    const u = [];
+    for (let i = 0; i < this.cruisers; i++) u.push('cruiser');
+    for (let i = 0; i < this.escorts; i++) u.push('escort');
+    return u;
+  }
+  /** idx번째 호위함의 기함 기준 상대 위치 (좌우 교대 + 뒤로 계단식) */
+  supportSlot(idx, type) {
+    const gap = BAL.escort.slotGap;
+    const def = SHIP_DEFS[this.tier];
+    const side = idx % 2 === 0 ? -1 : 1;
+    const row = Math.floor(idx / 2);
+    const baseX = type === 'cruiser' ? gap * 1.05 : gap * 1.95;
+    const baseY = def.h * 0.3 + 16 + row * (gap * 0.85);
+    return { x: side * (baseX + row * 5), y: baseY };
+  }
+
+  /** 호위함 사격: 기함과 같은 무기를 supportPower 비례로, 호위함 위치에서 발사 */
+  fireSupport(dt, world, dps, crit) {
+    const units = (this.escorts || 0) + (this.cruisers || 0);
+    if (units <= 0 || dps <= 0) return;
+    const W = BAL.weapons;
+    const shotsPerSec = Math.min(20, 3 + units * 1.6);
+    this.supportAcc = (this.supportAcc || 0) + shotsPerSec * dt;
+    while (this.supportAcc >= 1) {
+      this.supportAcc -= 1;
+      if (world.bullets.length >= BAL.bullet.cap) continue;
+      const dmg = crit(dps / shotsPerSec);
+      const idx = (this.supportIdx = ((this.supportIdx || 0) + 1) % units);
+      const type = idx < this.cruisers ? 'cruiser' : 'escort';
+      const slot = this.supportSlot(idx, type);
+      const sx = this.x + slot.x, sy = this.y + slot.y - 6;
+      if (this.weapon === 'laser') {
+        world.bullets.push(new Bullet(sx, sy, dmg, { vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv }));
+      } else if (this.weapon === 'homing') {
+        const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
+        if (alive < W.homing.cap) world.bullets.push(new HomingMissile(sx, sy, (Math.random() - 0.5) * 180, dmg, this.weaponLv));
+      } else {
+        const spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180;
+        const a = (Math.random() - 0.5) * 2 * spread;
+        world.bullets.push(new Bullet(sx, sy, dmg, { vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan', lv: this.weaponLv }));
+      }
+    }
+  }
+
+
   draw(ctx) {
     const w = this.width;
     const def = SHIP_DEFS[this.tier];
@@ -504,6 +556,21 @@ export class Squad {
       ctx.rotate(this.bank * 0.3);
       blit(ctx, scout, 0, 0, 0.55);
       ctx.restore();
+    }
+
+    // 호위함(호위기·순양함): 기함 뒤·옆에 나란히 — "함대가 커지는" 체감 + 같이 사격
+    if (this.escorts || this.cruisers) {
+      const cSprite = shipSprite(1, this.weapon);   // 순양함 = 인터셉터형
+      const total = this.cruisers + this.escorts;
+      for (let i = 0; i < total; i++) {
+        const type = i < this.cruisers ? 'cruiser' : 'escort';
+        const slot = this.supportSlot(i, type);
+        ctx.save();
+        ctx.translate(this.x + slot.x, this.y + slot.y + Math.sin(this.t * 3 + i) * 1.5);
+        ctx.rotate(this.bank * 0.25);
+        blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, type === 'cruiser' ? 0.85 : 0.78);
+        ctx.restore();
+      }
     }
 
     // 기함: 뱅킹(회전+가로 압축) + 반동 + 진화 스케일 펀치

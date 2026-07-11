@@ -15,7 +15,7 @@ export const BAL = {
     radius: 7,       // 드론 반지름
     followSpeed: 9,  // targetX 추적 반응 (클수록 민첩)
     laneMargin: 30,  // 트랙 좌우 여백
-    maxWidth: 120,   // 편대 최대 반폭
+    maxWidth: 84,    // 편대 최대 반폭 (회피 가능하게 축소 — 옛 120은 트랙 절반을 덮었다)
   },
 
   bullet: { speed: 620, radius: 3, cap: 400 },
@@ -24,7 +24,9 @@ export const BAL = {
   // enemyHpPowerScale: 적 HP를 함대 화력(maxPower)에 비례. 클수록 완만(내 DPS가 앞서 = 파워판타지).
   // enemyHpPowerCap: 비례 상한 — 이 배수를 넘으면 더 안 단단해져 강해질수록 쓸어버리는 손맛 (STG rank 완화).
   // enemyHpCapPerStage: 화력 비례 HP 상한을 스테이지마다 이만큼 올림 → 깊은 판에선 즉사 안 함(무한 상승)
-  economy: { droneGainMult: 0.5, enemyHpPowerScale: 110, enemyHpPowerCap: 6, enemyHpCapPerStage: 1.2 },
+  // droneGainMult 하향 = 진화 감속. 화력비례 상한(Cap)을 크게 올려 강해져도 적이 안 녹게(즉사 방지) →
+  //  후반 난이도 역전을 막고, 실제 위협은 밀도(spawn)+탄막(shotCap)+회피로 온다.
+  economy: { droneGainMult: 0.32, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5 },
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
@@ -38,7 +40,8 @@ export const BAL = {
 
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
   // 적 복제 수 = enemyMult + floor((stage-1)/stageStep), 상한 max. 깊은 판일수록 적이 많아 움직여야 생존.
-  spawn: { enemyMult: 2, enemyMultMax: 4, enemyMultStageStep: 3 },
+  // 밀도 = 후반 난이도의 핵심. 스테이지마다 적 복제 수가 늘어 화력으로 다 못 쓸고 회피를 강제한다.
+  spawn: { enemyMult: 2, enemyMultMax: 9, enemyMultStageStep: 2 },
 
   // 엘리트 변이(어픽스): 적에 특성을 붙여 같은 적을 다양하게. 색 오라+아이콘으로 표시.
   // 로직은 affixes.js, 여기엔 수치·표시만. 스테이지 깊을수록 자주·중첩된다.
@@ -76,6 +79,21 @@ export const BAL = {
     overloadPower: 320,
     // 무한 승천: 오버로드 = 『타이탄 ★N』 승천 단계. N회마다 관통 +1 (눈에 보이는 무한 성장).
     ascensionPiercePerN: 3,
+  },
+
+  // 드론 합체 순양함: 드론이 자동으로 순양함으로 뭉쳐 기함과 같은 무기를 60% 위력으로 쏜다.
+  //  드론 → (자동) 순양함 → (선택창) 기함 업그레이드. 강화 단계를 나눠 진행이 오래 이어진다.
+  //  드론→순양함은 자동(게이트·선택 없음). 순양함이 모여 기함을 올릴 때만 선택창(모듈 드래프트)이 뜬다.
+  escort: {
+    dronesPerCruiser: 130,    // 드론 130기 → 순양함 1척 (자동 합체) — 합체 감속
+    cruisersPerFlagship: 9,   // 순양함 9척 → 기함 1단계 자동 업그레이드 — 진화 감속
+    cruiserPower: 130,        // 순양함 1척 화력(드론 환산) — 총화력·적 스케일에 합산
+    cruiserFireRatio: 0.60,   // 표시/체감용: 기함 무기의 60% 위력으로 발사
+    maxCruisers: 12,          // 순양함 최대 (성능·화면 상한)
+    slotGap: 30,              // 순양함 편성 간격(px)
+    // 최종 단계(타이탄+순양함 만석)에서 넘치는 드론은 체력이 아니라 포인트(코인)로 전환.
+    dronePointCap: 300,       // 최종 상태에서 드론(체력) 상한 — 초과분은 포인트화
+    coinPerExcessDrone: 0.5,  // 초과 드론 1기당 코인 (2기 = 1코인)
   },
 
   // 보급 수송선: 부수면 그 자리에서 드론 지급 — "파괴 = 드론 회수"의 주력 공급원.
