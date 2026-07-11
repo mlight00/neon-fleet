@@ -16,10 +16,29 @@ test('기본값: 저장 없으면 best 0, coins 0, stage 1, style C(미선택), 
   const fake = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
   const s = createSave(fake);
   assert.deepEqual(s.get(), {
-    best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false, introSeen: false,
+    best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false, introSeen: false, stageMigrated: true,
     up: { drones: 0, dmg: 0, rate: 0, coin: 0 },
     snd: { bgm: 0.5, sfx: 0.8, mute: false },
   });
+});
+
+test('stage 마이그레이션: 옛 부풀려진 stage(내부 난이도)를 섹터로 1회 환산', () => {
+  const cases = [[6, 1], [12, 2], [18, 3], [1, 1], [7, 2]];   // 옛 stage → 섹터
+  for (const [old, expected] of cases) {
+    const mem = new Map([['neonFleet.v1', JSON.stringify({ best: 100, coins: 50, stage: old })]]);
+    const fake = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+    const s = createSave(fake);
+    assert.equal(s.get().stage, expected, `old ${old} → ${expected}`);
+    assert.equal(s.get().best, 100);                         // 다른 값은 보존
+    // 재생성해도 다시 줄어들지 않음(멱등: 플래그로 재환산 차단)
+    assert.equal(createSave(fake).get().stage, expected, `old ${old} 멱등`);
+  }
+});
+
+test('마이그레이션: 신규 저장(stageMigrated=true)은 stage를 건드리지 않는다', () => {
+  const mem = new Map([['neonFleet.v1', JSON.stringify({ stage: 3, stageMigrated: true })]]);
+  const fake = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  assert.equal(createSave(fake).get().stage, 3);   // 섹터 3 그대로 유지
 });
 
 test('reset: 진행 초기화하되 사운드·인트로 시청 여부는 유지', () => {

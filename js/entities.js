@@ -155,6 +155,7 @@ export class Squad {
     this.escorts = 0;         // (구 호위기 — 미사용)
     this.cruisers = 0;        // 순양함 수 (드론 130기 합체)
     this.banked = 0;          // 기함에 은행된 화력 (업그레이드 때 흡수한 순양함 화력 누적)
+    this.bankStack = [];      // 업그레이드별 은행 증가분 (강등 시 정확히 롤백 → 반복 적립 방지)
     this.supportAcc = 0;      // 호위함 사격 누적기
     this._offsets = Squad.formationOffsets(BAL.squad.drawCap);
   }
@@ -233,6 +234,7 @@ export class Squad {
       const gain = Math.round(need * E.cruiserPower * (E.upgradeBonus ?? 1.2));
       this.cruisers -= need;
       this.banked = (this.banked || 0) + gain;
+      this.bankStack.push(gain);   // 강등 시 롤백용 (반복 적립 방지)
       this.tier += 1;
       this.shield = true;                        // 업그레이드 직후 사고사 방지
       this.invulnT = BAL.squad.evolveInvuln;     // 업그레이드 무적 (A3)
@@ -295,9 +297,10 @@ export class Squad {
       rescue('⚠ 순양함 1척 소멸 · 편대 재건', `드론 ${refill}기 긴급 사출`);
       return;
     }
-    // 2) 등급이 남아 있으면 한 단계 강등 후 재건
+    // 2) 등급이 남아 있으면 한 단계 강등 후 재건 (그 티어에서 은행된 화력도 롤백 → 강등→재업글 farming 차단)
     if (this.tier > 0) {
       this.tier -= 1;
+      if (this.bankStack.length) this.banked = Math.max(0, this.banked - this.bankStack.pop());
       rescue(`⚠ ${ev.names[this.tier]}로 강등`, `드론 ${refill}기 긴급 사출`);
       return;
     }

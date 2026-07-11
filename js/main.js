@@ -213,7 +213,8 @@ function buildEncounter(node) {
       : stageOk;
   const pending = [];
   let prev = null;
-  const safeCount = node.type === 'boss' ? 1 : Math.min(3, 1 + Math.floor((stage - 1) / 4));
+  // 위험 노드는 debris/mine이 콘텐츠인데 안전-시작(isSafeChunk)을 강제하면 필터가 모순되어 일반 청크로 샘 → 0으로.
+  const safeCount = node.type === 'boss' ? 1 : node.type === 'hazard' ? 0 : Math.min(3, 1 + Math.floor((stage - 1) / 4));
   for (let i = 0; i < perRun; i++) {
     const tier = pickTier(i / perRun, bounds);
     const f = i < safeCount ? (c) => filt(c) && isSafeChunk(c) : filt;
@@ -699,7 +700,7 @@ document.getElementById('stage').appendChild(chargeBtn);
 
 // 일시정지·차지 버튼은 실제 플레이 중(state='play')에만 표시 — 결과/맵/격납고 화면에선 숨김
 function syncPlayButtons() {
-  const d = state === 'play' ? '' : 'none';
+  const d = (state === 'play' && !paused && !drafting) ? '' : 'none';
   if (pauseBtn.style.display !== d) pauseBtn.style.display = d;
   if (chargeBtn.style.display !== d) chargeBtn.style.display = d;
 }
