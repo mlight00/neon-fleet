@@ -4,16 +4,19 @@ import { BAL } from './balance.js';
 import { COLORS } from './render.js';
 import { circleHit } from './collision.js';
 import { Scrolling, enemyDie, drawEHp } from './entities.js';
+import { prismRoute, stageScale } from './adaptive-logic.js';
 
 const AE = () => BAL.adaptiveEnemies;
+const hpScale = (stage) => stageScale(stage, AE().hpPerStage, AE().hpScaleMax);
 
 // ── 프리즘 워든: 정면 70% 감소 방어막 + 좌우 코어 2개. 측면 조준/차지로 뚫는다.
 export class PrismWarden extends Scrolling {
-  constructor(x) {
-    const c = AE().prismWarden;
+  constructor(x, stage = 1) {
+    const c = AE().prismWarden, s = hpScale(stage);
     super(x, -40);
-    this.hp = this.maxHp = c.hp; this.r = c.r; this.coin = c.coin;
-    this.cores = [{ side: -1, hp: c.coreHp, max: c.coreHp }, { side: 1, hp: c.coreHp, max: c.coreHp }];
+    this.hp = this.maxHp = Math.round(c.hp * s); this.r = c.r; this.coin = c.coin;
+    const ch = Math.round(c.coreHp * s);
+    this.cores = [{ side: -1, hp: ch, max: ch }, { side: 1, hp: ch, max: ch }];
     this.isEnemy = true; this.dead = false; this.t = Math.random() * 10;
   }
   get shieldUp() { return this.cores.some((k) => k.hp > 0); }
@@ -24,21 +27,18 @@ export class PrismWarden extends Scrolling {
     this.x += Math.sign(dx) * Math.min(Math.abs(dx), 40 * dt);
     if (this.offscreen(world)) this.dead = true;
   }
-  hitByBullet(dmg, world, bullet = null) {
+  hitByBullet(dmg, world, ctx = null) {
     const c = AE().prismWarden;
     if (!this.shieldUp) { this._body(dmg, world); return; }   // 방어막 해제 → 정상 피해
-    if (!bullet) { this._body(dmg, world); return; }          // 차지 랜스(탄환 문맥 없음) → 방어막 무시
-    // 탄환 x로 코어/정면 판정
-    for (const k of this.cores) {
-      if (k.hp <= 0) continue;
-      if (Math.abs(bullet.x - (this.x + k.side * c.coreOffset)) <= 9) {
-        k.hp -= dmg; world.effects.burst(this.x + k.side * c.coreOffset, this.y, '#b44cff', 4, 90);
-        if (k.hp <= 0) world.effects.burst(this.x + k.side * c.coreOffset, this.y, '#ffffff', 10, 160);
-        return;
-      }
+    const route = prismRoute(ctx, this.x, this.cores, c.coreOffset);  // ctx=탄환{x} | 랜스{lance,pierceDefense} | null
+    if (route.hitCore >= 0) {
+      const k = this.cores[route.hitCore]; k.hp -= dmg;
+      world.effects.burst(this.x + k.side * c.coreOffset, this.y, '#b44cff', 4, 90);
+      if (k.hp <= 0) world.effects.burst(this.x + k.side * c.coreOffset, this.y, '#ffffff', 10, 160);
+      return;
     }
-    // 정면(중앙): 70% 감소된 본체 피해
-    this._body(dmg * (1 - c.frontReduce), world);
+    // 본체: 랜스 강습3단+(full)은 전액, 그 외(정면·광역·일반 랜스)는 70% 감소
+    this._body(route.full ? dmg : dmg * (1 - c.frontReduce), world);
   }
   _body(dmg, world) { this.hp -= dmg; if (this.hp <= 0) enemyDie(this, world, '#b44cff', this.coin); }
   draw(ctx) {
@@ -68,10 +68,10 @@ export class PrismWarden extends Scrolling {
 
 // ── 크리스탈 스캐빈저: 보상(크리스탈/수송선)을 훔쳐 도주. 처치=보상 ×1.5, 놓치면 손실.
 export class Scavenger extends Scrolling {
-  constructor(x) {
+  constructor(x, stage = 1) {
     const c = AE().scavenger;
     super(x, -30);
-    this.hp = this.maxHp = c.hp; this.r = c.r; this.coin = c.coin;
+    this.hp = this.maxHp = Math.round(c.hp * hpScale(stage)); this.r = c.r; this.coin = c.coin;
     this.state = 'seek'; this.target = null; this.stored = 0; this.stayT = c.stayTime;
     this.isEnemy = true; this.dead = false; this.t = Math.random() * 10;
   }
@@ -83,8 +83,8 @@ export class Scavenger extends Scrolling {
       if (this.target) {
         const dx = this.target.x - this.x, dy = this.target.y - this.y, d = Math.hypot(dx, dy) || 1;
         this.x += (dx / d) * c.approach * dt; this.y += (dy / d) * c.approach * dt;
-        if (d <= c.stealR) {           // 도달 → 보상 강탈
-          this.stored = this.target.reward || 0;
+        if (d <= c.stealR) {           // 도달 → 보상 강탈 (실수령 드론 = 정상 파괴와 동일 기준)
+          this.stored = this.target.getDroneReward ? this.target.getDroneReward(world) : (this.target.reward || 0);
           this.target.dead = true; this.target = null; this.state = 'flee';
           world.effects.text(this.x, this.y - 16, '강탈!', COLORS.danger, 13);
         }
@@ -126,12 +126,12 @@ export class Scavenger extends Scrolling {
 
 // ── 게이트 패러사이트: 게이트 한 레인에 부착, 살아서 통과하면 연산 반전. 처치=정화 +드론.
 export class GateParasite extends Scrolling {
-  constructor(gate, infectedLane) {
+  constructor(gate, infectedLane, stage = 1) {
     const c = AE().gateParasite;
     const side = infectedLane === 0 ? 'left' : 'right';
     const x = infectedLane === 0 ? gate.logicalW * 0.25 : gate.logicalW * 0.75;
     super(x, gate.y - c.offsetY);
-    this.hp = this.maxHp = c.hp; this.r = c.r; this.coin = 4;
+    this.hp = this.maxHp = Math.round(c.hp * hpScale(stage)); this.r = c.r; this.coin = 4;
     this.gate = gate; this.side = side; this.isEnemy = true; this.dead = false; this.t = Math.random() * 10;
     gate.corruptSide = side;   // 게이트 감염
   }

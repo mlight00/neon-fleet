@@ -420,12 +420,14 @@ export class Squad {
     const stageMult = ch.stageMult[Math.min(stage, ch.stageMult.length - 1)] || 1;
     const chgDmgMul = doctrineEffects(this.doctrine, BAL.doctrine).chargeDmgMult;  // 랜스 강습: 차지 피해↑
     const dmg = this.power * ch.blastCoef * stageMult * fireRate * damage * lvCoef * wCoef * (mfx.chargeMult ?? 1) * chgDmgMul;
+    // 랜스 문맥: 랜스 강습 교리 + 3단 이상이면 방어막 관통(프리즘·패러사이트), 아니면 일반 정면 취급
+    const lanceCtx = { lance: true, pierceDefense: doctrineEffects(this.doctrine, BAL.doctrine).lancePierceDefense && stage >= 3 };
     for (const e of world.entities) {       // 앞쪽 컬럼의 적 전부 관통
       if (e.dead || !e.hitByBullet) continue;
-      if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) e.hitByBullet(dmg, world);
+      if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) e.hitByBullet(dmg, world, lanceCtx);
     }
     if (world.bosses) for (const bo of world.bosses) {   // 랜스 컬럼 안의 모든 보스 타격
-      if (!bo.dead && Math.abs(bo.x - this.x) <= halfW + bo.r) bo.hitByBullet(dmg * (mfx.bossDmgMult ?? 1), world);
+      if (!bo.dead && Math.abs(bo.x - this.x) <= halfW + bo.r) bo.hitByBullet(dmg * (mfx.bossDmgMult ?? 1), world, lanceCtx);
     }
     // 경로 적탄 소멸은 3단계 이상에서만 (1·2단계는 적탄 못 지움)
     if (stage >= 3) for (const b of world.enemyBullets) if (Math.abs(b.x - this.x) <= halfW + 18) b.dead = true;
@@ -461,7 +463,7 @@ export class Squad {
     const ascPierce = 0;
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
     const escortShare = this.count > 1 ? 0.3 + dEff.escortShareBonus : 0;   // 군체 교리: 드론 사격 비중↑
-    this.fireEscort(dt, world, baseDps * wCoef * escortShare);
+    this.fireEscort(dt, world, baseDps * wCoef * escortShare * phaseMul);   // 위상 교리 피해 보너스를 드론 사격에도 반영
 
     if (this.weapon === 'homing') {
       const siege = evo === 'homing_siege' ? WE.homing_siege : null;
@@ -1070,13 +1072,17 @@ export class Crystal extends Scrolling {
     this.reward = value;
     this.r = value >= 150 ? 34 : value >= 40 ? 28 : 22;
   }
+  /** 실제 지급 드론 수 (보상 배수·경제·교리 반영). 스캐빈저도 이 값을 저장한다. */
+  getDroneReward(world) {
+    return Math.round(this.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult * world.squad.rewardGainMult);
+  }
   hitByBullet(dmg, world) {
     const res = hitCrystal(this, dmg);
     this.hp = res.hp;
     if (res.broken) {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.reward, 20);
-      world.squad.applyDelta(Math.round(res.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult * world.squad.rewardGainMult), world);
+      world.squad.applyDelta(this.getDroneReward(world), world);
       sfx('crystal');
     }
   }
@@ -1140,13 +1146,17 @@ export class DronePod extends Scrolling {
     this.x = this.baseX + Math.sin(this.t * BAL.pod.swayHz * Math.PI * 2) * BAL.pod.swayAmp;
     if (this.offscreen(world)) this.dead = true;
   }
+  /** 실제 지급 드론 수 (보상 배수·경제·교리 반영). 스캐빈저도 이 값을 저장한다. */
+  getDroneReward(world) {
+    return Math.round(this.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult * world.squad.rewardGainMult);
+  }
   hitByBullet(dmg, world) {
     this.hp -= dmg;
     if (this.hp <= 0 && !this.dead) {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.ally, 18, 200);
       world.effects.ring(this.x, this.y, COLORS.ally);
-      world.squad.applyDelta(Math.round(this.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult * world.squad.rewardGainMult), world, '보급 확보!');
+      world.squad.applyDelta(this.getDroneReward(world), world, '보급 확보!');
       sfx('crystal');
     }
   }

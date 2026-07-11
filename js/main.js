@@ -401,13 +401,13 @@ function update(dt) {
         ]));
       }
       // 대응형 신규 적 (고정 스탯 — 체력벽이 아니라 조준·수단 전환을 요구)
-      else if (it.type === 'prismWarden') w.entities.push(new PrismWarden(x));
-      else if (it.type === 'scavenger') w.entities.push(new Scavenger(x));
+      else if (it.type === 'prismWarden') w.entities.push(new PrismWarden(x, r.stage));
+      else if (it.type === 'scavenger') w.entities.push(new Scavenger(x, r.stage));
       else if (it.type === 'corruptedGate') {
         const gs = (g) => scaleGate(g, r.stage, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
         const gate = new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right));
         w.entities.push(gate);
-        w.entities.push(new GateParasite(gate, it.infectedLane ?? 0));
+        w.entities.push(new GateParasite(gate, it.infectedLane ?? 0, r.stage));
       }
     }
 
