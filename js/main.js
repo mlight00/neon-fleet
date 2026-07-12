@@ -7,7 +7,7 @@ import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, evolutionDef } from './weapon-evolutions.js';
 import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
-import { keystoneIcon } from './keystones.js';
+import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
@@ -253,6 +253,9 @@ function buildEncounter(node) {
   r.pending = pending;
   r.squad.y = logicalH - 130;
   r.squad.dead = false;
+  // 노드 시작: 키스톤 누적 카운터·타이머·예약 리셋 (선택한 키스톤 id는 유지) + FLOW 0
+  r.squad.keystoneState = freshKeystoneState();
+  r.squad.flow = 0; r.squad.rushT = 0; r.squad.grazeCombo = 0; r.squad.sinceGraze = Infinity;
 }
 
 /** 인카운터 클리어(트랙/보스 종료) → 코인 + 노드 완료 */
@@ -268,7 +271,10 @@ function completeNode(node) {
   const proceed = () => {
     if (node && node.type === 'boss') {
       r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `섹터 ${r.sector} 클리어!`, COLORS.reward);
-      startSector(r.sector + 1);
+      const nextSector = () => startSector(r.sector + 1);
+      // 첫 섹터 보스 격파 후 다음 섹터 맵 전에 키스톤 3택 (원정당 1개)
+      if (r.sector === 1 && !r.squad.keystone) openKeystone(nextSector);
+      else nextSector();
     } else {
       enterSectorMap();
     }
@@ -322,6 +328,7 @@ function onEnemyKilled(e, w) {
   if (mfx.killDroneChance > 0 && Math.random() < mfx.killDroneChance) {
     w.squad.applyDelta(mfx.killDroneAmt, w);
   }
+  w.squad.onEnemyKill(w, e);   // 키스톤(군체 용광로) 실제 적 처치 카운터
 }
 
 // ───────────────────────── 업데이트
@@ -581,6 +588,27 @@ function openDoctrine() {
       sfx('buy');
       r.effects.flash(0.7);
       r.effects.text(r.squad.x, r.squad.y - 60, `${DOCTRINE_BY_ID[id].icon} ${DOCTRINE_BY_ID[id].name}!`, COLORS.reward, 18);
+    },
+  });
+}
+
+// 키스톤 3택 (첫 섹터 보스 후 1회, 원정당 1개). 게임 일시 정지. after=선택 완료 후 진행.
+function openKeystone(after) {
+  const r = run;
+  drafting = true; state = 'map';
+  input.charging = false;   // 선택 중 차지 초기화
+  paused = false;
+  sfx('evolve');
+  ui.showKeystoneDraft({
+    options: KEYSTONES,
+    onPick(id) {
+      r.squad.keystone = id;
+      r.squad.keystoneState = freshKeystoneState();   // 누적 카운터 0에서 시작
+      drafting = false;
+      ui.hide();
+      sfx('buy');
+      r.effects.flash(0.7);
+      after();
     },
   });
 }

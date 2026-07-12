@@ -13,6 +13,7 @@ import { canEvolveWeapon } from './weapon-evolutions.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { droneReward } from './adaptive-logic.js';
 import { addFlow, updateFlow, onFlowHit, isGrazeDistance } from './flow.js';
+import { keystoneEffects, forgeOnKill } from './keystones.js';
 import { sfx } from './audio.js';
 
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
@@ -198,18 +199,93 @@ export class Squad {
       world.effects.text(this.x + (Math.random() - 0.5) * 20, this.y - 30, 'GRAZE', COLORS.gateGood, 12);
     }
     if (s.rushStarted) this._startRushFx(world);
-    // 키스톤 onGraze 훅 (C3), B22 STAGGER 훅 (C4) — 같은 graze를 한 번씩만 소비
-    if (this.onGrazeKeystone) this.onGrazeKeystone(world, shot);
+    // 키스톤 onGraze 훅, B22 STAGGER 훅 (C4) — 같은 graze를 한 번씩만 소비
+    this.onGrazeKeystone(world, shot);
     if (world.onPlayerGraze) world.onPlayerGraze(world, shot);
     return true;
   }
 
   /** 실제 전투 피격 시 FLOW/RUSH 규칙 (적탄·접촉 등 실제 손실이 있을 때만 호출). */
   onCombatHit(world) {
-    const s = onFlowHit(this._flowState(), BAL.flow);
     const wasRush = this.rushT > 0;
+    if (this.keystone === 'phase_afterimage') {
+      // 위상 잔상 대가: 피격 시 FLOW·RUSH를 전부 잃음
+      this.flow = 0; this.rushT = 0; this.grazeCombo = 0;
+      if (wasRush) world.effects.text(this.x, this.y - 40, 'RUSH 중단', COLORS.danger, 13);
+      return;
+    }
+    const s = onFlowHit(this._flowState(), BAL.flow);
     this._applyFlowState(s);
     if (wasRush && s.rushEnded) world.effects.text(this.x, this.y - 40, 'RUSH 중단', COLORS.danger, 13);
+  }
+
+  // ── 키스톤 전투 훅 (원정당 1개, keystoneState에 누적) ──
+  _ksState() { if (!this.keystoneState) this.keystoneState = { kills: 0, forgeT: 0, grazeCount: 0, pendingEchoes: [] }; return this.keystoneState; }
+
+  /** 근접 회피 시 키스톤 효과: 위상 잔상 3회마다 파동. */
+  onGrazeKeystone(world, shot) {
+    if (this.keystone !== 'phase_afterimage') return;
+    const ks = this._ksState();
+    ks.grazeCount = (ks.grazeCount || 0) + 1;
+    if (ks.grazeCount % BAL.keystone.phaseAfterimage.grazesPerProc === 0) this._phaseWave(world);
+  }
+
+  /** 위상 파동: 반경 내 적탄을 거리순 최대 8발 제거 (제거탄은 graze 미지급). 없어도 연출은 표시. */
+  _phaseWave(world) {
+    const P = BAL.keystone.phaseAfterimage;
+    const near = (world.enemyBullets || [])
+      .filter((b) => !b.dead && Math.hypot(b.x - this.x, b.y - this.y) <= P.radius)
+      .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y));
+    for (let i = 0; i < Math.min(P.maxClear, near.length); i++) near[i].dead = true;
+    world.effects.ring(this.x, this.y, '#b44cff');
+    world.effects.burst(this.x, this.y, '#b44cff', 8, 120);
+  }
+
+  /** 실제 적 처치 시 키스톤 효과: 군체 용광로 10킬마다 유령 순양함 전개. */
+  onEnemyKill(world, e) {
+    if (this.keystone !== 'swarm_forge') return;
+    if (!e || !e.isEnemy) return;   // 크리스탈·수송선·장애물 제외
+    const ks = this._ksState();
+    const r = forgeOnKill(ks, BAL.keystone.swarmForge);
+    ks.kills = r.kills; ks.forgeT = r.forgeT;
+    if (r.procced) {
+      world.effects.text(this.x, this.y - 54, '유령 순양함 전개!', COLORS.ally, 13);
+      world.effects.halo(this.x, this.y, '#57e0ff');
+    }
+  }
+
+  /** 3단+ 원본 랜스 후 공명 랜스 예약 (원본 1회당 1회, 재귀 없음, 최대 maxPending). */
+  scheduleLanceEcho(world, { x, halfW, dmg, pierceDefense, stage }) {
+    if (this.keystone !== 'lance_echo') return;
+    const K = BAL.keystone.lanceEcho;
+    if (stage < K.minStage) return;
+    const ks = this._ksState();
+    if ((ks.pendingEchoes || (ks.pendingEchoes = [])).length >= K.maxPending) return;
+    ks.pendingEchoes.push({ t: K.delay, x, halfW: halfW * K.widthFrac, dmg: dmg * K.dmgFrac, pierceDefense, stage });
+  }
+
+  /** 예약된 공명 랜스 타이머 진행 + 발사 (update에서 호출). */
+  _updateEchoes(dt, world) {
+    const ks = this.keystoneState;
+    if (!ks || !ks.pendingEchoes || !ks.pendingEchoes.length) return;
+    for (const echo of ks.pendingEchoes) echo.t -= dt;
+    const ready = ks.pendingEchoes.filter((e) => e.t <= 0);
+    ks.pendingEchoes = ks.pendingEchoes.filter((e) => e.t > 0);
+    for (const echo of ready) this._fireEcho(world, echo);
+  }
+
+  /** 공명 랜스 실발사: 같은 세로 컬럼 관통(피해·폭 축소). 적탄은 제거하지 않음. echo:true(STAGGER 없음). */
+  _fireEcho(world, echo) {
+    const ctx = { lance: true, pierceDefense: echo.pierceDefense, echo: true };
+    for (const e of world.entities) {
+      if (e.dead || !e.hitByBullet) continue;
+      if (e.y < this.y && Math.abs(e.x - echo.x) <= echo.halfW + (e.r || 0)) e.hitByBullet(echo.dmg, world, ctx);
+    }
+    if (world.bosses) for (const bo of world.bosses) {
+      if (!bo.dead && Math.abs(bo.x - echo.x) <= echo.halfW + bo.r) bo.hitByBullet(echo.dmg * (world.mfx?.bossDmgMult ?? 1), world, ctx);
+    }
+    world.spawnEntity(new ChargeLance(echo.x, this.y, echo.halfW, echo.stage));
+    world.effects.ring(echo.x, this.y, '#ffd93d');
   }
 
   /** NEON RUSH 발동 연출 (배수 적용은 fire 경로에서, C2). */
@@ -429,6 +505,11 @@ export class Squad {
       this._applyFlowState(fs);
       if (fs.rushEnded) world.effects.text(this.x, this.y - 50, 'RUSH 종료', COLORS.ally, 13);
     }
+    // 키스톤 타이머: 유령 순양함(군체 용광로) 감소 + 예약 메아리(공명 랜스) 발사
+    if (this.keystoneState) {
+      if (this.keystoneState.forgeT > 0) this.keystoneState.forgeT = Math.max(0, this.keystoneState.forgeT - dt);
+      this._updateEchoes(dt, world);
+    }
     if (this.evolvePunch > 0) this.evolvePunch -= dt;
     this.recoil *= Math.pow(0.001, dt); // ≈ *0.7 per frame @60fps
 
@@ -500,6 +581,8 @@ export class Squad {
     world.effects.burst(this.x, this.y, COLORS.ally, 18 + stage * 8, 320);
     this.recoil = 3 + stage;
     sfx('lance_fire');
+    // 공명 랜스 키스톤: 3단+ 원본 1회당 메아리 1회 예약 (원본 최종 피해·폭 기준, pierceDefense 계승)
+    this.scheduleLanceEcho(world, { x: this.x, halfW, dmg, pierceDefense: lanceCtx.pierceDefense, stage });
   }
 
   /** 무기별 발사: 총 DPS 공식은 동일, 무기는 "모양"을 바꾼다. 진화(weaponEvolutions)는 거동을 바꾼다. */
@@ -514,7 +597,9 @@ export class Squad {
     const damage = (world.stats?.damage ?? BAL.squad.damage) * (mfx.dmgMult ?? 1);
     const pb = mfx.pierceBonus || 0;
     const rush = this.rushDmgMult;   // NEON RUSH: 사격 피해 배수 (기함·호위·순양함에 한 번씩만 — 파생탄은 원본 비율이라 이중 없음)
-    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult * rush;
+    const ks = keystoneEffects(this.keystone, this.keystoneState);   // 키스톤 배수 (미선택이면 전부 1)
+    const rushAuto = rush * ks.autoMult;   // 공명 랜스 대가: 자동사격 전체 배수를 baseDps·support에 함께 접음
+    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult * rushAuto;
     const dEff = doctrineEffects(this.doctrine, BAL.doctrine);   // 기함 교리 효과 (중립이면 전부 1/0)
     // 니들 개틀링: 치명 확률 가산 / 위상 기동: 이동 뱅크에 비례한 피해 보너스(모든 탄에 적용)
     const needle = evo === 'vulcan_needle' ? WE.vulcan_needle : null;
@@ -522,19 +607,20 @@ export class Squad {
     const phaseMul = phaseDamageMult(Math.abs(this.bank || 0), dEff.bankDmgMax);
     const crit = (d) => (critP && Math.random() < critP ? d * (mfx.critMult || 2) : d) * phaseMul;
     // 호위함(순양함) 사격 — 군체 교리는 순양함 화력 배수
-    this.fireSupport(dt, world, this.supportPower * dEff.supportMult * fireRate * damage * lvCoef * powerMult * rush, crit);
+    // 순양함 사격: 군체 용광로 유령 활성 시 +25% (supportMult), autoMult는 rushAuto에 포함
+    this.fireSupport(dt, world, this.supportPower * dEff.supportMult * fireRate * damage * lvCoef * powerMult * rushAuto * ks.supportMult, crit);
     const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];
     const ascPierce = 0;
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
     const escortShare = this.count > 1 ? 0.3 + dEff.escortShareBonus : 0;   // 군체 교리: 드론 사격 비중↑
-    this.fireEscort(dt, world, baseDps * wCoef * escortShare * phaseMul);   // 위상 교리 피해 보너스를 드론 사격에도 반영
+    this.fireEscort(dt, world, baseDps * wCoef * escortShare * phaseMul * ks.supportMult);   // 위상 피해 + 군체 용광로 유령 보너스
 
     if (this.weapon === 'homing') {
       const siege = evo === 'homing_siege' ? WE.homing_siege : null;
       const wasp = evo === 'homing_wasp' ? WE.homing_wasp : null;
       const rateMul = siege ? siege.rateMult : 1;
       const cap = wasp ? wasp.cap : W.homing.cap;
-      const dps = baseDps * W.homing.coef * (1 - escortShare);
+      const dps = baseDps * W.homing.coef * (1 - escortShare) * ks.flagMult;   // 기함 직접 사격(군체 용광로 대가)
       this.fireAcc += W.homing.rate * trait.rate * rateMul * dt;
       while (this.fireAcc >= 1) {
         this.fireAcc -= 1;
@@ -571,7 +657,7 @@ export class Squad {
     const prism = evo === 'laser_prism';
     const cutter = evo === 'laser_cutter' ? WE.laser_cutter : null;
     const coef = isLaser ? W.laser.coef : W.vulcan.coef;
-    const dps = baseDps * coef * (1 - escortShare);
+    const dps = baseDps * coef * (1 - escortShare) * ks.flagMult;   // 기함 직접 사격(군체 용광로 대가)
     let shotsBase = isLaser ? 18 : Math.min(25, Math.max(4, this.count * fireRate));
     let shotsPerSec = shotsBase * trait.rate;
     if (needle) { shotsBase *= needle.rate; shotsPerSec *= needle.rate; }  // 발사↑ + 탄당 피해↓ = DPS 중립·집중
@@ -693,6 +779,21 @@ export class Squad {
       ctx.translate(x, y);
       ctx.rotate(this.bank * 0.3);
       blit(ctx, scout, 0, 0, 0.55);
+      ctx.restore();
+    }
+
+    // 군체 용광로 유령 순양함 (시각 전용, 체력·충돌 없음): 활성 중 기함 좌우에 반투명 편대
+    if (this.keystoneState && this.keystoneState.forgeT > 0) {
+      const gc = BAL.keystone.swarmForge.ghostCruisers;
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.15 * Math.sin(this.t * 6);
+      for (let i = 0; i < gc; i++) {
+        const gx = this.x + (i % 2 === 0 ? -1 : 1) * (w * 0.5 + 22);
+        const gy = this.y + 10 + Math.floor(i / 2) * 18;
+        ctx.save(); ctx.translate(gx, gy);
+        blit(ctx, scout, 0, 0, 0.7);
+        ctx.restore();
+      }
       ctx.restore();
     }
 

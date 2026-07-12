@@ -48,3 +48,24 @@ export function keystoneEffects(id, state = {}) {
   // phase_afterimage: 전투 배수 없음 (근접 회피 파동만)
   return eff;
 }
+
+/** 키스톤 원정 상태 초기값 (노드 시작마다 카운터·타이머·예약 리셋). id는 별도 보존. */
+export function freshKeystoneState() {
+  return { kills: 0, forgeT: 0, grazeCount: 0, pendingEchoes: [] };
+}
+
+/**
+ * 군체 용광로 킬 적립 (순수). 실제 적 처치 1회. 10킬마다 유령 8초(활성 중이면 +8, 최대 16).
+ * 반환: { kills, forgeT, procced }
+ */
+export function forgeOnKill(state, cfg) {
+  let kills = state.kills + 1;
+  let forgeT = state.forgeT, procced = false;
+  if (kills >= cfg.killsPerProc) {
+    kills -= cfg.killsPerProc;
+    forgeT = Math.min(forgeT + cfg.ghostDuration, cfg.ghostDurationMax);
+    procced = true;
+  }
+  return { kills, forgeT, procced };
+}
+

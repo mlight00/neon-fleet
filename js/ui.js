@@ -252,6 +252,26 @@ export const ui = {
     attachKeyNav(overlay.querySelectorAll('.doc-card'), (b) => onPick(b.dataset.id));
   },
 
+  /** 키스톤 3택 (첫 섹터 보스 후 1회). 각 카드에 행동 변화·장점·대가 명시. 게임 일시 정지. */
+  showKeystoneDraft({ options, onPick }) {
+    const cards = options.map((k) => `
+        <button class="ks-card" data-id="${k.id}" aria-label="${k.name}: ${k.change}" style="flex:1;min-width:110px;max-width:170px;padding:14px 9px;border:2px solid #b44cff;background:rgba(255,255,255,0.05);border-radius:14px;display:flex;flex-direction:column;gap:6px;align-items:center;cursor:pointer">
+          <div style="font-size:30px;line-height:1">${k.icon}</div>
+          <div style="font-weight:bold;font-size:14px;color:#d9b3ff">${k.name}</div>
+          <div style="font-size:11px;color:#dfe9ff;line-height:1.3">${k.change}</div>
+          <div style="font-size:11px;color:#7cff9c">▲ ${k.pro}</div>
+          <div style="font-size:11px;color:#ff9c9c">대가: ${k.con}</div>
+        </button>`).join('');
+    panel(`
+      <h2 style="color:#b44cff">키스톤 선택</h2>
+      <p><small>원정의 전투 리듬을 바꿉니다 — <b>원정당 1개</b>, 끝까지 유지</small></p>
+      <div style="display:flex;gap:10px;justify-content:center;margin:14px 0;flex-wrap:wrap">${cards}</div>
+      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 · ⌨ ←→ 이동 · Space 선택</p>
+    `);
+    overlay.querySelectorAll('.ks-card').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
+    attachKeyNav(overlay.querySelectorAll('.ks-card'), (b) => onPick(b.dataset.id));
+  },
+
   /** 섹터 분기 맵: 갈림길에서 다음 노드를 고른다 (게임 일시 정지) */
   showSectorMap({ map, currentId = null, doneIds = [], sector, coins = 0, onPick }) {
     const META = {
