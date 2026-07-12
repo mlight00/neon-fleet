@@ -14,6 +14,9 @@ let masterBgm = null;   // BGM 마스터 게인
 let unlocked = false;
 let settings = { bgm: 0.5, sfx: 0.8, mute: false };
 let saveRef = null;     // save 객체 (설정 영속화)
+// 효과음 전역 감쇠: 베이스 합성음이 커서 슬라이더를 낮춰도 시끄러웠음 → 실제 출력 = 슬라이더값 × 이 배수.
+// (밤시간·저볼륨 환경 대응. 슬라이더는 이 배수 위에서 비례 조절된다.)
+const SFX_MASTER = 0.1;
 
 const bgmBuffers = {};  // name → AudioBuffer | null(로드실패)
 let bgmSlot = null;     // { name, src, gain }
@@ -58,7 +61,7 @@ export function unlockAudio() {
     masterBgm = ctx.createGain();
     masterSfx = ctx.createGain();
     masterBgm.gain.value = settings.mute ? 0 : settings.bgm;
-    masterSfx.gain.value = settings.mute ? 0 : settings.sfx;
+    masterSfx.gain.value = settings.mute ? 0 : settings.sfx * SFX_MASTER;
     masterBgm.connect(ctx.destination);
     // SFX 버스에 컴프레서 → 타격감(펀치)과 글루. 무기 소리를 묵직하게.
     const comp = ctx.createDynamicsCompressor();
@@ -77,7 +80,7 @@ export function unlockAudio() {
 function applyVolumes() {
   if (!ctx) return;
   masterBgm.gain.setTargetAtTime(settings.mute ? 0 : settings.bgm, ctx.currentTime, 0.05);
-  masterSfx.gain.setTargetAtTime(settings.mute ? 0 : settings.sfx, ctx.currentTime, 0.05);
+  masterSfx.gain.setTargetAtTime(settings.mute ? 0 : settings.sfx * SFX_MASTER, ctx.currentTime, 0.05);
 }
 
 export function getSettings() { return { ...settings }; }
