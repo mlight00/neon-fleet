@@ -81,6 +81,17 @@ export const BAL = {
     homing_siege:  { rateMult: 0.35, dmgMult: 3.2, sizeMult: 1.5, blastRadius: 70, blastFrac: 0.35, bossBonus: 0.15, speedMult: 0.8, turnMult: 0.7 }, // 대형 폭발
   },
 
+  // 2단계 초진화(1단계 진화 후 같은 색 캡슐 → 2택). 정의는 weapon-evolutions.js. 무기 전체를 증폭(뚜렷한 정체성).
+  //  dmgMult=무기 피해, rateMult=발사 속도, spreadMult=발칸 확산, pierceBonus=관통 추가.
+  weaponSuperEvolution: {
+    vulcan_tempest: { dmgMult: 1.15, rateMult: 1.15, spreadMult: 1.4, pierceBonus: 0 },   // 초광역 폭풍
+    vulcan_lance:   { dmgMult: 1.30, rateMult: 1.0,  spreadMult: 0.5, pierceBonus: 2 },    // 관통 집중
+    laser_nova:     { dmgMult: 1.22, rateMult: 1.0,  spreadMult: 1.0, pierceBonus: 2 },    // 증폭 관통
+    laser_reaper:   { dmgMult: 1.10, rateMult: 1.35, spreadMult: 1.0, pierceBonus: 1 },    // 초고속 절단
+    homing_legion:  { dmgMult: 1.10, rateMult: 1.45, spreadMult: 1.0, pierceBonus: 0 },    // 미사일 난사
+    homing_nova:    { dmgMult: 1.40, rateMult: 0.7,  spreadMult: 1.0, pierceBonus: 0 },    // 초대형 강타
+  },
+
   // 기함 교리(첫 업그레이드 1회 선택). 전문 분야 +20~25%, 비전문엔 직접 보너스 없음.
   doctrine: {
     swarm: { supportMult: 1.25, escortShareBonus: 0.10, droneGainBonus: 0.10 },

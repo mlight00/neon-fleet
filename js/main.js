@@ -6,7 +6,7 @@ import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor,
 import { bossDefFor } from './sprites.js';
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
-import { evolutionOptions, evolutionDef } from './weapon-evolutions.js';
+import { evolutionOptions, superEvolutionOptions, evolutionDef } from './weapon-evolutions.js';
 import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
 import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
@@ -625,18 +625,22 @@ function openKeystone(after) {
   });
 }
 
-// 무기 진화 2택 선택창 (게임 일시 정지). 선택 시 해당 무기의 진화 확정.
+// 무기 진화 2택 선택창 (게임 일시 정지). 단계별: 1=1단계 진화, 2/재선택=2단계 초진화.
 function openWeaponEvolution(weapon) {
   const r = run;
-  const opts = evolutionOptions(weapon);
-  if (!opts.length) { r.squad.pendingWeaponEvolution = null; return; }
+  const stage = r.squad.pendingEvoStage || 1;
+  const isSuper = stage === 2 || stage === 're';
+  const opts = isSuper ? superEvolutionOptions(weapon) : evolutionOptions(weapon);
+  if (!opts.length) { r.squad.pendingWeaponEvolution = null; r.squad.pendingEvoStage = null; return; }
   drafting = true;
   sfx('evolve');
   ui.showWeaponEvolution({
-    weapon, options: opts,
+    weapon, options: opts, tier: isSuper ? 2 : 1, repick: stage === 're',
     onPick(id) {
-      r.squad.weaponEvolutions[weapon] = id;
+      if (isSuper) r.squad.weaponEvolutions2[weapon] = id;   // 2단계 초진화(재선택 포함)
+      else r.squad.weaponEvolutions[weapon] = id;            // 1단계 진화
       r.squad.pendingWeaponEvolution = null;
+      r.squad.pendingEvoStage = null;
       drafting = false;
       ui.hide();
       sfx('buy');
@@ -756,7 +760,7 @@ function draw() {
       stage: r.sector,
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,
-      weaponEvo: evolutionDef(r.squad.weaponEvolutions[r.squad.weapon])?.short,
+      weaponEvo: evolutionDef(r.squad.weaponEvolutions2[r.squad.weapon] || r.squad.weaponEvolutions[r.squad.weapon])?.short,
       shield: r.squad.shield,
       modules: moduleSummary(r.modules),
       logicalH,

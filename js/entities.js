@@ -9,7 +9,7 @@ import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateB
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
 import { getSprite, bossDefFor } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
-import { canEvolveWeapon } from './weapon-evolutions.js';
+import { canEvolveWeapon, evolutionStage, superEvoEffects } from './weapon-evolutions.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { droneReward } from './adaptive-logic.js';
 import { addFlow, updateFlow, onFlowHit, isGrazeDistance } from './flow.js';
@@ -162,8 +162,10 @@ export class Squad {
     this.banked = 0;          // 기함에 은행된 화력 (업그레이드 때 흡수한 순양함 화력 누적)
     this.bankStack = [];      // 업그레이드별 은행 증가분 (강등 시 정확히 롤백 → 반복 적립 방지)
     // ── NEON ADAPTATION Phase 1: 원정 내부 상태 (중립 시작, 저장 안 함) ──
-    this.weaponEvolutions = { vulcan: null, laser: null, homing: null }; // 무기별 진화 id
+    this.weaponEvolutions = { vulcan: null, laser: null, homing: null }; // 무기별 1단계 진화 id
+    this.weaponEvolutions2 = { vulcan: null, laser: null, homing: null }; // 무기별 2단계 초진화 id
     this.pendingWeaponEvolution = null;   // 진화 선택 대기 무기 ('vulcan'|'laser'|'homing')
+    this.pendingEvoStage = null;          // 대기 중 선택 단계 (1 | 2 | 're')
     this.doctrine = null;                 // 'swarm'|'lance'|'phase'
     this.pendingDoctrine = false;         // 교리 선택 대기
     this.supportAcc = 0;      // 호위함 사격 누적기
@@ -328,18 +330,17 @@ export class Squad {
       if (this.weaponLv < BAL.weapons.maxLv) {
         this.weaponLv++;
         world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[weapon]);
-      } else if (canEvolveWeapon(weapon, this.weaponLv, BAL.weapons.maxLv, this.weaponEvolutions) && !this.pendingWeaponEvolution) {
-        // Lv MAX + 미진화: 무기 진화 선택 요청 (main이 감지해 2택 선택창)
-        this.pendingWeaponEvolution = weapon;
-        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} 진화 가능!`, COLORS.reward);
-      } else if (this.weaponEvolutions[weapon]) {
-        // 이미 진화한 무기의 같은 색 캡슐 → 대체 보상(드론·코인)
-        const rw = BAL.weaponEvolution.duplicateReward;
-        this.applyDelta(rw.drones, world);
-        if (world.addCoins) world.addCoins(rw.coin);
-        world.effects.text(this.x, this.y - 64, `+${rw.drones} 드론 · +${rw.coin} 코인`, COLORS.reward);
-      } else {
-        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} MAX`, WEAPON_COLORS[weapon]);
+      } else if (!this.pendingWeaponEvolution) {
+        // Lv MAX: 진화 단계 판정 (1단계 → 2단계 → 재선택). main이 감지해 2택 선택창을 연다.
+        const st = evolutionStage(weapon, this.weaponLv, BAL.weapons.maxLv, this.weaponEvolutions, this.weaponEvolutions2);
+        if (st) {
+          this.pendingWeaponEvolution = weapon;
+          this.pendingEvoStage = st;
+          const label = st === 1 ? '진화 가능!' : st === 2 ? '초진화 가능!' : '진화 재선택!';
+          world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} ${label}`, COLORS.reward);
+        } else {
+          world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} MAX`, WEAPON_COLORS[weapon]);
+        }
       }
     } else {
       this.weapon = weapon; // 교체 벌점 없음: 레벨 유지 (라이덴 방식)
@@ -602,11 +603,12 @@ export class Squad {
     const lvCoef = W.lvCoef[this.weaponLv - 1];
     const fireRate = (world.stats?.fireRate ?? BAL.squad.fireRate) * (mfx.fireRateMult ?? 1);
     const damage = (world.stats?.damage ?? BAL.squad.damage) * (mfx.dmgMult ?? 1);
-    const pb = mfx.pierceBonus || 0;
+    const se = superEvoEffects(this.weaponEvolutions2[this.weapon], BAL.weaponSuperEvolution);   // 2단계 초진화 배수 (미선택이면 중립)
+    const pb = (mfx.pierceBonus || 0) + se.pierceBonus;
     const rush = this.rushDmgMult;   // NEON RUSH: 사격 피해 배수 (기함·호위·순양함에 한 번씩만 — 파생탄은 원본 비율이라 이중 없음)
     const ks = keystoneEffects(this.keystone, this.keystoneState);   // 키스톤 배수 (미선택이면 전부 1)
     const rushAuto = rush * ks.autoMult;   // 공명 랜스 대가: 자동사격 전체 배수를 baseDps·support에 함께 접음
-    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult * rushAuto;
+    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult * rushAuto * se.dmgMult;   // 초진화 피해 배수
     const dEff = doctrineEffects(this.doctrine, BAL.doctrine);   // 기함 교리 효과 (중립이면 전부 1/0)
     // 니들 개틀링: 치명 확률 가산 / 위상 기동: 이동 뱅크에 비례한 피해 보너스(모든 탄에 적용)
     const needle = evo === 'vulcan_needle' ? WE.vulcan_needle : null;
@@ -628,7 +630,7 @@ export class Squad {
       const rateMul = siege ? siege.rateMult : 1;
       const cap = wasp ? wasp.cap : W.homing.cap;
       const dps = baseDps * W.homing.coef * (1 - escortShare) * ks.flagMult;   // 기함 직접 사격(군체 용광로 대가)
-      this.fireAcc += W.homing.rate * trait.rate * rateMul * dt;
+      this.fireAcc += W.homing.rate * trait.rate * rateMul * dt * se.rateMult;   // 초진화 발사속도
       while (this.fireAcc >= 1) {
         this.fireAcc -= 1;
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
@@ -666,7 +668,7 @@ export class Squad {
     const coef = isLaser ? W.laser.coef : W.vulcan.coef;
     const dps = baseDps * coef * (1 - escortShare) * ks.flagMult;   // 기함 직접 사격(군체 용광로 대가)
     let shotsBase = isLaser ? 18 : Math.min(25, Math.max(4, this.count * fireRate));
-    let shotsPerSec = shotsBase * trait.rate;
+    let shotsPerSec = shotsBase * trait.rate * se.rateMult;   // 초진화 발사속도
     if (needle) { shotsBase *= needle.rate; shotsPerSec *= needle.rate; }  // 발사↑ + 탄당 피해↓ = DPS 중립·집중
     this.fireAcc += shotsPerSec * dt;
     const mounts = SHIP_DEFS[this.tier].mounts;
@@ -688,7 +690,7 @@ export class Squad {
         world.effects.muzzle(this.x + m.x, this.y + m.y - 2, isCut ? '#ffffff' : '#a8f0ff', isCut ? 9 : 6);
         sfx('laser');
       } else {
-        let spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180 * trait.spread;
+        let spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180 * trait.spread * se.spreadMult;   // 초진화 확산
         if (needle) spread *= needle.spread;
         if (storm) spread *= WE.vulcan_storm.spread;
         const a = (Math.random() - 0.5) * 2 * spread;

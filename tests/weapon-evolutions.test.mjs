@@ -1,5 +1,28 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { WEAPON_SUPER_EVOLUTIONS, superEvolutionOptions, evolutionStage, superEvoEffects } from '../js/weapon-evolutions.js';
+import { BAL as BAL2 } from '../js/balance.js';
+
+// ── 2단계 초진화 + 재선택 (플레이 피드백 반영) ──
+test('초진화 정의: 무기당 2종, 전체 id 유일', () => {
+  for (const w of ['vulcan', 'laser', 'homing']) assert.equal(superEvolutionOptions(w).length, 2);
+  assert.equal(new Set(ALL_EVOLUTION_IDS).size, ALL_EVOLUTION_IDS.length);   // 1·2단계 통합 id 중복 없음
+});
+
+test('evolutionStage: 미진화→1, 1단계 후→2, 둘 다 후→재선택(re), Lv미만→null', () => {
+  const e0 = { vulcan: null }, e1 = { vulcan: 'vulcan_storm' };
+  const s0 = { vulcan: null }, s1 = { vulcan: 'vulcan_tempest' };
+  assert.equal(evolutionStage('vulcan', 3, 3, e0, s0), 1);
+  assert.equal(evolutionStage('vulcan', 3, 3, e1, s0), 2);
+  assert.equal(evolutionStage('vulcan', 3, 3, e1, s1), 're');
+  assert.equal(evolutionStage('vulcan', 2, 3, e0, s0), null);   // Lv MAX 아님
+});
+
+test('superEvoEffects: 미선택 중립, 선택 시 balance 수치 반영', () => {
+  assert.deepEqual(superEvoEffects(null, BAL2.weaponSuperEvolution), { dmgMult: 1, rateMult: 1, spreadMult: 1, pierceBonus: 0 });
+  const lance = superEvoEffects('vulcan_lance', BAL2.weaponSuperEvolution);
+  assert.equal(lance.dmgMult, 1.30); assert.equal(lance.pierceBonus, 2);
+});
 import { WEAPON_EVOLUTIONS, ALL_EVOLUTION_IDS, evolutionOptions, evolutionDef, canEvolveWeapon, isCutterShot } from '../js/weapon-evolutions.js';
 import { BAL } from '../js/balance.js';
 
@@ -9,9 +32,9 @@ test('무기별 진화 옵션은 정확히 2개', () => {
   }
 });
 
-test('여섯 진화 id는 중복 없음', () => {
-  assert.equal(ALL_EVOLUTION_IDS.length, 6);
-  assert.equal(new Set(ALL_EVOLUTION_IDS).size, 6);
+test('진화 id는 중복 없음 (1단계 6 + 2단계 초진화 6 = 12)', () => {
+  assert.equal(ALL_EVOLUTION_IDS.length, 12);
+  assert.equal(new Set(ALL_EVOLUTION_IDS).size, 12);
 });
 
 test('canEvolveWeapon: Lv 최대 미만이면 불가', () => {

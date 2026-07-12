@@ -17,13 +17,35 @@ export const WEAPON_EVOLUTIONS = {
   ],
 };
 
-/** 모든 진화 id (중복 검증·HUD용) */
-export const ALL_EVOLUTION_IDS = Object.values(WEAPON_EVOLUTIONS).flat().map((e) => e.id);
-const EVO_BY_ID = Object.fromEntries(Object.values(WEAPON_EVOLUTIONS).flat().map((e) => [e.id, e]));
+// 2단계 진화(초진화): 1단계 진화 후 같은 색 캡슐을 다시 얻으면 2택. 1단계 갈래와 무관하게 무기 전체를 증폭한다.
+// 실제 수치는 balance.js(BAL.weaponSuperEvolution). 각각 뚜렷한 정체성(광역/관통/속사/강타).
+export const WEAPON_SUPER_EVOLUTIONS = {
+  vulcan: [
+    { id: 'vulcan_tempest', name: '템페스트',   short: '템페스트', shape: '초광역 폭풍탄',   pro: '확산·연사 극대',   con: '단일 표적 비효율' },
+    { id: 'vulcan_lance',   name: '랜스 발칸',   short: '랜스',     shape: '관통 집중탄',     pro: '관통+치명·단일 극대', con: '확산 대폭↓' },
+  ],
+  laser: [
+    { id: 'laser_nova',     name: '노바 빔',     short: '노바',     shape: '증폭 관통 빔',     pro: '피해·관통 대폭↑',  con: '' },
+    { id: 'laser_reaper',   name: '리퍼 빔',     short: '리퍼',     shape: '초고속 절단 빔',   pro: '연사·관통↑',       con: '탄당 피해 소폭↓' },
+  ],
+  homing: [
+    { id: 'homing_legion',  name: '레기온',      short: '레기온',   shape: '미사일 난사',      pro: '발사 수·연사 극대', con: '탄당 피해 소폭↓' },
+    { id: 'homing_nova',    name: '노바 토피도',  short: '노바',     shape: '초대형 강타',      pro: '단발 피해 극대',   con: '발사 느림' },
+  ],
+};
 
-/** 무기의 진화 옵션 2장 (순수). 알 수 없는 무기면 빈 배열. */
+/** 모든 진화 id (중복 검증·HUD용) — 1·2단계 전부 */
+export const ALL_EVOLUTION_IDS = [...Object.values(WEAPON_EVOLUTIONS), ...Object.values(WEAPON_SUPER_EVOLUTIONS)].flat().map((e) => e.id);
+const EVO_BY_ID = Object.fromEntries([...Object.values(WEAPON_EVOLUTIONS), ...Object.values(WEAPON_SUPER_EVOLUTIONS)].flat().map((e) => [e.id, e]));
+
+/** 무기의 1단계 진화 옵션 2장 (순수). 알 수 없는 무기면 빈 배열. */
 export function evolutionOptions(weapon) {
   return WEAPON_EVOLUTIONS[weapon] || [];
+}
+
+/** 무기의 2단계 초진화 옵션 2장 (순수). */
+export function superEvolutionOptions(weapon) {
+  return WEAPON_SUPER_EVOLUTIONS[weapon] || [];
 }
 
 /** 진화 정의 조회 (순수). HUD 짧은 이름 등에 사용. */
@@ -38,6 +60,31 @@ export function evolutionDef(id) {
  */
 export function canEvolveWeapon(weapon, weaponLv, maxLv, evolutions) {
   return weaponLv >= maxLv && !!WEAPON_EVOLUTIONS[weapon] && !evolutions[weapon];
+}
+
+/**
+ * 무기 진화 단계 판정 (순수). 같은 색 캡슐을 Lv MAX에서 다시 얻었을 때 무엇을 열지 결정한다.
+ *  - 1: 1단계 진화 선택 (아직 미진화)
+ *  - 2: 2단계 초진화 선택 (1단계는 했고 2단계 미완)
+ *  - 're': 재선택 (둘 다 완료 → 2단계 초진화를 다시 골라 교체)
+ *  - null: 열 것 없음 (Lv MAX 아님 또는 진화 불가 무기)
+ */
+export function evolutionStage(weapon, weaponLv, maxLv, evolutions, superEvolutions) {
+  if (weaponLv < maxLv || !WEAPON_EVOLUTIONS[weapon]) return null;
+  if (!evolutions[weapon]) return 1;
+  if (!superEvolutions[weapon]) return 2;
+  return 're';
+}
+
+/** 2단계 초진화 전투 배수 (순수). 미선택이면 중립. */
+export function superEvoEffects(id, cfg) {
+  const d = (cfg && cfg[id]) || null;
+  return {
+    dmgMult: d?.dmgMult ?? 1,
+    rateMult: d?.rateMult ?? 1,
+    spreadMult: d?.spreadMult ?? 1,
+    pierceBonus: d?.pierceBonus ?? 0,
+  };
 }
 
 /** 널 커터: shotCount번째 레이저 탄이 강화 절단탄인가 (순수, every=5). */
