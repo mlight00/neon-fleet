@@ -2885,7 +2885,7 @@ export class Orbiter {
 
 // B19 방패병: 앞 방패 주기 개폐 — 방패 올라간 동안 무적, 내려갔을 때만 타격
 export class Shielder {
-  constructor(x) { const c = NE().shielder; this.x = x; this.y = -30; this.hp = this.maxHp = c.hp; this.r = c.r; this.stayT = c.stay; this.fireT = c.fireInterval; this.shield = true; this.shieldT = c.shieldUp; this.state = 'enter'; this.isEnemy = true; this.dead = false; this.t = 0; }
+  constructor(x) { const c = NE().shielder; this.x = x; this.y = -30; this.hp = this.maxHp = c.hp; this.r = c.r; this.stayT = c.stay; this.fireT = c.fireInterval; this.shield = true; this.shieldT = c.shieldUp; this.state = 'enter'; this.isEnemy = true; this.dead = false; this.t = 0; this.hpScaleMul = c.hpScaleMul; }
   update(dt, world) {
     this.t += dt; const c = NE().shielder;
     if (this.state === 'enter') { this.y += c.enterSpeed * dt; if (this.y >= c.hoverY) this.state = 'hover'; }
@@ -2896,7 +2896,7 @@ export class Shielder {
       if (this.stayT <= 0) this.state = 'leave';
     } else { this.y += c.enterSpeed * dt; if (this.y > world.logicalH + 40) this.dead = true; }
   }
-  hitByBullet(dmg, world) { if (this.shield) { world.effects.burst(this.x, this.y + this.r * 0.6, '#57e0ff', 2, 60); return; } if (affixAbsorb(this, world)) return; this.hp -= dmg; if (this.hp <= 0) enemyDie(this, world, '#57e0ff', NE().shielder.coin); }
+  hitByBullet(dmg, world) { if (affixAbsorb(this, world)) return; const eff = this.shield ? dmg * (1 - NE().shielder.shieldReduce) : dmg; if (this.shield) world.effects.burst(this.x, this.y + this.r * 0.6, '#57e0ff', 2, 60); this.hp -= eff; if (this.hp <= 0) enemyDie(this, world, '#57e0ff', NE().shielder.coin); }
   draw(ctx) {
     const gem = getSprite('B19');
     if (gem) blit(ctx, gem, this.x, this.y);

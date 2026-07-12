@@ -105,7 +105,7 @@ export const BAL = {
   //  체력벽이 아니지만 후반에 무력화되지 않도록 완만한 전용 HP 스케일(상한 있음)을 적용한다.
   adaptiveEnemies: {
     hpPerStage: 0.18, hpScaleMax: 2.6,   // HP = 기본 × min(2.6, 1+0.18×(stage-1))
-    prismWarden:  { minStage: 2, hp: 70, r: 22, frontReduce: 0.70, coreHp: 22, coreOffset: 18, coin: 7 },
+    prismWarden:  { minStage: 2, hp: 70, r: 22, frontReduce: 0.55, coreHp: 16, coreOffset: 18, coin: 7 },  // 정면 55%감소(일반공격도 통하게), 코어 더 빨리 깨짐
     scavenger:    { minStage: 2, hp: 35, r: 17, approach: 150, flee: 260, stealR: 28, rewardMult: 1.5, coin: 5, stayTime: 1.2 },
     gateParasite: { minStage: 3, hp: 45, r: 15, offsetY: 36, cleanseDrones: 10, armorReduce: 0.35 },  // 일반 공격 35% 감소(65%만), 랜스 강습3단+ 무시(전액)
   },
@@ -202,7 +202,7 @@ export const BAL = {
     bomber:   { hp: 30, r: 20, hoverY: 150, enterSpeed: 150, stay: 4.5, fireInterval: 2.2, count: 7, spreadDeg: 62, speed: 120, dmgPct: 0.05, dmgMin: 4, coin: 4 }, // 광역 융단(넓은 하강 산탄)
     zapper:   { hp: 26, r: 16, hoverY: 140, enterSpeed: 200, stay: 4.5, cycle: 2.2, charge: 0.9, beamShots: 9, beamGap: 0.045, speed: 320, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 세로 번개 기둥
     orbiter:  { hp: 22, r: 15, orbitR: 66, hz: 0.5, descend: 52, fireInterval: 1.1, speed: 235, dmgPct: 0.04, dmgMin: 3, coin: 3 }, // 원 그리며 조준탄
-    shielder: { hp: 46, r: 20, hoverY: 162, enterSpeed: 170, stay: 6, shieldUp: 1.0, shieldDown: 2.0, fireInterval: 1.3, speed: 195, dmgPct: 0.05, dmgMin: 4, coin: 6 }, // 방패 주기 개폐(무적 1s↔타격 2s로 조정, 잡을 수 있게)
+    shielder: { hp: 46, r: 20, hoverY: 162, enterSpeed: 170, stay: 6, shieldUp: 1.0, shieldDown: 2.0, fireInterval: 1.3, speed: 195, dmgPct: 0.05, dmgMin: 4, coin: 6, shieldReduce: 0.6, hpScaleMul: 0.22 }, // 방패=완전무적 아니라 60%감소, HP스케일 완화(타이밍 퍼즐이지 체력벽 아님)
     carrier:  { hp: 42, r: 24, hoverY: 128, enterSpeed: 140, stay: 6, spawnInterval: 2.6, spawnCount: 2, coin: 6 }, // 소형 드론 사출
     blinker:  { hp: 20, r: 15, blink: 1.25, fireInterval: 1.25, speed: 265, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 순간이동+조준탄
   },

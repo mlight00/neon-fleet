@@ -381,7 +381,7 @@ function update(dt) {
       // 무한 상승: 화력 비례 HP 상한을 스테이지마다 올려 깊은 판에선 즉사(방치 클리어) 방지
       const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (r.stage - 1);
       const pf = 1 + Math.min(hpCapS, Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale);
-      const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
+      const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1)); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
       // 적 스폰 헬퍼: 스테이지 스케일 + 변이(어픽스) 롤 + 등록
       const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, r.stage, r.rng); w.entities.push(e); };
       // 적 항목은 enemyMult 배수만큼 복제 스폰: 복제본은 좌우 미러 + 세로로 살짝 시차.
