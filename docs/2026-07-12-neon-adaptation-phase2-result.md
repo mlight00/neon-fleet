@@ -16,7 +16,7 @@
   | C2 | `e90aba4` | feat(flow): NEON RUSH 전투 배수와 HUD 추가 |
   | C3 | `17d5fcc` | feat(keystone): 군체·랜스·위상 키스톤 3종 추가 |
   | C4 | `b5429d2` | feat(boss): STAGGER와 BREAK를 사용하는 네온 아비터 추가 |
-  | C5 | `__FINAL__` | balance(phase2): FLOW·키스톤·아비터 검증과 문서화 |
+  | C5 | `f35e73e` | balance(phase2): FLOW·키스톤·아비터 검증과 문서화 |
 
 ## 2. 변경 파일
 
@@ -94,7 +94,7 @@
 Phase 2 완료 여부: 완료
 자동 테스트: 162/162 통과
 신규 테스트: 53개
-최종 커밋: __FINAL__
+최종 커밋: f35e73e
 배포 URL: https://mlight00.github.io/neon-fleet/
 배포 검증: 완료 (localhost = 배포본 동일 파일, node 162/162 + 서버 서빙 파일 확인)
 잔여 문제: 없음 (B22 등장 스테이지·유령 순양함 확장은 Phase 3 후보로 기록)
