@@ -75,12 +75,13 @@ export const BAL = {
     evoLevelStep: 0.14,   // 진화 레벨(1→2→3)당 그 무기 피해 배수 증가 → "강해지는 게 느껴진다"
     superLevelStep: 0.12, // 초진화 레벨(1→2→3)당 추가 피해 배수
     duplicateReward: { drones: 20, coin: 10 },  // (미사용) 옛 대체 보상
-    vulcan_storm:  { spread: 1.25, ricochetFrac: 0.45, ricochetRadius: 120 },                                  // 도탄(1회, 비재귀)
-    vulcan_needle: { spread: 0.35, rate: 1.45, critBonus: 0.08, sizeMult: 0.85 },                              // 집중 연사
-    laser_prism:   { splitFrac: 0.35, splitRadius: 150 },                                                       // 좌우 분열(보스 제외, 비재귀)
-    laser_cutter:  { every: 5, widthMult: 1.7, pierceBonus: 2, clearRadius: 18, dmgMult: 1.25 },               // 5탄마다 강화 절단탄
-    homing_wasp:   { count: 3, totalFrac: 1.15, cap: 24 },                                                      // 소형 3발(서로 다른 표적)
-    homing_siege:  { rateMult: 0.35, dmgMult: 3.2, sizeMult: 1.5, blastRadius: 70, blastFrac: 0.35, bossBonus: 0.15, speedMult: 0.8, turnMult: 0.7 }, // 대형 폭발
+    // 양갈래를 정반대 스타일로 확실히 구분 (광역/연쇄 ↔ 단일/관통)
+    vulcan_storm:  { spread: 1.7, ricochetFrac: 0.6, ricochetRadius: 165, bounces: 2 },                        // 폭풍: 넓게 뿌리고 적 사이를 2번 튕김(다수전)
+    vulcan_needle: { spread: 0.12, rate: 1.9, critBonus: 0.2, sizeMult: 0.7, pierceBonus: 2 },                 // 니들: 일직선 초고속 관통 드릴(단일)
+    laser_prism:   { splitFrac: 0.5, splitRadius: 200, splitPierce: 2 },                                        // 프리즘: 관통 후 좌우로 크게 분열(다수전)
+    laser_cutter:  { every: 3, widthMult: 2.3, pierceBonus: 4, clearRadius: 34, dmgMult: 1.5 },                // 커터: 3탄마다 굵은 절단탄 + 넓은 적탄 제거(소탕)
+    homing_wasp:   { count: 5, totalFrac: 1.3, cap: 34 },                                                       // 와스프: 소형 5발 군집(분산 표적)
+    homing_siege:  { rateMult: 0.3, dmgMult: 4.4, sizeMult: 1.7, blastRadius: 100, blastFrac: 0.5, bossBonus: 0.25, speedMult: 0.75, turnMult: 0.65 }, // 시즈: 느린 초대형 강타(고화력)
   },
 
   // 2단계 초진화(1단계 진화 후 같은 색 캡슐 → 2택). 정의는 weapon-evolutions.js. 무기 전체를 증폭(뚜렷한 정체성).

@@ -83,27 +83,33 @@ test('정의 형식: 각 진화는 id·name·short·shape·pro·con 문자열을
   }
 });
 
-test('널 커터: 정확히 5번째 탄마다 강화탄(every=5)', () => {
+test('널 커터: every 탄마다 강화 절단탄 (balance 반영)', () => {
   const every = BAL.weaponEvolution.laser_cutter.every;
-  assert.equal(every, 5);
   const hits = [];
   for (let n = 1; n <= 12; n++) if (isCutterShot(n, every)) hits.push(n);
-  assert.deepEqual(hits, [5, 10]);
+  for (const h of hits) assert.equal(h % every, 0);
+  assert.ok(hits.length >= 12 / every - 1, '주기적으로 발동');
 });
 
-test('와스프: 3발 총 피해 = 기존 1발의 115% (밸런스 목표 범위)', () => {
+test('와스프: 소형 다발 군집, 총 피해 = totalFrac (분산 표적)', () => {
   const w = BAL.weaponEvolution.homing_wasp;
-  assert.equal(w.count, 3);
+  assert.ok(w.count >= 5, '5발 이상 군집');
   const perMissile = w.totalFrac / w.count;
-  assert.ok(Math.abs(perMissile * w.count - 1.15) < 1e-9, '총 1.15');
-  assert.ok(w.cap <= 24, '동시 상한 24');
+  assert.ok(Math.abs(perMissile * w.count - w.totalFrac) < 1e-9);
 });
 
-test('시즈: 직접 DPS 배수(rate×dmg)가 목표 범위(+10~15%) 안', () => {
+test('시즈: 느린 초대형 강타 — 단발 고화력, 폭발 감소 상한 준수', () => {
   const s = BAL.weaponEvolution.homing_siege;
-  const dpsFactor = s.rateMult * s.dmgMult;   // 0.35 × 3.2 = 1.12
-  assert.ok(dpsFactor >= 1.0 && dpsFactor <= 1.15, `dpsFactor=${dpsFactor}`);
-  assert.ok(s.blastFrac <= 0.7, '폭발 피해 감소는 70% 이하 상한 준수(면역 금지)');
+  assert.ok(s.rateMult < 0.5, '발사 느림');
+  assert.ok(s.dmgMult >= 3.5, '단발 초고화력');
+  assert.ok(s.blastFrac <= 0.7, '폭발 피해 감소는 70% 이하(면역 금지)');
+});
+
+test('양갈래 정체성 대비: 폭풍(광역/연쇄) vs 니들(단일/관통)', () => {
+  const st = BAL.weaponEvolution.vulcan_storm, nd = BAL.weaponEvolution.vulcan_needle;
+  assert.ok(st.spread > nd.spread * 3, '폭풍이 훨씬 넓다');
+  assert.ok((st.bounces || 1) >= 2, '폭풍은 다단 도탄');
+  assert.ok((nd.pierceBonus || 0) >= 1 && nd.rate > 1.5, '니들은 관통 + 초고속');
 });
 
 test('피해 감소 상한: 프리즘 정면 감소·시즈 폭발 등 어떤 진화도 100% 면역이 아님', () => {

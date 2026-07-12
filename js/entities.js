@@ -740,9 +740,10 @@ export class Squad {
         if (needle) spread *= needle.spread;
         if (storm) spread *= WE.vulcan_storm.spread;
         const a = (Math.random() - 0.5) * 2 * spread;
+        const vpb = pb + (needle ? (needle.pierceBonus || 0) : 0);   // 니들: 관통 드릴
         const b = new Bullet(this.x + m.x, this.y + m.y, dmg, {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
-          pierce: (pb + trait.pierce + ascPierce) > 0 ? 1 + pb + trait.pierce + ascPierce : 0, lv: this.weaponLv,
+          pierce: (vpb + trait.pierce + ascPierce) > 0 ? 1 + vpb + trait.pierce + ascPierce : 0, lv: this.weaponLv,
         });
         if (needle) b.scale = needle.sizeMult;
         if (storm) b.ricochet = true;
@@ -1190,14 +1191,18 @@ export class Bullet {
   onHit(hit, world) {
     const WE = BAL.weaponEvolution;
     if (this.ricochet) {
+      // 폭풍: 남은 튕김이 있으면 자탄도 도탄 → 적 사이를 연쇄로 튕긴다(다수전)
+      const bouncesLeft = (this.bounces ?? WE.vulcan_storm.bounces ?? 1) - 1;
       this.ricochet = false;
       const seen = new Set([hit]); if (this.hitSet) for (const e of this.hitSet) seen.add(e);
       const t = nearestTarget(world, this.x, this.y, WE.vulcan_storm.ricochetRadius, seen, 0);
       if (t) {
         const ang = Math.atan2(t.x - this.x, -(t.y - this.y));
-        world.bullets.push(new Bullet(this.x, this.y, this.damage * WE.vulcan_storm.ricochetFrac, {
+        const child = new Bullet(this.x, this.y, this.damage * WE.vulcan_storm.ricochetFrac, {
           vx: Math.sin(ang) * BAL.weapons.vulcan.speed, vy: -Math.cos(ang) * BAL.weapons.vulcan.speed, kind: 'vulcan', lv: this.lv,
-        }));   // ricochet 플래그 없음 → 재도탄 금지
+        });
+        if (bouncesLeft > 0) { child.ricochet = true; child.bounces = bouncesLeft; }   // 남은 튕김 계승
+        world.bullets.push(child);
         world.effects.burst((this.x + t.x) / 2, (this.y + t.y) / 2, COLORS.ally, 4, 90);
       }
     }
@@ -1208,7 +1213,7 @@ export class Bullet {
         if (t && t !== world.boss) {   // 보스 분열 제외
           const ang = Math.atan2(t.x - this.x, -(t.y - this.y));
           world.bullets.push(new Bullet(this.x, this.y, this.damage * WE.laser_prism.splitFrac, {
-            vx: Math.sin(ang) * BAL.weapons.laser.speed, vy: -Math.cos(ang) * BAL.weapons.laser.speed, kind: 'laser', beamW: 3, lv: this.lv, pierce: 0,
+            vx: Math.sin(ang) * BAL.weapons.laser.speed, vy: -Math.cos(ang) * BAL.weapons.laser.speed, kind: 'laser', beamW: 4, lv: this.lv, pierce: WE.laser_prism.splitPierce ?? 0,
           }));
         }
       }
