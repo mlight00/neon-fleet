@@ -333,10 +333,11 @@ function onEnemyKilled(e, w) {
   if (!claimKill(e)) return;   // 비적대·미사망·중복 차단 (개체당 1회, 폭발 재귀 안전)
   const mfx = w.mfx; if (!mfx) { w.squad.onEnemyKill(w, e); return; }
   if (mfx.explodeRadius > 0) {
-    w.effects.burst(e.x, e.y, '#ff9c41', 12, 180);
-    w.effects.ring(e.x, e.y, '#ff9c41');
     const dmg = Math.max(2, (e.maxHp || 20) * mfx.explodeDmgFrac);
     const rr = mfx.explodeRadius;
+    // 시각 효과를 실제 폭발 반경에 맞춤 (링·파편이 데미지 범위보다 크게 보이던 문제)
+    w.effects.burst(e.x, e.y, '#ff9c41', 8, rr * 1.6);
+    w.effects.ring(e.x, e.y, '#ff9c41', 0, rr);
     for (const o of w.entities) {
       if (o === e || o.dead || !o.hitByBullet) continue;
       const dx = o.x - e.x, dy = o.y - e.y;

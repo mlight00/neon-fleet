@@ -43,8 +43,8 @@ export function createEffects() {
       }
       texts.push({ x, y: ny, str, color, size, life: 0.9, max: 0.9 });
     },
-    ring(x, y, color, delay = 0) {
-      rings.push({ x, y, r: 20, life: 0.45 + delay, max: 0.45, color, delay });
+    ring(x, y, color, delay = 0, maxR = 150) {
+      rings.push({ x, y, r: Math.min(20, maxR), life: 0.45 + delay, max: 0.45, color, delay, maxR });
     },
     // 총구 섬광: 발사 순간 짧게 번쩍 (백열 코어 + 4갈래 별, 무기색)
     muzzle(x, y, color, size = 5) {
@@ -64,7 +64,8 @@ export function createEffects() {
       for (const r of rings) {
         if (r.delay > 0) { r.delay -= dt; continue; }
         r.life -= dt;
-        r.r += (150 - r.r) * Math.min(1, 6 * dt) + 120 * dt;
+        const cap = r.maxR ?? 150;
+        r.r = Math.min(cap, r.r + (cap - r.r) * Math.min(1, 6 * dt) + 120 * dt);   // maxR까지만 확장
       }
       for (const f of flashes) { if (f.delay > 0) { f.delay -= dt; continue; } f.life -= dt; }
       flashV = Math.max(0, flashV - dt * 5);
@@ -1326,8 +1327,8 @@ export class HomingMissile {
         Math.hypot(world.boss.x - this.x, world.boss.y - this.y) <= radius + world.boss.r) {
       world.boss.hitByBullet(this.damage * frac, world);
     }
-    world.effects.burst(this.x, this.y, '#ff9c41', 16, 240);
-    world.effects.ring(this.x, this.y, '#ff9c41');
+    world.effects.burst(this.x, this.y, '#ff9c41', 12, radius * 1.8);
+    world.effects.ring(this.x, this.y, '#ff9c41', 0, radius);   // 시각 링을 실제 폭발 반경에 맞춤
   }
 }
 
