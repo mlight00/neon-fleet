@@ -308,6 +308,18 @@ export class Squad {
     sfx('evolve');
   }
 
+  // 순양함 호위 대형 (단위 u 배수, +x=우 +y=후). 안쪽 쌍부터 채워 전방 스크린 → 측방 → 후방 예비.
+  static get FORMATION() {
+    return [
+      [-1.6, -1.4], [1.6, -1.4],   // 전방 좌/우 (선봉 스크린)
+      [-3.0, -0.5], [3.0, -0.5],   // 전측방 좌/우
+      [-2.4,  0.9], [2.4,  0.9],   // 측방 좌/우
+      [-1.0, -2.4], [1.0, -2.4],   // 최전방 첨병
+      [-4.0,  0.4], [4.0,  0.4],   // 원측방(넓게 감쌈)
+      [-1.2,  2.1], [1.2,  2.1],   // 후방 예비 좌/우
+    ];
+  }
+
   static formationOffsets(n) {
     const arr = [];
     const golden = Math.PI * (3 - Math.sqrt(5));
@@ -764,17 +776,15 @@ export class Squad {
     for (let i = 0; i < this.escorts; i++) u.push('escort');
     return u;
   }
-  /** idx번째 호위함의 기함 기준 상대 위치 — 좌우 대칭 델타(V) 날개 대형 (멋지게 벌려 배치) */
+  /** idx번째 호위함의 기함 기준 상대 위치 — 함대 호위 대형(전방·측방·후방 다이아몬드 스크린).
+   * 위협은 위(전방)에서 오므로 전방 호위를 두텁게, 측방으로 감싸고 후방에 예비를 둔다. (+x=우, +y=후) */
   supportSlot(idx, type) {
-    const gap = BAL.escort.slotGap;
     const def = SHIP_DEFS[this.tier];
-    const side = idx % 2 === 0 ? -1 : 1;
-    const rank = Math.floor(idx / 2);                 // 0,0,1,1,2,2… (좌우 한 쌍씩 바깥으로)
-    const base = (def.clearR || 24) + 16;             // 첫 순양함은 기함 바로 옆
-    const spreadStep = type === 'cruiser' ? gap * 1.12 : gap * 0.95;
-    const x = side * (base + rank * spreadStep);       // 바깥으로 벌어짐
-    const y = def.h * 0.08 + rank * (gap * 0.62);      // 뒤로 스윕(날개처럼) — 기함과 거의 나란히 시작
-    return { x, y };
+    const u = (def.clearR || 24) * 0.5 + 12;   // 대형 스케일 단위(기함 크기 비례)
+    // 좌우 대칭 쌍으로 전방→측방→후방 순서(안쪽부터 채워 항상 균형 잡힌 대형)
+    const F = Squad.FORMATION;
+    const p = F[Math.min(idx, F.length - 1)];
+    return { x: p[0] * u, y: p[1] * u };
   }
 
   // ── 순양함 피탄·격침 (드론 130기 합체 유닛도 적탄에 맞으면 깎인다) ──
@@ -830,6 +840,7 @@ export class Squad {
     const W = BAL.weapons;
     const shotsPerSec = Math.min(20, 3 + units * 1.6);
     this.supportAcc = (this.supportAcc || 0) + shotsPerSec * dt;
+    const tgt = this._nearestEnemy(world);   // 순양함은 능동 호위: 가장 가까운 적을 조준 사격
     while (this.supportAcc >= 1) {
       this.supportAcc -= 1;
       if (world.bullets.length >= BAL.bullet.cap) continue;
@@ -838,17 +849,34 @@ export class Squad {
       const type = idx < this.cruisers ? 'cruiser' : 'escort';
       const slot = this.supportSlot(idx, type);
       const sx = this.x + slot.x, sy = this.y + slot.y - 6;
+      const aim = tgt ? Math.atan2(tgt.x - sx, sy - tgt.y) : 0;   // 조준 각(정면=0), 표적 없으면 위로
       if (this.weapon === 'laser') {
-        world.bullets.push(new Bullet(sx, sy, dmg, { vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv }));
+        world.bullets.push(new Bullet(sx, sy, dmg, { vx: Math.sin(aim) * W.laser.speed, vy: -Math.cos(aim) * W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv }));
       } else if (this.weapon === 'homing') {
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
         if (alive < W.homing.cap) world.bullets.push(new HomingMissile(sx, sy, (Math.random() - 0.5) * 180, dmg, this.weaponLv));
       } else {
         const spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180;
-        const a = (Math.random() - 0.5) * 2 * spread;
+        const a = aim + (Math.random() - 0.5) * 2 * spread;
         world.bullets.push(new Bullet(sx, sy, dmg, { vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan', lv: this.weaponLv }));
       }
     }
+  }
+
+  /** 순양함 조준용: 편대 위쪽에서 가장 가까운 적 (적/보스). 없으면 null. */
+  _nearestEnemy(world) {
+    let best = null, bestD = 320 * 320;   // 조준 사거리(px²)
+    for (const e of world.entities) {
+      if (e.dead || !e.isEnemy || e.y > this.y) continue;
+      const dx = e.x - this.x, dy = e.y - this.y, d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    if (world.bosses) for (const bo of world.bosses) {
+      if (bo.dead) continue;
+      const dx = bo.x - this.x, dy = bo.y - this.y, d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = bo; }
+    }
+    return best;
   }
 
 

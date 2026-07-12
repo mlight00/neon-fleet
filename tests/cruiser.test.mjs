@@ -15,13 +15,14 @@ function squadWithCruisers(n) {
   return s;
 }
 
-test('순양함 배치는 좌우 대칭 날개 (짝수=왼쪽, 홀수=오른쪽)', () => {
-  const s = squadWithCruisers(4);
+test('순양함 함대 대형: 좌우 대칭 + 전방·측방·후방 배치', () => {
+  const s = squadWithCruisers(6);
   const s0 = s.supportSlot(0, 'cruiser'), s1 = s.supportSlot(1, 'cruiser');
-  const s2 = s.supportSlot(2, 'cruiser'), s3 = s.supportSlot(3, 'cruiser');
   assert.ok(s0.x < 0 && s1.x > 0, '0=좌 1=우');
-  assert.ok(Math.abs(s0.x) === Math.abs(s1.x), '좌우 대칭');
-  assert.ok(Math.abs(s2.x) > Math.abs(s0.x), '바깥 랭크는 더 벌어짐');
+  assert.ok(Math.abs(Math.abs(s0.x) - Math.abs(s1.x)) < 1e-6, '좌우 대칭');
+  assert.ok(s0.y < 0, '전방 쌍은 기함보다 앞(y<0)');
+  const rear = s.supportSlot(4, 'cruiser');   // 측방/후방 쌍
+  assert.ok(rear.y > s0.y, '뒤 슬롯은 전방보다 뒤');
 });
 
 test('cruiserPositions: cruisers 수만큼, cruiserHp 만피로 동기화', () => {
