@@ -51,12 +51,13 @@
 
 ## 8-2. 2차 리뷰 보완 (조건부 승인 잔여 2건)
 - **P2 패러사이트 방어 관통 실효화**: GateParasite에 방어 외피(`defenseReduce: 0.4`, 일반 공격 40% 감소) 추가, `hitByBullet(dmg,world,ctx)`에서 **랜스 강습 3단+(ctx.pierceDefense)만 전액**. README/결과서 문구와 구현 일치.
-- **P2 핵심 P1 회귀 테스트 보강**: 보상 계산을 순수 함수로 추출 — `droneReward`(원보상×배수×경제×교리), `scavengerPayout`(보관 시 ×1.5, 미보관 0). Crystal/DronePod/스캐빈저가 공용 사용. 테스트: `droneReward(100,1,0.32,1)=32`, `scavengerPayout(32,1.5)=48 / (0)=0`. **총 88개 통과.** (도주 미지급·중복예약·부모자식 정리 등 상태머신은 브라우저 계측으로 검증 — DOM 의존이라 node 단위테스트 불가.)
+- **P2 핵심 P1 회귀 테스트 보강**: 보상 계산을 순수 함수로 추출 — `droneReward`(원보상×배수×경제×교리), `scavengerPayout`(보관 시 ×1.5, 미보관 0). Crystal/DronePod/스캐빈저가 공용 사용. 테스트: `droneReward(100,1,0.32,1)=32`, `scavengerPayout(32,1.5)=48 / (0)=0`.
+  - **(마감 후속 정정)** 초판은 "상태머신은 DOM 의존이라 node 단위테스트 불가"로 적었으나, 이는 사실이 아님이 확인됨. 렌더/오디오/스프라이트가 전부 **런타임 지연 로딩**이라 node에서 모듈 임포트가 가능하며, 실제 `Crystal/DronePod/Scavenger/GateParasite/GatePair` 클래스 + 최소 world 스텁으로 도주 미지급·중복예약·정화 반전 등을 진짜로 검증할 수 있다. → `tests/adaptive-enemies.test.mjs`로 구현(공식 복사 아님). **총 106개 통과.** 상세는 [2026-07-12 마감 결과서](2026-07-12-adaptation-phase1-finalization-result.md) 참조.
 - **문서 정합**: 결과서 §3의 "차지는 탄환 문맥 없음" 문구를 "3단+만 문맥 전달로 관통"으로 정정.
 
 ## 9. 알려진 문제
 - 분열 레이저가 측면 이동 시 시각적으로 세로 스트릭으로 그려짐(기능 정상, 연출만 단순)
-- 스캐빈저 상태머신(도주 미지급·중복예약)·게이트 부모자식 정리는 node 단위테스트가 아닌 브라우저 계측으로 검증(모듈 DOM 의존)
+- ~~스캐빈저 상태머신·게이트 부모자식 정리는 node 단위테스트 불가(모듈 DOM 의존)~~ → **정정: 2026-07-12 마감 작업에서 실제 클래스 통합 테스트로 node 검증 완료** (`tests/adaptive-enemies.test.mjs`)
 
 ## 10. Phase 2 진행 상황
 - **entities.js 분할 (Boss → bosses.js)**: 사용자 승인("진행해" + "entities.js 분할 먼저" 선택) 하에 진행. Boss 374줄 분리(entities 3019→2648), 순환 import 안전, Boss 사격+소환 무크래시 검증. **범위 위반 아님 — 대화에서 명시 승인됨.**

@@ -1,5 +1,6 @@
 // 대응형 신규 적 3종 (NEON ADAPTATION Phase 1). Canvas 네온 도형만으로 완전 플레이 가능.
-// 기존 world 인터페이스 사용. hitByBullet(dmg, world, bullet=null) — bullet은 프리즘 코어 조준용(옵션).
+// 기존 world 인터페이스 사용. hitByBullet(dmg, world, ctx=null) — ctx는 명중 문맥(옵션):
+//   탄환 {x} = 좌표 기반 코어 조준용 | 랜스 {lance, pierceDefense} = 강습 3단+ 방어 관통 | null = 광역/도탄/폭발(문맥 없음).
 import { BAL } from './balance.js';
 import { COLORS } from './render.js';
 import { circleHit } from './collision.js';

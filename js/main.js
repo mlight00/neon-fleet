@@ -400,7 +400,7 @@ function update(dt) {
           { kind: 'shield' },
         ]));
       }
-      // 대응형 신규 적 (고정 스탯 — 체력벽이 아니라 조준·수단 전환을 요구)
+      // 대응형 신규 적 (완만한 스테이지 HP 스케일 — 체력벽이 아니라 조준·수단 전환을 요구)
       else if (it.type === 'prismWarden') w.entities.push(new PrismWarden(x, r.stage));
       else if (it.type === 'scavenger') w.entities.push(new Scavenger(x, r.stage));
       else if (it.type === 'corruptedGate') {
