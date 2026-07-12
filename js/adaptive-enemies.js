@@ -4,7 +4,7 @@ import { BAL } from './balance.js';
 import { COLORS } from './render.js';
 import { circleHit } from './collision.js';
 import { Scrolling, enemyDie, drawEHp } from './entities.js';
-import { prismRoute, stageScale, scavengerPayout } from './adaptive-logic.js';
+import { prismRoute, stageScale, scavengerPayout, parasiteDamageMult } from './adaptive-logic.js';
 
 const AE = () => BAL.adaptiveEnemies;
 const hpScale = (stage) => stageScale(stage, AE().hpPerStage, AE().hpScaleMax);
@@ -105,11 +105,13 @@ export class Scavenger extends Scrolling {
     this.target = best; if (best) best.claimedBy = this;
   }
   hitByBullet(dmg, world) {
+    if (this.dead) return;   // 중복 처리 차단 (보상 1회 지급 보장)
     this.hp -= dmg;
     if (this.hp > 0) return;
     this.dead = true;
     if (this.target && this.target.claimedBy === this) this.target.claimedBy = null;
     const payout = scavengerPayout(this.stored, AE().scavenger.rewardMult);  // 보관 중이면 ×1.5, 아니면 0
+    this.stored = 0;   // 지급 완료 → 방어적으로 비움 (중복 지급 방지)
     if (payout > 0) world.squad.applyDelta(payout, world, '보상 회수 ×1.5!');
     enemyDie(this, world, '#57e0ff', this.coin);
   }
@@ -141,9 +143,10 @@ export class GateParasite extends Scrolling {
     this.x = this.side === 'left' ? this.gate.logicalW * 0.25 : this.gate.logicalW * 0.75;
   }
   hitByBullet(dmg, world, ctx = null) {
-    // 방어 외피: 일반 공격은 감소, 랜스 강습 3단+(ctx.pierceDefense)만 방어 무시(전액)
-    const pierce = ctx && ctx.lance && ctx.pierceDefense;
-    this.hp -= pierce ? dmg : dmg * (1 - (AE().gateParasite.defenseReduce || 0));
+    if (this.dead) return;   // 중복 처리 차단 (정화 보상 1회)
+    const mult = parasiteDamageMult(ctx, AE().gateParasite.armorReduce);   // 일반=0.65, 랜스강습3단+=1
+    if (mult >= 1) world.effects.burst(this.x, this.y, '#ffffff', 6, 140);  // 관통 = 흰색 파열(방어 무시 표시)
+    this.hp -= dmg * mult;
     if (this.hp > 0) return;
     this.dead = true;
     if (this.gate) this.gate.corruptSide = null;   // 정화 → 게이트 원상

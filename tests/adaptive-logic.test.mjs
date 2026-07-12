@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prismRoute, stageScale, droneReward, scavengerPayout } from '../js/adaptive-logic.js';
+import { prismRoute, stageScale, droneReward, scavengerPayout, parasiteDamageMult } from '../js/adaptive-logic.js';
 
 const cores = () => [{ side: -1, hp: 22 }, { side: 1, hp: 22 }];
 const OFF = 18, X = 240;
@@ -43,4 +43,19 @@ test('droneReward: 원 보상 100 → 경제 0.32 적용 시 실수령 32 (스�
 test('scavengerPayout: 보관(32) → ×1.5=48, 미보관(0) → 0 (도주 전 처치만 지급)', () => {
   assert.equal(scavengerPayout(32, 1.5), 48);
   assert.equal(scavengerPayout(0, 1.5), 0);
+});
+
+test('parasiteDamageMult: ctx 없음/일반탄/광역/일반랜스 → 0.65, 랜스강습3단+ → 1', () => {
+  const AR = 0.35;
+  assert.equal(parasiteDamageMult(null, AR), 0.65);                                 // 문맥 없음(광역·도탄·폭발)
+  assert.equal(parasiteDamageMult({ x: 100 }, AR), 0.65);                            // 일반 탄환
+  assert.equal(parasiteDamageMult({ lance: true, pierceDefense: false }, AR), 0.65); // 일반 랜스/강습 1·2단
+  assert.equal(parasiteDamageMult({ lance: true, pierceDefense: true }, AR), 1);     // 랜스 강습 3단+
+});
+
+test('parasiteDamageMult: 감소율은 완전 면역(0)을 만들지 않는다 (70% 상한)', () => {
+  assert.ok(parasiteDamageMult(null, 0.35) > 0);
+  assert.ok(parasiteDamageMult(null, 0.99) >= 0.30);   // 0.70 상한 → 최소 0.30 피해
+  assert.ok(parasiteDamageMult({ lance: true, pierceDefense: true }, 0.35) >
+            parasiteDamageMult({ x: 0 }, 0.35));        // 관통 > 일반
 });

@@ -29,3 +29,13 @@ export function droneReward(raw, podMult = 1, econMult = 1, doctrineMult = 1) {
 export function scavengerPayout(stored, mult) {
   return stored > 0 ? Math.round(stored * mult) : 0;
 }
+
+/**
+ * 게이트 패러사이트 피해 배수 (순수). ctx=탄환{x}|랜스{lance,pierceDefense}|null.
+ * 랜스 강습 3단+(pierceDefense)만 방어 무시(1.0), 그 외 일반공격·도탄·폭발·일반랜스는 armor 감소.
+ * armorReduce는 0.70 상한(완전 면역 금지).
+ */
+export function parasiteDamageMult(ctx, armorReduce) {
+  const pierces = !!(ctx && ctx.lance && ctx.pierceDefense);
+  return pierces ? 1 : 1 - Math.min(0.70, armorReduce || 0);
+}
