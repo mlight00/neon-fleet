@@ -6,6 +6,8 @@
 
 ---
 
+> **후속 수정(2026-07-12)**: 코드리뷰 재검토에서 4건이 발견되어 후속 지시서(`docs/2026-07-12-phase2-review-followup-work-order.md`)로 해결했다 — ①위상 잔상 제거탄의 같은 프레임 피해, ②일부 처치 경로(랜스·메아리·시즈·연쇄) 킬 이벤트 누락, ③B22 STAGGER/BREAK HUD 중첩, ④`git diff --check 671b87a..HEAD` 실제 실패(keystones.js EOF 빈 줄). 상세·실측은 [후속 결과서](2026-07-12-phase2-review-followup-result.md) 참조. **아래 §10·§11의 "git diff --check 통과"는 초판 기준 `git diff --check`(언스테이지) 결과였고, 커밋 범위 검사는 후속 수정에서 통과로 바로잡았다.**
+
 ## 1. 기준 커밋과 최종 커밋
 
 - **기준 커밋**: `671b87a` (Phase 1 마감 완료 상태)
