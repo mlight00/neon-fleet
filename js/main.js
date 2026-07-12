@@ -9,6 +9,7 @@ import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, evolutionDef } from './weapon-evolutions.js';
 import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
 import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
+import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
@@ -127,6 +128,7 @@ function newExpedition() {
     addCoins(n) { this.coins += n; },
     spawnEntity(e) { this.entities.push(e); },
     spawnEnemyBullet(b) { if (this.enemyBullets.length < this.stageMods.shotCap) this.enemyBullets.push(b); },
+    notifyEnemyKilled(e) { onEnemyKilled(e, this); },   // 랜스·메아리·시즈 등 entities.js 킬 경로가 호출하는 중앙 알림
   };
   run = {
     world, squad, effects, rng,
@@ -313,9 +315,13 @@ function recomputeMfx() {
   run.squad.swarmPerDrone = run.world.mfx.swarmPerDrone;
 }
 
-// 적 격파 시: 폭발 탄두(광역) + 전리 회수(드론) 모듈
+// 중앙 킬 이벤트: "플레이어 공격으로 살아있던 적이 죽은 순간"을 개체당 정확히 한 번 처리.
+// 모든 처치 경로(일반탄·파생탄·차지/메아리 랜스·시즈 광역·폭발 탄두 연쇄)가 이 함수로 모인다.
+//   집계 대상: e.isEnemy (크리스탈·수송선·캡슐·보스·화면 밖 소멸 제외)
+//   멱등: e._killHandled 플래그로 중복/재귀 안전. 폭발 처리 전에 플래그를 먼저 세워 재귀 이중 처리 차단.
 function onEnemyKilled(e, w) {
-  const mfx = w.mfx; if (!mfx) return;
+  if (!claimKill(e)) return;   // 비적대·미사망·중복 차단 (개체당 1회, 폭발 재귀 안전)
+  const mfx = w.mfx; if (!mfx) { w.squad.onEnemyKill(w, e); return; }
   if (mfx.explodeRadius > 0) {
     w.effects.burst(e.x, e.y, '#ff9c41', 12, 180);
     w.effects.ring(e.x, e.y, '#ff9c41');
@@ -324,7 +330,10 @@ function onEnemyKilled(e, w) {
     for (const o of w.entities) {
       if (o === e || o.dead || !o.hitByBullet) continue;
       const dx = o.x - e.x, dy = o.y - e.y;
-      if (dx * dx + dy * dy <= (rr + (o.r || 0)) ** 2) o.hitByBullet(dmg, w);
+      if (dx * dx + dy * dy <= (rr + (o.r || 0)) ** 2) {
+        o.hitByBullet(dmg, w);
+        if (o.dead) onEnemyKilled(o, w);   // 연쇄 처치도 집계 (각 1회, _killHandled로 재귀 안전)
+      }
     }
   }
   if (mfx.killDroneChance > 0 && Math.random() < mfx.killDroneChance) {
@@ -509,7 +518,7 @@ function update(dt) {
   // 개체 업데이트
   for (const e of w.entities) e.update(dt, w);
   for (const b of w.bullets) b.update(dt, w);
-  for (const b of w.enemyBullets) b.update(dt, w);
+  for (const b of w.enemyBullets) if (!b.dead) b.update(dt, w);   // 같은 프레임에 제거된 탄(위상 잔상)은 업데이트 안 함
   r.effects.update(dt);
 
   // 아군 탄 vs 표적 (크리스탈/크리처/운석/보스). 레이저는 관통(횟수 차감 + 감쇠).

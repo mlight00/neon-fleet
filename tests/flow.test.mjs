@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isGrazeDistance, addFlow, updateFlow, onFlowHit } from '../js/flow.js';
-import { EnemyShot, Squad } from '../js/entities.js';
+import { EnemyShot, Squad, NeonArbiter } from '../js/entities.js';
+import { freshKeystoneState } from '../js/keystones.js';
 import { BAL } from '../js/balance.js';
 
 const cfg = () => BAL.flow;
@@ -83,7 +84,7 @@ test('RUSH 중 피격 시 RUSH 즉시 종료 + FLOW 0', () => {
 function makeWorld(squad) {
   const noop = () => {};
   return {
-    squad, logicalW: 480, logicalH: 776,
+    squad, logicalW: 480, logicalH: 776, enemyBullets: [], bullets: [], entities: [], bosses: [],
     effects: { burst: noop, text: noop, ring: noop, halo: noop, muzzle: noop, flash: noop },
     mfx: {},
   };
@@ -154,4 +155,62 @@ test('실제 전투 피격 시 onCombatHit로 FLOW가 hitLoss만큼 감소', () 
   const shot = new EnemyShot(sq.x, sq.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 3 });
   shot.age = 1; shot.update(0.016, w);
   assert.equal(sq.flow, 50 - BAL.flow.hitLoss);
+});
+
+// ── 후속 §2.4: 제거된(dead) 적탄이 같은 프레임에 피해·graze·STAGGER를 만들지 않는다 ──
+test('dead EnemyShot은 update()해도 위치가 변하지 않는다', () => {
+  const sq = freshSquad(); const w = makeWorld(sq);
+  const shot = new EnemyShot(100, 100, 500, 500, { r: 8, dmgPct: 0.05, dmgMin: 3 });
+  shot.dead = true; shot.age = 1;
+  shot.update(0.1, w);
+  assert.equal(shot.x, 100); assert.equal(shot.y, 100);
+});
+
+test('dead EnemyShot이 플레이어와 겹쳐도 드론 피해가 없다', () => {
+  const sq = freshSquad(); const w = makeWorld(sq);
+  const shot = new EnemyShot(sq.x, sq.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 3 });
+  shot.dead = true; shot.age = 1;
+  shot.update(0.016, w);
+  assert.equal(sq.count, 100);   // 손실 없음
+});
+
+test('dead EnemyShot이 graze 거리여도 FLOW가 증가하지 않는다', () => {
+  const sq = freshSquad(); const w = makeWorld(sq);
+  const shot = grazeShot(sq); shot.dead = true; shot.age = 1;
+  shot.update(0.016, w);
+  assert.equal(sq.flow, 0);
+});
+
+test('위상 잔상 3번째 graze로 제거한 탄은 그 후 update돼도 피해가 없다 (실클래스)', () => {
+  const sq = freshSquad(); sq.keystone = 'phase_afterimage'; sq.keystoneState = freshKeystoneState();
+  const w = makeWorld(sq);
+  // 편대에 겹치도록 실제 EnemyShot 5발을 반경 안에 배치
+  const shots = [];
+  for (let i = 0; i < 5; i++) { const s = new EnemyShot(sq.x, sq.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 3 }); w.enemyBullets.push(s); shots.push(s); }
+  const trigger = grazeShot(sq); trigger.age = 1; w.enemyBullets.push(trigger);
+  sq.grazeCombo = 0; sq.keystoneState.grazeCount = 2;   // 다음 graze가 3번째 → 파동
+  trigger.update(0.016, w);                              // graze → _phaseWave → 5발 dead
+  assert.ok(shots.every((s) => s.dead), '반경 내 탄 제거');
+  const count0 = sq.count;
+  for (const s of shots) s.update(0.016, w);             // 제거탄 차례
+  assert.equal(sq.count, count0);                        // 같은 프레임 피해 없음
+});
+
+test('제거된(dead) 탄은 B22 STAGGER를 증가시키지 않는다', () => {
+  const arb = new NeonArbiter(480, 1, 30, 1); arb.y = arb.targetY = 130;
+  const sq = freshSquad(); sq.keystone = 'phase_afterimage'; sq.keystoneState = freshKeystoneState();
+  const w = makeWorld(sq); w.bosses = [arb];
+  w.onPlayerGraze = (world) => arb.onPlayerGraze(world);   // 보스전 graze STAGGER 라우팅
+  const dead = new EnemyShot(sq.x, sq.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 3 });
+  dead.dead = true; dead.age = 1; w.enemyBullets.push(dead);
+  dead.update(0.016, w);
+  assert.equal(arb.stagger, 0);   // graze 미발생 → STAGGER 0
+});
+
+test('살아있는 일반 적탄의 이동·graze는 유지된다 (회귀)', () => {
+  const sq = freshSquad(); const w = makeWorld(sq);
+  const shot = grazeShot(sq); shot.age = 1;
+  shot.update(0.016, w);
+  assert.equal(shot.grazed, true);
+  assert.equal(sq.flow, BAL.flow.gain);
 });

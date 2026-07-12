@@ -279,7 +279,10 @@ export class Squad {
     const ctx = { lance: true, pierceDefense: echo.pierceDefense, echo: true };
     for (const e of world.entities) {
       if (e.dead || !e.hitByBullet) continue;
-      if (e.y < this.y && Math.abs(e.x - echo.x) <= echo.halfW + (e.r || 0)) e.hitByBullet(echo.dmg, world, ctx);
+      if (e.y < this.y && Math.abs(e.x - echo.x) <= echo.halfW + (e.r || 0)) {
+        e.hitByBullet(echo.dmg, world, ctx);
+        if (e.dead) world.notifyEnemyKilled?.(e);   // 메아리 랜스 처치도 킬 이벤트 집계
+      }
     }
     if (world.bosses) for (const bo of world.bosses) {
       if (!bo.dead && Math.abs(bo.x - echo.x) <= echo.halfW + bo.r) bo.hitByBullet(echo.dmg * (world.mfx?.bossDmgMult ?? 1), world, ctx);
@@ -569,7 +572,10 @@ export class Squad {
     const lanceCtx = { lance: true, pierceDefense: doctrineEffects(this.doctrine, BAL.doctrine).lancePierceDefense && stage >= 3, stage, echo: false, attackId: (this._lanceId = (this._lanceId || 0) + 1) };
     for (const e of world.entities) {       // 앞쪽 컬럼의 적 전부 관통
       if (e.dead || !e.hitByBullet) continue;
-      if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) e.hitByBullet(dmg, world, lanceCtx);
+      if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) {
+        e.hitByBullet(dmg, world, lanceCtx);
+        if (e.dead) world.notifyEnemyKilled?.(e);   // 차지 랜스 처치도 킬 이벤트 집계
+      }
     }
     if (world.bosses) for (const bo of world.bosses) {   // 랜스 컬럼 안의 모든 보스 타격
       if (!bo.dead && Math.abs(bo.x - this.x) <= halfW + bo.r) bo.hitByBullet(dmg * (mfx.bossDmgMult ?? 1), world, lanceCtx);
@@ -1212,7 +1218,10 @@ export class HomingMissile {
     const { radius, frac } = this.blast;
     for (const o of world.entities) {
       if (o === hit || o.dead || !o.hitByBullet || o.indestructible) continue;
-      if (Math.hypot(o.x - this.x, o.y - this.y) <= radius + (o.r || 0)) o.hitByBullet(this.damage * frac, world);
+      if (Math.hypot(o.x - this.x, o.y - this.y) <= radius + (o.r || 0)) {
+        o.hitByBullet(this.damage * frac, world);
+        if (o.dead) world.notifyEnemyKilled?.(o);   // 시즈 토피도 광역 처치도 킬 이벤트 집계
+      }
     }
     if (world.boss && !world.boss.dead && world.phase === 'boss' && world.boss !== hit &&
         Math.hypot(world.boss.x - this.x, world.boss.y - this.y) <= radius + world.boss.r) {
@@ -1983,6 +1992,7 @@ export class EnemyShot {
     return new EnemyShot(x, y, ((tx - x) / d) * speed, ((ty - y) / d) * speed, opts);
   }
   update(dt, world) {
+    if (this.dead) return;   // 위상 잔상 등으로 이미 제거된 탄은 같은 프레임에 이동·피격·graze 안 함
     this.age += dt;
     if (this.homing) {
       const dx = world.squad.x - this.x, dy = world.squad.y - this.y;
