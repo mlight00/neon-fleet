@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { WEAPON_SUPER_EVOLUTIONS, superEvolutionOptions, evolutionStage, superEvoEffects } from '../js/weapon-evolutions.js';
+import { WEAPON_SUPER_EVOLUTIONS, superEvolutionOptions, evolutionStage, superEvoEffects, evoLevelMult } from '../js/weapon-evolutions.js';
 import { BAL as BAL2 } from '../js/balance.js';
 
 // ── 2단계 초진화 + 재선택 (플레이 피드백 반영) ──
@@ -9,13 +9,29 @@ test('초진화 정의: 무기당 2종, 전체 id 유일', () => {
   assert.equal(new Set(ALL_EVOLUTION_IDS).size, ALL_EVOLUTION_IDS.length);   // 1·2단계 통합 id 중복 없음
 });
 
-test('evolutionStage: 미진화→1, 1단계 후→2, 둘 다 후→재선택(re), Lv미만→null', () => {
+test('evolutionStage 사다리: pick1→evoUp→pick2→superUp→re, Lv미만→null', () => {
   const e0 = { vulcan: null }, e1 = { vulcan: 'vulcan_storm' };
   const s0 = { vulcan: null }, s1 = { vulcan: 'vulcan_tempest' };
-  assert.equal(evolutionStage('vulcan', 3, 3, e0, s0), 1);
-  assert.equal(evolutionStage('vulcan', 3, 3, e1, s0), 2);
-  assert.equal(evolutionStage('vulcan', 3, 3, e1, s1), 're');
-  assert.equal(evolutionStage('vulcan', 2, 3, e0, s0), null);   // Lv MAX 아님
+  // 베이스 Lv 미만
+  assert.equal(evolutionStage('vulcan', 2, 3, e0, { vulcan: 0 }, s0, { vulcan: 0 }), null);
+  // Lv MAX, 미진화 → 진화 선택
+  assert.equal(evolutionStage('vulcan', 3, 3, e0, { vulcan: 0 }, s0, { vulcan: 0 }), 'pick1');
+  // 진화 후 Lv1~2 → 강화(evoUp)
+  assert.equal(evolutionStage('vulcan', 3, 3, e1, { vulcan: 1 }, s0, { vulcan: 0 }), 'evoUp');
+  assert.equal(evolutionStage('vulcan', 3, 3, e1, { vulcan: 2 }, s0, { vulcan: 0 }), 'evoUp');
+  // 진화 Lv3 도달 → 초진화 선택
+  assert.equal(evolutionStage('vulcan', 3, 3, e1, { vulcan: 3 }, s0, { vulcan: 0 }), 'pick2');
+  // 초진화 후 Lv1~2 → 강화(superUp)
+  assert.equal(evolutionStage('vulcan', 3, 3, e1, { vulcan: 3 }, s1, { vulcan: 1 }), 'superUp');
+  // 초진화 Lv3 → 재선택
+  assert.equal(evolutionStage('vulcan', 3, 3, e1, { vulcan: 3 }, s1, { vulcan: 3 }), 're');
+});
+
+test('evoLevelMult: 미진화 1, 진화 Lv1 1, Lv2/3은 step만큼 증가', () => {
+  assert.equal(evoLevelMult(null, 0, 0.14), 1);
+  assert.equal(evoLevelMult('vulcan_storm', 1, 0.14), 1);
+  assert.ok(Math.abs(evoLevelMult('vulcan_storm', 2, 0.14) - 1.14) < 1e-9);
+  assert.ok(Math.abs(evoLevelMult('vulcan_storm', 3, 0.14) - 1.28) < 1e-9);
 });
 
 test('superEvoEffects: 미선택 중립, 선택 시 balance 수치 반영', () => {

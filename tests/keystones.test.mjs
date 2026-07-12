@@ -30,13 +30,13 @@ test('키스톤 미선택 상태는 모든 전투 배수가 중립(1)', () => {
   assert.deepEqual(e, { flagMult: 1, supportMult: 1, autoMult: 1 });
 });
 
-test('군체 용광로는 정확히 10킬에서 발동(procced)', () => {
+test('군체 용광로는 정확히 killsPerProc에서 발동(procced)', () => {
   const S = BAL.keystone.swarmForge;
   let st = freshKeystoneState();
-  for (let i = 0; i < 9; i++) { const r = forgeOnKill(st, S); st = { ...st, ...r }; assert.equal(r.procced, false); }
-  const r10 = forgeOnKill(st, S);
-  assert.equal(r10.procced, true);
-  assert.equal(r10.forgeT, S.ghostDuration);   // 8초
+  for (let i = 0; i < S.killsPerProc - 1; i++) { const r = forgeOnKill(st, S); st = { ...st, ...r }; assert.equal(r.procced, false); }
+  const rp = forgeOnKill(st, S);
+  assert.equal(rp.procced, true);
+  assert.equal(rp.forgeT, S.ghostDuration);
 });
 
 test('비적대 보상 개체 파괴는 킬로 세지 않는다', () => {
@@ -55,10 +55,11 @@ test('군체 용광로 활성 시간은 최대 16초(재적립 상한)', () => {
   assert.equal(st.forgeT, S.ghostDurationMax);
 });
 
-test('군체 용광로 활성 중 supportMult=+25%, 대가 flagMult=−10%', () => {
+test('군체 용광로 활성 중 supportMult 보너스, 대가 flagMult 페널티 (balance 반영)', () => {
+  const S = BAL.keystone.swarmForge;
   const active = keystoneEffects('swarm_forge', { forgeT: 3 });
-  assert.ok(Math.abs(active.supportMult - 1.25) < 1e-9);
-  assert.ok(Math.abs(active.flagMult - 0.9) < 1e-9);
+  assert.ok(Math.abs(active.supportMult - (1 + S.supportBonus)) < 1e-9);
+  assert.ok(Math.abs(active.flagMult - (1 - S.flagPenalty)) < 1e-9);
   const idle = keystoneEffects('swarm_forge', { forgeT: 0 });
   assert.equal(idle.supportMult, 1);           // 유령 비활성 → 보너스 없음
 });

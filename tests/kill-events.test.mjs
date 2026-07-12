@@ -71,15 +71,16 @@ test('동일 적에 중앙 알림을 두 번 호출해도 1킬', () => {
   assert.equal(s.keystoneState.kills, 1);
 });
 
-test('실제 Squad.fireLance로 9→10킬 시 유령 순양함(forgeT=8) 발동', () => {
-  const s = forgeSquad(9); s.tier = 0; s.weapon = 'vulcan';
+test('실제 Squad.fireLance로 마지막 킬에서 유령 순양함(forgeT) 발동', () => {
+  const S = BAL.keystone.swarmForge;
+  const s = forgeSquad(S.killsPerProc - 1); s.tier = 0; s.weapon = 'vulcan';  // 발동 직전
   const w = makeWorld(s);
   const e = enemyAt(240, 400, 1);   // 편대(y=640) 앞쪽 컬럼, 저체력
   w.entities.push(e);
-  s.fireLance(w, 3);                // 3단 차지 랜스 직격 → 처치
+  s.fireLance(w, 3);                // 3단 차지 랜스 직격 → 처치 → killsPerProc 도달
   assert.equal(e.dead, true);
-  assert.equal(s.keystoneState.kills, 0);            // 10 도달 → 0으로 롤오버
-  assert.equal(s.keystoneState.forgeT, BAL.keystone.swarmForge.ghostDuration);  // 8초 발동
+  assert.equal(s.keystoneState.kills, 0);            // 정확히 도달 → 0으로 롤오버
+  assert.equal(s.keystoneState.forgeT, S.ghostDuration);  // 발동
 });
 
 test('시즈 토피도 광역 연쇄 처치가 각각 한 번씩 집계된다', () => {

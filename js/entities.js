@@ -9,7 +9,7 @@ import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateB
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
 import { getSprite, bossDefFor } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
-import { canEvolveWeapon, evolutionStage, superEvoEffects } from './weapon-evolutions.js';
+import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult } from './weapon-evolutions.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { droneReward } from './adaptive-logic.js';
 import { addFlow, updateFlow, onFlowHit, isGrazeDistance } from './flow.js';
@@ -164,8 +164,10 @@ export class Squad {
     // ── NEON ADAPTATION Phase 1: 원정 내부 상태 (중립 시작, 저장 안 함) ──
     this.weaponEvolutions = { vulcan: null, laser: null, homing: null }; // 무기별 1단계 진화 id
     this.weaponEvolutions2 = { vulcan: null, laser: null, homing: null }; // 무기별 2단계 초진화 id
+    this.evoLevels = { vulcan: 0, laser: 0, homing: 0 };                  // 진화 강화 레벨 1→3 (0=미진화)
+    this.superLevels = { vulcan: 0, laser: 0, homing: 0 };                // 초진화 강화 레벨 1→3
     this.pendingWeaponEvolution = null;   // 진화 선택 대기 무기 ('vulcan'|'laser'|'homing')
-    this.pendingEvoStage = null;          // 대기 중 선택 단계 (1 | 2 | 're')
+    this.pendingEvoStage = null;          // 대기 중 선택 단계 ('pick1' | 'pick2' | 're')
     this.doctrine = null;                 // 'swarm'|'lance'|'phase'
     this.pendingDoctrine = false;         // 교리 선택 대기
     this.supportAcc = 0;      // 호위함 사격 누적기
@@ -327,32 +329,55 @@ export class Squad {
 
   setWeapon(weapon, world) {
     if (this.weapon === weapon) {
-      if (this.weaponLv < BAL.weapons.maxLv) {
-        this.weaponLv++;
-        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[weapon]);
-      } else if (!this.pendingWeaponEvolution) {
-        // Lv MAX: 진화 단계 판정 (1단계 → 2단계 → 재선택). main이 감지해 2택 선택창을 연다.
-        const st = evolutionStage(weapon, this.weaponLv, BAL.weapons.maxLv, this.weaponEvolutions, this.weaponEvolutions2);
-        if (st) {
-          this.pendingWeaponEvolution = weapon;
-          this.pendingEvoStage = st;
-          const label = st === 1 ? '진화 가능!' : st === 2 ? '초진화 가능!' : '진화 재선택!';
-          world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} ${label}`, COLORS.reward);
-        } else {
-          world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} MAX`, WEAPON_COLORS[weapon]);
-        }
-      }
+      this.advanceWeapon(world);   // 같은 색 캡슐: 진행 사다리 한 칸 (베이스Lv→진화선택→진화Lv→초진화선택→초진화Lv→재선택)
     } else {
-      this.weapon = weapon; // 교체 벌점 없음: 레벨 유지 (라이덴 방식)
-      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} 장착!`, WEAPON_COLORS[weapon]);
+      // 다른 색 캡슐 = 무기 교체. 강화 레벨은 유지(라이덴식). 단, 진화 단계였으면 새 무기는 진화 1단계부터.
+      const wasEvolved = !!this.weaponEvolutions[this.weapon];
+      this.weapon = weapon;
+      if (wasEvolved) {
+        this.weaponLv = BAL.weapons.maxLv;   // 진화 단계 → 새 무기는 베이스 MAX(=진화 직전)로
+        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} 장착 · 진화 준비`, WEAPON_COLORS[weapon]);
+        if (!this.weaponEvolutions[weapon] && !this.pendingWeaponEvolution) {
+          this.pendingWeaponEvolution = weapon; this.pendingEvoStage = 'pick1';   // 새 무기 진화 1단계 선택창
+        }
+      } else {
+        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} 장착 · Lv${this.weaponLv} 유지`, WEAPON_COLORS[weapon]);
+      }
     }
     world.effects.burst(this.x, this.y - 20, WEAPON_COLORS[this.weapon], 14, 140);
     sfx('pickup');
   }
 
+  /** 진행 사다리 한 칸 (같은 색 캡슐·레벨업 게이트 공용). */
+  advanceWeapon(world) {
+    const w = this.weapon;
+    if (this.weaponLv < BAL.weapons.maxLv) {
+      this.weaponLv++;
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[w]);
+      return;
+    }
+    if (this.pendingWeaponEvolution) return;   // 이미 선택 대기 중
+    const st = evolutionStage(w, this.weaponLv, BAL.weapons.maxLv, this.weaponEvolutions, this.evoLevels, this.weaponEvolutions2, this.superLevels);
+    if (st === 'evoUp') {
+      this.evoLevels[w] = (this.evoLevels[w] || 1) + 1;
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 진화 Lv${this.evoLevels[w]}! · 강화`, COLORS.reward);
+      world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
+    } else if (st === 'superUp') {
+      this.superLevels[w] = (this.superLevels[w] || 1) + 1;
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 초진화 Lv${this.superLevels[w]}! · 강화`, COLORS.reward);
+      world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
+    } else if (st === 'pick1' || st === 'pick2' || st === 're') {
+      this.pendingWeaponEvolution = w;
+      this.pendingEvoStage = st;
+      const label = st === 'pick1' ? '진화 가능!' : st === 'pick2' ? '초진화 가능!' : '진화 재선택!';
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} ${label}`, COLORS.reward);
+    } else {
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} MAX`, WEAPON_COLORS[w]);
+    }
+  }
+
   levelUp(world) {
-    if (this.weaponLv < BAL.weapons.maxLv) this.weaponLv++;
-    world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[this.weapon]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[this.weapon]);
+    this.advanceWeapon(world);   // 레벨업 게이트도 진화 사다리 사용 (Lv MAX면 진화/초진화/강화로 이어짐)
   }
 
   /** 기함 화력 (드론 환산): 드론 수 + 은행된 화력(흡수한 순양함) + 군체 의지(드론당). 기함 본체 사격 기준. */
@@ -603,21 +628,26 @@ export class Squad {
     const lvCoef = W.lvCoef[this.weaponLv - 1];
     const fireRate = (world.stats?.fireRate ?? BAL.squad.fireRate) * (mfx.fireRateMult ?? 1);
     const damage = (world.stats?.damage ?? BAL.squad.damage) * (mfx.dmgMult ?? 1);
+    const WEB = BAL.weaponEvolution;
+    const evoMult = evoLevelMult(this.weaponEvolutions[this.weapon], this.evoLevels[this.weapon], WEB.evoLevelStep);   // 진화 레벨(1→3) 피해 배수
     const se = superEvoEffects(this.weaponEvolutions2[this.weapon], BAL.weaponSuperEvolution);   // 2단계 초진화 배수 (미선택이면 중립)
+    const superLv = this.superLevels[this.weapon] || 0;
+    const seDmg = se.dmgMult * (1 + Math.max(0, superLv - 1) * WEB.superLevelStep);   // 초진화 레벨(1→3) 추가 배수
     const pb = (mfx.pierceBonus || 0) + se.pierceBonus;
     const rush = this.rushDmgMult;   // NEON RUSH: 사격 피해 배수 (기함·호위·순양함에 한 번씩만 — 파생탄은 원본 비율이라 이중 없음)
     const ks = keystoneEffects(this.keystone, this.keystoneState);   // 키스톤 배수 (미선택이면 전부 1)
     const rushAuto = rush * ks.autoMult;   // 공명 랜스 대가: 자동사격 전체 배수를 baseDps·support에 함께 접음
-    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult * rushAuto * se.dmgMult;   // 초진화 피해 배수
+    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult * rushAuto * evoMult * seDmg;   // 진화·초진화 레벨 피해 배수
     const dEff = doctrineEffects(this.doctrine, BAL.doctrine);   // 기함 교리 효과 (중립이면 전부 1/0)
     // 니들 개틀링: 치명 확률 가산 / 위상 기동: 이동 뱅크에 비례한 피해 보너스(모든 탄에 적용)
     const needle = evo === 'vulcan_needle' ? WE.vulcan_needle : null;
     const critP = (mfx.crit || 0) + (needle ? needle.critBonus : 0);
     const phaseMul = phaseDamageMult(Math.abs(this.bank || 0), dEff.bankDmgMax);
     const crit = (d) => (critP && Math.random() < critP ? d * (mfx.critMult || 2) : d) * phaseMul;
-    // 호위함(순양함) 사격 — 군체 교리는 순양함 화력 배수
-    // 순양함 사격: 군체 용광로 유령 활성 시 +25% (supportMult), autoMult는 rushAuto에 포함
-    this.fireSupport(dt, world, this.supportPower * dEff.supportMult * fireRate * damage * lvCoef * powerMult * rushAuto * ks.supportMult, crit);
+    // 호위함(순양함) 사격 — 군체 교리 배수 + 군체 용광로 유령 순양함(활성 중 실제 사격까지)
+    const ghost = (this.keystone === 'swarm_forge' && (this.keystoneState?.forgeT || 0) > 0) ? BAL.keystone.swarmForge.ghostCruisers : 0;
+    const supportDps = (this.supportPower + ghost * BAL.escort.cruiserPower) * dEff.supportMult * fireRate * damage * lvCoef * powerMult * rushAuto * ks.supportMult;
+    this.fireSupport(dt, world, supportDps, crit, ghost);
     const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];
     const ascPierce = 0;
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
@@ -741,9 +771,9 @@ export class Squad {
     return { x: side * (baseX + row * 5), y: baseY };
   }
 
-  /** 호위함 사격: 기함과 같은 무기를 supportPower 비례로, 호위함 위치에서 발사 */
-  fireSupport(dt, world, dps, crit) {
-    const units = (this.escorts || 0) + (this.cruisers || 0);
+  /** 호위함 사격: 기함과 같은 무기를 supportPower 비례로, 호위함 위치에서 발사. ghost=군체 용광로 유령 순양함(실사격). */
+  fireSupport(dt, world, dps, crit, ghost = 0) {
+    const units = (this.escorts || 0) + (this.cruisers || 0) + ghost;
     if (units <= 0 || dps <= 0) return;
     const W = BAL.weapons;
     const shotsPerSec = Math.min(20, 3 + units * 1.6);

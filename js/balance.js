@@ -72,7 +72,9 @@ export const BAL = {
   // ── NEON ADAPTATION Phase 1 ──────────────────────────────────
   // 무기 진화(Lv3 후 같은 색 캡슐로 2택). 특정 무기 완전 면역 금지, 피해 감소 ≤70%.
   weaponEvolution: {
-    duplicateReward: { drones: 20, coin: 10 },  // 이미 진화한 무기의 중복 캡슐 → 대체 보상
+    evoLevelStep: 0.14,   // 진화 레벨(1→2→3)당 그 무기 피해 배수 증가 → "강해지는 게 느껴진다"
+    superLevelStep: 0.12, // 초진화 레벨(1→2→3)당 추가 피해 배수
+    duplicateReward: { drones: 20, coin: 10 },  // (미사용) 옛 대체 보상
     vulcan_storm:  { spread: 1.25, ricochetFrac: 0.45, ricochetRadius: 120 },                                  // 도탄(1회, 비재귀)
     vulcan_needle: { spread: 0.35, rate: 1.45, critBonus: 0.08, sizeMult: 0.85 },                              // 집중 연사
     laser_prism:   { splitFrac: 0.35, splitRadius: 150 },                                                       // 좌우 분열(보스 제외, 비재귀)
@@ -128,7 +130,7 @@ export const BAL = {
 
   // 키스톤(원정당 1개, 첫 섹터 보스 후 선택). 정의는 js/keystones.js. 여기엔 수치만.
   keystone: {
-    swarmForge:  { killsPerProc: 10, ghostDuration: 8, ghostDurationMax: 16, ghostCruisers: 2, supportBonus: 0.25, flagPenalty: 0.10 },
+    swarmForge:  { killsPerProc: 8, ghostDuration: 8, ghostDurationMax: 16, ghostCruisers: 2, supportBonus: 0.5, flagPenalty: 0.08 },  // 유령 순양함이 실제 사격까지(체감↑)
     lanceEcho:   { minStage: 3, delay: 0.35, dmgFrac: 0.45, widthFrac: 0.65, autoPenalty: 0.12, maxPending: 3 },
     phaseAfterimage: { grazesPerProc: 3, radius: 70, maxClear: 8 },
   },

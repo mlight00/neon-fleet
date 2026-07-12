@@ -63,17 +63,22 @@ export function canEvolveWeapon(weapon, weaponLv, maxLv, evolutions) {
 }
 
 /**
- * 무기 진화 단계 판정 (순수). 같은 색 캡슐을 Lv MAX에서 다시 얻었을 때 무엇을 열지 결정한다.
- *  - 1: 1단계 진화 선택 (아직 미진화)
- *  - 2: 2단계 초진화 선택 (1단계는 했고 2단계 미완)
- *  - 're': 재선택 (둘 다 완료 → 2단계 초진화를 다시 골라 교체)
- *  - null: 열 것 없음 (Lv MAX 아님 또는 진화 불가 무기)
+ * 무기 진행 사다리 판정 (순수). Lv MAX에서 같은 색 캡슐·레벨업을 다시 얻었을 때 무엇을 할지 결정한다.
+ * 진행: 베이스Lv1-3 → [pick1 진화선택] → 진화Lv1→2→3(evoUp) → [pick2 초진화선택] → 초진화Lv1→2→3(superUp) → 재선택(re)
+ *  반환: 'pick1' | 'evoUp' | 'pick2' | 'superUp' | 're' | null(베이스 레벨 중 or 불가 무기)
  */
-export function evolutionStage(weapon, weaponLv, maxLv, evolutions, superEvolutions) {
+export function evolutionStage(weapon, weaponLv, maxLv, evo, evoLv, evo2, superLv, maxEvoLv = 3) {
   if (weaponLv < maxLv || !WEAPON_EVOLUTIONS[weapon]) return null;
-  if (!evolutions[weapon]) return 1;
-  if (!superEvolutions[weapon]) return 2;
+  if (!evo[weapon]) return 'pick1';
+  if ((evoLv[weapon] || 0) < maxEvoLv) return 'evoUp';
+  if (!evo2[weapon]) return 'pick2';
+  if ((superLv[weapon] || 0) < maxEvoLv) return 'superUp';
   return 're';
+}
+
+/** 진화 레벨 피해 배수 (순수): 진화 안 했으면 1, 했으면 1 + (레벨-1)×step. */
+export function evoLevelMult(evoId, evoLevel, step) {
+  return evoId ? 1 + Math.max(0, (evoLevel || 1) - 1) * step : 1;
 }
 
 /** 2단계 초진화 전투 배수 (순수). 미선택이면 중립. */

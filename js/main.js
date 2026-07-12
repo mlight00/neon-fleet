@@ -309,6 +309,15 @@ function startPlay() {
   newExpedition();   // → startSector(1) → enterSectorMap(): 섹터 맵 화면(state='map'). 노드 선택 시 전투 시작.
 }
 
+// HUD용 무기 진화 라벨: 초진화 > 진화 우선, 강화 레벨 병기 (예: "템페스트2", "폭풍3")
+function weaponEvoLabel(sq) {
+  const w = sq.weapon;
+  const superId = sq.weaponEvolutions2[w], evoId = sq.weaponEvolutions[w];
+  if (superId) return `${evolutionDef(superId)?.short || ''}${sq.superLevels[w] || 1}`;
+  if (evoId) return `${evolutionDef(evoId)?.short || ''}${sq.evoLevels[w] || 1}`;
+  return undefined;
+}
+
 // 모듈 효과 누적기 재계산 (모듈 획득 시)
 function recomputeMfx() {
   run.world.mfx = computeMfx(run.modules);
@@ -612,7 +621,7 @@ function openKeystone(after) {
   paused = false;
   sfx('evolve');
   ui.showKeystoneDraft({
-    options: KEYSTONES,
+    options: KEYSTONES, sector: r.sector,
     onPick(id) {
       r.squad.keystone = id;
       r.squad.keystoneState = freshKeystoneState();   // 누적 카운터 0에서 시작
@@ -628,8 +637,8 @@ function openKeystone(after) {
 // 무기 진화 2택 선택창 (게임 일시 정지). 단계별: 1=1단계 진화, 2/재선택=2단계 초진화.
 function openWeaponEvolution(weapon) {
   const r = run;
-  const stage = r.squad.pendingEvoStage || 1;
-  const isSuper = stage === 2 || stage === 're';
+  const stage = r.squad.pendingEvoStage || 'pick1';
+  const isSuper = stage === 'pick2' || stage === 're';
   const opts = isSuper ? superEvolutionOptions(weapon) : evolutionOptions(weapon);
   if (!opts.length) { r.squad.pendingWeaponEvolution = null; r.squad.pendingEvoStage = null; return; }
   drafting = true;
@@ -637,8 +646,13 @@ function openWeaponEvolution(weapon) {
   ui.showWeaponEvolution({
     weapon, options: opts, tier: isSuper ? 2 : 1, repick: stage === 're',
     onPick(id) {
-      if (isSuper) r.squad.weaponEvolutions2[weapon] = id;   // 2단계 초진화(재선택 포함)
-      else r.squad.weaponEvolutions[weapon] = id;            // 1단계 진화
+      if (isSuper) {
+        r.squad.weaponEvolutions2[weapon] = id;              // 2단계 초진화(재선택 포함)
+        if (stage === 'pick2') r.squad.superLevels[weapon] = 1;   // 초진화 Lv1부터
+      } else {
+        r.squad.weaponEvolutions[weapon] = id;               // 1단계 진화
+        r.squad.evoLevels[weapon] = 1;                        // 진화 Lv1부터
+      }
       r.squad.pendingWeaponEvolution = null;
       r.squad.pendingEvoStage = null;
       drafting = false;
@@ -760,7 +774,7 @@ function draw() {
       stage: r.sector,
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,
-      weaponEvo: evolutionDef(r.squad.weaponEvolutions2[r.squad.weapon] || r.squad.weaponEvolutions[r.squad.weapon])?.short,
+      weaponEvo: weaponEvoLabel(r.squad),
       shield: r.squad.shield,
       modules: moduleSummary(r.modules),
       logicalH,
