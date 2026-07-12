@@ -1577,8 +1577,21 @@ export class TriGate extends Scrolling {
     if (!this.applied) {
       const { squad } = world;
       if (Math.abs(squad.y - this.y) < this.h / 2 + 8) {
-        const lane = Math.max(0, Math.min(2, Math.floor((squad.x / this.logicalW) * 3)));
-        this.apply(this.options[lane], world);
+        const laneW = this.logicalW / 3;
+        const lane = Math.max(0, Math.min(2, Math.floor(squad.x / laneW)));
+        const opt = this.options[lane];
+        // 무기 게이트: 현재 무기를 다른 무기로 바꾸려면 그 레인 '중앙부'에 확실히 있어야 한다.
+        // (탄 피하다 발칸 레인 가장자리를 스쳐 레이저가 발칸으로 뒤바뀌는 사고 방지 — 애매하면 현재 무기 유지)
+        if (opt.kind === 'weapon' && opt.weapon !== squad.weapon) {
+          const centerX = (lane + 0.5) * laneW;
+          if (Math.abs(squad.x - centerX) > laneW * 0.34) {
+            this.applied = true; this.appliedLane = -1; this.flashT = BAL.gate.passFlashTime;
+            world.effects.text(squad.x, squad.y - 64, `${WEAPON_LABELS[squad.weapon]} 유지`, WEAPON_COLORS[squad.weapon], 13);
+            if (this.offscreen(world)) this.dead = true;
+            return;
+          }
+        }
+        this.apply(opt, world);
         this.applied = true;
         this.appliedLane = lane;
         this.flashT = BAL.gate.passFlashTime;
