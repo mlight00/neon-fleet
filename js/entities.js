@@ -181,6 +181,10 @@ export class Squad {
   _flowState() { return { flow: this.flow, rushT: this.rushT, combo: this.grazeCombo, sinceGraze: this.sinceGraze }; }
   _applyFlowState(s) { this.flow = s.flow; this.rushT = s.rushT; this.grazeCombo = s.combo; this.sinceGraze = s.sinceGraze; }
   get inRush() { return this.rushT > 0; }
+  // NEON RUSH 전투 배수 (중복 없이 각 경로에서 한 번씩만 적용)
+  get rushDmgMult() { return this.rushT > 0 ? BAL.flow.rushDamageMult : 1; }
+  get rushChargeMult() { return this.rushT > 0 ? BAL.flow.rushChargeSpeedMult : 1; }
+  get rushMoveMult() { return this.rushT > 0 ? BAL.flow.rushMoveResponseMult : 1; }
 
   /** 근접 회피 1회. 무적·사망 중엔 무시. 탄을 소비(중복 방지)했으면 true. */
   onGraze(world, shot) {
@@ -406,7 +410,7 @@ export class Squad {
     this.t += dt;
     const target = world.input.targetX;
     this.prevX = this.x;
-    this.x += (target - this.x) * Math.min(1, BAL.squad.followSpeed * dt);
+    this.x += (target - this.x) * Math.min(1, BAL.squad.followSpeed * this.rushMoveMult * dt);  // RUSH: 이동 반응 ↑
     const m = BAL.squad.laneMargin + this.width * 0.4;
     this.x = Math.max(m, Math.min(world.logicalW - m, this.x));
 
@@ -448,7 +452,7 @@ export class Squad {
     const maxStage = ch.maxStage + (world.mfx?.chargeMaxBonus || 0);
     const chargeSpeedMul = doctrineEffects(this.doctrine, BAL.doctrine).chargeSpeedMult;  // 랜스 강습: 충전 속도↑
     if (charging) {
-      this.charge += dt * (world.mfx?.chargeSpeed || 1) * chargeSpeedMul;
+      this.charge += dt * (world.mfx?.chargeSpeed || 1) * chargeSpeedMul * this.rushChargeMult;   // RUSH: 충전 속도 ↑
       const st = chargeStageFor(this.charge, ch.stageTime, maxStage);
       if (st > this.chargeStage) {          // 단계 상승 연출 + 사운드
         this.chargeStage = st;
@@ -509,7 +513,8 @@ export class Squad {
     const fireRate = (world.stats?.fireRate ?? BAL.squad.fireRate) * (mfx.fireRateMult ?? 1);
     const damage = (world.stats?.damage ?? BAL.squad.damage) * (mfx.dmgMult ?? 1);
     const pb = mfx.pierceBonus || 0;
-    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult;
+    const rush = this.rushDmgMult;   // NEON RUSH: 사격 피해 배수 (기함·호위·순양함에 한 번씩만 — 파생탄은 원본 비율이라 이중 없음)
+    const baseDps = this.flagPower * fireRate * damage * lvCoef * powerMult * rush;
     const dEff = doctrineEffects(this.doctrine, BAL.doctrine);   // 기함 교리 효과 (중립이면 전부 1/0)
     // 니들 개틀링: 치명 확률 가산 / 위상 기동: 이동 뱅크에 비례한 피해 보너스(모든 탄에 적용)
     const needle = evo === 'vulcan_needle' ? WE.vulcan_needle : null;
@@ -517,7 +522,7 @@ export class Squad {
     const phaseMul = phaseDamageMult(Math.abs(this.bank || 0), dEff.bankDmgMax);
     const crit = (d) => (critP && Math.random() < critP ? d * (mfx.critMult || 2) : d) * phaseMul;
     // 호위함(순양함) 사격 — 군체 교리는 순양함 화력 배수
-    this.fireSupport(dt, world, this.supportPower * dEff.supportMult * fireRate * damage * lvCoef * powerMult, crit);
+    this.fireSupport(dt, world, this.supportPower * dEff.supportMult * fireRate * damage * lvCoef * powerMult * rush, crit);
     const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];
     const ascPierce = 0;
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;

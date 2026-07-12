@@ -163,7 +163,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, stage, weapon, weaponLv, weaponEvo, shield, modules = [] }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '' }) {
   ctx.save();
   // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
@@ -263,5 +263,43 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
     }
     ctx.globalAlpha = 1;
   }
+
+  // ── FLOW / NEON RUSH HUD (하단 중앙, 보스·함대·무기와 겹치지 않음) ──
+  {
+    const bw = 128, bh = 7;
+    const bx = (logicalW - bw) / 2, by = logicalH - 30;
+    const inRush = rushT > 0;
+    ctx.textAlign = 'center';
+    if (inRush) {
+      // RUSH: 텍스트 + 청록/자홍 게이지 (색상만이 아니라 RUSH 텍스트 병행)
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillStyle = '#ff4cd2';
+      ctx.fillText(`NEON RUSH ${rushT.toFixed(1)}s`, logicalW / 2, by - 4);
+      ctx.fillStyle = 'rgba(87,224,255,0.18)';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = '#57e0ff';
+      ctx.fillRect(bx, by, bw * Math.min(1, rushT / 4), bh);
+    } else {
+      // FLOW: 0일 땐 흐리게(시스템 존재 표시), 값 있으면 밝게. FLOW 텍스트 병행.
+      const frac = Math.max(0, Math.min(1, flow / flowMax));
+      ctx.globalAlpha = flow > 0 ? 1 : 0.4;
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillStyle = COLORS.gateGood;
+      ctx.fillText(`FLOW ${Math.round(flow)}`, logicalW / 2, by - 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = COLORS.gateGood;
+      ctx.fillRect(bx, by, bw * frac, bh);
+      ctx.globalAlpha = 1;
+    }
+    // 선택한 키스톤 아이콘 (하나만, FLOW 바 오른쪽에 짧게 — C3)
+    if (keystoneIcon) {
+      ctx.font = '15px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = COLORS.reward;
+      ctx.fillText(keystoneIcon, bx + bw + 8, by + bh);
+    }
+  }
+  ctx.textAlign = 'left';
   ctx.restore();
 }

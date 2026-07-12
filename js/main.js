@@ -7,6 +7,7 @@ import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, evolutionDef } from './weapon-evolutions.js';
 import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
+import { keystoneIcon } from './keystones.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
@@ -718,6 +719,11 @@ function draw() {
       weaponEvo: evolutionDef(r.squad.weaponEvolutions[r.squad.weapon])?.short,
       shield: r.squad.shield,
       modules: moduleSummary(r.modules),
+      logicalH,
+      flow: r.squad.flow || 0,
+      flowMax: BAL.flow.max,
+      rushT: r.squad.rushT || 0,
+      keystoneIcon: keystoneIcon(r.squad.keystone),
     });
   }
 
