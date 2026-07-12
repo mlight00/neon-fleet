@@ -94,7 +94,7 @@ export const BAL = {
     hpPerStage: 0.18, hpScaleMax: 2.6,   // HP = 기본 × min(2.6, 1+0.18×(stage-1))
     prismWarden:  { minStage: 2, hp: 70, r: 22, frontReduce: 0.70, coreHp: 22, coreOffset: 18, coin: 7 },
     scavenger:    { minStage: 2, hp: 35, r: 17, approach: 150, flee: 260, stealR: 28, rewardMult: 1.5, coin: 5, stayTime: 1.2 },
-    gateParasite: { minStage: 3, hp: 45, r: 15, offsetY: 36, cleanseDrones: 10 },
+    gateParasite: { minStage: 3, hp: 45, r: 15, offsetY: 36, cleanseDrones: 10, defenseReduce: 0.4 },  // 일반 공격 40% 감소, 랜스 강습3단+ 무시
   },
 
   // 드론 합체 순양함: 드론이 자동으로 순양함으로 뭉쳐 기함과 같은 무기로 함께 쏜다(1척=cruiserPower 화력).

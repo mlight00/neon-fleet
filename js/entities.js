@@ -11,6 +11,7 @@ import { getSprite, bossDefFor } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
 import { canEvolveWeapon } from './weapon-evolutions.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
+import { droneReward } from './adaptive-logic.js';
 import { sfx } from './audio.js';
 
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
@@ -1074,7 +1075,7 @@ export class Crystal extends Scrolling {
   }
   /** 실제 지급 드론 수 (보상 배수·경제·교리 반영). 스캐빈저도 이 값을 저장한다. */
   getDroneReward(world) {
-    return Math.round(this.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult * world.squad.rewardGainMult);
+    return droneReward(this.reward, world.mfx?.podRewardMult ?? 1, BAL.economy.droneGainMult, world.squad.rewardGainMult);
   }
   hitByBullet(dmg, world) {
     const res = hitCrystal(this, dmg);
@@ -1148,7 +1149,7 @@ export class DronePod extends Scrolling {
   }
   /** 실제 지급 드론 수 (보상 배수·경제·교리 반영). 스캐빈저도 이 값을 저장한다. */
   getDroneReward(world) {
-    return Math.round(this.reward * (world.mfx?.podRewardMult ?? 1) * BAL.economy.droneGainMult * world.squad.rewardGainMult);
+    return droneReward(this.reward, world.mfx?.podRewardMult ?? 1, BAL.economy.droneGainMult, world.squad.rewardGainMult);
   }
   hitByBullet(dmg, world) {
     this.hp -= dmg;

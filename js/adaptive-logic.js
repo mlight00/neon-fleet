@@ -19,3 +19,13 @@ export function prismRoute(ctx, x, cores, coreOffset) {
 export function stageScale(stage, perStage, max) {
   return Math.min(max, 1 + perStage * (Math.max(1, stage) - 1));
 }
+
+/** 실제 지급 드론 수 (원 보상 × 보상배수 × 경제 × 교리). 순수. Crystal/DronePod/스캐빈저 공통. */
+export function droneReward(raw, podMult = 1, econMult = 1, doctrineMult = 1) {
+  return Math.round(raw * podMult * econMult * doctrineMult);
+}
+
+/** 스캐빈저 처치 보상: 보관 중이면 ×mult, 아니면 0 (도주 전 처치만 지급). 순수. */
+export function scavengerPayout(stored, mult) {
+  return stored > 0 ? Math.round(stored * mult) : 0;
+}

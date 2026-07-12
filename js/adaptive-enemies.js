@@ -4,7 +4,7 @@ import { BAL } from './balance.js';
 import { COLORS } from './render.js';
 import { circleHit } from './collision.js';
 import { Scrolling, enemyDie, drawEHp } from './entities.js';
-import { prismRoute, stageScale } from './adaptive-logic.js';
+import { prismRoute, stageScale, scavengerPayout } from './adaptive-logic.js';
 
 const AE = () => BAL.adaptiveEnemies;
 const hpScale = (stage) => stageScale(stage, AE().hpPerStage, AE().hpScaleMax);
@@ -109,9 +109,8 @@ export class Scavenger extends Scrolling {
     if (this.hp > 0) return;
     this.dead = true;
     if (this.target && this.target.claimedBy === this) this.target.claimedBy = null;
-    if (this.stored > 0) {  // 도주 전 처치 → 훔친 보상 ×1.5 회수
-      world.squad.applyDelta(Math.round(this.stored * AE().scavenger.rewardMult), world, '보상 회수 ×1.5!');
-    }
+    const payout = scavengerPayout(this.stored, AE().scavenger.rewardMult);  // 보관 중이면 ×1.5, 아니면 0
+    if (payout > 0) world.squad.applyDelta(payout, world, '보상 회수 ×1.5!');
     enemyDie(this, world, '#57e0ff', this.coin);
   }
   draw(ctx) {
@@ -141,8 +140,10 @@ export class GateParasite extends Scrolling {
     this.y = this.gate.y - AE().gateParasite.offsetY;   // 게이트에 위치 동기화
     this.x = this.side === 'left' ? this.gate.logicalW * 0.25 : this.gate.logicalW * 0.75;
   }
-  hitByBullet(dmg, world) {
-    this.hp -= dmg;
+  hitByBullet(dmg, world, ctx = null) {
+    // 방어 외피: 일반 공격은 감소, 랜스 강습 3단+(ctx.pierceDefense)만 방어 무시(전액)
+    const pierce = ctx && ctx.lance && ctx.pierceDefense;
+    this.hp -= pierce ? dmg : dmg * (1 - (AE().gateParasite.defenseReduce || 0));
     if (this.hp > 0) return;
     this.dead = true;
     if (this.gate) this.gate.corruptSide = null;   // 정화 → 게이트 원상
