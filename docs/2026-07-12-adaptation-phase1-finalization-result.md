@@ -88,7 +88,7 @@ export function parasiteDamageMult(ctx, armorReduce) {
 | FIN1 | `8c64b6c` | `fix(adaptation): 패러사이트 방어와 랜스 강습 3단 관통 구현` |
 | FIN2 | `569f39e` | `test(adaptation): 스캐빈저·패러사이트·보스 import 회귀 테스트 추가` |
 | FIN3 | `79725eb` | `docs(adaptation): Phase 1 최종 동작과 검증 결과 동기화` |
-| 후속 | `8ca4325` | `docs(adaptation): 마감 재검토 3건 — 결과서 40%→35% 정정·패러사이트 HP 결합 테스트·지시서 커밋` |
+| 후속 | `9761521` | `docs(adaptation): 마감 재검토 3건 — 결과서 40%→35% 정정·패러사이트 HP 결합 테스트·지시서 커밋` |
 
 - **원격**: `mlight00/neon-fleet` `master` (공개 저장소)
 - **배포 URL**: https://mlight00.github.io/neon-fleet/ — GitHub Pages, 저장소 root/master 자동 재빌드(push 후 ~1–2분)
