@@ -197,23 +197,24 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillText(`보스 ${n}기 · ${bosses[0].name}`, logicalW / 2, 51);
     }
     // 네온 아비터 전용 STAGGER/BREAK 보조 바 (다른 보스엔 표시 안 함)
+    // 보스 이름·HP(y=51)와 모듈 줄(y=83) 사이에 배치 — 라벨 y=64, 바 y=68~73, BREAK y=70 (중첩 방지)
     const bo = bosses[0];
     if (n === 1 && bo.stagger !== undefined && bo.staggerMax) {
-      const sbw = logicalW - 120, sy = 44;
+      const sbw = logicalW - 120;
       if (bo.breakT > 0) {
         ctx.textAlign = 'center';
         ctx.font = 'bold 11px sans-serif';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(`BREAK ${bo.breakT.toFixed(1)}s · DAMAGE ×1.25`, logicalW / 2, sy + 8);
+        ctx.fillText(`BREAK ${bo.breakT.toFixed(1)}s · DAMAGE ×1.25`, logicalW / 2, 70);
       } else {
-        ctx.fillStyle = 'rgba(138,255,255,0.18)';
-        ctx.fillRect(60, sy, sbw, 5);
-        ctx.fillStyle = '#8affff';
-        ctx.fillRect(60, sy, sbw * Math.min(1, bo.stagger / bo.staggerMax), 5);
         ctx.textAlign = 'left';
         ctx.font = 'bold 10px sans-serif';
         ctx.fillStyle = '#8affff';
-        ctx.fillText(`STAGGER ${bo.stagger}/${bo.staggerMax}`, 60, sy - 2);
+        ctx.fillText(`STAGGER ${bo.stagger}/${bo.staggerMax}`, 60, 64);
+        ctx.fillStyle = 'rgba(138,255,255,0.18)';
+        ctx.fillRect(60, 68, sbw, 5);
+        ctx.fillStyle = '#8affff';
+        ctx.fillRect(60, 68, sbw * Math.min(1, bo.stagger / bo.staggerMax), 5);
       }
     }
     ctx.textAlign = 'left';

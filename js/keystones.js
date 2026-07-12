@@ -68,4 +68,3 @@ export function forgeOnKill(state, cfg) {
   }
   return { kills, forgeT, procced };
 }
-
