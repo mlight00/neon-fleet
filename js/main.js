@@ -259,6 +259,7 @@ function buildEncounter(node) {
   // 노드 시작: 키스톤 누적 카운터·타이머·예약 리셋 (선택한 키스톤 id는 유지) + FLOW 0
   r.squad.keystoneState = freshKeystoneState();
   r.squad.flow = 0; r.squad.rushT = 0; r.squad.grazeCombo = 0; r.squad.sinceGraze = Infinity;
+  r.squad.cruiserHp = []; r.squad.cruiserFlash = [];   // 노드 시작 시 순양함 체력 만피 회복 (다음 사용 시 재보충)
   w.onPlayerGraze = null;   // 보스전 STAGGER 라우터 초기화 (B22 update가 다시 등록)
 }
 

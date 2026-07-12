@@ -159,6 +159,8 @@ export class Squad {
     this.invulnT = 0;         // 진화 무적 잔여 시간(A3)
     this.escorts = 0;         // (구 호위기 — 미사용)
     this.cruisers = 0;        // 순양함 수 (드론 130기 합체)
+    this.cruiserHp = [];      // 순양함별 체력 (피탄 → 감소, 0이면 격침). 길이는 cruisers에 동기화
+    this.cruiserFlash = [];   // 순양함별 피격 플래시 타이머
     this.banked = 0;          // 기함에 은행된 화력 (업그레이드 때 흡수한 순양함 화력 누적)
     this.bankStack = [];      // 업그레이드별 은행 증가분 (강등 시 정확히 롤백 → 반복 적립 방지)
     // ── NEON ADAPTATION Phase 1: 원정 내부 상태 (중립 시작, 저장 안 함) ──
@@ -528,6 +530,7 @@ export class Squad {
     if (this.invulnT > 0) this.invulnT -= dt;   // 진화 무적 감쇠 (A3)
     if (this.flash > 0) this.flash -= dt;
     if (this.grazeFxT > 0) this.grazeFxT -= dt;
+    for (let i = 0; i < this.cruiserFlash.length; i++) if (this.cruiserFlash[i] > 0) this.cruiserFlash[i] -= dt;  // 순양함 피격 플래시
     // FLOW 감소 + RUSH 타이머 (근접 회피 시스템, Phase 2)
     {
       const fs = updateFlow(this._flowState(), dt, BAL.flow);
@@ -760,15 +763,63 @@ export class Squad {
     for (let i = 0; i < this.escorts; i++) u.push('escort');
     return u;
   }
-  /** idx번째 호위함의 기함 기준 상대 위치 (좌우 교대 + 뒤로 계단식) */
+  /** idx번째 호위함의 기함 기준 상대 위치 — 좌우 대칭 델타(V) 날개 대형 (멋지게 벌려 배치) */
   supportSlot(idx, type) {
     const gap = BAL.escort.slotGap;
     const def = SHIP_DEFS[this.tier];
     const side = idx % 2 === 0 ? -1 : 1;
-    const row = Math.floor(idx / 2);
-    const baseX = type === 'cruiser' ? gap * 1.05 : gap * 1.95;
-    const baseY = def.h * 0.3 + 16 + row * (gap * 0.85);
-    return { x: side * (baseX + row * 5), y: baseY };
+    const rank = Math.floor(idx / 2);                 // 0,0,1,1,2,2… (좌우 한 쌍씩 바깥으로)
+    const base = (def.clearR || 24) + 16;             // 첫 순양함은 기함 바로 옆
+    const spreadStep = type === 'cruiser' ? gap * 1.12 : gap * 0.95;
+    const x = side * (base + rank * spreadStep);       // 바깥으로 벌어짐
+    const y = def.h * 0.08 + rank * (gap * 0.62);      // 뒤로 스윕(날개처럼) — 기함과 거의 나란히 시작
+    return { x, y };
+  }
+
+  // ── 순양함 피탄·격침 (드론 130기 합체 유닛도 적탄에 맞으면 깎인다) ──
+  /** cruiserHp 길이를 cruisers 수에 동기화 (증가분은 만피로 보충). */
+  _syncCruiserHp() {
+    const max = BAL.escort.cruiserHp;
+    while (this.cruiserHp.length < this.cruisers) this.cruiserHp.push(max);
+    if (this.cruiserHp.length > this.cruisers) this.cruiserHp.length = this.cruisers;
+    while (this.cruiserFlash.length < this.cruisers) this.cruiserFlash.push(0);
+    if (this.cruiserFlash.length > this.cruisers) this.cruiserFlash.length = this.cruisers;
+  }
+  /** 순양함들의 월드 좌표 목록. */
+  cruiserPositions() {
+    this._syncCruiserHp();
+    const out = [];
+    for (let i = 0; i < this.cruisers; i++) {
+      const s = this.supportSlot(i, 'cruiser');
+      out.push({ x: this.x + s.x, y: this.y + s.y, i });
+    }
+    return out;
+  }
+  /** (x,y,r) 탄이 어떤 순양함을 맞혔는가 → 인덱스, 없으면 -1. */
+  cruiserHitIndex(x, y, r) {
+    const cr = BAL.escort.cruiserR;
+    for (const c of this.cruiserPositions()) {
+      if (Math.hypot(x - c.x, y - c.y) <= r + cr) return c.i;
+    }
+    return -1;
+  }
+  /** 순양함 i 피격: HP 감소, 0이면 격침(화력 하락 + 연출). */
+  hitCruiser(i, dmg, world) {
+    this._syncCruiserHp();
+    if (i < 0 || i >= this.cruisers) return;
+    this.cruiserHp[i] -= dmg;
+    this.cruiserFlash[i] = 0.2;
+    const pos = this.supportSlot(i, 'cruiser');
+    world.effects.burst(this.x + pos.x, this.y + pos.y, '#57e0ff', 5, 90);
+    if (this.cruiserHp[i] <= 0) {
+      this.cruiserHp.splice(i, 1);
+      this.cruiserFlash.splice(i, 1);
+      this.cruisers = Math.max(0, this.cruisers - 1);
+      world.effects.burst(this.x + pos.x, this.y + pos.y, COLORS.danger, 18, 200);
+      world.effects.ring(this.x + pos.x, this.y + pos.y, COLORS.danger);
+      world.effects.text(this.x + pos.x, this.y + pos.y - 20, '순양함 격침!', COLORS.danger, 13);
+      sfx('explode_s');
+    }
   }
 
   /** 호위함 사격: 기함과 같은 무기를 supportPower 비례로, 호위함 위치에서 발사. ghost=군체 용광로 유령 순양함(실사격). */
@@ -836,10 +887,11 @@ export class Squad {
       ctx.restore();
     }
 
-    // 호위함(호위기·순양함): 기함 뒤·옆에 나란히 — "함대가 커지는" 체감 + 같이 사격
+    // 호위함(호위기·순양함): 좌우 날개 대형 — "함대가 커지는" 체감 + 같이 사격 + 피탄 시 손상 표시
     if (this.escorts || this.cruisers) {
       const cSprite = shipSprite(1, this.weapon);   // 순양함 = 인터셉터형
       const total = this.cruisers + this.escorts;
+      const cMax = BAL.escort.cruiserHp;
       for (let i = 0; i < total; i++) {
         const type = i < this.cruisers ? 'cruiser' : 'escort';
         const slot = this.supportSlot(i, type);
@@ -847,6 +899,21 @@ export class Squad {
         ctx.translate(this.x + slot.x, this.y + slot.y + Math.sin(this.t * 3 + i) * 1.5);
         ctx.rotate(this.bank * 0.25);
         blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, type === 'cruiser' ? 0.85 : 0.78);
+        // 순양함 손상: 피격 플래시(붉은 링) + HP 낮으면 손상 표시
+        if (type === 'cruiser') {
+          const hp = this.cruiserHp[i] ?? cMax;
+          if ((this.cruiserFlash[i] || 0) > 0) {
+            ctx.globalAlpha = Math.min(0.7, this.cruiserFlash[i] * 3);
+            ctx.strokeStyle = COLORS.danger; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+          if (hp < cMax) {   // 체력바 (손상 시에만)
+            const bw = 20, f = Math.max(0, hp / cMax);
+            ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-bw / 2, -18, bw, 3);
+            ctx.fillStyle = f > 0.4 ? '#57e0ff' : COLORS.danger; ctx.fillRect(-bw / 2, -18, bw * f, 3);
+          }
+        }
         ctx.restore();
       }
     }
@@ -2046,10 +2113,17 @@ export class EnemyShot {
       sq.applyDelta(-dmg, world);
       sq.onCombatHit(world);        // 실제 전투 손실 → FLOW/RUSH 규칙
       world.effects.burst(this.x, this.y, COLORS.danger, 10);
-    } else if (!this.grazed && this.age >= BAL.flow.minBulletAge && sq.invulnT <= 0
-               && isGrazeDistance(dist, sq.hitRadius, this.r, BAL.flow.grazeBand)) {
-      // 근접 회피: 피격하지 않은 탄만, 탄당 1회 (age·무적·중복 게이트)
-      if (sq.onGraze(world, this)) this.grazed = true;
+    } else {
+      // 순양함 피탄: 기함에 안 맞았을 때, 날개의 순양함을 맞히면 그 순양함 HP가 깎인다(격침 가능). 탄 소모 → graze 없음.
+      const ci = (sq.cruisers > 0) ? sq.cruiserHitIndex(this.x, this.y, this.r) : -1;
+      if (ci >= 0) {
+        this.dead = true;
+        if (sq.invulnT <= 0) sq.hitCruiser(ci, Math.max(this.dmgMin, Math.round(sq.count * this.dmgPct)), world);
+      } else if (!this.grazed && this.age >= BAL.flow.minBulletAge && sq.invulnT <= 0
+                 && isGrazeDistance(dist, sq.hitRadius, this.r, BAL.flow.grazeBand)) {
+        // 근접 회피: 피격하지 않은 탄만, 탄당 1회 (age·무적·중복 게이트)
+        if (sq.onGraze(world, this)) this.grazed = true;
+      }
     }
     if (this.y > world.logicalH + 30 || this.y < -40 || this.x < -30 || this.x > world.logicalW + 30) this.dead = true;
   }
