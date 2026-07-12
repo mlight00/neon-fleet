@@ -43,7 +43,10 @@ export function parasiteDamageMult(ctx, armorReduce) {
 `entities.js`에서 재export한 `Boss`와 `bosses.js`에서 직접 import한 `Boss`가 **동일 클래스**임을 검증(순환 import 안전성 회귀 방지) + `new Boss` 기본값(dead=false, hp=maxHp, pattern·spriteId 존재).
 
 ### 결과
-**총 106개 테스트 통과** (초판 88 → 마감 106, +18: 통합 14 + 보스 import 2 + parasiteDamageMult 관련 순수 테스트).
+**총 109개 테스트 통과** (초판 88 → 마감 109). 추가분:
+- 통합(`adaptive-enemies.test.mjs`) 17개 — 스캐빈저 8, 패러사이트/게이트 9.
+- **패러사이트 HP 감소 실결합 3개**: 일반 공격은 `dmg×0.65`만 적중(45→38.5, 생존), 랜스 강습 3단+는 `dmg` 전액(관통 감소 > 일반 감소), 일반 공격만 반복해도 결국 처치(완전 면역 없음 + 정화 확인). → `parasiteDamageMult`가 실제 `GateParasite.hitByBullet`에 결합돼 HP를 정확히 깎는지를 순수 함수 단위가 아니라 **실클래스로** 검증.
+- 보스 import(`bosses-import.test.mjs`) 2개 + `parasiteDamageMult` 순수 테스트.
 
 ---
 
@@ -60,7 +63,7 @@ export function parasiteDamageMult(ctx, armorReduce) {
 
 ## 검증 (지시서 §11)
 
-- ✅ `node --test`: **106 passed / 0 failed**
+- ✅ `node --test`: **109 passed / 0 failed**
 - ✅ `node --check` 전체 JS·테스트: 문법 오류 없음
 - ✅ `git diff --check`: 공백 오류 없음
 - ✅ 모듈 임포트 스모크: `import('./js/entities.js') → typeof Boss === "function"`
@@ -73,3 +76,22 @@ export function parasiteDamageMult(ctx, armorReduce) {
 ## 지시서 준수 확인 (§0·§7 금지 범위)
 
 신규 보스/무기/교리/적 없음 · DPS 재조정 없음 · 뱅킹/승격/강등 로직 변경 없음 · 저장 스키마/마이그레이션 변경 없음 · 청크/노드 필터 변경 없음 · entities.js/bosses.js/main.js 추가 구조 리팩토링 없음. 변경은 방어 순수화·테스트·문서 3영역에 한정.
+
+---
+
+## 커밋·배포·완료 판정
+
+**기준 커밋**: `d330590` (Phase 2 Boss 분할)
+
+| 순서 | 커밋 | 내용 |
+| --- | --- | --- |
+| FIN1 | `8c64b6c` | `fix(adaptation): 패러사이트 방어와 랜스 강습 3단 관통 구현` |
+| FIN2 | `569f39e` | `test(adaptation): 스캐빈저·패러사이트·보스 import 회귀 테스트 추가` |
+| FIN3 | `79725eb` | `docs(adaptation): Phase 1 최종 동작과 검증 결과 동기화` |
+| 후속 | `8ca4325` | `docs(adaptation): 마감 재검토 3건 — 결과서 40%→35% 정정·패러사이트 HP 결합 테스트·지시서 커밋` |
+
+- **원격**: `mlight00/neon-fleet` `master` (공개 저장소)
+- **배포 URL**: https://mlight00.github.io/neon-fleet/ — GitHub Pages, 저장소 root/master 자동 재빌드(push 후 ~1–2분)
+- **배포 검증 제약**: 회사 PC는 `github.io` 접속이 차단돼 있어 배포본 직접 확인이 불가. 대신 GitHub Pages가 서빙하는 것과 **동일한 커밋 파일**을 `localhost:8321`(python http.server, `.claude/launch.json` name `neon-fleet`)로 검증했다. 즉 로컬 검증 = 배포본 검증(파일 동일).
+
+**완료 판정: ✅ 마감 완료.** 마감 지시서 §0·§7 금지 범위를 지키며 남은 3개 지적을 모두 해소했고, 이후 GPT 재검토 3건(결과서 40%→35% 정정, 패러사이트 HP 감소 실결합 테스트, 결과서 커밋·URL·판정 보완)과 지시서 파일 저장소 커밋까지 반영했다. 테스트 109개 전부 통과, 문법·공백·모듈 임포트·데스크톱/모바일 콘솔 무결.

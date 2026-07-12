@@ -50,7 +50,7 @@
 - **P2 회귀 테스트·미사용 telegraph**: 순수 모듈 `adaptive-logic.js`(prismRoute·stageScale) 추출 + `tests/adaptive-logic.test.mjs` 6종 추가(코어/정면/랜스/광역 라우팅·스케일). 미사용 `prismWarden.telegraph` 제거.
 
 ## 8-2. 2차 리뷰 보완 (조건부 승인 잔여 2건)
-- **P2 패러사이트 방어 관통 실효화**: GateParasite에 방어 외피(`defenseReduce: 0.4`, 일반 공격 40% 감소) 추가, `hitByBullet(dmg,world,ctx)`에서 **랜스 강습 3단+(ctx.pierceDefense)만 전액**. README/결과서 문구와 구현 일치.
+- **P2 패러사이트 방어 관통 실효화**: GateParasite에 방어 외피 추가, `hitByBullet(dmg,world,ctx)`에서 **랜스 강습 3단+(ctx.pierceDefense)만 전액**. (초판은 `defenseReduce: 0.4`(40% 감소)로 구현했으나, **2026-07-12 마감 작업에서 순수 함수 `parasiteDamageMult` + `armorReduce: 0.35`(일반 공격 65%만 적중)로 확정**했다. 최종 수치는 35%이며 [마감 결과서](2026-07-12-adaptation-phase1-finalization-result.md) 참조.)
 - **P2 핵심 P1 회귀 테스트 보강**: 보상 계산을 순수 함수로 추출 — `droneReward`(원보상×배수×경제×교리), `scavengerPayout`(보관 시 ×1.5, 미보관 0). Crystal/DronePod/스캐빈저가 공용 사용. 테스트: `droneReward(100,1,0.32,1)=32`, `scavengerPayout(32,1.5)=48 / (0)=0`.
   - **(마감 후속 정정)** 초판은 "상태머신은 DOM 의존이라 node 단위테스트 불가"로 적었으나, 이는 사실이 아님이 확인됨. 렌더/오디오/스프라이트가 전부 **런타임 지연 로딩**이라 node에서 모듈 임포트가 가능하며, 실제 `Crystal/DronePod/Scavenger/GateParasite/GatePair` 클래스 + 최소 world 스텁으로 도주 미지급·중복예약·정화 반전 등을 진짜로 검증할 수 있다. → `tests/adaptive-enemies.test.mjs`로 구현(공식 복사 아님). **총 106개 통과.** 상세는 [2026-07-12 마감 결과서](2026-07-12-adaptation-phase1-finalization-result.md) 참조.
 - **문서 정합**: 결과서 §3의 "차지는 탄환 문맥 없음" 문구를 "3단+만 문맥 전달로 관통"으로 정정.
