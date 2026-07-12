@@ -5,6 +5,8 @@ import { COLORS, glow, blit } from './render.js';
 import { bossDefFor, getSprite } from './sprites.js';
 import { EnemyShot, Creature } from './entities.js';
 
+const AR = () => BAL.neonArbiter;
+
 export class Boss {
   constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1) {
     // 스테이지별 보스: 로스터 순환. PNG가 아직 없으면 하이브 퀸 이미지로 폴백 (sprite() 참고)
@@ -378,4 +380,215 @@ export class Boss {
       ctx.fill();
     }
   }
+}
+
+// ── B22 네온 아비터: 탄막 안전 틈 graze / 3단 랜스로 STAGGER → BREAK 상호작용형 보스 ──
+// 일반 자동사격도 항상 100% 기본 피해. STAGGER는 처치 시간을 단축하는 보너스(완전 면역 아님).
+export class NeonArbiter extends Boss {
+  constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1) {
+    super(logicalW, rateMult, stage, sizeMul);
+    this.arbiterPhase = 1;
+    this.stagger = 0;
+    this.breakT = 0;
+    this.staggerCooldownT = 0;
+    this.warning = null;          // GAP WALL 경고 { slots:[], t }
+    this.signatureToggle = 0;     // 단계3 패턴 교대
+    this.attackT = AR().wallInterval;
+    this._lastSafe = [];          // 직전 안전 통로(3회 연속 동일 방지)
+    this._lastStaggerAttack = null;
+  }
+  sprite() { return null; }        // 전용 Canvas 폴백 (B7 이미지 재사용 금지)
+  get intervalMult() { return this.arbiterPhase >= 3 ? AR().enrageIntervalMult : 1; }
+
+  _staggerable() { return !this.dead && this.breakT <= 0 && this.staggerCooldownT <= 0; }
+
+  /** STAGGER 적립 (attackId로 한 공격 중복 방지). 최대 도달 시 BREAK. */
+  addStagger(n, world, attackId = null) {
+    if (!this._staggerable()) return;
+    if (attackId != null && attackId === this._lastStaggerAttack) return;
+    if (attackId != null) this._lastStaggerAttack = attackId;
+    this.stagger = Math.min(AR().staggerMax, this.stagger + n);
+    world.effects.text(this.x + (Math.random() - 0.5) * 40, this.y - 30, `STAGGER +${n}`, '#8affff', 12);
+    if (this.stagger >= AR().staggerMax) this._enterBreak(world);
+  }
+  /** 보스전 근접 회피 → STAGGER +1 (Squad.onGraze에서 world.onPlayerGraze로 호출) */
+  onPlayerGraze(world) { this.addStagger(AR().grazeStagger, world, null); }
+
+  _enterBreak(world) {
+    this.breakT = AR().breakDuration;
+    this.stagger = 0;
+    this.warning = null;                    // 진행 중 경고 취소
+    world.effects.text(this.x, this.y - 40, 'BREAK!', '#ffffff', 22);
+    world.effects.ring(this.x, this.y, '#ffffff');
+    world.effects.burst(this.x, this.y, '#ffffff', 24, 200);
+    world.effects.flash(0.24);
+  }
+
+  _updatePhase(world) {
+    const ratio = this.hp / this.maxHp;
+    const p = ratio > 0.66 ? 1 : ratio > 0.33 ? 2 : 3;
+    if (p !== this.arbiterPhase) {
+      this.arbiterPhase = p;
+      world.effects.text(this.x, this.y - 50, p === 3 ? 'FINAL JUDGMENT' : `PHASE ${p}`, '#b44cff', 16);
+      world.effects.ring(this.x, this.y, '#b44cff');
+    }
+  }
+
+  update(dt, world) {
+    this.t += dt;
+    const L = this.layout(world.logicalH);
+    this.drawScale = L.scale; this.targetY = L.safeY;
+    if (this.y < this.targetY) { this.y += 120 * dt; return; }
+    world.onPlayerGraze = (w) => this.onPlayerGraze(w);   // 보스전 graze STAGGER 라우팅
+    this._updatePhase(world);
+    // BREAK 중: 모든 공격·이동 정지, 받는 피해 ×1.25 (hitByBullet에서 처리), 종료 후 쿨다운
+    if (this.breakT > 0) {
+      this.breakT -= dt;
+      if (this.breakT <= 0) { this.breakT = 0; this.staggerCooldownT = AR().staggerCooldown; }
+      return;
+    }
+    if (this.staggerCooldownT > 0) this.staggerCooldownT = Math.max(0, this.staggerCooldownT - dt);
+    // 완만한 좌우 이동 (BREAK 중엔 위 return으로 정지)
+    const margin = L.halfW + 10;
+    const rawX = this.homeX + Math.sin(this.t * 0.5) * this.logicalW * 0.14;
+    this.x = Math.max(margin, Math.min(this.logicalW - margin, rawX));
+    // 예약된 GAP WALL 경고 → 발사
+    if (this.warning) {
+      this.warning.t -= dt;
+      if (this.warning.t <= 0) { this._fireWall(world, this.warning.slots); this.warning = null; }
+    }
+    // 공격 타이머 (단계별 패턴, 단계3은 간격 ×0.82)
+    this.attackT -= dt;
+    if (this.attackT <= 0 && !this.warning) this._startAttack(world);
+  }
+
+  _startAttack(world) {
+    const C = AR();
+    let useWall;
+    if (this.arbiterPhase === 1) useWall = true;
+    else if (this.arbiterPhase === 2) useWall = false;
+    else useWall = (this.signatureToggle++ % 2 === 0);   // 단계3: 교대
+    if (useWall) {
+      // GAP WALL: 안전 통로 결정 + 경고선(0.65s) 예약. 경고 중 실탄 미발사.
+      const safe = this._pickSafeSlot(world);
+      this.warning = { slots: safe, t: C.wallTelegraph };
+      this.attackT = C.wallInterval * this.intervalMult;
+    } else {
+      this._fireRing(world);
+      this.attackT = C.ringInterval * this.intervalMult;
+    }
+  }
+
+  /** 안전 통로 시작 슬롯(연속 2칸). 화면 밖 잘림 방지 + 3회 연속 동일 금지 + rng 재현성. */
+  _pickSafeSlot(world) {
+    const C = AR();
+    const maxStart = C.wallCount - C.wallGapSlots;   // 0..6 (통로가 화면 안)
+    const rng = world.rng || Math.random;
+    let start;
+    for (let tries = 0; tries < 8; tries++) {
+      start = Math.floor(rng() * (maxStart + 1));
+      const last = this._lastSafe;
+      const threePeat = last.length >= 2 && last[last.length - 1] === start && last[last.length - 2] === start;
+      if (!threePeat) break;
+    }
+    this._lastSafe.push(start);
+    if (this._lastSafe.length > 3) this._lastSafe.shift();
+    return start;
+  }
+
+  _fireWall(world, safeStart) {
+    const C = AR();
+    const slotW = this.logicalW / C.wallCount;
+    const st = { r: 7, dmgPct: BAL.boss.fanDamagePct, dmgMin: BAL.boss.fanDamageMin, color: '#8affff', shape: 'orb' };
+    for (let s = 0; s < C.wallCount; s++) {
+      if (s >= safeStart && s < safeStart + C.wallGapSlots) continue;   // 안전 통로 비움
+      const px = (s + 0.5) * slotW;
+      world.spawnEnemyBullet(new EnemyShot(px, this.y + this.r * 0.4, 0, C.wallSpeed, st));
+    }
+  }
+
+  _fireRing(world) {
+    const C = AR();
+    const st = { r: 6, dmgPct: BAL.boss.fanDamagePct, dmgMin: BAL.boss.fanDamageMin, color: '#b44cff', shape: 'ring' };
+    // 편대 방향 ±35° 안에 빈 각도(≥55°)를 남긴다 (읽고 통과 가능하도록 느린 속도)
+    const toSquad = Math.atan2(world.squad.x - this.x, world.squad.y - this.y);
+    const rng = world.rng || Math.random;
+    const gapCenter = toSquad + (rng() - 0.5) * (70 * Math.PI / 180);   // ±35°
+    const gapHalf = (C.ringGapDeg * Math.PI / 180) / 2;
+    for (let i = 0; i < C.ringCount; i++) {
+      const a = (i / C.ringCount) * Math.PI * 2;
+      let d = Math.abs(((a - gapCenter + Math.PI * 3) % (Math.PI * 2)) - Math.PI);  // 최소 각차
+      if (d < gapHalf) continue;   // 빈 각도 유지 (샷캡 부족해도 gap 보존)
+      world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * C.ringSpeed, Math.cos(a) * C.ringSpeed, st));
+    }
+  }
+
+  hitByBullet(dmg, world, ctx = null) {
+    // 3단+ 원본 차지 랜스 직격 → STAGGER +2 (메아리·일반탄 제외, attackId 중복 방지)
+    if (ctx && ctx.lance && ctx.stage >= 3 && !ctx.echo) this.addStagger(AR().lanceStagger, world, ctx.attackId);
+    const mult = this.breakT > 0 ? AR().breakDamageMult : 1;   // BREAK 중 받는 피해 ×1.25
+    super.hitByBullet(dmg * mult, world);                       // 일반 자동사격도 100% 기본 피해
+  }
+
+  draw(ctx) {
+    if (this.dying) { this.drawDying(ctx, BAL.bossDeath.duration); return; }
+    const sc = this.drawScale || 1;
+    const R = this.r * sc;
+    const broken = this.breakT > 0;
+    const p3 = this.arbiterPhase >= 3;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    // 외곽 링 (단계3 붉은색, 그 외 청록) — 색+텍스트(HUD) 병행
+    ctx.globalAlpha = broken ? 0.4 + 0.4 * Math.sin(this.t * 40) : 0.5;
+    ctx.strokeStyle = p3 ? COLORS.danger : '#57e0ff';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // 회전 저울 팔 (청록 좌 / 자홍 우) — BREAK 중 정지 + 흰색 점멸
+    const arm = broken ? this._breakArm : (this._breakArm = this.t * 1.2);
+    for (const [dir, col] of [[-1, '#57e0ff'], [1, '#ff4cd2']]) {
+      ctx.save();
+      ctx.rotate(arm + (dir < 0 ? 0 : Math.PI));
+      ctx.strokeStyle = broken ? '#ffffff' : col;
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 1.3, 0); ctx.stroke();
+      ctx.fillStyle = broken ? '#ffffff' : col;
+      ctx.beginPath(); ctx.arc(R * 1.3, 0, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    // 중앙 판결 코어 (흰색) + STAGGER 비례 균열
+    ctx.fillStyle = broken ? '#ffffff' : '#f5f7ff';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.6, 0, Math.PI * 2); ctx.fill();
+    const cracks = Math.round((this.stagger / AR().staggerMax) * 6);
+    ctx.strokeStyle = '#1a2030'; ctx.lineWidth = 2;
+    for (let i = 0; i < cracks; i++) {
+      const a = (i / 6) * Math.PI * 2 + this.t * 0.2;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.sin(a) * R * 0.6, Math.cos(a) * R * 0.6); ctx.stroke();
+    }
+    ctx.fillStyle = p3 ? COLORS.danger : '#b44cff';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // GAP WALL 경고선 (위험 슬롯에 세로 맥동선) — 실탄 발사 전 시각 구분
+    if (this.warning) {
+      const C = AR();
+      const slotW = this.logicalW / C.wallCount;
+      ctx.save();
+      ctx.globalAlpha = 0.3 + 0.4 * Math.sin(this.t * 12);
+      ctx.strokeStyle = COLORS.danger; ctx.lineWidth = 3;
+      for (let s = 0; s < C.wallCount; s++) {
+        if (s >= this.warning.slots && s < this.warning.slots + C.wallGapSlots) continue;
+        const px = (s + 0.5) * slotW;
+        ctx.beginPath(); ctx.moveTo(px, this.y + this.r); ctx.lineTo(px, this.y + this.r + 220); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+}
+
+/** 스테이지 보스 생성: B22면 네온 아비터(단독), 그 외 일반 Boss. */
+export function makeBoss(logicalW, rateMult, stage, sizeMul = 1) {
+  const def = bossDefFor(stage);
+  return def.id === 'B22'
+    ? new NeonArbiter(logicalW, rateMult, stage, sizeMul)
+    : new Boss(logicalW, rateMult, stage, sizeMul);
 }

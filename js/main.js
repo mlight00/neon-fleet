@@ -2,7 +2,8 @@
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
-import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, createEffects } from './entities.js';
+import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects } from './entities.js';
+import { bossDefFor } from './sprites.js';
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, evolutionDef } from './weapon-evolutions.js';
@@ -256,6 +257,7 @@ function buildEncounter(node) {
   // 노드 시작: 키스톤 누적 카운터·타이머·예약 리셋 (선택한 키스톤 id는 유지) + FLOW 0
   r.squad.keystoneState = freshKeystoneState();
   r.squad.flow = 0; r.squad.rushT = 0; r.squad.grazeCombo = 0; r.squad.sinceGraze = Infinity;
+  w.onPlayerGraze = null;   // 보스전 STAGGER 라우터 초기화 (B22 update가 다시 등록)
 }
 
 /** 인카운터 클리어(트랙/보스 종료) → 코인 + 노드 완료 */
@@ -427,13 +429,14 @@ function update(dt) {
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
       playBgm('boss'); // 보스 BGM으로 크로스페이드
-      // 무한 상승: 스테이지가 깊을수록 보스 2~3기 동시 등장 (가로 슬롯 배치)
-      const bossN = r.stage >= BAL.boss.multiFromStage3 ? 3 : r.stage >= BAL.boss.multiFromStage2 ? 2 : 1;
+      // 무한 상승: 스테이지가 깊을수록 보스 2~3기 동시. 단, 네온 아비터(B22)는 항상 단독(STAGGER 대상 명확화)
+      const isArbiter = bossDefFor(r.stage).id === 'B22';
+      const bossN = isArbiter ? 1 : (r.stage >= BAL.boss.multiFromStage3 ? 3 : r.stage >= BAL.boss.multiFromStage2 ? 2 : 1);
       const hpCap = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
       const totalMult = bossN > 1 ? BAL.boss.multiTotalMult : 1;                 // 다중 총 HP 배수(각=이/보스수)
       r.bosses = [];
       for (let i = 0; i < bossN; i++) {
-        const b = new Boss(LOGICAL_W, r.mods.enemyRate, r.stage, bossN > 1 ? 0.72 : 1);
+        const b = makeBoss(LOGICAL_W, r.mods.enemyRate, r.stage, bossN > 1 ? 0.72 : 1);
         b.homeX = LOGICAL_W * (i + 1) / (bossN + 1);   // 가로 슬롯
         b.x = b.homeX;
         b.swayScale = 1 / bossN;                        // 좌우 폭 축소 → 겹침 방지
@@ -732,7 +735,7 @@ function draw() {
     const needCruisers = r.squad.tier < maxTier ? Math.max(1, Math.round(BAL.escort.cruisersPerFlagship * evc)) : 0;
     drawHUD(ctx, LOGICAL_W, {
       progress: Math.min(1, r.traveled / r.totalTrack),
-      bosses: r.phase === 'boss' ? r.bosses.map((b) => ({ hp: Math.max(0, b.hp), maxHp: b.maxHp, name: b.korName, dead: b.dead })) : [],
+      bosses: r.phase === 'boss' ? r.bosses.map((b) => ({ hp: Math.max(0, b.hp), maxHp: b.maxHp, name: b.korName, dead: b.dead, stagger: b.stagger, staggerMax: BAL.neonArbiter.staggerMax, breakT: b.breakT })) : [],
       count: r.squad.count,
       cruisers: r.squad.cruisers || 0,
       tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,

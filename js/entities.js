@@ -565,7 +565,8 @@ export class Squad {
     const chgDmgMul = doctrineEffects(this.doctrine, BAL.doctrine).chargeDmgMult;  // 랜스 강습: 차지 피해↑
     const dmg = this.power * ch.blastCoef * stageMult * fireRate * damage * lvCoef * wCoef * (mfx.chargeMult ?? 1) * chgDmgMul;
     // 랜스 문맥: 랜스 강습 교리 + 3단 이상이면 방어막 관통(프리즘·패러사이트), 아니면 일반 정면 취급
-    const lanceCtx = { lance: true, pierceDefense: doctrineEffects(this.doctrine, BAL.doctrine).lancePierceDefense && stage >= 3 };
+    // stage·echo·attackId = B22 STAGGER 판정(3단+ 원본만 +2, 메아리·중복 제외)
+    const lanceCtx = { lance: true, pierceDefense: doctrineEffects(this.doctrine, BAL.doctrine).lancePierceDefense && stage >= 3, stage, echo: false, attackId: (this._lanceId = (this._lanceId || 0) + 1) };
     for (const e of world.entities) {       // 앞쪽 컬럼의 적 전부 관통
       if (e.dead || !e.hitByBullet) continue;
       if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) e.hitByBullet(dmg, world, lanceCtx);
@@ -2821,4 +2822,4 @@ export class Blinker {
 
 
 // 보스 클래스는 bosses.js로 분리 (신규 보스 추가 대비). main.js 등 기존 import 호환을 위해 재export.
-export { Boss } from './bosses.js';
+export { Boss, NeonArbiter, makeBoss } from './bosses.js';

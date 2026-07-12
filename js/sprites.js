@@ -38,6 +38,8 @@ export const BOSS_ROSTER = [
   { id: 'B13', name: 'TIDAL LEVIATHAN', korName: '타이달 리바이어던' },
   { id: 'B14', name: 'STORMBRINGER', korName: '스톰브링어' },
   { id: 'B15', name: 'OPTIC WARDEN', korName: '옵틱 워든' },
+  // 상호작용형 보스 (NEON ADAPTATION Phase 2). 전용 Canvas 폴백 외형 — B7 이미지 재사용 안 함.
+  { id: 'B22', name: 'NEON ARBITER', korName: '네온 아비터' },
 ];
 export function bossDefFor(stage) {
   return BOSS_ROSTER[(Math.max(1, stage) - 1) % BOSS_ROSTER.length];
@@ -75,6 +77,7 @@ export const SPRITE_SIZES = {
   B4: 36, B5: 42, B6: 38,                      // 저격/포탑/위버
   B7: 150, B8: 150, B9: 150, B10: 150, B11: 150, // 스테이지 보스 5종 — 잘림 방지 위해 축소
   B12: 150, B13: 150, B14: 150, B15: 150,      // 신규 보스 4종
+  B22: 150,                                     // 네온 아비터 — Canvas 폴백(RASTER/SVG 미등록 → 404 없이 코드 드로잉)
   B16: 46, B17: 42, B18: 40, B19: 48, B20: 52, B21: 40, // 신규 일반 적 6종
   C1: 56, C2: 30, C3: 34, C4: 46,              // 크리스탈/캡슐/파워/운석
 };
