@@ -12,6 +12,7 @@ import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw
 import { canEvolveWeapon } from './weapon-evolutions.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { droneReward } from './adaptive-logic.js';
+import { addFlow, updateFlow, onFlowHit, isGrazeDistance } from './flow.js';
 import { sfx } from './audio.js';
 
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
@@ -165,7 +166,56 @@ export class Squad {
     this.doctrine = null;                 // 'swarm'|'lance'|'phase'
     this.pendingDoctrine = false;         // 교리 선택 대기
     this.supportAcc = 0;      // 호위함 사격 누적기
+    // ── NEON ADAPTATION Phase 2: FLOW/RUSH 원정 내부 상태 (저장 안 함) ──
+    this.flow = 0;            // 근접 회피 게이지 0~max
+    this.rushT = 0;           // NEON RUSH 잔여 시간(초)
+    this.grazeCombo = 0;      // 연속 근접 회피 콤보
+    this.sinceGraze = Infinity; // 마지막 graze 후 경과(감소 지연 판정)
+    this.grazeFxT = 0;        // GRAZE 문구·SFX 스팸 제한 타이머
+    this.keystone = null;     // 선택한 키스톤 id (원정당 1개, C3)
+    this.keystoneState = {};  // 키스톤 누적 상태 (킬 카운터 등, C3)
     this._offsets = Squad.formationOffsets(BAL.squad.drawCap);
+  }
+
+  // ── FLOW 상태 헬퍼: 순수 로직(flow.js)과 Squad 필드를 잇는다 ──
+  _flowState() { return { flow: this.flow, rushT: this.rushT, combo: this.grazeCombo, sinceGraze: this.sinceGraze }; }
+  _applyFlowState(s) { this.flow = s.flow; this.rushT = s.rushT; this.grazeCombo = s.combo; this.sinceGraze = s.sinceGraze; }
+  get inRush() { return this.rushT > 0; }
+
+  /** 근접 회피 1회. 무적·사망 중엔 무시. 탄을 소비(중복 방지)했으면 true. */
+  onGraze(world, shot) {
+    if (this.invulnT > 0 || this.dead) return false;
+    const cfg = BAL.flow;
+    const s = addFlow(this._flowState(), cfg);
+    this._applyFlowState(s);
+    // 문구·SFX 스팸 제한 (색상만이 아니라 텍스트로도 상태 전달)
+    if ((this.grazeFxT || 0) <= 0) {
+      this.grazeFxT = cfg.textCooldown;
+      world.effects.text(this.x + (Math.random() - 0.5) * 20, this.y - 30, 'GRAZE', COLORS.gateGood, 12);
+    }
+    if (s.rushStarted) this._startRushFx(world);
+    // 키스톤 onGraze 훅 (C3), B22 STAGGER 훅 (C4) — 같은 graze를 한 번씩만 소비
+    if (this.onGrazeKeystone) this.onGrazeKeystone(world, shot);
+    if (world.onPlayerGraze) world.onPlayerGraze(world, shot);
+    return true;
+  }
+
+  /** 실제 전투 피격 시 FLOW/RUSH 규칙 (적탄·접촉 등 실제 손실이 있을 때만 호출). */
+  onCombatHit(world) {
+    const s = onFlowHit(this._flowState(), BAL.flow);
+    const wasRush = this.rushT > 0;
+    this._applyFlowState(s);
+    if (wasRush && s.rushEnded) world.effects.text(this.x, this.y - 40, 'RUSH 중단', COLORS.danger, 13);
+  }
+
+  /** NEON RUSH 발동 연출 (배수 적용은 fire 경로에서, C2). */
+  _startRushFx(world) {
+    world.effects.text(this.x, this.y - 70, 'NEON RUSH!', COLORS.reward, 20);
+    world.effects.ring(this.x, this.y, '#57e0ff');
+    world.effects.ring(this.x, this.y, '#ff4cd2');
+    world.effects.halo(this.x, this.y, COLORS.reward);
+    world.effects.flash(0.22);   // 화면 플래시 0.25 이하 제한
+    sfx('evolve');
   }
 
   static formationOffsets(n) {
@@ -348,6 +398,7 @@ export class Squad {
     }
     const cap = Math.max(2, Math.ceil(this.count * BAL.squad.contactCapPct * (world.mfx?.contactCapMult ?? 1)));
     this.applyDelta(-Math.min(n, cap), world);
+    this.onCombatHit(world);   // 실제 접촉 손실 → FLOW/RUSH 규칙 (Phase 2)
     sfx('damage');
   }
 
@@ -367,6 +418,13 @@ export class Squad {
     if (this.powerT > 0) this.powerT -= dt;
     if (this.invulnT > 0) this.invulnT -= dt;   // 진화 무적 감쇠 (A3)
     if (this.flash > 0) this.flash -= dt;
+    if (this.grazeFxT > 0) this.grazeFxT -= dt;
+    // FLOW 감소 + RUSH 타이머 (근접 회피 시스템, Phase 2)
+    {
+      const fs = updateFlow(this._flowState(), dt, BAL.flow);
+      this._applyFlowState(fs);
+      if (fs.rushEnded) world.effects.text(this.x, this.y - 50, 'RUSH 종료', COLORS.ally, 13);
+    }
     if (this.evolvePunch > 0) this.evolvePunch -= dt;
     this.recoil *= Math.pow(0.001, dt); // ≈ *0.7 per frame @60fps
 
@@ -1810,12 +1868,15 @@ export class EnemyShot {
     this.color = color;     // 발사체 색 (보스별 다양화)
     this.shape = shape;     // orb | needle | ring | ember
     this.dead = false;
+    this.age = 0;           // 생성 후 경과(초) — 겹침 farming 방지 (Phase 2)
+    this.grazed = false;    // 근접 회피 적립 여부 (탄 1개당 1회)
   }
   static aimed(x, y, tx, ty, speed, opts) {
     const d = Math.hypot(tx - x, ty - y) || 1;
     return new EnemyShot(x, y, ((tx - x) / d) * speed, ((ty - y) / d) * speed, opts);
   }
   update(dt, world) {
+    this.age += dt;
     if (this.homing) {
       const dx = world.squad.x - this.x, dy = world.squad.y - this.y;
       const d = Math.hypot(dx, dy) || 1;
@@ -1826,12 +1887,20 @@ export class EnemyShot {
     }
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    if (circleHit(this.x, this.y, this.r, world.squad.x, world.squad.y, world.squad.hitRadius)) {
+    const sq = world.squad;
+    const dist = Math.hypot(this.x - sq.x, this.y - sq.y);
+    if (dist <= this.r + sq.hitRadius) {
+      // 실제 피격: 탄 제거 + (무적 아니면) 피해 + FLOW 규칙. 같은 프레임 graze 금지.
       this.dead = true;
-      if (world.squad.invulnT > 0) return;   // 진화 무적 (A3)
-      const dmg = Math.max(this.dmgMin, Math.round(world.squad.count * this.dmgPct));
-      world.squad.applyDelta(-dmg, world);
+      if (sq.invulnT > 0) return;   // 진화 무적 (A3) — 실제 손실 0이므로 FLOW 규칙도 미적용
+      const dmg = Math.max(this.dmgMin, Math.round(sq.count * this.dmgPct));
+      sq.applyDelta(-dmg, world);
+      sq.onCombatHit(world);        // 실제 전투 손실 → FLOW/RUSH 규칙
       world.effects.burst(this.x, this.y, COLORS.danger, 10);
+    } else if (!this.grazed && this.age >= BAL.flow.minBulletAge && sq.invulnT <= 0
+               && isGrazeDistance(dist, sq.hitRadius, this.r, BAL.flow.grazeBand)) {
+      // 근접 회피: 피격하지 않은 탄만, 탄당 1회 (age·무적·중복 게이트)
+      if (sq.onGraze(world, this)) this.grazed = true;
     }
     if (this.y > world.logicalH + 30 || this.y < -40 || this.x < -30 || this.x > world.logicalW + 30) this.dead = true;
   }
