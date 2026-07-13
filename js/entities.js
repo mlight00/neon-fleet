@@ -852,7 +852,8 @@ export class Squad {
       const sx = this.x + slot.x, sy = this.y + slot.y - 6;
       const aim = tgt ? Math.atan2(tgt.x - sx, sy - tgt.y) : 0;   // 조준 각(정면=0), 표적 없으면 위로
       if (this.weapon === 'laser') {
-        world.bullets.push(new Bullet(sx, sy, dmg, { vx: Math.sin(aim) * W.laser.speed, vy: -Math.cos(aim) * W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv }));
+        // 레이저는 세로 빔 — 순양함 조준사격도 옆으로 눕히지 않고 정면(위)으로만 발사 (평행 레이저 버그 방지)
+        world.bullets.push(new Bullet(sx, sy, dmg, { vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv }));
       } else if (this.weapon === 'homing') {
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
         if (alive < W.homing.cap) world.bullets.push(new HomingMissile(sx, sy, (Math.random() - 0.5) * 180, dmg, this.weaponLv));

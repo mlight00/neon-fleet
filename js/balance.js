@@ -26,7 +26,7 @@ export const BAL = {
   // enemyHpCapPerStage: 화력 비례 HP 상한을 스테이지마다 이만큼 올림 → 깊은 판에선 즉사 안 함(무한 상승)
   // droneGainMult 하향 = 진화 감속. 화력비례 상한(Cap)을 크게 올려 강해져도 적이 안 녹게(즉사 방지) →
   //  후반 난이도 역전을 막고, 실제 위협은 밀도(spawn)+탄막(shotCap)+회피로 온다.
-  economy: { droneGainMult: 0.28, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5 },
+  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5 },
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
@@ -41,7 +41,7 @@ export const BAL = {
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
   // 적 복제 수 = enemyMult + floor((stage-1)/stageStep), 상한 max. 깊은 판일수록 적이 많아 움직여야 생존.
   // 밀도 = 후반 난이도의 핵심. 스테이지마다 적 복제 수가 늘어 화력으로 다 못 쓸고 회피를 강제한다.
-  spawn: { enemyMult: 3, enemyMultMax: 10, enemyMultStageStep: 2 },
+  spawn: { enemyMult: 4, enemyMultMax: 12, enemyMultStageStep: 2 },
 
   // 엘리트 변이(어픽스): 적에 특성을 붙여 같은 적을 다양하게. 색 오라+아이콘으로 표시.
   // 로직은 affixes.js, 여기엔 수치·표시만. 스테이지 깊을수록 자주·중첩된다.

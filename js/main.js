@@ -396,7 +396,11 @@ function update(dt) {
       else if (it.type === 'splitter') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, 'mid', { splits: 3 }), 'creature');
       else if (it.type === 'meteor') w.entities.push(new Meteor(x, -60, r.rng));
       else if (it.type === 'debris') w.entities.push(new Debris(x, -90, it.size));
-      else if (it.type === 'power') w.entities.push(new PowerModule(x, -60));
+      else if (it.type === 'power') {
+        // 절반은 무기 캡슐(무기 선택/강화)로 교체 — 10초 임시 파워업만 반복되지 않게 (사용자 요청)
+        if (r.rng() < 0.5) w.entities.push(new PowerModule(x, -60));
+        else w.entities.push(new Capsule(x, -60, ['vulcan', 'laser', 'homing'][Math.floor(r.rng() * 3)]));
+      }
       else if (it.type === 'sniper') for (let k = 0; k < dup; k++) spawnEnemy(new Sniper(k ? LOGICAL_W - x : x), 'sniper');
       else if (it.type === 'turret') for (let k = 0; k < dup; k++) spawnEnemy(new Turret(k ? LOGICAL_W - x : x, -60 - 90 * k), 'turret');
       else if (it.type === 'weaver') for (let k = 0; k < dup; k++) spawnEnemy(new Weaver(k ? !(it.x < 0.5) : it.x < 0.5, LOGICAL_W), 'weaver');
