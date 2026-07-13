@@ -203,7 +203,7 @@ export class Squad {
     // 문구·SFX 스팸 제한 (색상만이 아니라 텍스트로도 상태 전달)
     if ((this.grazeFxT || 0) <= 0) {
       this.grazeFxT = cfg.textCooldown;
-      world.effects.text(this.x + (Math.random() - 0.5) * 20, this.y - 30, 'GRAZE', COLORS.gateGood, 12);
+      world.effects.text(this.x + (Math.random() - 0.5) * 20, this.y - 30, '회피!', COLORS.gateGood, 12);
     }
     if (s.rushStarted) this._startRushFx(world);
     // 키스톤 onGraze 훅, B22 STAGGER 훅 (C4) — 같은 graze를 한 번씩만 소비
@@ -218,12 +218,12 @@ export class Squad {
     if (this.keystone === 'phase_afterimage') {
       // 위상 잔상 대가: 피격 시 FLOW·RUSH를 전부 잃음
       this.flow = 0; this.rushT = 0; this.grazeCombo = 0;
-      if (wasRush) world.effects.text(this.x, this.y - 40, 'RUSH 중단', COLORS.danger, 13);
+      if (wasRush) world.effects.text(this.x, this.y - 40, '폭주 끊김', COLORS.danger, 13);
       return;
     }
     const s = onFlowHit(this._flowState(), BAL.flow);
     this._applyFlowState(s);
-    if (wasRush && s.rushEnded) world.effects.text(this.x, this.y - 40, 'RUSH 중단', COLORS.danger, 13);
+    if (wasRush && s.rushEnded) world.effects.text(this.x, this.y - 40, '폭주 끊김', COLORS.danger, 13);
   }
 
   // ── 키스톤 전투 훅 (원정당 1개, keystoneState에 누적) ──
@@ -300,7 +300,7 @@ export class Squad {
 
   /** NEON RUSH 발동 연출 (배수 적용은 fire 경로에서, C2). */
   _startRushFx(world) {
-    world.effects.text(this.x, this.y - 70, 'NEON RUSH!', COLORS.reward, 20);
+    world.effects.text(this.x, this.y - 70, '폭주 시작!', COLORS.reward, 20);
     world.effects.ring(this.x, this.y, '#57e0ff');
     world.effects.ring(this.x, this.y, '#ff4cd2');
     world.effects.halo(this.x, this.y, COLORS.reward);
@@ -515,7 +515,7 @@ export class Squad {
     if (this.invulnT > 0) return;   // 진화 무적 (A3)
     if (this.shield) {
       this.shield = false;
-      world.effects.text(this.x, this.y - 40, 'SHIELD!', COLORS.gateGood);
+      world.effects.text(this.x, this.y - 40, '보호막!', COLORS.gateGood);
       world.effects.ring(this.x, this.y, COLORS.gateGood);
       sfx('shield_pop');
       return;
@@ -548,7 +548,7 @@ export class Squad {
     {
       const fs = updateFlow(this._flowState(), dt, BAL.flow);
       this._applyFlowState(fs);
-      if (fs.rushEnded) world.effects.text(this.x, this.y - 50, 'RUSH 종료', COLORS.ally, 13);
+      if (fs.rushEnded) world.effects.text(this.x, this.y - 50, '폭주 종료', COLORS.ally, 13);
     }
     // 키스톤 타이머: 유령 순양함(군체 용광로) 감소 + 예약 메아리(공명 랜스) 발사
     if (this.keystoneState) {

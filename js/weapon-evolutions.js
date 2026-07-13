@@ -4,16 +4,16 @@
 
 export const WEAPON_EVOLUTIONS = {
   vulcan: [
-    { id: 'vulcan_storm',  name: '폭풍 발칸',   short: '폭풍',   shape: '넓게 뿌리고 적 사이 2회 연쇄 도탄', pro: '다수전 지배',      con: '단일 표적 약함' },
-    { id: 'vulcan_needle', name: '니들 개틀링', short: '니들',   shape: '일직선 초고속 관통 드릴',           pro: '단일·라인 폭딜',   con: '넓게 못 씀' },
+    { id: 'vulcan_storm',  name: '폭풍 발칸',   short: '폭풍',   shape: '넓게 뿌리고, 튕겨서 옆 적도 맞힘', pro: '여러 적에 강함',   con: '한 마리엔 약함' },
+    { id: 'vulcan_needle', name: '니들 개틀링', short: '니들',   shape: '한 줄로 빠르게 뚫는 드릴',        pro: '한 마리에 강함',   con: '넓게는 약함' },
   ],
   laser: [
-    { id: 'laser_prism',  name: '프리즘 어레이', short: '프리즘', shape: '관통 후 좌우로 크게 분열(분열탄도 관통)', pro: '다수전 지배',      con: '보스 분열 무효' },
-    { id: 'laser_cutter', name: '널 커터',       short: '커터',   shape: '3탄마다 굵은 절단탄 + 넓은 적탄 소거',    pro: '소탕·생존',        con: '순수 DPS 낮음' },
+    { id: 'laser_prism',  name: '프리즘 어레이', short: '프리즘', shape: '뚫은 뒤 좌우로 갈라짐',           pro: '여러 적에 강함',   con: '보스는 안 갈라짐' },
+    { id: 'laser_cutter', name: '널 커터',       short: '커터',   shape: '가끔 굵은 빔 + 적 총알 지움',       pro: '청소·생존에 강함', con: '공격력은 낮은 편' },
   ],
   homing: [
-    { id: 'homing_wasp',  name: '와스프 스웜',  short: '와스프', shape: '소형 미사일 5발 군집',   pro: '분산 표적 청소',   con: '단발 약함' },
-    { id: 'homing_siege', name: '시즈 토피도',  short: '시즈',   shape: '느린 초대형 폭발 강타',  pro: '단일·보스 초고화력', con: '탄 느림' },
+    { id: 'homing_wasp',  name: '와스프 스웜',  short: '와스프', shape: '작은 유도 미사일 5발',   pro: '흩어진 적 청소',   con: '한 방은 약함' },
+    { id: 'homing_siege', name: '시즈 토피도',  short: '시즈',   shape: '느리지만 초대형 폭발',   pro: '보스에 아주 강함', con: '느림' },
   ],
 };
 
@@ -21,16 +21,16 @@ export const WEAPON_EVOLUTIONS = {
 // 실제 수치는 balance.js(BAL.weaponSuperEvolution). 각각 뚜렷한 정체성(광역/관통/속사/강타).
 export const WEAPON_SUPER_EVOLUTIONS = {
   vulcan: [
-    { id: 'vulcan_tempest', name: '템페스트',   short: '템페스트', shape: '초광역 폭풍탄',   pro: '확산·연사 극대',   con: '단일 표적 비효율' },
-    { id: 'vulcan_lance',   name: '랜스 발칸',   short: '랜스',     shape: '관통 집중탄',     pro: '관통+치명·단일 극대', con: '확산 대폭↓' },
+    { id: 'vulcan_tempest', name: '템페스트',   short: '템페스트', shape: '아주 넓은 폭풍',   pro: '넓게·빠르게 최대',   con: '한 마리엔 비효율' },
+    { id: 'vulcan_lance',   name: '랜스 발칸',   short: '랜스',     shape: '한 곳을 뚫는 집중탄', pro: '한 마리에 최대',     con: '넓게는 크게 약함' },
   ],
   laser: [
-    { id: 'laser_nova',     name: '노바 빔',     short: '노바',     shape: '증폭 관통 빔',     pro: '피해·관통 대폭↑',  con: '' },
-    { id: 'laser_reaper',   name: '리퍼 빔',     short: '리퍼',     shape: '초고속 절단 빔',   pro: '연사·관통↑',       con: '탄당 피해 소폭↓' },
+    { id: 'laser_nova',     name: '노바 빔',     short: '노바',     shape: '더 강하게 뚫는 빔', pro: '피해 크게 ↑',      con: '' },
+    { id: 'laser_reaper',   name: '리퍼 빔',     short: '리퍼',     shape: '아주 빠른 절단 빔', pro: '빠르게 여러 발',    con: '한 발 피해 살짝 ↓' },
   ],
   homing: [
-    { id: 'homing_legion',  name: '레기온',      short: '레기온',   shape: '미사일 난사',      pro: '발사 수·연사 극대', con: '탄당 피해 소폭↓' },
-    { id: 'homing_nova',    name: '노바 토피도',  short: '노바',     shape: '초대형 강타',      pro: '단발 피해 극대',   con: '발사 느림' },
+    { id: 'homing_legion',  name: '레기온',      short: '레기온',   shape: '미사일 마구 발사',  pro: '발사 수 최대',      con: '한 발 피해 살짝 ↓' },
+    { id: 'homing_nova',    name: '노바 토피도',  short: '노바',     shape: '초대형 한 방',     pro: '한 방 피해 최대',   con: '느림' },
   ],
 };
 

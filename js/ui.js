@@ -78,12 +78,10 @@ export const ui = {
     panel(`
       <h1>NEON FLEET</h1>
       <p>네온 함대</p>
-      <p>드론을 모아 <b>순양함</b>으로, 순양함으로 <b>기함</b>을 업그레이드!<br>전투마다 <b>모듈</b>을 골라 매 원정 다른 빌드로 도전!</p>
-      <p>📱 드래그 · 🖱 마우스 · ⌨ ←→ 로 이동</p>
-      <p><small>⚡ 꾹 누르면(홀드) 자동사격 멈추고 <b>차지 랜스</b> 충전 → 놓으면 정면 관통 발사</small></p>
-      <p class="big">최고 도달 STAGE ${stage}</p>
-      ${best > 0 ? `<p>최고 함대 화력: ${best.toLocaleString()} · 코인 ${coins.toLocaleString()}</p>` : ''}
-      ${saveOk ? '' : '<p style="color:#ff3d71">⚠ 이 브라우저에선 기록 저장이 꺼져 있어요</p>'}
+      <p class="big">최고 기록 STAGE ${stage}</p>
+      <p style="font-size:12.5px;color:#9fb8d8;margin:10px 0 2px">좌우로 움직여 적과 총알을 피하세요 · 공격은 자동</p>
+      <p style="font-size:11.5px;color:#7f93b0;margin:0">스페이스(또는 화면) 꾹 누르면 💥 강한 일격</p>
+      ${saveOk ? '' : '<p style="color:#ff3d71;font-size:11px">⚠ 이 브라우저에선 기록이 저장되지 않아요</p>'}
       <div class="btn-row">
         <button id="btn-start">출격</button>
         ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고</button>' : ''}

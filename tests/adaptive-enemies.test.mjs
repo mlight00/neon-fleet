@@ -4,6 +4,10 @@ import { Crystal, DronePod, GatePair } from '../js/entities.js';
 import { Scavenger, GateParasite } from '../js/adaptive-enemies.js';
 import { BAL } from '../js/balance.js';
 
+// 드론 경제 상수에서 파생 — 밸런스 튜닝(droneGainMult 등)에도 안 깨지게 값 대신 계산으로 검증
+const REWARD_100 = Math.round(100 * BAL.economy.droneGainMult);                             // Crystal(100) 실수령
+const SCAVENGER_PAYOUT = Math.round(REWARD_100 * BAL.adaptiveEnemies.scavenger.rewardMult); // 스캐빈저 처치 시 지급(보상×1.5)
+
 // 실제 클래스를 구동하는 최소 world 스텁 (계산식 복사 아님 — 지시서 §3.4 요구).
 function makeWorld() {
   const squad = {
@@ -25,42 +29,45 @@ function makeWorld() {
 }
 
 // ─── 스캐빈저 보상·예약·도주 ───────────────────────────────
-test('Crystal(100) 기본 실수령 = round(100×0.32) = 32', () => {
+test('Crystal(100) 기본 실수령 = round(100×droneGainMult)', () => {
   const w = makeWorld();
-  assert.equal(new Crystal(0, 0, 100).getDroneReward(w), 32);
+  assert.equal(new Crystal(0, 0, 100).getDroneReward(w), REWARD_100);
 });
 
 test('podRewardMult·rewardGainMult가 Crystal·DronePod에 동일 적용', () => {
   const w = makeWorld();
   const cr = new Crystal(0, 0, 100), pod = new DronePod(0, 0, 'mid');
-  const cr1 = cr.getDroneReward(w), pod1 = pod.getDroneReward(w);
+  // 코드와 동일한 단일 반올림식으로 검증(round(raw×pod×econ×doctrine)) — pod1×2 식은 반올림 선형성을 가정해 취약
+  const G = BAL.economy.droneGainMult;
   w.mfx.podRewardMult = 2;                        // 보상 모듈 ×2
-  assert.equal(cr.getDroneReward(w), cr1 * 2);
-  assert.equal(pod.getDroneReward(w), pod1 * 2);
-  w.mfx.podRewardMult = 1; w.squad.doctrine = 'swarm'; w.squad.cruisers = 1;  // 군체 +10%
-  assert.equal(cr.getDroneReward(w), Math.round(100 * BAL.economy.droneGainMult * 1.1));
+  assert.equal(cr.getDroneReward(w), Math.round(cr.reward * 2 * G));
+  assert.equal(pod.getDroneReward(w), Math.round(pod.reward * 2 * G));
+  w.mfx.podRewardMult = 1; w.squad.doctrine = 'swarm'; w.squad.cruisers = 1;  // 군체 교리 보너스
+  const swarmMult = 1 + BAL.doctrine.swarm.droneGainBonus;
+  assert.equal(cr.getDroneReward(w), Math.round(cr.reward * G * swarmMult));
+  assert.equal(pod.getDroneReward(w), Math.round(pod.reward * G * swarmMult));
 });
 
-test('스캐빈저가 Crystal(100)을 훔치면 원시값 100이 아니라 실수령 32를 저장', () => {
+test('스캐빈저가 Crystal(100)을 훔치면 원시값 100이 아니라 실수령을 저장', () => {
   const w = makeWorld();
   const cr = new Crystal(100, 300, 100); w.entities.push(cr);
   const sc = new Scavenger(100); sc.y = 250; w.entities.push(sc);
   for (let i = 0; i < 30 && sc.state !== 'flee'; i++) sc.update(0.1, w);
   assert.equal(sc.state, 'flee');
   assert.equal(cr.dead, true);
-  assert.equal(sc.stored, 32);            // 원시 100 아님
+  assert.equal(sc.stored, REWARD_100);    // 원시 100 아님
 });
 
-test('스캐빈저 처치 시 48만 지급 + 사망 두 번 호출해도 한 번만', () => {
+test('스캐빈저 처치 시 보상×1.5만 지급 + 사망 두 번 호출해도 한 번만', () => {
   const w = makeWorld();
   const cr = new Crystal(100, 300, 100); w.entities.push(cr);
   const sc = new Scavenger(100); sc.y = 250; w.entities.push(sc);
   for (let i = 0; i < 30 && sc.state !== 'flee'; i++) sc.update(0.1, w);
   const before = w.squad.count;
   sc.hitByBullet(999, w);
-  assert.equal(w.squad.count - before, 48);   // 32 × 1.5
+  assert.equal(w.squad.count - before, SCAVENGER_PAYOUT);   // 실수령 × 1.5
   sc.hitByBullet(999, w);                       // 중복 처리
-  assert.equal(w.squad.count - before, 48);   // 여전히 48 (한 번만)
+  assert.equal(w.squad.count - before, SCAVENGER_PAYOUT);   // 여전히 동일 (한 번만)
 });
 
 test('훔치지 않은 스캐빈저 처치 → 드론 없음, 코인만', () => {
@@ -77,7 +84,7 @@ test('보상을 들고 화면 밖으로 도주하면 드론 보상 미지급', (
   const cr = new Crystal(100, 300, 100); w.entities.push(cr);
   const sc = new Scavenger(100); sc.y = 250; w.entities.push(sc);
   for (let i = 0; i < 30 && sc.state !== 'flee'; i++) sc.update(0.1, w);
-  assert.equal(sc.stored, 32);
+  assert.equal(sc.stored, REWARD_100);
   const before = w.squad.count;
   for (let i = 0; i < 100 && !sc.dead; i++) sc.update(0.1, w);   // 위로 도주 → 화면 밖
   assert.equal(sc.dead, true);

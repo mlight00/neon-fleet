@@ -518,7 +518,7 @@ function update(dt) {
     // 보스 위치를 지나는 순간 "STAGE CLEAR" 배너
     if (!r.clearShown && r.boss && r.squad.y < r.boss.y + 30) {
       r.clearShown = true;
-      r.effects.text(LOGICAL_W / 2, logicalH * 0.42, 'STAGE CLEAR!', COLORS.ally);
+      r.effects.text(LOGICAL_W / 2, logicalH * 0.42, '구간 돌파!', COLORS.ally);
       r.effects.ring(LOGICAL_W / 2, logicalH * 0.42, COLORS.ally);
       r.effects.flash(0.4);
       sfx('evolve');

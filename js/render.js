@@ -205,12 +205,12 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
         ctx.textAlign = 'center';
         ctx.font = 'bold 11px sans-serif';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(`BREAK ${bo.breakT.toFixed(1)}s · DAMAGE ×1.25`, logicalW / 2, 70);
+        ctx.fillText(`붕괴 ${bo.breakT.toFixed(1)}초 · 받는 피해 ×1.25`, logicalW / 2, 70);
       } else {
         ctx.textAlign = 'left';
         ctx.font = 'bold 10px sans-serif';
         ctx.fillStyle = '#8affff';
-        ctx.fillText(`STAGGER ${bo.stagger}/${bo.staggerMax}`, 60, 64);
+        ctx.fillText(`균열 ${bo.stagger}/${bo.staggerMax}`, 60, 64);
         ctx.fillStyle = 'rgba(138,255,255,0.18)';
         ctx.fillRect(60, 68, sbw, 5);
         ctx.fillStyle = '#8affff';
@@ -295,7 +295,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       // RUSH: 텍스트 + 청록/자홍 게이지 (색상만이 아니라 RUSH 텍스트 병행)
       ctx.font = 'bold 13px sans-serif';
       ctx.fillStyle = '#ff4cd2';
-      ctx.fillText(`NEON RUSH ${rushT.toFixed(1)}s`, logicalW / 2, by - 4);
+      ctx.fillText(`폭주! ${rushT.toFixed(1)}초`, logicalW / 2, by - 4);
       ctx.fillStyle = 'rgba(87,224,255,0.18)';
       ctx.fillRect(bx, by, bw, bh);
       ctx.fillStyle = '#57e0ff';
@@ -306,7 +306,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.globalAlpha = flow > 0 ? 1 : 0.4;
       ctx.font = 'bold 11px sans-serif';
       ctx.fillStyle = COLORS.gateGood;
-      ctx.fillText(`FLOW ${Math.round(flow)}`, logicalW / 2, by - 3);
+      ctx.fillText(`집중 ${Math.round(flow)}`, logicalW / 2, by - 3);
       ctx.fillStyle = 'rgba(255,255,255,0.12)';
       ctx.fillRect(bx, by, bw, bh);
       ctx.fillStyle = COLORS.gateGood;
