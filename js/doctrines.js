@@ -3,9 +3,9 @@
 // 수치는 balance.js(BAL.doctrine). 중립(미선택) 상태에서는 모든 배수 1 / 보너스 0.
 
 export const DOCTRINES = [
-  { id: 'swarm', name: '군체 지휘', icon: '🐝', desc: '순양함·드론이 강해짐' },
-  { id: 'lance', name: '랜스 강습', icon: '⚡', desc: '강한 일격·정면 돌파가 강해짐' },
-  { id: 'phase', name: '위상 기동', icon: '◈', desc: '이동·회피가 좋아짐' },
+  { id: 'swarm', name: '드론 지휘', icon: '🐝', desc: '드론·순양함 공격 강화' },
+  { id: 'lance', name: '차지 강습', icon: '⚡', desc: '차지 샷·정면 공격 강화' },
+  { id: 'phase', name: '기동 전술', icon: '◈', desc: '이동·회피 성능 강화' },
 ];
 
 export const DOCTRINE_BY_ID = Object.fromEntries(DOCTRINES.map((d) => [d.id, d]));

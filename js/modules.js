@@ -5,21 +5,21 @@
 // 각 모듈: apply(mfx)가 효과 누적기를 변형(스택마다 1회 호출). rarity: common(흔함)/rare(귀함).
 export const MODULE_DEFS = [
   { id: 'dmg',    name: '화력 코어',   icon: '🔥', desc: '공격력 +8%',              rarity: 'common', max: 6, apply: (m) => { m.dmgMult *= 1.08; } },
-  { id: 'rate',   name: '연사 장치',   icon: '⚡', desc: '총알 더 빨리 발사 +8%',    rarity: 'common', max: 5, apply: (m) => { m.fireRateMult *= 1.08; } },
-  { id: 'pierce', name: '관통탄',      icon: '🎯', desc: '총알이 적을 1마리 더 뚫음', rarity: 'common', max: 3, apply: (m) => { m.pierceBonus += 1; } },
-  { id: 'explode',name: '폭발 탄두',   icon: '💥', desc: '적을 부수면 작은 폭발',     rarity: 'common', max: 3, apply: (m) => { m.explodeRadius += 20; m.explodeDmgFrac += 0.015; } },
-  { id: 'crit',   name: '치명 회로',   icon: '✴️', desc: '가끔(5%) 2배 피해',        rarity: 'common', max: 4, apply: (m) => { m.crit += 0.05; } },
-  { id: 'boss',   name: '사냥꾼 표식', icon: '☠️', desc: '보스에게 주는 피해 +10%',  rarity: 'rare',   max: 3, apply: (m) => { m.bossDmgMult *= 1.10; } },
-  { id: 'harvest',name: '수확 드론',   icon: '💠', desc: '크리스탈·보급선 보상 +30%', rarity: 'common', max: 4, apply: (m) => { m.podRewardMult *= 1.3; } },
-  { id: 'evolve', name: '신속 업그레이드', icon: '🌀', desc: '업그레이드가 더 빨라짐 (비용 −15%)', rarity: 'common', max: 3, apply: (m) => { m.evolveCostMult *= 0.85; } },
-  { id: 'scavenge',name: '드론 회수',  icon: '🧲', desc: '적을 잡으면 드론 얻을 확률 ↑', rarity: 'common', max: 4, apply: (m) => { m.killDroneChance += 0.12; } },
-  { id: 'armor',  name: '위상 장갑',   icon: '🧊', desc: '부딪힐 때 받는 피해 −25%',  rarity: 'common', max: 2, apply: (m) => { m.contactCapMult *= 0.7; } },
-  { id: 'shieldregen', name: '반응 실드', icon: '🔵', desc: '가끔 보호막이 생김',      rarity: 'rare', max: 3, apply: (m) => { m.shieldRegen = m.shieldRegen ? m.shieldRegen * 0.7 : 9; } },
-  { id: 'swarm',  name: '군체 의지',   icon: '🐝', desc: '드론이 많을수록 공격력 ↑',   rarity: 'rare',   max: 5, apply: (m) => { m.swarmPerDrone += 0.12; } },
+  { id: 'rate',   name: '연사 가속기',   icon: '⚡', desc: '연사력 +8%',    rarity: 'common', max: 5, apply: (m) => { m.fireRateMult *= 1.08; } },
+  { id: 'pierce', name: '관통탄',      icon: '🎯', desc: '탄환이 적 1기를 추가로 관통', rarity: 'common', max: 3, apply: (m) => { m.pierceBonus += 1; } },
+  { id: 'explode',name: '폭발탄',   icon: '💥', desc: '적 처치 시 주변에 작은 폭발 발생',     rarity: 'common', max: 3, apply: (m) => { m.explodeRadius += 20; m.explodeDmgFrac += 0.015; } },
+  { id: 'crit',   name: '치명타 회로',   icon: '✴️', desc: '치명타 확률 5% · 치명타 피해 2배',        rarity: 'common', max: 4, apply: (m) => { m.crit += 0.05; } },
+  { id: 'boss',   name: '사냥꾼 표식', icon: '☠️', desc: '보스 대상 피해 +10%',  rarity: 'rare',   max: 3, apply: (m) => { m.bossDmgMult *= 1.10; } },
+  { id: 'harvest',name: '수확 드론',   icon: '💠', desc: '크리스탈·보급에서 얻는 드론 +30%', rarity: 'common', max: 4, apply: (m) => { m.podRewardMult *= 1.3; } },
+  { id: 'evolve', name: '효율 설계', icon: '🌀', desc: '기함 강화에 필요한 드론 −15%', rarity: 'common', max: 3, apply: (m) => { m.evolveCostMult *= 0.85; } },
+  { id: 'scavenge',name: '드론 회수 장치',  icon: '🧲', desc: '적 처치 시 드론 획득 확률 증가', rarity: 'common', max: 4, apply: (m) => { m.killDroneChance += 0.12; } },
+  { id: 'armor',  name: '위상 장갑',   icon: '🧊', desc: '충돌 시 잃는 드론 −25%',  rarity: 'common', max: 2, apply: (m) => { m.contactCapMult *= 0.7; } },
+  { id: 'shieldregen', name: '반응 보호막', icon: '🔵', desc: '주기적으로 공격 1회를 막는 보호막 생성',      rarity: 'rare', max: 3, apply: (m) => { m.shieldRegen = m.shieldRegen ? m.shieldRegen * 0.7 : 9; } },
+  { id: 'swarm',  name: '함대 시너지',   icon: '🐝', desc: '보유 드론이 많을수록 공격력 증가',   rarity: 'rare',   max: 5, apply: (m) => { m.swarmPerDrone += 0.12; } },
   // 차지 랜스(강한 일격) 특화
-  { id: 'chgPower', name: '충전 증폭', icon: '🔆', desc: '강한 일격 위력 +12%',       rarity: 'common', max: 4, apply: (m) => { m.chargeMult *= 1.12; } },
-  { id: 'chgSpeed', name: '신속 충전', icon: '⏩', desc: '강한 일격 충전 +35% 빨리',   rarity: 'common', max: 3, apply: (m) => { m.chargeSpeed *= 1.35; } },
-  { id: 'chgMax',   name: '과부하',     icon: '⚡', desc: '강한 일격이 더 강해짐 (단계 +1)', rarity: 'rare', max: 2, apply: (m) => { m.chargeMaxBonus += 1; } },
+  { id: 'chgPower', name: '차지 증폭기', icon: '🔆', desc: '차지 샷 피해 +12%',       rarity: 'common', max: 4, apply: (m) => { m.chargeMult *= 1.12; } },
+  { id: 'chgSpeed', name: '고속 충전', icon: '⏩', desc: '차지 샷 충전 속도 +35%',   rarity: 'common', max: 3, apply: (m) => { m.chargeSpeed *= 1.35; } },
+  { id: 'chgMax',   name: '한계 돌파',     icon: '⚡', desc: '차지 샷 최대 충전 단계 +1', rarity: 'rare', max: 2, apply: (m) => { m.chargeMaxBonus += 1; } },
 ];
 
 export const MODULE_BY_ID = Object.fromEntries(MODULE_DEFS.map((m) => [m.id, m]));

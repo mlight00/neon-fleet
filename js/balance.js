@@ -49,12 +49,12 @@ export const BAL = {
     baseChance: 0.08, chancePerStage: 0.06, chanceCap: 0.55,
     twoAffixStage: 6,                                     // 이 스테이지부터 최대 2개 중첩
     defs: {
-      swift:  { name: '가속',   icon: '»', color: '#ff9c41', spd: 1.6, fire: 0.7 },  // 빠른 이동/발사
+      swift:  { name: '고속',   icon: '»', color: '#ff9c41', spd: 1.6, fire: 0.7 },  // 빠른 이동/발사
       shield: { name: '보호막', icon: '◈', color: '#3fd0f5', charges: 1 },           // 첫 피격 무효
       split:  { name: '분열',   icon: '✶', color: '#b44cff', count: 2 },             // 죽으면 소형 분열
-      toxic:  { name: '독성',   icon: '☣', color: '#7cff4c', contact: 1.7 },         // 접촉 피해 증가
-      elite:  { name: '엘리트', icon: '★', color: '#ffd93d', hp: 3.2, radius: 1.35, bounty: 6, coin: 8 }, // 단단·대박
-      magnet: { name: '자성탄', icon: '◎', color: '#ff4cd2', homing: 3.2 },          // 탄이 편대 유도
+      toxic:  { name: '돌격',   icon: '☣', color: '#7cff4c', contact: 1.7 },         // 접촉 피해 증가
+      elite:  { name: '정예', icon: '★', color: '#ffd93d', hp: 3.2, radius: 1.35, bounty: 6, coin: 8 }, // 단단·대박
+      magnet: { name: '유도탄', icon: '◎', color: '#ff4cd2', homing: 3.2 },          // 탄이 편대 유도
     },
   },
 
@@ -66,7 +66,7 @@ export const BAL = {
   // 함선 진화: 순양함을 모아 기함을 업그레이드(자동). 티어 이름만 데이터로 유지.
   // (화력은 흡수 순양함을 squad.banked에 누적 — entities.checkEvolution. 옛 드론소모/오버로드/승천 제거)
   evolution: {
-    names: ['스카웃', '인터셉터', '스트라이커', '커리어', '드레드노트', '타이탄'],
+    names: ['스카우트', '인터셉터', '스트라이커', '캐리어', '드레드노트', '타이탄'],
   },
 
   // ── NEON ADAPTATION Phase 1 ──────────────────────────────────
@@ -231,12 +231,12 @@ export const BAL = {
   //  rate=연사(탄 수), dmg=탄당 위력, spread=벌칸 확산, pierce=관통 보너스. 티어 초과 시 마지막 값 클램프.
   //  차이를 확실히 느끼도록 극단적으로 벌렸다(연사 1.6↔0.8, 확산 0.4↔2.0, 관통 0↔3).
   shipTraits: [
-    { tag: '스카웃 · 균형',            rate: 1.00, dmg: 1.00, spread: 1.0, pierce: 0 }, // T1 기본
-    { tag: '인터셉터 · 쾌속연사(탄막)',  rate: 1.65, dmg: 0.72, spread: 1.25, pierce: 0 }, // T2 탄을 쏟아붓는다
-    { tag: '스트라이커 · 집중포화(고화력)', rate: 0.95, dmg: 1.65, spread: 0.4, pierce: 0 }, // T3 좁고 묵직한 한 방
-    { tag: '커리어 · 광역산탄(넓게)',    rate: 1.45, dmg: 0.90, spread: 2.1, pierce: 0 }, // T4 부채꼴로 흩뿌림
-    { tag: '드레드노트 · 관통포(꿰뚫음)', rate: 0.85, dmg: 1.55, spread: 0.7, pierce: 2 }, // T5 적 3기 관통
-    { tag: '타이탄 · 초중포(관통·최대)',  rate: 0.78, dmg: 2.05, spread: 0.55, pierce: 3 }, // T6 4기 관통 대구경
+    { tag: '스카우트 · 균형형',            rate: 1.00, dmg: 1.00, spread: 1.0, pierce: 0 }, // T1 기본
+    { tag: '인터셉터 · 고속 연사',  rate: 1.65, dmg: 0.72, spread: 1.25, pierce: 0 }, // T2 탄을 쏟아붓는다
+    { tag: '스트라이커 · 집중 화력', rate: 0.95, dmg: 1.65, spread: 0.4, pierce: 0 }, // T3 좁고 묵직한 한 방
+    { tag: '캐리어 · 광역 사격',    rate: 1.45, dmg: 0.90, spread: 2.1, pierce: 0 }, // T4 부채꼴로 흩뿌림
+    { tag: '드레드노트 · 관통 포격', rate: 0.85, dmg: 1.55, spread: 0.7, pierce: 2 }, // T5 적 3기 관통
+    { tag: '타이탄 · 최대 관통·화력',  rate: 0.78, dmg: 2.05, spread: 0.55, pierce: 3 }, // T6 4기 관통 대구경
   ],
 
   creature: {
@@ -357,10 +357,10 @@ export const BAL = {
     costGrowth: 1.6,        // 레벨당 비용 배수
     maxLv: 10,
     upgrades: {
-      drones: { name: '시작 편대', desc: '출격 시 드론 수', base: 60, step: 2, unit: '기' },
-      dmg: { name: '공격력', desc: '탄환 데미지', base: 90, step: 0.1, unit: '' },
-      rate: { name: '발사 속도', desc: '드론당 초당 발사 수', base: 90, step: 0.2, unit: '/s' },
-      coin: { name: '코인획득 증가', desc: '코인 획득량', base: 50, step: 0.1, unit: 'x' },
+      drones: { name: '시작 드론 수', desc: '출격 시 보유 드론 증가', base: 60, step: 2, unit: '기' },
+      dmg: { name: '공격력', desc: '탄환 1발의 피해 증가', base: 90, step: 0.1, unit: '' },
+      rate: { name: '연사력', desc: '초당 발사 횟수 증가', base: 90, step: 0.2, unit: '/s' },
+      coin: { name: '코인 획득량', desc: '획득 코인 증가', base: 50, step: 0.1, unit: 'x' },
     },
   },
 };

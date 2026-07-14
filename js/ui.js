@@ -78,16 +78,16 @@ export const ui = {
     panel(`
       <h1>NEON FLEET</h1>
       <p>네온 함대</p>
-      <p class="big">최고 기록 STAGE ${stage}</p>
-      <p style="font-size:12.5px;color:#9fb8d8;margin:10px 0 2px">좌우로 움직여 적과 총알을 피하세요 · 공격은 자동</p>
-      <p style="font-size:11.5px;color:#7f93b0;margin:0">스페이스(또는 화면) 꾹 누르면 💥 강한 일격</p>
-      ${saveOk ? '' : '<p style="color:#ff3d71;font-size:11px">⚠ 이 브라우저에선 기록이 저장되지 않아요</p>'}
+      <p class="big">최고 기록: 스테이지 ${stage}</p>
+      <p style="font-size:12.5px;color:#9fb8d8;margin:10px 0 2px">좌우로 이동해 적과 적 탄환을 피하세요. 공격은 자동입니다.</p>
+      <p style="font-size:11.5px;color:#7f93b0;margin:0">스페이스바 또는 화면을 길게 눌러 차지 샷을 충전하세요.</p>
+      ${saveOk ? '' : '<p style="color:#ff3d71;font-size:11px">⚠ 현재 브라우저에서는 기록을 저장할 수 없습니다.</p>'}
       <div class="btn-row">
-        <button id="btn-start">출격</button>
-        ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고</button>' : ''}
+        <button id="btn-start">출격하기</button>
+        ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고 · 영구 강화</button>' : ''}
       </div>
       <div class="title-links">
-        ${onIntro ? '<button id="btn-intro" class="link-btn">📖 스토리 다시보기</button>' : ''}
+        ${onIntro ? '<button id="btn-intro" class="link-btn">📖 스토리 다시 보기</button>' : ''}
         ${onReset ? '<button id="btn-reset" class="link-btn danger">기록 초기화</button>' : ''}
       </div>
     `);
@@ -100,10 +100,10 @@ export const ui = {
   /** 초기화 확인 대화 */
   showResetConfirm({ onConfirm, onCancel }) {
     panel(`
-      <h2 style="color:#ff3d71">기록 초기화</h2>
-      <p>스테이지 진행, 코인, 격납고 강화,<br>최고 기록이 <b>모두 삭제</b>됩니다.</p>
-      <p style="color:#ff9c41"><small>되돌릴 수 없습니다.</small></p>
-      <button id="btn-reset-yes" style="background:linear-gradient(135deg,#ff3d71,#ff9c41)">초기화</button>
+      <h2 style="color:#ff3d71">모든 기록을 삭제할까요?</h2>
+      <p>스테이지 진행 기록, 코인, 격납고 강화,<br>최고 기록이 <b>모두 삭제</b>됩니다.</p>
+      <p style="color:#ff9c41"><small>삭제한 기록은 복구할 수 없습니다.</small></p>
+      <button id="btn-reset-yes" style="background:linear-gradient(135deg,#ff3d71,#ff9c41)">모두 삭제</button>
       <button id="btn-reset-no" class="sub-btn">취소</button>
     `);
     document.getElementById('btn-reset-yes').addEventListener('click', onConfirm);
@@ -132,15 +132,15 @@ export const ui = {
             <small>${def.desc}: ${cur[key](lv)}${maxed ? '' : ' → ' + cur[key](lv + 1)}</small>
           </div>
           <button class="h-buy" data-key="${key}" ${maxed || !afford ? 'disabled' : ''}>
-            ${maxed ? 'MAX' : `🪙 ${cost.toLocaleString()}`}
+            ${maxed ? '최고 레벨 (MAX)' : `강화 🪙 ${cost.toLocaleString()}`}
           </button>
         </div>`;
     }).join('');
     panel(`
-      <h2>격납고</h2>
+      <h2>격납고 · 영구 강화</h2>
       <p class="big">보유 코인: 🪙 ${data.coins.toLocaleString()}</p>
       <div class="h-list">${rows}</div>
-      <p><small>강화는 영구 적용됩니다. 코인은 판을 진행하며 모입니다.</small></p>
+      <p><small>격납고 강화는 모든 출격에 영구 적용됩니다. 코인은 플레이 중 획득할 수 있습니다.</small></p>
       <button id="btn-back">돌아가기</button>
     `);
     overlay.querySelectorAll('.h-buy').forEach((b) => {
@@ -153,12 +153,12 @@ export const ui = {
   showPause({ onResume, onQuit }) {
     panel(`
       <h2>일시정지</h2>
-      <p>계속하려면 아래 버튼 또는 <b>ESC</b></p>
+      <p>아래 버튼 또는 <b>ESC</b>를 눌러 계속하세요.</p>
       <div class="btn-row">
-        <button id="btn-resume">게임 재개하기</button>
-        ${onQuit ? '<button id="btn-quit" class="sub-btn">끝내기</button>' : ''}
+        <button id="btn-resume">계속하기</button>
+        ${onQuit ? '<button id="btn-quit" class="sub-btn">출격 종료</button>' : ''}
       </div>
-      ${onQuit ? '<p><small>끝내도 이번 판에 모은 코인과 기록은 저장됩니다</small></p>' : ''}
+      ${onQuit ? '<p><small>지금 종료해도 이번 출격에서 획득한 코인과 기록은 저장됩니다.</small></p>' : ''}
     `);
     document.getElementById('btn-resume').addEventListener('click', onResume);
     if (onQuit) document.getElementById('btn-quit').addEventListener('click', onQuit);
@@ -168,16 +168,16 @@ export const ui = {
     const mods = modules.length
       ? `<p style="font-size:16px;letter-spacing:2px;margin-top:6px">${modules.map((m) => m.icon + (m.count > 1 ? m.count : '')).join(' ')}</p>` : '';
     panel(`
-      <h2 style="color:#ff3d71">원정 종료</h2>
-      <p class="big">STAGE ${stage} 도달</p>
+      <h2 style="color:#ff3d71">출격 종료</h2>
+      <p class="big">스테이지 ${stage} 도달</p>
       <p>최대 함대 화력: <b>${maxPower.toLocaleString()}</b> ${isRecord ? '<span class="record">★ 신기록!</span>' : ''}</p>
       ${mods}
       ${coins > 0 ? `<p>획득 코인: <b>🪙 +${coins.toLocaleString()}</b></p>` : ''}
-      ${best > 0 && !isRecord ? `<p>최고 기록: ${best.toLocaleString()}</p>` : ''}
-      <p style="color:#9fb8d8"><small>죽으면 처음부터 — 격납고 강화로 더 멀리</small></p>
+      ${best > 0 && !isRecord ? `<p>역대 최고 화력: ${best.toLocaleString()}</p>` : ''}
+      <p style="color:#9fb8d8"><small>격납고에서 영구 강화하고 더 멀리 진격하세요.</small></p>
       <div class="btn-row">
-        <button id="btn-retry">새 원정</button>
-        ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고</button>' : ''}
+        <button id="btn-retry">다시 출격</button>
+        ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고 · 영구 강화</button>' : ''}
       </div>
     `);
     document.getElementById('btn-retry').addEventListener('click', onRetry);
@@ -200,11 +200,11 @@ export const ui = {
     const ownedRow = owned.length
       ? `<p style="font-size:15px;letter-spacing:2px;margin-top:8px;opacity:0.85">${owned.map((o) => o.icon + (o.count > 1 ? o.count : '')).join(' ')}</p>` : '';
     panel(`
-      <h2 style="color:#ffd93d">업그레이드 · 모듈 선택</h2>
-      <p><small>하나를 골라 함대를 강화 — 원정 내내 유지·중첩됩니다</small></p>
+      <h2 style="color:#ffd93d">전투 모듈 선택</h2>
+      <p><small>1개를 선택하세요. 효과는 이번 출격 동안 유지되며 같은 모듈은 중첩됩니다.</small></p>
       <div style="display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap">${cards}</div>
       ${ownedRow}
-      <p style="font-size:10.5px;color:#9fb8d8;margin-top:8px">🖱 클릭 · ⌨ ←→ 이동 · Space 선택</p>
+      <p style="font-size:10.5px;color:#9fb8d8;margin-top:8px">🖱 클릭 선택 · ⌨ ←→ 이동 · Space 확정</p>
     `);
     overlay.querySelectorAll('.draft-card').forEach((b) => {
       b.addEventListener('click', () => onPick(b.dataset.id));
@@ -222,15 +222,15 @@ export const ui = {
           <div style="font-size:11px;color:#7cff9c">▲ ${o.pro}</div>
           ${o.con ? `<div style="font-size:11px;color:#ff9c9c">▼ ${o.con}</div>` : ''}
         </button>`).join('');
-    const title = tier === 2 ? `${WEAPON_LABELS[weapon] || '무기'} 초진화` : `${WEAPON_LABELS[weapon] || '무기'} 진화`;
-    const sub = repick ? '초진화를 다시 골라 교체합니다 — 자유롭게 실험하세요'
-      : tier === 2 ? '진화 무기를 한 번 더 강화 — 원정 내내 유지'
-      : '공격 형태가 바뀝니다 — 원정 내내 유지, 무기당 1회';
+    const title = tier === 2 ? `${WEAPON_LABELS[weapon] || '무기'} 초진화 선택` : `${WEAPON_LABELS[weapon] || '무기'} 진화 선택`;
+    const sub = repick ? '초진화형을 다시 선택할 수 있습니다. 기존 효과는 새 효과로 교체됩니다.'
+      : tier === 2 ? '초진화형 1개를 선택하세요. 진화 무기의 특성이 크게 강화됩니다.'
+      : '진화형 1개를 선택하세요. 공격 방식이 바뀌며 이번 출격 동안 유지됩니다.';
     panel(`
       <h2 style="color:${col}">${title}</h2>
       <p><small>${sub}</small></p>
       <div style="display:flex;gap:12px;justify-content:center;margin:14px 0;flex-wrap:wrap">${cards}</div>
-      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 · ⌨ ←→ 이동 · Space 선택</p>
+      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 선택 · ⌨ ←→ 이동 · Space 확정</p>
     `);
     overlay.querySelectorAll('.evo-card').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
     attachKeyNav(overlay.querySelectorAll('.evo-card'), (b) => onPick(b.dataset.id));
@@ -245,10 +245,10 @@ export const ui = {
           <div style="font-size:11px;color:#dfe9ff;line-height:1.3">${d.desc}</div>
         </button>`).join('');
     panel(`
-      <h2 style="color:#ffd93d">기함 교리 선택</h2>
-      <p><small>이번 원정의 함대 교리 — 한 번만 선택, 강등돼도 유지</small></p>
+      <h2 style="color:#ffd93d">함대 전투 스타일 선택</h2>
+      <p><small>이번 출격의 성장 방향입니다. 한 번만 선택하며 기함 등급이 내려가도 유지됩니다.</small></p>
       <div style="display:flex;gap:10px;justify-content:center;margin:14px 0;flex-wrap:wrap">${cards}</div>
-      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 · ⌨ ←→ 이동 · Space 선택</p>
+      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 선택 · ⌨ ←→ 이동 · Space 확정</p>
     `);
     overlay.querySelectorAll('.doc-card').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
     attachKeyNav(overlay.querySelectorAll('.doc-card'), (b) => onPick(b.dataset.id));
@@ -265,11 +265,11 @@ export const ui = {
           <div style="font-size:11px;color:#ff9c9c">대가: ${k.con}</div>
         </button>`).join('');
     panel(`
-      <div style="font-size:13px;color:#ffd93d;font-weight:bold;margin-bottom:4px">🏆 섹터 ${sector} 클리어 보상</div>
-      <h2 style="color:#b44cff;margin-top:0">키스톤 선택</h2>
-      <p><small>원정의 전투 리듬을 바꾸는 특전입니다 — <b>원정당 1개</b>, 끝까지 유지</small></p>
+      <div style="font-size:13px;color:#ffd93d;font-weight:bold;margin-bottom:4px">🏆 섹터 ${sector} 보스 격파!</div>
+      <h2 style="color:#b44cff;margin-top:0">핵심 특성 선택</h2>
+      <p><small>강력한 효과와 대가가 함께 있는 특성입니다. 이번 출격에서 <b>1개만</b> 선택하며 끝까지 유지됩니다.</small></p>
       <div style="display:flex;gap:10px;justify-content:center;margin:14px 0;flex-wrap:wrap">${cards}</div>
-      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 · ⌨ ←→ 이동 · Space 선택</p>
+      <p style="font-size:10.5px;color:#9fb8d8;margin-top:6px">🖱 클릭 선택 · ⌨ ←→ 이동 · Space 확정</p>
     `);
     overlay.querySelectorAll('.ks-card').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
     attachKeyNav(overlay.querySelectorAll('.ks-card'), (b) => onPick(b.dataset.id));
@@ -278,11 +278,11 @@ export const ui = {
   /** 섹터 분기 맵: 갈림길에서 다음 노드를 고른다 (게임 일시 정지) */
   showSectorMap({ map, currentId = null, doneIds = [], sector, coins = 0, onPick }) {
     const META = {
-      combat: { icon: '⚔️', label: '교전', color: '#ff6b6b' },
-      elite: { icon: '☠️', label: '정예', color: '#ff4cd2' },
-      hazard: { icon: '☄️', label: '위험', color: '#ff9c41' },
+      combat: { icon: '⚔️', label: '전투', color: '#ff6b6b' },
+      elite: { icon: '☠️', label: '정예 전투', color: '#ff4cd2' },
+      hazard: { icon: '☄️', label: '위험 지역', color: '#ff9c41' },
       supply: { icon: '💎', label: '보급', color: '#6fe3ff' },
-      repair: { icon: '🔧', label: '정비', color: '#7cff6b' },
+      repair: { icon: '🔧', label: '수리', color: '#7cff6b' },
       boss: { icon: '👑', label: '보스', color: '#ffd93d' },
     };
     const W = 300, H = 430, mx = 46, my = 40, SP = 84;
@@ -321,13 +321,13 @@ export const ui = {
     const legend = Object.values(META).map((m) => `<span style="white-space:nowrap">${m.icon}${m.label}</span>`).join(' · ');
     panel(`
       <h2 style="color:#3ff5e0">섹터 ${sector} · 항로 선택</h2>
-      <p><small>빛나는 노드를 골라 진격 (위 = 섹터 보스)</small></p>
+      <p><small>빛나는 지점을 선택해 진격하세요. 맨 위 지점은 섹터 보스입니다.</small></p>
       <div style="position:relative;width:${W}px;height:${H}px;margin:6px auto">
         <svg width="${W}" height="${H}" style="position:absolute;left:0;top:0;pointer-events:none">${lines}</svg>
         ${nodes}
       </div>
       <p style="font-size:10.5px;color:#9fb8d8;line-height:1.6">${legend}</p>
-      <p style="font-size:10.5px;color:#9fb8d8">🖱 클릭 · ⌨ ←→ 이동 · Space 선택 &nbsp; 🪙 ${coins.toLocaleString()}</p>
+      <p style="font-size:10.5px;color:#9fb8d8">🖱 클릭 선택 · ⌨ ←→ 이동 · Space 확정 &nbsp; 보유 코인 🪙 ${coins.toLocaleString()}</p>
     `);
     const pickNode = (b) => onPick(idToNode[+b.dataset.node]);
     overlay.querySelectorAll('[data-node]').forEach((b) => {
@@ -341,16 +341,16 @@ export const ui = {
     const mods = modules.length
       ? `<p style="font-size:15px;letter-spacing:2px;margin-top:4px">${modules.map((m) => m.icon + (m.count > 1 ? m.count : '')).join(' ')}</p>` : '';
     panel(`
-      <h2 style="color:#3ff5e0">STAGE ${stage} 클리어!</h2>
-      <p class="big">${bossName} 격파</p>
+      <h2 style="color:#3ff5e0">스테이지 ${stage} 클리어!</h2>
+      <p class="big">${bossName} 격파!</p>
       <div style="margin:10px 0;line-height:1.8">
         <div>함대 화력 <b>${power.toLocaleString()}</b></div>
-        <div>${tierName} · 드론 ${drones}기</div>
-        <div>원정 코인 <b>🪙 ${coins.toLocaleString()}</b></div>
+        <div>기함 ${tierName} · 드론 ${drones}기</div>
+        <div>보유 코인 <b>🪙 ${coins.toLocaleString()}</b></div>
       </div>
       ${mods ? '<p style="color:#9fb8d8"><small>보유 모듈</small></p>' + mods : ''}
-      <p style="color:#ff9c41"><small>다음 스테이지는 적이 더 강해집니다</small></p>
-      <button id="btn-next">STAGE ${nextStage} 출격 ▶</button>
+      <p style="color:#ff9c41"><small>다음 스테이지는 난이도가 더 높습니다.</small></p>
+      <button id="btn-next">스테이지 ${nextStage} 출격 ▶</button>
     `);
     document.getElementById('btn-next').addEventListener('click', onNext);
   },

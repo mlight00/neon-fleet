@@ -63,9 +63,9 @@ window.addEventListener('keydown', firstGestureUnlock);
   wrap.innerHTML = `
     <button id="snd-gear" title="사운드 설정">${snd.mute ? '🔇' : '🔊'}</button>
     <div id="snd-panel" class="hidden">
-      <label>🎵 BGM <input id="snd-bgm" type="range" min="0" max="100" value="${Math.round(snd.bgm * 100)}"></label>
+      <label>🎵 배경음악 <input id="snd-bgm" type="range" min="0" max="100" value="${Math.round(snd.bgm * 100)}"></label>
       <label>🔊 효과음 <input id="snd-sfx" type="range" min="0" max="100" value="${Math.round(snd.sfx * 100)}"></label>
-      <button id="snd-mute">${snd.mute ? '🔇 음소거 해제' : '🔇 음소거'}</button>
+      <button id="snd-mute">${snd.mute ? '🔊 음소거 해제' : '🔇 음소거'}</button>
     </div>`;
   document.getElementById('stage').appendChild(wrap);
 
@@ -87,7 +87,7 @@ window.addEventListener('keydown', firstGestureUnlock);
     e.stopPropagation();
     const muted = toggleMute();
     gear.textContent = muted ? '🔇' : '🔊';
-    muteToggle.textContent = muted ? '🔇 음소거 해제' : '🔇 음소거';
+    muteToggle.textContent = muted ? '🔊 음소거 해제' : '🔇 음소거';
   });
   // 패널 밖 클릭 시 닫기
   document.addEventListener('click', (e) => {
@@ -522,7 +522,7 @@ function update(dt) {
     // 보스 위치를 지나는 순간 "STAGE CLEAR" 배너
     if (!r.clearShown && r.boss && r.squad.y < r.boss.y + 30) {
       r.clearShown = true;
-      r.effects.text(LOGICAL_W / 2, logicalH * 0.42, '구간 돌파!', COLORS.ally);
+      r.effects.text(LOGICAL_W / 2, logicalH * 0.42, '전투 완료!', COLORS.ally);
       r.effects.ring(LOGICAL_W / 2, logicalH * 0.42, COLORS.ally);
       r.effects.flash(0.4);
       sfx('evolve');
@@ -614,7 +614,7 @@ function openDoctrine() {
       ui.hide();
       sfx('buy');
       r.effects.flash(0.7);
-      r.effects.text(r.squad.x, r.squad.y - 60, `${DOCTRINE_BY_ID[id].icon} ${DOCTRINE_BY_ID[id].name}!`, COLORS.reward, 18);
+      r.effects.text(r.squad.x, r.squad.y - 60, `전투 스타일 선택: ${DOCTRINE_BY_ID[id].icon} ${DOCTRINE_BY_ID[id].name}`, COLORS.reward, 18);
     },
   });
 }
@@ -823,7 +823,7 @@ document.getElementById('stage').appendChild(pauseBtn);
 const chargeBtn = document.createElement('button');
 chargeBtn.id = 'charge-btn';
 chargeBtn.textContent = '⚡';
-chargeBtn.title = '차지 (홀드)';
+chargeBtn.title = '차지 샷 (길게 누르기)';
 chargeBtn.style.cssText = 'position:fixed;right:18px;bottom:26px;width:66px;height:66px;border-radius:50%;font-size:30px;background:rgba(63,245,224,0.15);border:2px solid #3ff5e0;color:#3ff5e0;z-index:15;touch-action:none;user-select:none;cursor:pointer';
 const setCharge = (v) => (e) => { e.preventDefault(); e.stopPropagation(); input.charging = v; };
 chargeBtn.addEventListener('pointerdown', setCharge(true));

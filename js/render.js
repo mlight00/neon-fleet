@@ -19,7 +19,7 @@ export const WEAPON_COLORS = {
   laser: '#a8f0ff',
   homing: '#ffd93d',
 };
-export const WEAPON_LABELS = { vulcan: '발칸', laser: '레이저', homing: '호밍' };
+export const WEAPON_LABELS = { vulcan: '발칸', laser: '레이저', homing: '유도 미사일' };
 
 /** 글로우 상태를 감싸서 그리기 (shadowBlur 설정/복원) */
 export function glow(ctx, color, blur, fn) {
@@ -194,7 +194,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillText(`${Math.ceil(bosses[0].hp).toLocaleString()} / ${bosses[0].maxHp.toLocaleString()}`, logicalW - 60, 51);
     } else {
       ctx.textAlign = 'center';
-      ctx.fillText(`보스 ${n}기 · ${bosses[0].name}`, logicalW / 2, 51);
+      ctx.fillText(`보스 ×${n} · ${bosses[0].name}`, logicalW / 2, 51);
     }
     // 네온 아비터 전용 STAGGER/BREAK 보조 바 (다른 보스엔 표시 안 함)
     // 보스 이름·HP(y=51)와 모듈 줄(y=83) 사이에 배치 — 라벨 y=64, 바 y=68~73, BREAK y=70 (중첩 방지)
@@ -205,12 +205,12 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
         ctx.textAlign = 'center';
         ctx.font = 'bold 11px sans-serif';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(`붕괴 ${bo.breakT.toFixed(1)}초 · 받는 피해 ×1.25`, logicalW / 2, 70);
+        ctx.fillText(`무방비 ${bo.breakT.toFixed(1)}초 · 받는 피해 +25%`, logicalW / 2, 70);
       } else {
         ctx.textAlign = 'left';
         ctx.font = 'bold 10px sans-serif';
         ctx.fillStyle = '#8affff';
-        ctx.fillText(`균열 ${bo.stagger}/${bo.staggerMax}`, 60, 64);
+        ctx.fillText(`무력화 게이지 ${bo.stagger}/${bo.staggerMax}`, 60, 64);
         ctx.fillStyle = 'rgba(138,255,255,0.18)';
         ctx.fillRect(60, 68, sbw, 5);
         ctx.fillStyle = '#8affff';
@@ -226,14 +226,14 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   ctx.textAlign = 'left';
   // 보스전에는 기함 상세줄이 보스 HP바·이름과 겹치므로, 함대 줄(보스 HP바보다 위)에 기함 이름만 짧게 붙인다.
   const bossShip = bosses.length && shipName ? ` · 기함 ${shipName}${doctrine ? ' ' + doctrine : ''}` : '';
-  ctx.fillText(`드론 ${count}기 · 순양함 ${cruisers}${bossShip}`, 12, 28);
+  ctx.fillText(`드론 ${count}기 · 순양함 ${cruisers}척${bossShip}`, 12, 28);
   // 상세줄(트레잇·화력·게이지·섹터)은 보스전엔 숨김 (겹침 방지)
   if (!bosses.length) {
     if (tierName) {
       ctx.font = 'bold 11px sans-serif';
       ctx.fillStyle = COLORS.ally;
       const dTag = doctrine ? ` ${doctrine}` : '';
-    ctx.fillText((tierPower > 0 ? `기함 ${tierName} · 화력 ${tierPower}` : `기함 ${tierName}`) + dTag, 12, 42);
+    ctx.fillText((tierPower > 0 ? `기함 ${tierName} · 함대 화력 ${tierPower}` : `기함 ${tierName}`) + dTag, 12, 42);
     }
     // 기함 업그레이드 게이지: 순양함을 모아 임계치를 채우면 기함 1단계 업그레이드
     if (upgradeMax > 0) {
@@ -243,11 +243,11 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillStyle = COLORS.reward;
       ctx.fillRect(12, 48, gw * Math.min(1, upgradeCur / upgradeMax), 5);
       ctx.font = 'bold 10px sans-serif';
-      ctx.fillText(`기함 강화까지 순양함 ${upgradeCur}/${upgradeMax}`, 12 + gw + 6, 53);
+      ctx.fillText(`다음 기함 등급까지: 순양함 ${upgradeCur}/${upgradeMax}`, 12 + gw + 6, 53);
     } else if (tierName) {
       ctx.font = 'bold 10px sans-serif';
       ctx.fillStyle = COLORS.reward;
-      ctx.fillText('기함 최종단계 (MAX)', 12, 53);
+      ctx.fillText('기함 최고 등급 (MAX)', 12, 53);
     }
     if (stage) {
       ctx.font = 'bold 11px sans-serif';
@@ -295,7 +295,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       // RUSH: 텍스트 + 청록/자홍 게이지 (색상만이 아니라 RUSH 텍스트 병행)
       ctx.font = 'bold 13px sans-serif';
       ctx.fillStyle = '#ff4cd2';
-      ctx.fillText(`폭주! ${rushT.toFixed(1)}초`, logicalW / 2, by - 4);
+      ctx.fillText(`폭주 ${rushT.toFixed(1)}초`, logicalW / 2, by - 4);
       ctx.fillStyle = 'rgba(87,224,255,0.18)';
       ctx.fillRect(bx, by, bw, bh);
       ctx.fillStyle = '#57e0ff';
@@ -306,7 +306,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.globalAlpha = flow > 0 ? 1 : 0.4;
       ctx.font = 'bold 11px sans-serif';
       ctx.fillStyle = COLORS.gateGood;
-      ctx.fillText(`집중 ${Math.round(flow)}`, logicalW / 2, by - 3);
+      ctx.fillText(`집중 게이지 ${Math.round(flow)}`, logicalW / 2, by - 3);
       ctx.fillStyle = 'rgba(255,255,255,0.12)';
       ctx.fillRect(bx, by, bw, bh);
       ctx.fillStyle = COLORS.gateGood;

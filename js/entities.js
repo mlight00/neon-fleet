@@ -203,7 +203,7 @@ export class Squad {
     // 문구·SFX 스팸 제한 (색상만이 아니라 텍스트로도 상태 전달)
     if ((this.grazeFxT || 0) <= 0) {
       this.grazeFxT = cfg.textCooldown;
-      world.effects.text(this.x + (Math.random() - 0.5) * 20, this.y - 30, '회피!', COLORS.gateGood, 12);
+      world.effects.text(this.x + (Math.random() - 0.5) * 20, this.y - 30, '아슬아슬 회피!', COLORS.gateGood, 12);
     }
     if (s.rushStarted) this._startRushFx(world);
     // 키스톤 onGraze 훅, B22 STAGGER 훅 (C4) — 같은 graze를 한 번씩만 소비
@@ -218,12 +218,12 @@ export class Squad {
     if (this.keystone === 'phase_afterimage') {
       // 위상 잔상 대가: 피격 시 FLOW·RUSH를 전부 잃음
       this.flow = 0; this.rushT = 0; this.grazeCombo = 0;
-      if (wasRush) world.effects.text(this.x, this.y - 40, '폭주 끊김', COLORS.danger, 13);
+      if (wasRush) world.effects.text(this.x, this.y - 40, '폭주 중단!', COLORS.danger, 13);
       return;
     }
     const s = onFlowHit(this._flowState(), BAL.flow);
     this._applyFlowState(s);
-    if (wasRush && s.rushEnded) world.effects.text(this.x, this.y - 40, '폭주 끊김', COLORS.danger, 13);
+    if (wasRush && s.rushEnded) world.effects.text(this.x, this.y - 40, '폭주 중단!', COLORS.danger, 13);
   }
 
   // ── 키스톤 전투 훅 (원정당 1개, keystoneState에 누적) ──
@@ -256,7 +256,7 @@ export class Squad {
     const r = forgeOnKill(ks, BAL.keystone.swarmForge);
     ks.kills = r.kills; ks.forgeT = r.forgeT;
     if (r.procced) {
-      world.effects.text(this.x, this.y - 54, '유령 순양함 전개!', COLORS.ally, 13);
+      world.effects.text(this.x, this.y - 54, '유령 순양함 소환!', COLORS.ally, 13);
       world.effects.halo(this.x, this.y, '#57e0ff');
     }
   }
@@ -300,7 +300,7 @@ export class Squad {
 
   /** NEON RUSH 발동 연출 (배수 적용은 fire 경로에서, C2). */
   _startRushFx(world) {
-    world.effects.text(this.x, this.y - 70, '폭주 시작!', COLORS.reward, 20);
+    world.effects.text(this.x, this.y - 70, '폭주 발동!', COLORS.reward, 20);
     world.effects.ring(this.x, this.y, '#57e0ff');
     world.effects.ring(this.x, this.y, '#ff4cd2');
     world.effects.halo(this.x, this.y, COLORS.reward);
@@ -351,12 +351,12 @@ export class Squad {
       this.weapon = weapon;
       if (wasEvolved) {
         this.weaponLv = BAL.weapons.maxLv;   // 진화 단계 → 새 무기는 베이스 MAX(=진화 직전)로
-        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} 장착 · 진화 준비`, WEAPON_COLORS[weapon]);
+        world.effects.text(this.x, this.y - 64, `무기 교체: ${WEAPON_LABELS[weapon]} · 진화 가능!`, WEAPON_COLORS[weapon]);
         if (!this.weaponEvolutions[weapon] && !this.pendingWeaponEvolution) {
           this.pendingWeaponEvolution = weapon; this.pendingEvoStage = 'pick1';   // 새 무기 진화 1단계 선택창
         }
       } else {
-        world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[weapon]} 장착 · Lv${this.weaponLv} 유지`, WEAPON_COLORS[weapon]);
+        world.effects.text(this.x, this.y - 64, `무기 교체: ${WEAPON_LABELS[weapon]} · Lv${this.weaponLv} 유지`, WEAPON_COLORS[weapon]);
       }
     }
     world.effects.burst(this.x, this.y - 20, WEAPON_COLORS[this.weapon], 14, 140);
@@ -368,18 +368,18 @@ export class Squad {
     const w = this.weapon;
     if (this.weaponLv < BAL.weapons.maxLv) {
       this.weaponLv++;
-      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} Lv${this.weaponLv}! · 영구`, WEAPON_COLORS[w]);
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} Lv${this.weaponLv} 강화!`, WEAPON_COLORS[w]);
       return;
     }
     if (this.pendingWeaponEvolution) return;   // 이미 선택 대기 중
     const st = evolutionStage(w, this.weaponLv, BAL.weapons.maxLv, this.weaponEvolutions, this.evoLevels, this.weaponEvolutions2, this.superLevels);
     if (st === 'evoUp') {
       this.evoLevels[w] = (this.evoLevels[w] || 1) + 1;
-      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 진화 Lv${this.evoLevels[w]}! · 강화`, COLORS.reward);
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 진화 Lv${this.evoLevels[w]} 강화!`, COLORS.reward);
       world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
     } else if (st === 'superUp') {
       this.superLevels[w] = (this.superLevels[w] || 1) + 1;
-      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 초진화 Lv${this.superLevels[w]}! · 강화`, COLORS.reward);
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 초진화 Lv${this.superLevels[w]} 강화!`, COLORS.reward);
       world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
     } else if (st === 'pick1' || st === 'pick2' || st === 're') {
       this.pendingWeaponEvolution = w;
@@ -421,7 +421,7 @@ export class Squad {
     const m = dronesToCruisers(this.count, this.cruisers || 0, E);
     if (m.merged > 0) {
       this.count = m.count; this.cruisers = m.cruisers;
-      world.effects.text(this.x, this.y - 44, `순양함 +${m.merged}`, COLORS.ally, 14);
+      world.effects.text(this.x, this.y - 44, `순양함 +${m.merged}척`, COLORS.ally, 14);
       sfx('pickup');
     }
     // 2) 순양함이 임계치 이상이면 기함 1단계 업그레이드 (여기서만 선택창=모듈 드래프트가 뜬다)
@@ -439,8 +439,8 @@ export class Squad {
       // (선택창 제거: 기함 업그레이드는 자동. 모듈 드래프트는 정비 노드에서만 뜬다)
       world.effects.halo(this.x, this.y, COLORS.reward);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
-      world.effects.text(this.x, this.y - 98, `${ev.names[this.tier]} 업그레이드! · 화력 +${gain}`, COLORS.reward, 18);
-      world.effects.text(this.x, this.y - 76, `『${BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally, 14);
+      world.effects.text(this.x, this.y - 98, `기함 등급 상승: ${ev.names[this.tier]} · 화력 +${gain}`, COLORS.reward, 18);
+      world.effects.text(this.x, this.y - 76, `기함 특성 획득: 『${BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally, 14);
       sfx('evolve');
     }
     // 3) 최종 상태(타이탄 + 순양함 만석)에서 넘치는 드론은 체력이 아니라 포인트(코인)로 전환
@@ -450,7 +450,7 @@ export class Squad {
       const coins = Math.floor(excess * E.coinPerExcessDrone);
       if (coins > 0 && world.addCoins) {
         world.addCoins(coins);
-        world.effects.text(this.x, this.y - 44, `드론 ${excess}기 → +${coins} 포인트`, COLORS.reward, 14);
+        world.effects.text(this.x, this.y - 44, `초과 드론 ${excess}기 → 점수 +${coins}`, COLORS.reward, 14);
       }
     }
   }
@@ -515,7 +515,7 @@ export class Squad {
     if (this.invulnT > 0) return;   // 진화 무적 (A3)
     if (this.shield) {
       this.shield = false;
-      world.effects.text(this.x, this.y - 40, '보호막!', COLORS.gateGood);
+      world.effects.text(this.x, this.y - 40, '보호막 방어!', COLORS.gateGood);
       world.effects.ring(this.x, this.y, COLORS.gateGood);
       sfx('shield_pop');
       return;
@@ -1465,7 +1465,7 @@ export class DronePod extends Scrolling {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.ally, 18, 200);
       world.effects.ring(this.x, this.y, COLORS.ally);
-      world.squad.applyDelta(this.getDroneReward(world), world, '보급 확보!');
+      world.squad.applyDelta(this.getDroneReward(world), world, '보급 획득!');
       sfx('crystal');
     }
   }
@@ -1516,7 +1516,7 @@ export class GatePair extends Scrolling {
     this.corruptSide = null;   // 게이트 패러사이트 감염 레인 (null|'left'|'right') — 살아있으면 통과 시 반전
   }
   static isGood(g) { return g.op === '+' || g.op === 'x'; }
-  static label(g) { return `${g.op === 'x' ? '×' : g.op === '/' ? '÷' : g.op}${g.value}`; }
+  static label(g) { return `드론 ${g.op === 'x' ? '×' : g.op === '/' ? '÷' : g.op}${g.value}`; }
 
   rects() {
     const w = this.logicalW / 2 - 24;
@@ -1535,7 +1535,7 @@ export class GatePair extends Scrolling {
       if (Math.abs(squad.y - this.y) < this.h / 2 + 8) {
         const side = squad.x < this.logicalW / 2 ? 'left' : 'right';
         let gate = this[side];
-        if (this.corruptSide === side) { gate = invertGateOp(gate); world.effects.text(squad.x, this.y - 20, '감염!', COLORS.gateBad, 14); }
+        if (this.corruptSide === side) { gate = invertGateOp(gate); world.effects.text(squad.x, this.y - 20, '감염! 게이트 효과 반전', COLORS.gateBad, 14); }
         const next = applyGate(squad.count, gate);
         squad.setCount(next, world, GatePair.label(gate));
         this.applied = true;
@@ -1587,7 +1587,7 @@ export class TriGate extends Scrolling {
 
   laneStyle(opt) {
     if (opt.kind === 'weapon') return { color: WEAPON_COLORS[opt.weapon], label: WEAPON_LABELS[opt.weapon] };
-    if (opt.kind === 'drones') return { color: COLORS.ally, label: `+${opt.value}` };
+    if (opt.kind === 'drones') return { color: COLORS.ally, label: `드론 +${opt.value}` };
     if (opt.kind === 'weaponLv') return { color: COLORS.reward, label: 'Lv UP' };
     return { color: COLORS.gateGood, label: '실드' };
   }
@@ -1599,7 +1599,7 @@ export class TriGate extends Scrolling {
     else if (opt.kind === 'weaponLv') sq.levelUp(world);
     else if (opt.kind === 'shield') {
       sq.shield = true;
-      world.effects.text(sq.x, sq.y - 64, '실드 획득!', COLORS.gateGood);
+      world.effects.text(sq.x, sq.y - 64, '보호막 획득!', COLORS.gateGood);
       sfx('shield_on');
     }
   }
@@ -1620,7 +1620,7 @@ export class TriGate extends Scrolling {
           const centerX = (lane + 0.5) * laneW;
           if (Math.abs(squad.x - centerX) > laneW * 0.34) {
             this.applied = true; this.appliedLane = -1; this.flashT = BAL.gate.passFlashTime;
-            world.effects.text(squad.x, squad.y - 64, `${WEAPON_LABELS[squad.weapon]} 유지`, WEAPON_COLORS[squad.weapon], 13);
+            world.effects.text(squad.x, squad.y - 64, `${WEAPON_LABELS[squad.weapon]} 유지!`, WEAPON_COLORS[squad.weapon], 13);
             if (this.offscreen(world)) this.dead = true;
             return;
           }
@@ -2072,7 +2072,7 @@ export class PowerModule extends Scrolling {
     this.spin += dt * 4;
     if (circleHit(this.x, this.y, this.r + 6, world.squad.x, world.squad.y, world.squad.hitRadius)) {
       world.squad.powerT = BAL.powerModule.duration;
-      world.effects.text(world.squad.x, world.squad.y - 40, `⚡ 화력 ×2 · ${BAL.powerModule.duration}초!`, '#4cc9ff');
+      world.effects.text(world.squad.x, world.squad.y - 40, `⚡ 공격력 2배! · ${BAL.powerModule.duration}초`, '#4cc9ff');
       world.effects.burst(this.x, this.y, '#4cc9ff', 18);
       sfx('pickup');
       this.dead = true;

@@ -408,7 +408,7 @@ export class NeonArbiter extends Boss {
     if (attackId != null && attackId === this._lastStaggerAttack) return;
     if (attackId != null) this._lastStaggerAttack = attackId;
     this.stagger = Math.min(AR().staggerMax, this.stagger + n);
-    world.effects.text(this.x + (Math.random() - 0.5) * 40, this.y - 30, `균열 +${n}`, '#8affff', 12);
+    world.effects.text(this.x + (Math.random() - 0.5) * 40, this.y - 30, `무력화 +${n}`, '#8affff', 12);
     if (this.stagger >= AR().staggerMax) this._enterBreak(world);
   }
   /** 보스전 근접 회피 → STAGGER +1 (Squad.onGraze에서 world.onPlayerGraze로 호출) */
@@ -418,7 +418,7 @@ export class NeonArbiter extends Boss {
     this.breakT = AR().breakDuration;
     this.stagger = 0;
     this.warning = null;                    // 진행 중 경고 취소
-    world.effects.text(this.x, this.y - 40, '붕괴! 지금 공격!', '#ffffff', 20);
+    world.effects.text(this.x, this.y - 40, '보스 무방비! 지금 집중 공격!', '#ffffff', 20);
     world.effects.ring(this.x, this.y, '#ffffff');
     world.effects.burst(this.x, this.y, '#ffffff', 24, 200);
     world.effects.flash(0.24);
@@ -429,7 +429,7 @@ export class NeonArbiter extends Boss {
     const p = ratio > 0.66 ? 1 : ratio > 0.33 ? 2 : 3;
     if (p !== this.arbiterPhase) {
       this.arbiterPhase = p;
-      world.effects.text(this.x, this.y - 50, p === 3 ? '최종 단계!' : `${p}단계`, '#b44cff', 16);
+      world.effects.text(this.x, this.y - 50, p === 3 ? '최종 패턴!' : `보스 패턴 ${p}단계`, '#b44cff', 16);
       world.effects.ring(this.x, this.y, '#b44cff');
     }
   }
