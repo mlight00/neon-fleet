@@ -76,12 +76,12 @@ export const BAL = {
     superLevelStep: 0.12, // 초진화 레벨(1→2→3)당 추가 피해 배수
     duplicateReward: { drones: 20, coin: 10 },  // (미사용) 옛 대체 보상
     // 양갈래를 정반대 스타일로 확실히 구분 (광역/연쇄 ↔ 단일/관통)
-    vulcan_storm:  { spread: 1.7, ricochetFrac: 0.6, ricochetRadius: 165, bounces: 2 },                        // 폭풍: 넓게 뿌리고 적 사이를 2번 튕김(다수전)
+    vulcan_storm:  { spread: 1.7, ricochetFrac: 0.75, ricochetRadius: 165, bounces: 2 },                       // 폭풍: 넓게 뿌리고 적 사이를 2번 튕김(다수전) · 반동피해 0.6→0.75
     vulcan_needle: { spread: 0.12, rate: 1.9, critBonus: 0.2, sizeMult: 0.7, pierceBonus: 2 },                 // 니들: 일직선 초고속 관통 드릴(단일)
     laser_prism:   { splitFrac: 0.5, splitRadius: 200, splitPierce: 2 },                                        // 프리즘: 관통 후 좌우로 크게 분열(다수전)
-    laser_cutter:  { every: 3, widthMult: 2.3, pierceBonus: 4, clearRadius: 34, dmgMult: 1.5 },                // 커터: 3탄마다 굵은 절단탄 + 넓은 적탄 제거(소탕)
-    homing_wasp:   { count: 5, totalFrac: 1.3, cap: 34 },                                                       // 와스프: 소형 5발 군집(분산 표적)
-    homing_siege:  { rateMult: 0.3, dmgMult: 4.4, sizeMult: 1.7, blastRadius: 100, blastFrac: 0.5, bossBonus: 0.25, speedMult: 0.75, turnMult: 0.65 }, // 시즈: 느린 초대형 강타(고화력)
+    laser_cutter:  { every: 5, widthMult: 2.3, pierceBonus: 4, clearRadius: 16, dmgMult: 1.6 },                // 커터: 5발마다 굵은 절단탄 + 적탄 제거(반경 34→16·빈도 3→5로 하향, 대신 dmg 1.5→1.6)
+    homing_wasp:   { count: 5, totalFrac: 1.7, cap: 34 },                                                       // 와스프: 소형 5발 군집(분산 표적) · 총피해 1.3→1.7
+    homing_siege:  { rateMult: 0.42, dmgMult: 5.2, sizeMult: 1.7, blastRadius: 110, blastFrac: 0.5, bossBonus: 0.25, speedMult: 0.75, turnMult: 0.65 }, // 시즈: 느린 초대형 강타 · 발사 0.3→0.42·피해 4.4→5.2·폭발 100→110
   },
 
   // 2단계 초진화(1단계 진화 후 같은 색 캡슐 → 2택). 정의는 weapon-evolutions.js. 무기 전체를 증폭(뚜렷한 정체성).
@@ -174,9 +174,9 @@ export const BAL = {
 
   // 속성 무기 3종 (부록 §2): DPS 총량이 아니라 "모양"을 바꾼다
   weapons: {
-    vulcan: { coef: 1.0, speed: 560, spreadDeg: [16, 20, 24] },       // Lv별 확산각
+    vulcan: { coef: 1.2, speed: 560, spreadDeg: [16, 20, 24] },       // Lv별 확산각 (파워 상향 1.0→1.2: 발칸 빈약 피드백)
     laser: { coef: 1.15, speed: 900, pierce: [3, 3, 4], decay: 0.65 }, // 관통 수, 관통당 감쇠
-    homing: { coef: 0.56, rate: 12, speedFrom: 300, speedTo: 480, turnRate: 5, cap: 16 }, // 자동조준=안빗나감 → 약 20% 너프(0.7→0.56)
+    homing: { coef: 0.8, rate: 12, speedFrom: 300, speedTo: 480, turnRate: 5, cap: 16 }, // 자동조준 보정 완화(0.56→0.8: 호밍 위력 빈약 피드백)
     lvCoef: [1.0, 1.15, 1.3],
     maxLv: 3,
   },
@@ -203,7 +203,7 @@ export const BAL = {
     bomber:   { hp: 30, r: 20, hoverY: 150, enterSpeed: 150, stay: 4.5, fireInterval: 2.2, count: 7, spreadDeg: 62, speed: 120, dmgPct: 0.05, dmgMin: 4, coin: 4 }, // 광역 융단(넓은 하강 산탄)
     zapper:   { hp: 26, r: 16, hoverY: 140, enterSpeed: 200, stay: 4.5, cycle: 2.2, charge: 0.9, beamShots: 9, beamGap: 0.045, speed: 320, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 세로 번개 기둥
     orbiter:  { hp: 22, r: 15, orbitR: 66, hz: 0.5, descend: 52, fireInterval: 1.1, speed: 235, dmgPct: 0.04, dmgMin: 3, coin: 3 }, // 원 그리며 조준탄
-    shielder: { hp: 46, r: 20, hoverY: 162, enterSpeed: 170, stay: 6, shieldUp: 1.0, shieldDown: 2.0, fireInterval: 1.3, speed: 195, dmgPct: 0.05, dmgMin: 4, coin: 6, shieldReduce: 0.6, hpScaleMul: 0.22 }, // 방패=완전무적 아니라 60%감소, HP스케일 완화(타이밍 퍼즐이지 체력벽 아님)
+    shielder: { hp: 46, r: 20, hoverY: 162, enterSpeed: 170, stay: 6, shieldUp: 0.6, shieldDown: 2.6, fireInterval: 1.3, speed: 195, dmgPct: 0.05, dmgMin: 4, coin: 6, shieldReduce: 0.25, hpScaleMul: 0.14 }, // 방패 대폭 약화(감소 60%→25%·켜짐 1.0→0.6·꺼짐 2.0→2.6·HP스케일 0.22→0.14): "보호막 너무 강함" 피드백
     carrier:  { hp: 42, r: 24, hoverY: 128, enterSpeed: 140, stay: 6, spawnInterval: 2.6, spawnCount: 2, coin: 6 }, // 소형 드론 사출
     blinker:  { hp: 20, r: 15, blink: 1.25, fireInterval: 1.25, speed: 265, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 순간이동+조준탄
   },
