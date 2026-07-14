@@ -97,12 +97,13 @@ export function chargeStageFor(charge, stageTime, maxStage) {
 export function stageMods(stage) {
   const g = Math.max(1, stage) - 1;
   return {
-    enemyHp: 2 + 0.9 * g + 0.1 * g * g,         // 시작부터 튼튼(즉사 대신 내려와 위협) — 시작난이도 ~3배
-    enemyRate: Math.max(0.4, 0.72 - 0.08 * g), // 적 발사 주기 배수 (작을수록 빠름) — 시작부터 빠르게
+    // 시작값(g=0)만 약 30% 낮추고 성장 계수(g·g² 항)는 유지 → 난이도 곡선은 그대로, 초반만 완만
+    enemyHp: 1.4 + 0.9 * g + 0.1 * g * g,       // 시작 적 체력 2→1.4 (−30%), 곡선은 유지
+    enemyRate: Math.max(0.4, 0.8 - 0.08 * g),  // 적 발사 주기 배수 (작을수록 빠름) — 시작 0.72→0.8 (초반 발사 완화)
     crystal: 1 + 0.18 * g,                     // 드론 보상 완만 상승 (진화 감속)
     boss: 1 + 0.5 * g + 0.04 * g * g,          // 보스 HP 준지수
     tierShift: Math.min(0.3, 0.06 * g),        // hard 청크가 더 일찍 나옴
-    shotCap: Math.min(40, 22 + 3 * g),         // 동시 적탄 상한 대폭↑ (회피 강제)
+    shotCap: Math.min(40, 16 + 3 * g),         // 동시 적탄 상한 — 시작 22→16 (−27%), 상한·기울기 유지
   };
 }
 

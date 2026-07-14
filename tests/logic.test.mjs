@@ -69,10 +69,10 @@ test('stormDecay: 초당 비율 감소, 최소 0', () => {
 // ─── 스테이지 난이도 스케일링 ───
 const { stageMods } = await import('../js/logic.js');
 
-test('stageMods: 스테이지 1 시작 기준값 (난이도 상향 반영)', () => {
+test('stageMods: 스테이지 1 시작 기준값 (시작 30% 완화 반영)', () => {
   const m = stageMods(1);   // g=0
-  assert.equal(m.enemyHp, 2);      // 시작부터 튼튼(즉사 방지·위협)
-  assert.equal(m.enemyRate, 0.72); // 시작부터 빠르게 발사
+  assert.ok(Math.abs(m.enemyHp - 1.4) < 1e-9);  // 시작 적 체력(2→1.4, 곡선 유지)
+  assert.ok(Math.abs(m.enemyRate - 0.8) < 1e-9); // 시작 발사 주기(0.72→0.8, 완화)
   assert.equal(m.crystal, 1);
   assert.equal(m.boss, 1);
   assert.equal(m.tierShift, 0);
@@ -80,15 +80,15 @@ test('stageMods: 스테이지 1 시작 기준값 (난이도 상향 반영)', () 
 
 test('stageMods: 스테이지가 오르면 적은 준지수로 단단·빠르게, 보상은 완만', () => {
   const m = stageMods(3);
-  assert.ok(Math.abs(m.enemyHp - 4.2) < 1e-9);   // g=2: 2 + 0.9×2 + 0.1×4
-  assert.ok(Math.abs(m.enemyRate - 0.56) < 1e-9); // g=2: 0.72 - 0.08×2
+  assert.ok(Math.abs(m.enemyHp - 3.6) < 1e-9);   // g=2: 1.4 + 0.9×2 + 0.1×4
+  assert.ok(Math.abs(m.enemyRate - 0.64) < 1e-9); // g=2: 0.8 - 0.08×2
   assert.ok(Math.abs(m.crystal - 1.36) < 1e-9);   // g=2: 1 + 0.18×2
   assert.ok(Math.abs(m.boss - 2.16) < 1e-9);      // g=2: 1 + 0.5×2 + 0.04×4
 });
 
 test('stageMods: 준지수라 후반이 급격히 어려워진다 (제곱항)', () => {
   const m10 = stageMods(10);   // g=9
-  assert.ok(Math.abs(m10.enemyHp - (2 + 0.9 * 9 + 0.1 * 81)) < 1e-9); // 18.2
+  assert.ok(Math.abs(m10.enemyHp - (1.4 + 0.9 * 9 + 0.1 * 81)) < 1e-9); // 17.6
   assert.ok(m10.enemyHp > 1.9 * stageMods(6).enemyHp);  // 후반 가속 확인
 });
 

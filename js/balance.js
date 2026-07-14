@@ -41,7 +41,7 @@ export const BAL = {
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
   // 적 복제 수 = enemyMult + floor((stage-1)/stageStep), 상한 max. 깊은 판일수록 적이 많아 움직여야 생존.
   // 밀도 = 후반 난이도의 핵심. 스테이지마다 적 복제 수가 늘어 화력으로 다 못 쓸고 회피를 강제한다.
-  spawn: { enemyMult: 4, enemyMultMax: 12, enemyMultStageStep: 2 },
+  spawn: { enemyMult: 3, enemyMultMax: 12, enemyMultStageStep: 2 },
 
   // 엘리트 변이(어픽스): 적에 특성을 붙여 같은 적을 다양하게. 색 오라+아이콘으로 표시.
   // 로직은 affixes.js, 여기엔 수치·표시만. 스테이지 깊을수록 자주·중첩된다.
