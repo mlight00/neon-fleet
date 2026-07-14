@@ -2161,16 +2161,17 @@ export class EnemyShot {
       sq.applyDelta(-dmg, world);
       sq.onCombatHit(world);        // 실제 전투 손실 → FLOW/RUSH 규칙
       world.effects.burst(this.x, this.y, COLORS.danger, 10);
-    } else {
-      // 순양함 피탄: 기함에 안 맞았을 때, 날개의 순양함을 맞히면 그 순양함 HP가 깎인다(격침 가능). 탄 소모 → graze 없음.
-      const ci = (sq.cruisers > 0) ? sq.cruiserHitIndex(this.x, this.y, this.r) : -1;
+    } else if (!this.grazed && this.age >= BAL.flow.minBulletAge && sq.invulnT <= 0
+               && isGrazeDistance(dist, sq.hitRadius, this.r, BAL.flow.grazeBand)) {
+      // 근접 회피(집중 게이지): 기함 코어를 스치는 탄은 순양함 요격보다 '먼저' 인정한다.
+      //  → 편대가 커져 순양함이 대부분의 탄을 가로채도, 코어를 총알 근처로 누비면 후반에도 집중 게이지 획득 가능.
+      if (sq.onGraze(world, this)) this.grazed = true;
+    } else if (sq.cruisers > 0) {
+      // 순양함 피탄: 코어 근접(회피)이 아닌 탄이 날개 순양함을 맞히면 HP가 깎인다(격침 가능). 탄 소모.
+      const ci = sq.cruiserHitIndex(this.x, this.y, this.r);
       if (ci >= 0) {
         this.dead = true;
         if (sq.invulnT <= 0) sq.hitCruiser(ci, Math.max(this.dmgMin, Math.round(sq.count * this.dmgPct)), world);
-      } else if (!this.grazed && this.age >= BAL.flow.minBulletAge && sq.invulnT <= 0
-                 && isGrazeDistance(dist, sq.hitRadius, this.r, BAL.flow.grazeBand)) {
-        // 근접 회피: 피격하지 않은 탄만, 탄당 1회 (age·무적·중복 게이트)
-        if (sq.onGraze(world, this)) this.grazed = true;
       }
     }
     if (this.y > world.logicalH + 30 || this.y < -40 || this.x < -30 || this.x > world.logicalW + 30) this.dead = true;

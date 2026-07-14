@@ -48,17 +48,31 @@ test('hitCruiser: HP 감소, 0이면 격침(cruisers 감소)', () => {
   assert.equal(s.cruiserHp.length, 1);
 });
 
-test('EnemyShot이 순양함을 맞히면: 탄 소멸 + 순양함 HP 감소, 드론 손실·graze 없음', () => {
-  const s = squadWithCruisers(2); const w = makeWorld(s);
-  const p = s.cruiserPositions()[0];
-  const shot = new EnemyShot(p.x, p.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 6 });
+test('EnemyShot이 (코어 밴드 밖) 순양함을 맞히면: 탄 소멸 + HP 감소, 드론 손실·graze 없음', () => {
+  const s = squadWithCruisers(6); const w = makeWorld(s);
+  // 코어 회피 밴드(hitDist ~ hitDist+band) '밖'의 순양함으로 순수 요격을 검증한다.
+  // (밴드 '안'의 전방 순양함은 이제 회피가 우선 — 아래 별도 테스트)
+  const hitDist = s.hitRadius + 8, band = BAL.flow.grazeBand;
+  const far = s.cruiserPositions().find((p) => Math.hypot(p.x - s.x, p.y - s.y) > hitDist + band + 1);
+  assert.ok(far, '코어 밴드 밖 순양함이 존재해야');
+  const shot = new EnemyShot(far.x, far.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 6 });
   shot.age = 1;
   const drones0 = s.count;
   shot.update(0.016, w);
   assert.equal(shot.dead, true);
   assert.equal(s.count, drones0);                 // 드론 안 깎임 (순양함이 막음)
-  assert.equal(shot.grazed, false);               // graze 없음
-  assert.ok(s.cruiserHp[0] < BAL.escort.cruiserHp, '순양함 HP 감소');
+  assert.equal(shot.grazed, false);               // 밴드 밖이라 회피 아님
+  assert.ok(s.cruiserHp[far.i] < BAL.escort.cruiserHp, '순양함 HP 감소');
+});
+
+test('코어 근접 탄은 순양함이 있어도 회피(graze) 우선 인정 — 후반 집중 게이지 획득 가능', () => {
+  const s = squadWithCruisers(4); const w = makeWorld(s);
+  // 기함 코어 정면 위쪽 회피 밴드 안에 탄 배치 → 순양함 요격보다 회피가 우선돼야 (편대가 커도 FLOW 획득)
+  const hitDist = s.hitRadius + 6;
+  const shot = new EnemyShot(s.x, s.y - (hitDist + BAL.flow.grazeBand * 0.5), 0, 0, { r: 6, dmgPct: 0.05, dmgMin: 6 });
+  shot.age = 1;
+  shot.update(0.016, w);
+  assert.equal(shot.grazed, true);                // 순양함보다 회피 우선
 });
 
 test('EnemyShot이 기함을 맞히면 여전히 드론 피해 (순양함 추가에도 회귀)', () => {
