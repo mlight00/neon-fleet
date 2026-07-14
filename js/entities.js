@@ -683,7 +683,7 @@ export class Squad {
         if (alive >= cap) continue;
         const md = crit(dps / W.homing.rate * trait.dmg);   // 기본 1발 피해
         if (wasp) {
-          // 소형 3발: 총 피해 = md × 1.15, 서로 다른 표적 우선
+          // 소형 미사일: count발, 각 md × totalFrac/count (발당 위력↑), 서로 다른 표적 우선
           for (let k = 0; k < wasp.count && alive + k < cap; k++) {
             const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, this.weaponLv);
             mis.wasp = true; mis.r *= 0.8;

@@ -91,10 +91,11 @@ test('널 커터: every 탄마다 강화 절단탄 (balance 반영)', () => {
   assert.ok(hits.length >= 12 / every - 1, '주기적으로 발동');
 });
 
-test('와스프: 소형 다발 군집, 총 피해 = totalFrac (분산 표적)', () => {
+test('와스프: 소형 다발 군집, 발당 위력 유의미 + 총 피해 = totalFrac (분산 표적)', () => {
   const w = BAL.weaponEvolution.homing_wasp;
-  assert.ok(w.count >= 5, '5발 이상 군집');
+  assert.ok(w.count >= 3, '다발 군집(3발 이상)');
   const perMissile = w.totalFrac / w.count;
+  assert.ok(perMissile >= 0.5, '발당 위력이 유의미해야(무의미하게 약하지 않게)');
   assert.ok(Math.abs(perMissile * w.count - w.totalFrac) < 1e-9);
 });
 
