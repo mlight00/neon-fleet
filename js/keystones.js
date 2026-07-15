@@ -18,7 +18,7 @@ export const KEYSTONES = [
   },
   {
     id: 'phase_afterimage', icon: '◈', name: '위상 잔상',
-    change: '아슬아슬 회피 3회 시 주변에 충격파 발생',
+    change: '적 5기 처치마다 주변에 충격파 발생',
     pro: '충격파가 적 탄환 최대 8발 제거',
     con: '피격 시 집중 게이지 초기화·폭주 즉시 종료',
   },

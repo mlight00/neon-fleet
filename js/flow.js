@@ -15,11 +15,11 @@ export function isGrazeDistance(distance, hitRadius, bulletRadius, band) {
  * FLOW가 max에 도달하면 즉시 RUSH 발동 + FLOW 0.
  * 반환: { flow, rushT, combo, sinceGraze, rushStarted }
  */
-export function addFlow(state, cfg) {
+export function addFlow(state, cfg, gain = cfg.gain) {
   if (state.rushT > 0) {
     return { flow: state.flow, rushT: state.rushT, combo: state.combo + 1, sinceGraze: 0, rushStarted: false };
   }
-  let flow = Math.min(cfg.max, state.flow + cfg.gain);
+  let flow = Math.min(cfg.max, state.flow + gain);
   const combo = state.combo + 1;
   let rushT = state.rushT, rushStarted = false;
   if (flow >= cfg.max) { rushT = cfg.rushDuration; flow = 0; rushStarted = true; }

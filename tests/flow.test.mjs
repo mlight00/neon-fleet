@@ -100,20 +100,23 @@ function grazeShot(sq) {
   return new EnemyShot(gx, sq.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 3 });
 }
 
-test('근접 통과한 탄이 FLOW를 정확히 한 번(gain 10) 지급한다', () => {
+test('적 처치가 집중 게이지를 gainPerKill만큼 지급한다 (콤보 — 회피 대체)', () => {
   const sq = freshSquad(); const w = makeWorld(sq);
-  const shot = grazeShot(sq);
-  shot.age = 1;                    // minBulletAge 통과
-  shot.update(0.016, w);
-  assert.equal(sq.flow, BAL.flow.gain);
-  assert.equal(shot.grazed, true);
+  sq.onEnemyKill(w, { isEnemy: true });
+  assert.equal(sq.flow, BAL.flow.gainPerKill);
 });
 
-test('같은 탄이 여러 프레임 근접해도 중복 지급하지 않는다', () => {
+test('비적대(크리스탈·수송선 등) 처치는 집중 게이지를 올리지 않는다', () => {
+  const sq = freshSquad(); const w = makeWorld(sq);
+  sq.onEnemyKill(w, { isEnemy: false });
+  assert.equal(sq.flow, 0);
+});
+
+test('적탄이 기함 코어를 스쳐 지나가도 더는 FLOW를 주지 않는다 (회피 폐지 회귀)', () => {
   const sq = freshSquad(); const w = makeWorld(sq);
   const shot = grazeShot(sq); shot.age = 1;
   for (let i = 0; i < 5; i++) shot.update(0.016, w);
-  assert.equal(sq.flow, BAL.flow.gain);   // 여전히 10
+  assert.equal(sq.flow, 0);
 });
 
 test('실제 명중한 탄은 graze를 지급하지 않는다', () => {
@@ -181,36 +184,33 @@ test('dead EnemyShot이 graze 거리여도 FLOW가 증가하지 않는다', () =
   assert.equal(sq.flow, 0);
 });
 
-test('위상 잔상 3번째 graze로 제거한 탄은 그 후 update돼도 피해가 없다 (실클래스)', () => {
+test('위상 잔상이 처치로 제거한 탄은 그 후 update돼도 피해가 없다 (실클래스)', () => {
   const sq = freshSquad(); sq.keystone = 'phase_afterimage'; sq.keystoneState = freshKeystoneState();
   const w = makeWorld(sq);
-  // 편대에 겹치도록 실제 EnemyShot 5발을 반경 안에 배치
+  // 편대 위치에 실제 EnemyShot 5발을 반경 안에 배치
   const shots = [];
   for (let i = 0; i < 5; i++) { const s = new EnemyShot(sq.x, sq.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 3 }); w.enemyBullets.push(s); shots.push(s); }
-  const trigger = grazeShot(sq); trigger.age = 1; w.enemyBullets.push(trigger);
-  sq.grazeCombo = 0; sq.keystoneState.grazeCount = 2;   // 다음 graze가 3번째 → 파동
-  trigger.update(0.016, w);                              // graze → _phaseWave → 5발 dead
+  const N = BAL.keystone.phaseAfterimage.killsPerProc;
+  for (let i = 0; i < N; i++) sq.onEnemyKill(w, { isEnemy: true });   // N번째 처치 → 파동 → 5발 dead
   assert.ok(shots.every((s) => s.dead), '반경 내 탄 제거');
   const count0 = sq.count;
   for (const s of shots) s.update(0.016, w);             // 제거탄 차례
-  assert.equal(sq.count, count0);                        // 같은 프레임 피해 없음
+  assert.equal(sq.count, count0);                        // 이후 피해 없음
 });
 
-test('제거된(dead) 탄은 B22 STAGGER를 증가시키지 않는다', () => {
+test('적탄 update는 B22 STAGGER와 무관하다 (STAGGER는 플레이어 피해 누적 기반)', () => {
   const arb = new NeonArbiter(480, 1, 30, 1); arb.y = arb.targetY = 130;
-  const sq = freshSquad(); sq.keystone = 'phase_afterimage'; sq.keystoneState = freshKeystoneState();
-  const w = makeWorld(sq); w.bosses = [arb];
-  w.onPlayerGraze = (world) => arb.onPlayerGraze(world);   // 보스전 graze STAGGER 라우팅
-  const dead = new EnemyShot(sq.x, sq.y, 0, 0, { r: 8, dmgPct: 0.05, dmgMin: 3 });
-  dead.dead = true; dead.age = 1; w.enemyBullets.push(dead);
-  dead.update(0.016, w);
-  assert.equal(arb.stagger, 0);   // graze 미발생 → STAGGER 0
+  const sq = freshSquad(); const w = makeWorld(sq); w.bosses = [arb];
+  const b = new EnemyShot(sq.x + 120, sq.y - 60, 0, 40, { r: 8, dmgPct: 0.05, dmgMin: 3 }); b.age = 1; w.enemyBullets.push(b);
+  b.update(0.016, w);
+  assert.equal(arb.stagger, 0);   // 적탄은 STAGGER를 올리지 않음
 });
 
-test('살아있는 일반 적탄의 이동·graze는 유지된다 (회귀)', () => {
+test('일반 적탄은 정상 이동하며 FLOW를 주지 않는다 (회피 폐지 회귀)', () => {
   const sq = freshSquad(); const w = makeWorld(sq);
-  const shot = grazeShot(sq); shot.age = 1;
+  const shot = new EnemyShot(sq.x + 120, sq.y - 120, 0, 60, { r: 8, dmgPct: 0.05, dmgMin: 3 }); shot.age = 1;
+  const y0 = shot.y;
   shot.update(0.016, w);
-  assert.equal(shot.grazed, true);
-  assert.equal(sq.flow, BAL.flow.gain);
+  assert.ok(shot.y > y0, '탄이 아래로 이동');
+  assert.equal(sq.flow, 0, 'FLOW 미지급');
 });

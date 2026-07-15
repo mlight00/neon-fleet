@@ -411,8 +411,17 @@ export class NeonArbiter extends Boss {
     world.effects.text(this.x + (Math.random() - 0.5) * 40, this.y - 30, `무력화 +${n}`, '#8affff', 12);
     if (this.stagger >= AR().staggerMax) this._enterBreak(world);
   }
-  /** 보스전 근접 회피 → STAGGER +1 (Squad.onGraze에서 world.onPlayerGraze로 호출) */
-  onPlayerGraze(world) { this.addStagger(AR().grazeStagger, world, null); }
+  /** 보스에 누적 피해 → STAGGER 적립 (구 근접 회피 대체). HP의 dmgStaggerFrac마다 +1. */
+  staggerFromDamage(dmg, world) {
+    if (!this._staggerable()) return;
+    const per = this.maxHp * AR().dmgStaggerFrac;
+    this._staggerDmg = (this._staggerDmg || 0) + dmg;
+    if (this._staggerDmg >= per) {
+      const add = Math.floor(this._staggerDmg / per);
+      this._staggerDmg -= add * per;
+      this.addStagger(add, world, null);
+    }
+  }
 
   _enterBreak(world) {
     this.breakT = AR().breakDuration;
@@ -439,7 +448,6 @@ export class NeonArbiter extends Boss {
     const L = this.layout(world.logicalH);
     this.drawScale = L.scale; this.targetY = L.safeY;
     if (this.y < this.targetY) { this.y += 120 * dt; return; }
-    world.onPlayerGraze = (w) => this.onPlayerGraze(w);   // 보스전 graze STAGGER 라우팅
     this._updatePhase(world);
     // BREAK 중: 모든 공격·이동 정지, 받는 피해 ×1.25 (hitByBullet에서 처리), 종료 후 쿨다운
     if (this.breakT > 0) {
@@ -526,6 +534,7 @@ export class NeonArbiter extends Boss {
   hitByBullet(dmg, world, ctx = null) {
     // 3단+ 원본 차지 랜스 직격 → STAGGER +2 (메아리·일반탄 제외, attackId 중복 방지)
     if (ctx && ctx.lance && ctx.stage >= 3 && !ctx.echo) this.addStagger(AR().lanceStagger, world, ctx.attackId);
+    this.staggerFromDamage(dmg, world);                        // 누적 피해로 STAGGER (구 근접 회피 대체)
     const mult = this.breakT > 0 ? AR().breakDamageMult : 1;   // BREAK 중 받는 피해 ×1.25
     super.hitByBullet(dmg * mult, world);                       // 일반 자동사격도 100% 기본 피해
   }

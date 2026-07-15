@@ -111,34 +111,34 @@ export const BAL = {
     gateParasite: { minStage: 3, hp: 45, r: 15, offsetY: 36, cleanseDrones: 10, armorReduce: 0.35 },  // 일반 공격 35% 감소(65%만), 랜스 강습3단+ 무시(전액)
   },
 
-  // ── NEON ADAPTATION Phase 2 ──────────────────────────────────
-  // 근접 회피(FLOW)와 NEON RUSH. 적탄 가장자리를 스치면 FLOW가 쌓이고 100에서 RUSH 자동 발동.
-  //  로직은 js/flow.js(순수). 여기엔 수치만. 완전 면역·필수 진행 조건 아님(보상형).
+  // ── 집중 게이지(FLOW) → 폭주(NEON RUSH). '적 처치 콤보'로 게이지가 차고 100에서 폭주 자동 발동.
+  //  (구 '근접 회피'가 너무 어렵다는 피드백 → 처치 콤보로 개편). 로직은 js/flow.js(순수). 보상형(필수 아님).
   flow: {
-    grazeBand: 18,          // 실제 피격 경계 바깥 추가 graze 판정 폭(px)
-    gain: 10,               // 적탄 1개당 FLOW 적립
+    gainPerKill: 12,        // 적 1기 처치당 집중 게이지 적립 (콤보)
+    gain: 10,               // (구) 회피 1회 적립 — 현재 미사용
+    grazeBand: 18,          // (구) 회피 판정 폭 — 현재 미사용
     max: 100,
-    decayDelay: 1.5,        // 마지막 graze 후 감소 시작(초)
-    decayPerSec: 8,
-    minBulletAge: 0.12,     // 생성 직후 겹침 farming 방지(초)
+    decayDelay: 1.5,        // 마지막 처치 후 감소 시작(초)
+    decayPerSec: 8,         // 이후 초당 감소 (콤보 유지 압박)
+    minBulletAge: 0.12,     // (구) — 현재 미사용
     rushDuration: 4.0,
     rushDamageMult: 1.18,
     rushChargeSpeedMult: 1.20,
     rushMoveResponseMult: 1.15,
-    hitLoss: 35,            // RUSH 아닐 때 피격 시 FLOW 손실
-    textCooldown: 0.12,     // GRAZE 문구·SFX 스팸 제한(초)
+    hitLoss: 35,            // 피격 시 게이지 손실 (콤보 끊김)
+    textCooldown: 0.12,
   },
 
   // 키스톤(원정당 1개, 첫 섹터 보스 후 선택). 정의는 js/keystones.js. 여기엔 수치만.
   keystone: {
     swarmForge:  { killsPerProc: 8, ghostDuration: 8, ghostDurationMax: 16, ghostCruisers: 2, supportBonus: 0.5, flagPenalty: 0.08 },  // 유령 순양함이 실제 사격까지(체감↑)
     lanceEcho:   { minStage: 3, delay: 0.35, dmgFrac: 0.45, widthFrac: 0.65, autoPenalty: 0.12, maxPending: 3 },
-    phaseAfterimage: { grazesPerProc: 3, radius: 70, maxClear: 8 },
+    phaseAfterimage: { killsPerProc: 5, radius: 70, maxClear: 8 },   // 적 5기 처치마다 충격파 (구: 회피 3회)
   },
 
-  // B22 네온 아비터: STAGGER(graze/랜스)로 BREAK를 유발하는 상호작용형 보스.
+  // B22 네온 아비터: STAGGER(피해 누적/랜스)로 BREAK를 유발하는 상호작용형 보스. (구 graze→피해기반)
   neonArbiter: {
-    staggerMax: 10, grazeStagger: 1, lanceStagger: 2,
+    staggerMax: 10, dmgStaggerFrac: 0.05, lanceStagger: 2,   // 보스 HP의 5% 딜마다 무력화 +1 (총 50% 딜=완전 무력화)
     breakDuration: 1.6, breakDamageMult: 1.25, staggerCooldown: 2.0,
     wallInterval: 1.35, wallTelegraph: 0.65, wallCount: 8, wallGapSlots: 2, wallSpeed: 170, wallMinGapPx: 72,
     ringInterval: 1.55, ringCount: 14, ringGapDeg: 55, ringSpeed: 155,

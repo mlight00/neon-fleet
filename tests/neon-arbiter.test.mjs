@@ -95,10 +95,11 @@ test('동일 RNG 시 GAP WALL 패턴이 재현된다', () => {
   assert.deepEqual(s1, s2);
 });
 
-test('graze 1회는 STAGGER +1', () => {
+test('보스에 피해를 누적하면 STAGGER가 오른다 (HP의 dmgStaggerFrac마다 +1)', () => {
   const a = settled(); const w = makeWorld(a);
-  a.onPlayerGraze(w);
-  assert.equal(a.stagger, AR.grazeStagger);
+  const per = a.maxHp * AR.dmgStaggerFrac;
+  a.hitByBullet(per, w, { x: 240 });   // 정확히 1단계 분량 (일반 탄환)
+  assert.equal(a.stagger, 1);
 });
 
 test('일반 자동사격(탄환 ctx)은 STAGGER를 올리지 않는다', () => {
@@ -124,7 +125,8 @@ test('동일 attackId는 중복 STAGGER를 주지 않는다', () => {
 
 test('STAGGER 최대에서 BREAK 시작(1.6s) + STAGGER 0', () => {
   const a = settled(); const w = makeWorld(a);
-  for (let i = 0; i < AR.staggerMax; i++) a.onPlayerGraze(w);
+  const per = a.maxHp * AR.dmgStaggerFrac;
+  a.hitByBullet(per * AR.staggerMax, w, { x: 240 });   // 총 staggerMax 단계 분량 피해 → 완전 무력화
   assert.ok(Math.abs(a.breakT - AR.breakDuration) < 1e-9);
   assert.equal(a.stagger, 0);
 });
@@ -151,8 +153,8 @@ test('BREAK 종료 후 2초 쿨다운 동안 STAGGER가 쌓이지 않는다', ()
   a.breakT = 0.1;
   a.update(0.2, w);                       // BREAK 종료 → 쿨다운 진입
   assert.ok(a.staggerCooldownT > 0);
-  a.onPlayerGraze(w);
-  assert.equal(a.stagger, 0);             // 쿨다운 중 적립 차단
+  a.hitByBullet(a.maxHp * AR.dmgStaggerFrac, w, { x: 240 });   // 쿨다운 중 피해
+  assert.equal(a.stagger, 0);             // 적립 차단
 });
 
 test('일반 사격만으로도 B22를 처치할 수 있다(완전 면역 없음)', () => {

@@ -12,7 +12,7 @@ import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw
 import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult } from './weapon-evolutions.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { droneReward } from './adaptive-logic.js';
-import { addFlow, updateFlow, onFlowHit, isGrazeDistance } from './flow.js';
+import { addFlow, updateFlow, onFlowHit } from './flow.js';
 import { keystoneEffects, forgeOnKill } from './keystones.js';
 import { sfx } from './audio.js';
 
@@ -194,24 +194,6 @@ export class Squad {
   get rushChargeMult() { return this.rushT > 0 ? BAL.flow.rushChargeSpeedMult : 1; }
   get rushMoveMult() { return this.rushT > 0 ? BAL.flow.rushMoveResponseMult : 1; }
 
-  /** 근접 회피 1회. 무적·사망 중엔 무시. 탄을 소비(중복 방지)했으면 true. */
-  onGraze(world, shot) {
-    if (this.invulnT > 0 || this.dead) return false;
-    const cfg = BAL.flow;
-    const s = addFlow(this._flowState(), cfg);
-    this._applyFlowState(s);
-    // 문구·SFX 스팸 제한 (색상만이 아니라 텍스트로도 상태 전달)
-    if ((this.grazeFxT || 0) <= 0) {
-      this.grazeFxT = cfg.textCooldown;
-      world.effects.text(this.x + (Math.random() - 0.5) * 20, this.y - 30, '아슬아슬 회피!', COLORS.gateGood, 12);
-    }
-    if (s.rushStarted) this._startRushFx(world);
-    // 키스톤 onGraze 훅, B22 STAGGER 훅 (C4) — 같은 graze를 한 번씩만 소비
-    this.onGrazeKeystone(world, shot);
-    if (world.onPlayerGraze) world.onPlayerGraze(world, shot);
-    return true;
-  }
-
   /** 실제 전투 피격 시 FLOW/RUSH 규칙 (적탄·접촉 등 실제 손실이 있을 때만 호출). */
   onCombatHit(world) {
     const wasRush = this.rushT > 0;
@@ -229,15 +211,7 @@ export class Squad {
   // ── 키스톤 전투 훅 (원정당 1개, keystoneState에 누적) ──
   _ksState() { if (!this.keystoneState) this.keystoneState = { kills: 0, forgeT: 0, grazeCount: 0, pendingEchoes: [] }; return this.keystoneState; }
 
-  /** 근접 회피 시 키스톤 효과: 위상 잔상 3회마다 파동. */
-  onGrazeKeystone(world, shot) {
-    if (this.keystone !== 'phase_afterimage') return;
-    const ks = this._ksState();
-    ks.grazeCount = (ks.grazeCount || 0) + 1;
-    if (ks.grazeCount % BAL.keystone.phaseAfterimage.grazesPerProc === 0) this._phaseWave(world);
-  }
-
-  /** 위상 파동: 반경 내 적탄을 거리순 최대 8발 제거 (제거탄은 graze 미지급). 없어도 연출은 표시. */
+  /** 위상 파동: 반경 내 적탄을 거리순 최대 8발 제거. 없어도 연출은 표시. */
   _phaseWave(world) {
     const P = BAL.keystone.phaseAfterimage;
     const near = (world.enemyBullets || [])
@@ -248,16 +222,28 @@ export class Squad {
     world.effects.burst(this.x, this.y, '#b44cff', 8, 120);
   }
 
-  /** 실제 적 처치 시 키스톤 효과: 군체 용광로 10킬마다 유령 순양함 전개. */
+  /** 실제 적 처치 시: 집중 게이지(처치 콤보) 충전 + 키스톤 효과. */
   onEnemyKill(world, e) {
-    if (this.keystone !== 'swarm_forge') return;
     if (!e || !e.isEnemy) return;   // 크리스탈·수송선·장애물 제외
-    const ks = this._ksState();
-    const r = forgeOnKill(ks, BAL.keystone.swarmForge);
-    ks.kills = r.kills; ks.forgeT = r.forgeT;
-    if (r.procced) {
-      world.effects.text(this.x, this.y - 54, '유령 순양함 소환!', COLORS.ally, 13);
-      world.effects.halo(this.x, this.y, '#57e0ff');
+    // 집중 게이지: 처치할수록 차고 100에서 폭주 자동 발동 (구 '근접 회피' 대체)
+    if (this.invulnT <= 0 && !this.dead) {
+      const s = addFlow(this._flowState(), BAL.flow, BAL.flow.gainPerKill);
+      this._applyFlowState(s);
+      if (s.rushStarted) this._startRushFx(world);
+    }
+    // 키스톤별 처치 효과
+    if (this.keystone === 'swarm_forge') {
+      const ks = this._ksState();
+      const r = forgeOnKill(ks, BAL.keystone.swarmForge);
+      ks.kills = r.kills; ks.forgeT = r.forgeT;
+      if (r.procced) {
+        world.effects.text(this.x, this.y - 54, '유령 순양함 소환!', COLORS.ally, 13);
+        world.effects.halo(this.x, this.y, '#57e0ff');
+      }
+    } else if (this.keystone === 'phase_afterimage') {
+      const ks = this._ksState();
+      ks.phaseKills = (ks.phaseKills || 0) + 1;   // 위상 잔상: 적 N기 처치마다 충격파
+      if (ks.phaseKills % BAL.keystone.phaseAfterimage.killsPerProc === 0) this._phaseWave(world);
     }
   }
 
@@ -2161,13 +2147,9 @@ export class EnemyShot {
       sq.applyDelta(-dmg, world);
       sq.onCombatHit(world);        // 실제 전투 손실 → FLOW/RUSH 규칙
       world.effects.burst(this.x, this.y, COLORS.danger, 10);
-    } else if (!this.grazed && this.age >= BAL.flow.minBulletAge && sq.invulnT <= 0
-               && isGrazeDistance(dist, sq.hitRadius, this.r, BAL.flow.grazeBand)) {
-      // 근접 회피(집중 게이지): 기함 코어를 스치는 탄은 순양함 요격보다 '먼저' 인정한다.
-      //  → 편대가 커져 순양함이 대부분의 탄을 가로채도, 코어를 총알 근처로 누비면 후반에도 집중 게이지 획득 가능.
-      if (sq.onGraze(world, this)) this.grazed = true;
     } else if (sq.cruisers > 0) {
-      // 순양함 피탄: 코어 근접(회피)이 아닌 탄이 날개 순양함을 맞히면 HP가 깎인다(격침 가능). 탄 소모.
+      // 순양함 피탄: 기함에 안 맞은 탄이 날개 순양함을 맞히면 HP가 깎인다(격침 가능). 탄 소모.
+      //  (구 '근접 회피'는 처치 콤보 방식으로 개편되어 여기서 제거됨)
       const ci = sq.cruiserHitIndex(this.x, this.y, this.r);
       if (ci >= 0) {
         this.dead = true;
