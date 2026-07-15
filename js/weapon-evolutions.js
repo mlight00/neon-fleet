@@ -40,12 +40,12 @@ const EVO_BY_ID = Object.fromEntries([...Object.values(WEAPON_EVOLUTIONS), ...Ob
 
 // 진화별 발사체 색 — 적 팩션(보라~적색)과 겹치지 않게 청록/파랑/초록/노랑/주황 계열로 구분.
 export const EVO_PROJECTILE_COLOR = {
-  vulcan_storm: '#ff9c41', vulcan_needle: '#8affff',            // 발칸: 폭풍=호박 / 니들=전기청록
-  laser_prism: '#6cc8ff', laser_cutter: '#7cff6b',             // 레이저: 프리즘=밝은파랑 / 커터=초록
-  homing_wasp: '#c8ff4c', homing_siege: '#ff8c1a',             // 호밍: 와스프=연두 / 시즈=진한주황
-  vulcan_tempest: '#ffc23d', vulcan_lance: '#ff6a2a',          // 초진화(더 강렬)
-  laser_nova: '#aef0ff', laser_reaper: '#4cffc8',
-  homing_legion: '#ffe14c', homing_nova: '#ff7a2a',
+  vulcan_storm: '#ff8c1a', vulcan_needle: '#5cc8ff',           // 발칸: 폭풍=주황 / 니들=하늘파랑
+  laser_prism: '#2fd0ff', laser_cutter: '#5cff5c',            // 레이저: 프리즘=밝은청록 / 커터=초록
+  homing_wasp: '#c8ff2a', homing_siege: '#ff7a1a',            // 호밍: 와스프=연두 / 시즈=주황
+  vulcan_tempest: '#ffc23d', vulcan_lance: '#ff5c2a',         // 초진화(더 강렬·뚜렷하게)
+  laser_nova: '#2f7bff', laser_reaper: '#2affc0',             // 노바=로열블루 / 리퍼=민트 (기본 레이저색과 확실히 구분)
+  homing_legion: '#ffe14c', homing_nova: '#ff9500',
 };
 /** 현재 무기의 발사체 색: 초진화 > 1단계 진화 > 기본색. */
 export function weaponProjectileColor(evoId, superId, defaultColor) {

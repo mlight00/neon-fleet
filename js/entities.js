@@ -1111,17 +1111,15 @@ export class Bullet {
     const top = Math.min(this.y, this.prevY) - L / 2;
     const bot = Math.max(this.y, this.prevY) + L / 2;
     const h = bot - top;
-    ctx.globalAlpha = 0.22;                // 외피 (중앙 가림 완화 — 적탄 가독성 위해 반투명 하향)
+    // 색 본체를 진하게 — 진화색이 확실히 보이도록 (예전엔 흰 코어가 빔을 덮어 색이 거의 안 보였음)
+    ctx.globalAlpha = 0.8;
     ctx.fillStyle = c;
     ctx.fillRect(this.x - w, top, w * 2, h);
-    ctx.globalAlpha = 0.75;                // 백열 코어 (살짝 반투명)
+    // 가는 백열 중심선만 — 색을 덮지 않게 얇게
+    ctx.globalAlpha = 0.85;
     ctx.fillStyle = '#ffffff';
-    const cw = this.lv >= 3 ? w * 0.8 : this.lv === 2 ? w * 0.6 : w * 0.45;
+    const cw = Math.max(1.4, w * 0.32);
     ctx.fillRect(this.x - cw / 2, top, cw, h);
-    if (this.lv >= 2) {                    // 진행 끝단 색 포인트
-      ctx.fillStyle = c;
-      ctx.fillRect(this.x - w, this.y - 2, w * 2, 4);
-    }
     ctx.globalAlpha = 1;
   }
 
