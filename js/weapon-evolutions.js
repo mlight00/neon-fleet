@@ -38,6 +38,20 @@ export const WEAPON_SUPER_EVOLUTIONS = {
 export const ALL_EVOLUTION_IDS = [...Object.values(WEAPON_EVOLUTIONS), ...Object.values(WEAPON_SUPER_EVOLUTIONS)].flat().map((e) => e.id);
 const EVO_BY_ID = Object.fromEntries([...Object.values(WEAPON_EVOLUTIONS), ...Object.values(WEAPON_SUPER_EVOLUTIONS)].flat().map((e) => [e.id, e]));
 
+// 진화별 발사체 색 — 적 팩션(보라~적색)과 겹치지 않게 청록/파랑/초록/노랑/주황 계열로 구분.
+export const EVO_PROJECTILE_COLOR = {
+  vulcan_storm: '#ff9c41', vulcan_needle: '#8affff',            // 발칸: 폭풍=호박 / 니들=전기청록
+  laser_prism: '#6cc8ff', laser_cutter: '#7cff6b',             // 레이저: 프리즘=밝은파랑 / 커터=초록
+  homing_wasp: '#c8ff4c', homing_siege: '#ff8c1a',             // 호밍: 와스프=연두 / 시즈=진한주황
+  vulcan_tempest: '#ffc23d', vulcan_lance: '#ff6a2a',          // 초진화(더 강렬)
+  laser_nova: '#aef0ff', laser_reaper: '#4cffc8',
+  homing_legion: '#ffe14c', homing_nova: '#ff7a2a',
+};
+/** 현재 무기의 발사체 색: 초진화 > 1단계 진화 > 기본색. */
+export function weaponProjectileColor(evoId, superId, defaultColor) {
+  return EVO_PROJECTILE_COLOR[superId] || EVO_PROJECTILE_COLOR[evoId] || defaultColor;
+}
+
 /** 무기의 1단계 진화 옵션 2장 (순수). 알 수 없는 무기면 빈 배열. */
 export function evolutionOptions(weapon) {
   return WEAPON_EVOLUTIONS[weapon] || [];

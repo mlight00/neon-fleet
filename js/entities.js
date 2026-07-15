@@ -9,7 +9,7 @@ import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateB
 import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
 import { getSprite, bossDefFor } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
-import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult } from './weapon-evolutions.js';
+import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult, weaponProjectileColor } from './weapon-evolutions.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { droneReward } from './adaptive-logic.js';
 import { addFlow, updateFlow, onFlowHit } from './flow.js';
@@ -633,6 +633,7 @@ export class Squad {
     const WEB = BAL.weaponEvolution;
     const evoMult = evoLevelMult(this.weaponEvolutions[this.weapon], this.evoLevels[this.weapon], WEB.evoLevelStep);   // 진화 레벨(1→3) 피해 배수
     const se = superEvoEffects(this.weaponEvolutions2[this.weapon], BAL.weaponSuperEvolution);   // 2단계 초진화 배수 (미선택이면 중립)
+    const projColor = weaponProjectileColor(evo, this.weaponEvolutions2[this.weapon], WEAPON_COLORS[this.weapon]);   // 진화별 발사체 색 (초진화>진화>기본)
     const superLv = this.superLevels[this.weapon] || 0;
     const seDmg = se.dmgMult * (1 + Math.max(0, superLv - 1) * WEB.superLevelStep);   // 초진화 레벨(1→3) 추가 배수
     const pb = (mfx.pierceBonus || 0) + se.pierceBonus;
@@ -671,20 +672,20 @@ export class Squad {
         if (wasp) {
           // 소형 미사일: count발, 각 md × totalFrac/count (발당 위력↑), 서로 다른 표적 우선
           for (let k = 0; k < wasp.count && alive + k < cap; k++) {
-            const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, this.weaponLv);
+            const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, this.weaponLv, projColor);
             mis.wasp = true; mis.r *= 0.8;
             world.bullets.push(mis);
           }
           world.effects.muzzle(this.x, this.y - 14, '#ffd0a0', 6);
         } else if (siege) {
           // 대형 폭발 미사일: 느리지만 강함
-          const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 120, md * siege.dmgMult, this.weaponLv);
+          const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 120, md * siege.dmgMult, this.weaponLv, projColor);
           mis.r *= siege.sizeMult; mis.speedMult = siege.speedMult; mis.turnMult = siege.turnMult;
           mis.blast = { radius: siege.blastRadius, frac: siege.blastFrac, bossBonus: siege.bossBonus };
           world.bullets.push(mis);
           world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 8);
         } else {
-          world.bullets.push(new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 240, md, this.weaponLv));
+          world.bullets.push(new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 240, md, this.weaponLv, projColor));
           world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 5);
         }
         this.recoil = 1.5;
@@ -715,7 +716,7 @@ export class Squad {
         let pierce = W.laser.pierce[this.weaponLv - 1] + pb + trait.pierce + ascPierce;
         let ldmg = dmg, isCut = false;
         if (cutter) { this.cutterCount = (this.cutterCount || 0) + 1; if (this.cutterCount % cutter.every === 0) { beamW *= cutter.widthMult; pierce += cutter.pierceBonus; ldmg *= cutter.dmgMult; isCut = true; } }
-        const b = new Bullet(this.x + m.x, this.y + m.y, ldmg, { vy: -W.laser.speed, kind: 'laser', pierce, beamW, lv: this.weaponLv });
+        const b = new Bullet(this.x + m.x, this.y + m.y, ldmg, { vy: -W.laser.speed, kind: 'laser', pierce, beamW, lv: this.weaponLv, color: projColor });
         if (prism) b.split = true;
         if (isCut) b.cutter = cutter.clearRadius;
         world.bullets.push(b);
@@ -729,7 +730,7 @@ export class Squad {
         const vpb = pb + (needle ? (needle.pierceBonus || 0) : 0);   // 니들: 관통 드릴
         const b = new Bullet(this.x + m.x, this.y + m.y, dmg, {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
-          pierce: (vpb + trait.pierce + ascPierce) > 0 ? 1 + vpb + trait.pierce + ascPierce : 0, lv: this.weaponLv,
+          pierce: (vpb + trait.pierce + ascPierce) > 0 ? 1 + vpb + trait.pierce + ascPierce : 0, lv: this.weaponLv, color: projColor,
         });
         if (needle) b.scale = needle.sizeMult;
         if (storm) b.ricochet = true;
@@ -825,6 +826,7 @@ export class Squad {
     const units = (this.escorts || 0) + (this.cruisers || 0) + ghost;
     if (units <= 0 || dps <= 0) return;
     const W = BAL.weapons;
+    const projColor = weaponProjectileColor(this.weaponEvolutions[this.weapon], this.weaponEvolutions2[this.weapon], WEAPON_COLORS[this.weapon]);   // 진화별 색 (기함과 동일)
     const shotsPerSec = Math.min(20, 3 + units * 1.6);
     this.supportAcc = (this.supportAcc || 0) + shotsPerSec * dt;
     const tgt = this._nearestEnemy(world);   // 순양함은 능동 호위: 가장 가까운 적을 조준 사격
@@ -839,14 +841,14 @@ export class Squad {
       const aim = tgt ? Math.atan2(tgt.x - sx, sy - tgt.y) : 0;   // 조준 각(정면=0), 표적 없으면 위로
       if (this.weapon === 'laser') {
         // 레이저는 세로 빔 — 순양함 조준사격도 옆으로 눕히지 않고 정면(위)으로만 발사 (평행 레이저 버그 방지)
-        world.bullets.push(new Bullet(sx, sy, dmg, { vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv }));
+        world.bullets.push(new Bullet(sx, sy, dmg, { vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv, color: projColor }));
       } else if (this.weapon === 'homing') {
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
-        if (alive < W.homing.cap) world.bullets.push(new HomingMissile(sx, sy, (Math.random() - 0.5) * 180, dmg, this.weaponLv));
+        if (alive < W.homing.cap) world.bullets.push(new HomingMissile(sx, sy, (Math.random() - 0.5) * 180, dmg, this.weaponLv, projColor));
       } else {
         const spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180;
         const a = aim + (Math.random() - 0.5) * 2 * spread;
-        world.bullets.push(new Bullet(sx, sy, dmg, { vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan', lv: this.weaponLv }));
+        world.bullets.push(new Bullet(sx, sy, dmg, { vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan', lv: this.weaponLv, color: projColor }));
       }
     }
   }
@@ -1080,11 +1082,12 @@ function nearestTarget(world, x, y, radius, seen, side = 0) {
 }
 
 export class Bullet {
-  constructor(x, y, damage, { vx = 0, vy = -BAL.bullet.speed, kind = 'vulcan', pierce = 0, beamW = 4, lv = 1 } = {}) {
+  constructor(x, y, damage, { vx = 0, vy = -BAL.bullet.speed, kind = 'vulcan', pierce = 0, beamW = 4, lv = 1, color = null } = {}) {
     this.x = x; this.y = y;
     this.vx = vx; this.vy = vy;
     this.damage = damage;
     this.kind = kind;
+    this.color = color;        // 진화별 발사체 색 (없으면 draw에서 기본색)
     this.lv = lv;              // 무기 레벨 — 레벨별로 탄 디자인이 달라진다
     this.pierce = pierce;      // 남은 관통 수 (레이저)
     this.beamW = beamW;        // 레이저 볼트 굵기 (레벨 비례)
@@ -1102,20 +1105,21 @@ export class Bullet {
 
   drawLaser(ctx) {
     // 이동 잔상까지 '하나로 이어진' 스트릭 — 느린 프레임에서 두 조각으로 갈라져 보이던 문제 해결
+    const c = this.color || '#a8f0ff';     // 진화별 발사체 색 (없으면 기본 레이저색)
     const w = this.beamW;
     const L = 34 + this.lv * 8;
     const top = Math.min(this.y, this.prevY) - L / 2;
     const bot = Math.max(this.y, this.prevY) + L / 2;
     const h = bot - top;
-    ctx.globalAlpha = 0.22;                // 청록 외피 (중앙 가림 완화 — 적탄 가독성 위해 반투명 하향)
-    ctx.fillStyle = '#a8f0ff';
+    ctx.globalAlpha = 0.22;                // 외피 (중앙 가림 완화 — 적탄 가독성 위해 반투명 하향)
+    ctx.fillStyle = c;
     ctx.fillRect(this.x - w, top, w * 2, h);
     ctx.globalAlpha = 0.75;                // 백열 코어 (살짝 반투명)
     ctx.fillStyle = '#ffffff';
     const cw = this.lv >= 3 ? w * 0.8 : this.lv === 2 ? w * 0.6 : w * 0.45;
     ctx.fillRect(this.x - cw / 2, top, cw, h);
     if (this.lv >= 2) {                    // 진행 끝단 색 포인트
-      ctx.fillStyle = COLORS.ally;
+      ctx.fillStyle = c;
       ctx.fillRect(this.x - w, this.y - 2, w * 2, 4);
     }
     ctx.globalAlpha = 1;
@@ -1126,23 +1130,24 @@ export class Bullet {
     ctx.translate(this.x, this.y);
     ctx.rotate(Math.atan2(this.vx, -this.vy));
     if (this.scale) ctx.scale(this.scale, this.scale);   // 니들: 탄 크기 축소
+    const c = this.color || COLORS.ally;   // 진화별 발사체 색 (없으면 기본 발칸색)
     if (this.lv === 1) {
       // Lv1: 가는 예광탄
-      ctx.fillStyle = COLORS.ally;
+      ctx.fillStyle = c;
       ctx.fillRect(-1.5, -6, 3, 12);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(-1.5, -8, 3, 4);
     } else if (this.lv === 2) {
       // Lv2: 이중 탄두 (두 발이 나란히 나는 형태)
-      ctx.fillStyle = COLORS.ally;
+      ctx.fillStyle = c;
       ctx.fillRect(-4, -5, 2.6, 11);
       ctx.fillRect(1.4, -5, 2.6, 11);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(-4, -7.5, 2.6, 3.5);
       ctx.fillRect(1.4, -7.5, 2.6, 3.5);
     } else {
-      // Lv3: 굵은 청록 에너지 볼트 — 단색 통일(적·로켓처럼 안 보이게) + 백열 코어
-      ctx.fillStyle = COLORS.ally;
+      // Lv3: 굵은 에너지 볼트 — 진화색 단색 통일(적·로켓처럼 안 보이게) + 백열 코어
+      ctx.fillStyle = c;
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
       ctx.moveTo(0, -11);       // 위로 뾰족
@@ -1186,7 +1191,7 @@ export class Bullet {
       if (t) {
         const ang = Math.atan2(t.x - this.x, -(t.y - this.y));
         const child = new Bullet(this.x, this.y, this.damage * WE.vulcan_storm.ricochetFrac, {
-          vx: Math.sin(ang) * BAL.weapons.vulcan.speed, vy: -Math.cos(ang) * BAL.weapons.vulcan.speed, kind: 'vulcan', lv: this.lv,
+          vx: Math.sin(ang) * BAL.weapons.vulcan.speed, vy: -Math.cos(ang) * BAL.weapons.vulcan.speed, kind: 'vulcan', lv: this.lv, color: this.color,
         });
         if (bouncesLeft > 0) { child.ricochet = true; child.bounces = bouncesLeft; }   // 남은 튕김 계승
         world.bullets.push(child);
@@ -1200,7 +1205,7 @@ export class Bullet {
         if (t && t !== world.boss) {   // 보스 분열 제외
           const ang = Math.atan2(t.x - this.x, -(t.y - this.y));
           world.bullets.push(new Bullet(this.x, this.y, this.damage * WE.laser_prism.splitFrac, {
-            vx: Math.sin(ang) * BAL.weapons.laser.speed, vy: -Math.cos(ang) * BAL.weapons.laser.speed, kind: 'laser', beamW: 4, lv: this.lv, pierce: WE.laser_prism.splitPierce ?? 0,
+            vx: Math.sin(ang) * BAL.weapons.laser.speed, vy: -Math.cos(ang) * BAL.weapons.laser.speed, kind: 'laser', beamW: 4, lv: this.lv, pierce: WE.laser_prism.splitPierce ?? 0, color: this.color,
           }));
         }
       }
@@ -1210,13 +1215,14 @@ export class Bullet {
 
 // ───────────────────────── 호밍 미사일 (금색, 유도)
 export class HomingMissile {
-  constructor(x, y, vx0, damage, lv = 1) {
+  constructor(x, y, vx0, damage, lv = 1, color = null) {
     this.x = x; this.y = y;
     this.vx = vx0;
     this.vy = -BAL.weapons.homing.speedFrom;
     this.speed = BAL.weapons.homing.speedFrom;
     this.damage = damage;
     this.kind = 'homing';
+    this.color = color;   // 진화별 발사체 색 (없으면 기본 금색)
     this.lv = lv;
     this.r = 3.5 + lv * 1.2;    // 레벨이 오르면 미사일 자체가 커짐
     this.trailMax = 3 + lv * 2; // 꼬리 길이도 증가
@@ -1272,10 +1278,11 @@ export class HomingMissile {
     if (this.y < -30 || this.y > world.logicalH + 30 || this.x < -30 || this.x > world.logicalW + 30) this.dead = true;
   }
   draw(ctx) {
+    const c = this.color || COLORS.reward;   // 진화별 발사체 색 (없으면 기본 금색)
     // 꼬리 잔상 (레벨이 오를수록 굵고 길게)
     if (this.trail.length > 1) {
       ctx.globalAlpha = 0.5;
-      ctx.strokeStyle = '#ff9c41';
+      ctx.strokeStyle = c;
       ctx.lineWidth = 1 + this.lv;
       ctx.beginPath();
       this.trail.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
@@ -1288,7 +1295,7 @@ export class HomingMissile {
     const r = this.r;
     if (this.lv === 1) {
       // Lv1: 소형 로켓 (원형 탄두)
-      ctx.fillStyle = COLORS.reward;
+      ctx.fillStyle = c;
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.fill();
@@ -1309,7 +1316,7 @@ export class HomingMissile {
         ctx.fill();
         ctx.globalAlpha = 1;
       }
-      ctx.fillStyle = COLORS.reward;
+      ctx.fillStyle = c;
       ctx.beginPath();
       ctx.roundRect(-r * 0.55, -r - 1, r * 1.1, (r + 1) * 2, r * 0.55);
       ctx.fill();
