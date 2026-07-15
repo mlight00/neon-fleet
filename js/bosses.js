@@ -2,15 +2,15 @@
 // (entities.js에서 분리 — 신규 보스 추가 대비. EnemyShot 등 공용 개체는 entities.js에서 import)
 import { BAL } from './balance.js';
 import { COLORS, glow, blit } from './render.js';
-import { bossDefFor, getSprite } from './sprites.js';
+import { bossDefFor, bossDefById, getSprite } from './sprites.js';
 import { EnemyShot, Creature } from './entities.js';
 
 const AR = () => BAL.neonArbiter;
 
 export class Boss {
-  constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1) {
-    // 스테이지별 보스: 로스터 순환. PNG가 아직 없으면 하이브 퀸 이미지로 폴백 (sprite() 참고)
-    const def = bossDefFor(stage);
+  constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1, bossIdOverride = null) {
+    // 보스 정체성: 캠페인 ID override가 있으면 그걸, 없으면 로스터 순환. PNG 없으면 하이브 퀸 폴백.
+    const def = bossIdOverride ? bossDefById(bossIdOverride) : bossDefFor(stage);
     this.spriteId = def.id;
     this.name = def.name;
     this.korName = def.korName;
@@ -594,10 +594,10 @@ export class NeonArbiter extends Boss {
   }
 }
 
-/** 스테이지 보스 생성: B22면 네온 아비터(단독), 그 외 일반 Boss. */
-export function makeBoss(logicalW, rateMult, stage, sizeMul = 1) {
-  const def = bossDefFor(stage);
+/** 보스 생성: bossIdOverride(캠페인/엔드리스 순서)가 있으면 그 ID로, 없으면 로스터 순환. B22=네온 아비터(단독). */
+export function makeBoss(logicalW, rateMult, stage, sizeMul = 1, bossIdOverride = null) {
+  const def = bossIdOverride ? bossDefById(bossIdOverride) : bossDefFor(stage);
   return def.id === 'B22'
     ? new NeonArbiter(logicalW, rateMult, stage, sizeMul)
-    : new Boss(logicalW, rateMult, stage, sizeMul);
+    : new Boss(logicalW, rateMult, stage, sizeMul, bossIdOverride);
 }

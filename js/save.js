@@ -4,6 +4,9 @@ const DEFAULTS = {
   best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false,
   introSeen: false,                             // 인트로 크롤 시청 여부
   firstGuideSeen: false,                        // 첫 출격 조작 안내 표시 여부(1회) — 이후 루트 노드 자동 진입 생략
+  campaignCleared: false,                       // 섹터 6 하이브 퀸 격파 여부 (§6.4)
+  endlessUnlocked: false,                       // 무한 원정 해금 여부
+  endlessBest: 0,                               // 엔드리스 최고 도달 섹터(캠페인 기록과 별도, §6.5)
   stageMigrated: true,                          // stage 기록 마이그레이션 완료 플래그(신규 저장은 항상 true)
   up: { drones: 0, dmg: 0, rate: 0, coin: 0 }, // 격납고 강화 레벨
   snd: { bgm: 0.5, sfx: 0.8, mute: false },     // 사운드 설정

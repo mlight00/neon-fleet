@@ -44,6 +44,10 @@ export const BOSS_ROSTER = [
 export function bossDefFor(stage) {
   return BOSS_ROSTER[(Math.max(1, stage) - 1) % BOSS_ROSTER.length];
 }
+/** 보스 ID로 정의 조회 (캠페인 보스 순서용, 지시서 §6.2). 없으면 하이브 퀸 폴백. */
+export function bossDefById(id) {
+  return BOSS_ROSTER.find((b) => b.id === id) || BOSS_ROSTER[0];
+}
 
 // 스타일별 배경 이미지 배열 (스테이지 진행에 따라 전환. 없으면 스타필드만)
 const BG_ART = { C: ['assets/styleC/bg1.png', 'assets/styleC/bg2.png', 'assets/styleC/bg3.png'] };

@@ -66,6 +66,19 @@ export function nodeCoinReward(sector, nodeCol, type, coinMult) {
 }
 
 /**
+ * 섹터·모드에 따른 보스 ID (순수, 지시서 §6.2). 순수 함수라 테스트 가능.
+ * 캠페인: campaignBosses[sector-1] (섹터 1~6). 엔드리스: 캠페인 이후 섹터부터 endlessBosses를 순환.
+ */
+export function campaignBossId(sector, mode, campaignBosses, endlessBosses) {
+  if (mode === 'endless') {
+    const i = Math.max(0, sector - (campaignBosses.length + 1));   // 섹터 7 → endless[0]
+    return endlessBosses[i % endlessBosses.length];
+  }
+  const s = Math.min(Math.max(1, sector), campaignBosses.length);
+  return campaignBosses[s - 1];
+}
+
+/**
  * 노드 완료 시 모듈 드래프트 계약 (순수, 지시서 §5.3).
  * combat·hazard=일반 3택, elite=eliteCount택(희귀 보장), 그 외(supply·repair·boss)=없음(null).
  */

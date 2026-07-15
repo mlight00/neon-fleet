@@ -300,6 +300,13 @@ export const BAL = {
     coinPerProgress: 30,    // 실제 사망 시 진행도(0~1) x 이 값 추가 (자발적 종료엔 없음)
   },
 
+  // 캠페인·엔드리스 (지시서 Phase D §6). 섹터별 보스 순서 + 엔드리스 보스 순환.
+  campaign: {
+    sectors: 6,
+    bosses: ['B8', 'B9', 'B10', 'B11', 'B22', 'B7'],   // 섹터 1~6 (6=B7 하이브 퀸 = 최종)
+    endlessBosses: ['B12', 'B13', 'B14', 'B15', 'B22'],// 캠페인 클리어 후 무한 원정 순환
+  },
+
   // 항로 보상 계약 (지시서 Phase C §5). 노드 코인·모듈·보급/정비 배수.
   nodeReward: {
     // 코인 = baseNodeCoins(sector,col) × 타입 배수. 보스는 별도(높게).

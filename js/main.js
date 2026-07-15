@@ -3,7 +3,7 @@ import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects } from './entities.js';
-import { bossDefFor } from './sprites.js';
+import { bossDefById } from './sprites.js';
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, superEvolutionOptions, evolutionDef } from './weapon-evolutions.js';
@@ -12,7 +12,7 @@ import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -102,7 +102,7 @@ let drafting = false; // 모듈 드래프트 표시 중(게임 일시 정지)
 let betweenStages = false; // 스테이지 클리어 요약 표시 중(게임 일시 정지)
 
 // 원정(run) = 1스테이지부터 죽을 때까지 연속. 기함·드론·모듈이 누적된다.
-function newExpedition() {
+function newExpedition(mode = 'campaign') {
   const rng = mulberry32((Math.random() * 2 ** 31) | 0);
   const up = save.get().up;
   const H = BAL.hangar.upgrades;
@@ -138,8 +138,10 @@ function newExpedition() {
     phase: 'track', boss: null, bosses: [], endT: 0,
     maxPower: squad.power, scrollY: 0,
     sector: 1, map: null, node: null, done: [], isBossNode: false,   // 섹터 분기 맵
+    mode,                                                            // 'campaign' | 'endless' (§6)
   };
-  startSector(1);
+  // 엔드리스는 캠페인 이후 섹터(7)부터 시작 → 보스 순환·변주·다중 보스가 자연히 강해진다.
+  startSector(mode === 'endless' ? BAL.campaign.sectors + 1 : 1);
 }
 
 // ── 섹터 분기 맵 ─────────────────────────────────────────────
@@ -297,6 +299,8 @@ function completeNode(node) {
   if (node && !r.done.includes(node.id)) r.done.push(node.id);
   const proceed = () => {
     if (node && node.type === 'boss') {
+      // 캠페인 최종 보스(섹터 6 하이브 퀸) 격파 → 승리 화면(자동 섹터 7 진행 안 함, §6.2/6.3)
+      if (r.mode !== 'endless' && r.sector >= BAL.campaign.sectors) { winCampaign(); return; }
       r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `섹터 ${r.sector} 클리어!`, COLORS.reward);
       const nextSector = () => startSector(r.sector + 1);
       // 첫 섹터 보스 격파 후 다음 섹터 맵 전에 키스톤 3택 (원정당 1개)
@@ -476,15 +480,16 @@ function update(dt) {
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
       playBgm('boss'); // 보스 BGM으로 크로스페이드
-      // 보스 정체성·다중 수는 bossTier(=섹터). 구 동작 재현: 섹터2→2기, 섹터3+→3기. B22(아비터)는 항상 단독.
+      // 보스 정체성 = 캠페인/엔드리스 순서(§6.2). 다중 수는 bossTier(섹터2→2기·섹터3+→3기). B22는 항상 단독.
       const { bossTier } = r.progression;
-      const isArbiter = bossDefFor(bossTier).id === 'B22';
+      const bossId = campaignBossId(r.sector, r.mode, BAL.campaign.bosses, BAL.campaign.endlessBosses);
+      const isArbiter = bossDefById(bossId).id === 'B22';
       const bossN = isArbiter ? 1 : (bossTier >= BAL.boss.multiFromSector3 ? 3 : bossTier >= BAL.boss.multiFromSector2 ? 2 : 1);
       const hpCap = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
       const totalMult = bossN > 1 ? BAL.boss.multiTotalMult : 1;                 // 다중 총 HP 배수(각=이/보스수)
       r.bosses = [];
       for (let i = 0; i < bossN; i++) {
-        const b = makeBoss(LOGICAL_W, r.mods.enemyRate, bossTier, bossN > 1 ? 0.72 : 1);
+        const b = makeBoss(LOGICAL_W, r.mods.enemyRate, bossTier, bossN > 1 ? 0.72 : 1, bossId);
         b.homeX = LOGICAL_W * (i + 1) / (bossN + 1);   // 가로 슬롯
         b.x = b.homeX;
         b.swayScale = 1 / bossN;                        // 좌우 폭 축소 → 겹침 방지
@@ -708,18 +713,39 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
   const best = Math.max(data.best, r.maxPower);
   const earned = Math.round(r.world.coins * r.world.stats.coinMult);   // 전투 중 획득 코인
   // 진행도(0~1): 완료 섹터 + 현재 섹터 내 노드 진행 / 캠페인 섹터 수.
-  const CAMPAIGN_SECTORS = 6;
-  const progress = ((r.sector - 1) + (r.done.length / (BAL.sector.depth + 1))) / CAMPAIGN_SECTORS;
+  const progress = ((r.sector - 1) + (r.done.length / (BAL.sector.depth + 1))) / BAL.campaign.sectors;
   const total = reason === 'death'
     ? failureReward({ earned, progress, base: BAL.run.failBaseCoins, perProgress: BAL.run.coinPerProgress })
     : earned;   // quit·기타: 획득분만
   const bonus = total - earned;   // UI 분할 표시용 (원정 진행 보상)
   if (!r.settled) {   // 중복 정산 차단 (같은 원정을 두 번 저장하지 않음)
     r.settled = true;
-    save.set({ best, coins: data.coins + total, stage: Math.max(data.stage, r.sector) });
+    const patch = { best, coins: data.coins + total, stage: Math.max(data.stage, r.sector) };
+    if (r.mode === 'endless') patch.endlessBest = Math.max(data.endlessBest || 0, r.sector);   // 엔드리스 기록은 별도 필드(§6.5)
+    save.set(patch);
   }
   if (toTitle) { showTitleScreen(); return; }
   ui.showLose({ stage: r.sector, maxPower: r.maxPower, coins: earned, bonus, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
+}
+
+/** 캠페인 최종 보스(하이브 퀸) 격파 → 정산 + 무한 원정 해금 + 승리 화면 (§6.3). */
+function winCampaign() {
+  const r = run;
+  state = 'done'; drafting = false; betweenStages = false; playBgm('title');
+  const data = save.get();
+  const best = Math.max(data.best, r.maxPower);
+  const earned = Math.round(r.world.coins * r.world.stats.coinMult);
+  if (!r.settled) {
+    r.settled = true;
+    save.set({ best, coins: data.coins + earned, stage: Math.max(data.stage, r.sector), campaignCleared: true, endlessUnlocked: true });
+  }
+  ui.showVictory({ coins: earned, best, onTitle: showTitleScreen, onEndless: startEndless, onRestart: startPlay });
+}
+
+/** 무한 원정 시작(캠페인 클리어 후 해금). 캠페인 이후 섹터부터 보스 순환·변주가 강해진다. */
+function startEndless() {
+  drafting = false; betweenStages = false; sfx('start');
+  newExpedition('endless');
 }
 
 // ───────────────────────── 격납고 (영구 강화 상점)
@@ -897,7 +923,10 @@ function showTitleScreen() {
     stage: d.stage,
     coins: d.coins,
     saveOk: save.available,
+    endlessUnlocked: d.endlessUnlocked,      // 무한 원정 해금 시에만 버튼 표시(§6.5)
+    endlessBest: d.endlessBest,
     onStart: startPlay,
+    onEndless: d.endlessUnlocked ? startEndless : null,
     onHangar: showHangar,
     onIntro: () => playIntro(showTitleScreen),
     onReset: () => ui.showResetConfirm({

@@ -74,16 +74,18 @@ export const ui = {
     overlay.innerHTML = '';
   },
 
-  showTitle({ best, stage, coins = 0, saveOk, onStart, onHangar, onIntro, onReset }) {
+  showTitle({ best, stage, coins = 0, saveOk, onStart, onHangar, onIntro, onReset, onEndless = null, endlessUnlocked = false, endlessBest = 0 }) {
     panel(`
       <h1>NEON FLEET</h1>
       <p>네온 함대</p>
       <p class="big">최고 기록: 스테이지 ${stage}</p>
+      ${endlessUnlocked ? `<p style="font-size:12px;color:#ffd93d;margin:2px 0">🌌 은하 해방 · 무한 원정 최고 섹터 ${endlessBest}</p>` : ''}
       <p style="font-size:12.5px;color:#9fb8d8;margin:10px 0 2px">좌우로 이동해 적과 적 탄환을 피하세요. 공격은 자동입니다.</p>
       <p style="font-size:11.5px;color:#7f93b0;margin:0">차지 샷: PC는 Space·마우스 홀드, 모바일은 ⚡ 버튼 홀드.</p>
       ${saveOk ? '' : '<p style="color:#ff3d71;font-size:11px">⚠ 현재 브라우저에서는 기록을 저장할 수 없습니다.</p>'}
       <div class="btn-row">
         <button id="btn-start">출격하기</button>
+        ${onEndless ? '<button id="btn-endless" class="sub-btn">🌌 무한 원정</button>' : ''}
         ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고 · 영구 강화</button>' : ''}
       </div>
       <div class="title-links">
@@ -92,9 +94,31 @@ export const ui = {
       </div>
     `);
     document.getElementById('btn-start').addEventListener('click', onStart);
+    if (onEndless) document.getElementById('btn-endless').addEventListener('click', onEndless);
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
     if (onIntro) document.getElementById('btn-intro').addEventListener('click', onIntro);
     if (onReset) document.getElementById('btn-reset').addEventListener('click', onReset);
+  },
+
+  /** 캠페인 승리 화면 (§6.3): 은하 해방 + 무한 원정 해금. */
+  showVictory({ coins = 0, best = 0, onTitle, onEndless, onRestart }) {
+    panel(`
+      <h1 style="color:#ffd93d">은하 해방</h1>
+      <p class="big">하이브 퀸을 격파했습니다.</p>
+      <p style="color:#3ff5e0;margin:8px 0">무한 원정이 해금되었습니다.</p>
+      <div style="margin:10px 0;line-height:1.7">
+        <div>이번 원정 획득 🪙 ${coins.toLocaleString()}</div>
+        <div>최고 함대 화력 <b>${best.toLocaleString()}</b></div>
+      </div>
+      <div class="btn-row" style="flex-direction:column;gap:10px;align-items:stretch">
+        <button id="btn-vic-endless">🌌 무한 원정 시작</button>
+        <button id="btn-vic-restart" class="sub-btn">캠페인 다시 시작</button>
+        <button id="btn-vic-title" class="sub-btn">타이틀로</button>
+      </div>
+    `);
+    document.getElementById('btn-vic-endless').addEventListener('click', onEndless);
+    document.getElementById('btn-vic-restart').addEventListener('click', onRestart);
+    document.getElementById('btn-vic-title').addEventListener('click', onTitle);
   },
 
   /** 첫 출격 조작 안내 (루트 노드 자동 진입 직전 1회만 표시) */
