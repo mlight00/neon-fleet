@@ -295,9 +295,20 @@ export const BAL = {
 
   run: {
     failOverlayDelay: 0.5,  // 실패 후 오버레이까지(초)
-    coinPerClear: 50,       // 클리어 보상 = 이 값 x 스테이지 번호
+    coinPerClear: 50,       // (구) 클리어 보상 — Phase C에서 nodeReward로 대체(잔존 참조 없음)
     failBaseCoins: 12,      // 실제 사망 시 기본 보상 (첫 원정 성장 단절 방지)
     coinPerProgress: 30,    // 실제 사망 시 진행도(0~1) x 이 값 추가 (자발적 종료엔 없음)
+  },
+
+  // 항로 보상 계약 (지시서 Phase C §5). 노드 코인·모듈·보급/정비 배수.
+  nodeReward: {
+    // 코인 = baseNodeCoins(sector,col) × 타입 배수. 보스는 별도(높게).
+    coinMult: { combat: 1.0, supply: 0.5, hazard: 1.2, elite: 1.8, repair: 0, boss: 2.5 },
+    supplyPayoutMult: 1.4,          // 보급 노드에서만 크리스탈·수송선 payout ×1.4 (정확히 한 번)
+    eliteDraftCount: 4,             // 정예 드래프트 4택(희귀 1장 이상 보장)
+    repairModuleCostPerSector: 25,  // 모듈 정비 비용 = 이 값 × sector
+    repairHealMin: 12,              // 긴급 수리 최소 회복
+    repairHealPct: 0.35,            // 긴급 수리 = max(12, round(count×0.35))
   },
 
   // 섹터 분기 맵 (슬레이 더 스파이어식)

@@ -295,6 +295,22 @@ export const ui = {
     attachKeyNav(overlay.querySelectorAll('.ks-card'), (b) => onPick(b.dataset.id));
   },
 
+  /** 정비 노드: 긴급 수리 vs 모듈 정비(유료) 택1 (§5.5) */
+  showRepair({ heal, cost, coins, canAfford, onHeal, onModule }) {
+    panel(`
+      <h2 style="color:#7cff6b">🔧 정비 노드</h2>
+      <p><small>하나만 선택할 수 있습니다. 보유 코인 🪙 ${coins.toLocaleString()}</small></p>
+      <div class="btn-row" style="flex-direction:column;gap:10px;align-items:stretch">
+        <button id="btn-repair-heal">🩹 긴급 수리 · 드론 +${heal}</button>
+        <button id="btn-repair-mod"${canAfford ? '' : ' disabled style="opacity:0.5;cursor:not-allowed"'}>🧩 모듈 정비 · 🪙 ${cost.toLocaleString()} → 모듈 3택</button>
+      </div>
+      ${canAfford ? '' : `<p style="color:#ff9c41;font-size:11px">모듈 정비에 코인이 ${(cost - coins).toLocaleString()} 부족합니다.</p>`}
+    `);
+    document.getElementById('btn-repair-heal').addEventListener('click', onHeal);
+    const mb = document.getElementById('btn-repair-mod');
+    if (canAfford) mb.addEventListener('click', onModule);
+  },
+
   /** 섹터 분기 맵: 갈림길에서 다음 노드를 고른다 (게임 일시 정지) */
   showSectorMap({ map, currentId = null, doneIds = [], sector, coins = 0, onPick }) {
     const META = {
@@ -338,6 +354,14 @@ export const ui = {
         ? `<button data-node="${node.id}" style="${st}" title="${m.label}">${m.icon}</button>`
         : `<div style="${st}" title="${m.label}">${m.icon}</div>`;
     }
+    // 노드 정보(§5.6): 선택 가능한(도달) 노드 아이콘 아래에 보상 요약. 작은 화면 겹침 방지 위해 nowrap+말줄임+도달 노드만.
+    const INFO = { combat: '코인 보통·모듈', supply: '드론 다수·짧음', hazard: '코인+20%·모듈', elite: '코인+80%·희귀', repair: '회복/정비', boss: '섹터 보스' };
+    let infos = '';
+    for (const col of map.cols) for (const node of col) {
+      if (!reachIds.has(node.id) || !INFO[node.type]) continue;
+      const p = pos(node);
+      infos += `<div style="position:absolute;left:${p.x - 40}px;top:${p.y + 21}px;width:80px;text-align:center;font-size:8px;line-height:1.1;color:#cfe0f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${INFO[node.type]}</div>`;
+    }
     const legend = Object.values(META).map((m) => `<span style="white-space:nowrap">${m.icon}${m.label}</span>`).join(' · ');
     panel(`
       <h2 style="color:#3ff5e0">섹터 ${sector} · 항로 선택</h2>
@@ -345,6 +369,7 @@ export const ui = {
       <div style="position:relative;width:${W}px;height:${H}px;margin:6px auto">
         <svg width="${W}" height="${H}" style="position:absolute;left:0;top:0;pointer-events:none">${lines}</svg>
         ${nodes}
+        ${infos}
       </div>
       <p style="font-size:10.5px;color:#9fb8d8;line-height:1.6">${legend}</p>
       <p style="font-size:10.5px;color:#9fb8d8">🖱 클릭 선택 · ⌨ ←→ 이동 · Space 확정 &nbsp; 보유 코인 🪙 ${coins.toLocaleString()}</p>

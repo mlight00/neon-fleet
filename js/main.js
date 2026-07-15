@@ -12,7 +12,7 @@ import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -188,20 +188,28 @@ function enterNode(node) {
   r.effects.flash(0.3);
 }
 
-/** 정비 노드: 드론 회복 + 무료 모듈 1장 (트랙 없음) → 맵 복귀 */
+/** 정비 노드(트랙 없음): [긴급 수리] 드론 회복 vs [모듈 정비] 코인 지불→모듈 3택 (택1, §5.5) → 맵 복귀 */
 function enterRepair(node) {
   const r = run;
-  const heal = Math.max(BAL.sector.repairMin, Math.round(r.squad.count * BAL.sector.repairPct));
-  r.squad.applyDelta(heal, r.world);
-  sfx('pickup');
-  const opts = draftOptions(r.modules, r.rng, 3);
-  if (opts.length) {
-    drafting = true; state = 'map';
-    ui.showDraft({
-      options: opts, owned: moduleSummary(r.modules),
-      onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); completeNode(node); },
-    });
-  } else { completeNode(node); }
+  state = 'map';
+  const cost = BAL.nodeReward.repairModuleCostPerSector * r.sector;              // 25 × sector
+  const heal = Math.max(BAL.nodeReward.repairHealMin, Math.round(r.squad.count * BAL.nodeReward.repairHealPct));  // max(12, count×0.35)
+  ui.showRepair({
+    heal, cost, coins: r.world.coins, canAfford: r.world.coins >= cost,
+    onHeal() { r.squad.applyDelta(heal, r.world); sfx('pickup'); completeNode(node); },
+    onModule() {
+      if (r.world.coins < cost) return;   // 방어: 부족 시 무시(버튼도 비활성)
+      r.world.addCoins(-cost);
+      const opts = draftOptions(r.modules, r.rng, 3);
+      if (opts.length) {
+        drafting = true;
+        ui.showDraft({
+          options: opts, owned: moduleSummary(r.modules),
+          onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); completeNode(node); },
+        });
+      } else { completeNode(node); }
+    },
+  });
 }
 
 /** 노드 인카운터 트랙 구성 (타입별 청크 필터·길이·보스 게이트). r.progression은 enterNode에서 설정됨. */
@@ -277,8 +285,10 @@ function buildEncounter(node) {
 
 /** 인카운터 클리어(트랙/보스 종료) → 코인 + 노드 완료 */
 function onEncounterClear() {
-  run.world.addCoins(BAL.run.coinPerClear * run.sector);   // 노드 클리어 코인 = 섹터 기준(Phase C에서 노드별 계약으로 대체)
-  completeNode(run.node);
+  const r = run;
+  // 노드 클리어 코인 = baseNodeCoins(sector,col) × 타입 배수 (§5.2)
+  r.world.addCoins(nodeCoinReward(r.sector, r.node.col, r.node.type, BAL.nodeReward.coinMult));
+  completeNode(r.node);
 }
 
 /** 노드 완료 → 맵 복귀, 보스 노드면 다음 섹터 */
@@ -296,11 +306,11 @@ function completeNode(node) {
       enterSectorMap();
     }
   };
-  // 전투류 노드 완료 시 모듈 드래프트 1장 → 빌드를 초반부터 쌓게 (첫 전투 직후 첫 모듈)
-  // 정비 노드(자체 드래프트)·보스(다음 섹터로) 제외
-  const isEncounter = node && ['combat', 'elite', 'hazard', 'supply'].includes(node.type);
-  if (isEncounter) {
-    const opts = draftOptions(r.modules, r.rng, 3);
+  // 노드 타입별 모듈 지급 계약 (§5.3, logic.nodeModuleGrant): combat·hazard=일반 3택,
+  // elite=4택(희귀 보장), supply=없음, repair=자체 UI, boss=다음 섹터/키스톤.
+  const grant = node && nodeModuleGrant(node.type, BAL.nodeReward.eliteDraftCount);
+  if (grant) {
+    const opts = draftOptions(r.modules, r.rng, grant.count, !!grant.rare);
     if (opts.length) {
       drafting = true; state = 'map';
       ui.showDraft({
@@ -389,6 +399,7 @@ function update(dt) {
       const x = (it.x ?? 0.5) * LOGICAL_W;
       const mods = r.mods;
       const { contentTier, difficultyLevel } = r.progression;   // 해금·변이=contentTier, 난이도스케일=difficultyLevel
+      const supplyMult = r.node.type === 'supply' ? BAL.nodeReward.supplyPayoutMult : 1;   // 보급 노드 payout ×1.4 (§5.4)
       // 난이도 스케일: 적은 단단하고 빨라지고, 크리스탈은 소폭 커진다
       // 적 HP = 기본 × 난이도배수 × 화력비례(상한 있음: 강해질수록 DPS가 앞서 쓸어버리는 손맛 — A2)
       // 화력 비례 HP 상한을 난이도에 따라 올려 깊은 판에선 즉사(방치 클리어) 방지
@@ -399,7 +410,7 @@ function update(dt) {
       const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, contentTier, r.rng); w.entities.push(e); };
       // 적 항목은 난이도 비례 복제 스폰(§4.5): 복제본은 좌우 미러 + 세로로 살짝 시차.
       const dup = copyCount(difficultyLevel, r.tutorial);   // 첫 노드는 최대 2로 제한(logic.copyCount)
-      if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal), w));
+      if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal), w, supplyMult));
       else if (it.type === 'gatePair') {
         const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
         w.entities.push(new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right)));
@@ -424,7 +435,7 @@ function update(dt) {
       else if (it.type === 'shielder') spawnEnemy(new Shielder(x), 'shielder');       // 단일(주기 방패)
       else if (it.type === 'carrier') spawnEnemy(new BroodCarrier(x), 'carrier');      // 단일(드론 사출)
       else if (it.type === 'blinker') for (let k = 0; k < dup; k++) spawnEnemy(new Blinker(k ? LOGICAL_W - x : x, LOGICAL_W), 'blinker');
-      else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size, w));
+      else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size, w, supplyMult));
       else if (it.type === 'midboss') w.entities.push(new MidBoss(LOGICAL_W, contentTier, r.maxPower));
       else if (it.type === 'capsule') {
         const weapon = it.weapon === 'random'

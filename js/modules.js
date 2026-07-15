@@ -51,17 +51,22 @@ export function computeMfx(picks) {
  * 드래프트 후보 count개 추첨 (서로 다름). 스택 상한에 도달한 모듈은 제외.
  * common은 rare보다 3배 자주. rng 주입 → 테스트 가능.
  */
-export function draftOptions(picks, rng, count = 3) {
+export function draftOptions(picks, rng, count = 3, rareGuaranteed = false) {
   const counts = tally(picks);
+  const avail = MODULE_DEFS.filter((m) => (counts[m.id] || 0) < m.max);
   const pool = [];
-  for (const m of MODULE_DEFS) {
-    if ((counts[m.id] || 0) >= m.max) continue;
+  for (const m of avail) {
     const w = m.rarity === 'rare' ? 1 : 3;
     for (let i = 0; i < w; i++) pool.push(m.id);
   }
-  const distinct = new Set(pool).size;
   const chosen = [];
   const used = new Set();
+  // 희귀 보장(§5.3): 반복 재추첨이 아니라, 희귀 후보 풀에서 1개를 먼저 확정한 뒤 나머지를 채운다.
+  if (rareGuaranteed) {
+    const rares = avail.filter((m) => m.rarity === 'rare').map((m) => m.id);
+    if (rares.length) { const id = rares[Math.floor(rng() * rares.length) % rares.length]; used.add(id); chosen.push(id); }
+  }
+  const distinct = new Set(pool).size;
   let guard = 0;
   while (chosen.length < count && used.size < distinct && guard++ < 500) {
     const id = pool[Math.floor(rng() * pool.length) % pool.length];

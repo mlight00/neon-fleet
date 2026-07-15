@@ -1365,17 +1365,21 @@ export class Scrolling {
 }
 
 // ───────────────────────── 에너지 크리스탈
-/** 생성 시점의 보상 배수(모듈·경제·군체 교리)를 반영해 실지급 드론 수를 확정한다. 표시=지급 (지시서 §3.6). */
-function fixedPayout(raw, world) {
-  return droneReward(raw, world?.mfx?.podRewardMult ?? 1, BAL.economy.droneGainMult, world?.squad?.rewardGainMult ?? 1);
+/**
+ * 생성 시점의 보상 배수(모듈·경제·군체 교리 + 보급 노드 배수)를 반영해 실지급 드론 수를 확정한다.
+ * 표시=지급(§3.6). 각 배수는 정확히 한 번만(§5.4): 단일 round 안에서 곱한다.
+ * extraMult = 보급 노드 payout 배수(1.4), 일반 노드는 1.
+ */
+function fixedPayout(raw, world, extraMult = 1) {
+  return droneReward(raw, world?.mfx?.podRewardMult ?? 1, BAL.economy.droneGainMult, (world?.squad?.rewardGainMult ?? 1) * extraMult);
 }
 
 export class Crystal extends Scrolling {
-  constructor(x, y, value, world) {
+  constructor(x, y, value, world, extraMult = 1) {
     super(x, y);
     this.hp = this.maxHp = value;             // 격파에 필요한 화력(=체력)
     this.reward = value;                      // 표적 우선순위·스캐빈저 대체값의 기준
-    this.payout = fixedPayout(value, world);  // 생성 시 확정된 실지급 드론 수(표시와 동일)
+    this.payout = fixedPayout(value, world, extraMult);  // 생성 시 확정된 실지급 드론 수(표시와 동일)
     this.r = value >= 150 ? 34 : value >= 40 ? 28 : 22;
   }
   /** 실제 지급 드론 수 = 생성 시 확정된 payout. 스캐빈저도 이 값을 저장한다. (world 인자는 하위 호환용) */
@@ -1442,14 +1446,14 @@ export class Crystal extends Scrolling {
 
 // ───────────────────────── 보급 수송선: 부수면 드론 지급 (파괴 = 드론 회수의 주력 공급원)
 export class DronePod extends Scrolling {
-  constructor(x, y, size, world) {
+  constructor(x, y, size, world, extraMult = 1) {
     super(x, y);
     const cfg = BAL.pod[size];
     this.size = size;
     this.hp = cfg.hp;
     this.maxHp = cfg.hp;
-    this.reward = cfg.reward;                      // 표적 우선순위·스캐빈저 대체값의 기준
-    this.payout = fixedPayout(cfg.reward, world);  // 생성 시 확정된 실지급 드론 수(표시와 동일)
+    this.reward = cfg.reward;                                 // 표적 우선순위·스캐빈저 대체값의 기준
+    this.payout = fixedPayout(cfg.reward, world, extraMult);  // 생성 시 확정된 실지급 드론 수(표시와 동일)
     this.r = cfg.r;
     this.baseX = x;
     this.t = Math.random() * 10;

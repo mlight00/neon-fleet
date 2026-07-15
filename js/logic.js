@@ -53,6 +53,29 @@ export function progressionFor(sector, nodeCol, depth) {
 }
 
 /**
+ * 노드 기본 코인 (순수 함수, 지시서 §5.2). 섹터·노드 열에 따라 단조 증가.
+ * 실지급 = baseNodeCoins × 노드 타입 배수(nodeCoinReward).
+ */
+export function baseNodeCoins(sector, nodeCol) {
+  return 40 + 10 * Math.max(1, sector) + 5 * Math.max(0, nodeCol);
+}
+
+/** 노드 클리어 코인 = 기본 코인 × 타입 배수 (combat 1.0/supply 0.5/hazard 1.2/elite 1.8/repair 0/boss 별도). 순수. */
+export function nodeCoinReward(sector, nodeCol, type, coinMult) {
+  return Math.round(baseNodeCoins(sector, nodeCol) * (coinMult[type] ?? 1));
+}
+
+/**
+ * 노드 완료 시 모듈 드래프트 계약 (순수, 지시서 §5.3).
+ * combat·hazard=일반 3택, elite=eliteCount택(희귀 보장), 그 외(supply·repair·boss)=없음(null).
+ */
+export function nodeModuleGrant(type, eliteCount = 4) {
+  if (type === 'combat' || type === 'hazard') return { count: 3, rare: false };
+  if (type === 'elite') return { count: eliteCount, rare: true };
+  return null;
+}
+
+/**
  * 적 복제 스폰 수 (순수 함수, 지시서 §4.5). 난이도(difficultyLevel)에 따라 2→최대 8.
  * 첫 노드(tutorial=true)는 최대 2로 제한 → 조작 학습 구간의 밀집도를 낮춘다(지시서 A-3).
  * difficultyLevel = progressionFor가 돌려주는 소수 난이도.
