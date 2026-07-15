@@ -11,8 +11,8 @@ import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
 import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
-import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinStage } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount } from './logic.js';
+import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -175,7 +175,9 @@ function enterSectorMap() {
 /** 노드 진입: 타입별 인카운터로 분기 */
 function enterNode(node) {
   const r = run;
-  r.stage = (r.sector - 1) * (BAL.sector.depth + 1) + node.col + 1;   // 난이도 카운터(기존 스케일 재활용)
+  // 진행 3축 분리(지시서 §4.2): sector/contentTier/difficultyLevel/bossTier. 밸런스 계산은 이 값들을 쓴다.
+  r.progression = progressionFor(r.sector, node.col, BAL.sector.depth);
+  r.legacyStage = (r.sector - 1) * (BAL.sector.depth + 1) + node.col + 1;   // 과도기 호환용(신규 밸런스 계산엔 미사용)
   r.node = node;
   if (node.type === 'repair') { enterRepair(node); return; }
   buildEncounter(node);
@@ -202,11 +204,11 @@ function enterRepair(node) {
   } else { completeNode(node); }
 }
 
-/** 노드 인카운터 트랙 구성 (타입별 청크 필터·길이·보스 게이트). r.stage는 enterNode에서 설정됨. */
+/** 노드 인카운터 트랙 구성 (타입별 청크 필터·길이·보스 게이트). r.progression은 enterNode에서 설정됨. */
 function buildEncounter(node) {
   const r = run, w = r.world;
-  const stage = r.stage;
-  const mods = stageMods(stage);
+  const { contentTier, difficultyLevel } = r.progression;   // 해금=contentTier, 난이도=difficultyLevel
+  const mods = stageMods(difficultyLevel);
   r.mods = mods; w.stageMods = mods;
   r.isBossNode = node.type === 'boss';
   r.tutorial = r.sector === 1 && node.col === 0;   // 첫 원정 첫 노드 = 조작 학습 구간(안전 청크·복제 제한)
@@ -221,15 +223,16 @@ function buildEncounter(node) {
   const tb = BAL.chunk.tierBounds;
   const bounds = [Math.max(0.1, tb[0] - mods.tierShift), Math.max(0.35, tb[1] - mods.tierShift)];
   const rng = r.rng;
-  const stageOk = (c) => chunkMinStage(c) <= stage;
+  // 콘텐츠 해금은 노드 열과 무관하게 섹터(=contentTier)로만 결정 → 같은 섹터 내 해금이 일정(지시서 §4.7).
+  const tierOk = (c) => chunkMinTier(c) <= contentTier;
   const has = (c, ...t) => c.items.some((it) => t.includes(it.type));
-  const filt = node.type === 'supply' ? (c) => stageOk(c) && isSafeChunk(c) && has(c, 'crystal', 'capsule')
-    : node.type === 'hazard' ? (c) => stageOk(c) && has(c, 'debris', 'mine')
-      : stageOk;
+  const filt = node.type === 'supply' ? (c) => tierOk(c) && isSafeChunk(c) && has(c, 'crystal', 'capsule')
+    : node.type === 'hazard' ? (c) => tierOk(c) && has(c, 'debris', 'mine')
+      : tierOk;
   const pending = [];
   let prev = null;
   // 위험 노드는 debris/mine이 콘텐츠인데 안전-시작(isSafeChunk)을 강제하면 필터가 모순되어 일반 청크로 샘 → 0으로.
-  const safeCount = node.type === 'boss' ? 1 : node.type === 'hazard' ? 0 : Math.min(3, 1 + Math.floor((stage - 1) / 4));
+  const safeCount = node.type === 'boss' ? 1 : node.type === 'hazard' ? 0 : Math.min(3, 1 + Math.floor((difficultyLevel - 1) / 2));
   // 첫 노드: 모든 청크를 튜토리얼-안전으로 제한(나쁜 게이트·위협 적 배제). 그 외: 앞 safeCount칸만 안전.
   const tutFilt = (c) => filt(c) && isTutorialSafeChunk(c);
   for (let i = 0; i < perRun; i++) {
@@ -274,7 +277,7 @@ function buildEncounter(node) {
 
 /** 인카운터 클리어(트랙/보스 종료) → 코인 + 노드 완료 */
 function onEncounterClear() {
-  run.world.addCoins(BAL.run.coinPerClear * run.stage);
+  run.world.addCoins(BAL.run.coinPerClear * run.sector);   // 노드 클리어 코인 = 섹터 기준(Phase C에서 노드별 계약으로 대체)
   completeNode(run.node);
 }
 
@@ -385,20 +388,20 @@ function update(dt) {
       const it = r.pending.shift();
       const x = (it.x ?? 0.5) * LOGICAL_W;
       const mods = r.mods;
-      // 스테이지 스케일: 적은 단단하고 빨라지고, 크리스탈은 소폭 커진다
-      // 적 HP = 기본 × 스테이지배수 × 화력비례(상한 있음: 강해질수록 DPS가 앞서 쓸어버리는 손맛 — A2)
-      // 무한 상승: 화력 비례 HP 상한을 스테이지마다 올려 깊은 판에선 즉사(방치 클리어) 방지
-      const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (r.stage - 1);
+      const { contentTier, difficultyLevel } = r.progression;   // 해금·변이=contentTier, 난이도스케일=difficultyLevel
+      // 난이도 스케일: 적은 단단하고 빨라지고, 크리스탈은 소폭 커진다
+      // 적 HP = 기본 × 난이도배수 × 화력비례(상한 있음: 강해질수록 DPS가 앞서 쓸어버리는 손맛 — A2)
+      // 화력 비례 HP 상한을 난이도에 따라 올려 깊은 판에선 즉사(방치 클리어) 방지
+      const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (difficultyLevel - 1);
       const pf = 1 + Math.min(hpCapS, Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale);
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1)); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
-      // 적 스폰 헬퍼: 스테이지 스케일 + 변이(어픽스) 롤 + 등록
-      const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, r.stage, r.rng); w.entities.push(e); };
-      // 적 항목은 enemyMult 배수만큼 복제 스폰: 복제본은 좌우 미러 + 세로로 살짝 시차.
-      // 무한 상승: 스테이지가 깊을수록 복제 수↑ → 적이 많아 움직여야 생존
-      const dup = copyCount(r.stage, BAL.spawn, r.tutorial);   // 첫 노드는 최대 2로 제한(logic.copyCount)
+      // 적 스폰 헬퍼: 난이도 스케일 + 변이(어픽스=섹터 확률) 롤 + 등록
+      const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, contentTier, r.rng); w.entities.push(e); };
+      // 적 항목은 난이도 비례 복제 스폰(§4.5): 복제본은 좌우 미러 + 세로로 살짝 시차.
+      const dup = copyCount(difficultyLevel, r.tutorial);   // 첫 노드는 최대 2로 제한(logic.copyCount)
       if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal), w));
       else if (it.type === 'gatePair') {
-        const gs = (g) => scaleGate(g, r.stage, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
+        const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
         w.entities.push(new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right)));
       }
       else if (it.type === 'creature') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, it.size), 'creature');
@@ -422,7 +425,7 @@ function update(dt) {
       else if (it.type === 'carrier') spawnEnemy(new BroodCarrier(x), 'carrier');      // 단일(드론 사출)
       else if (it.type === 'blinker') for (let k = 0; k < dup; k++) spawnEnemy(new Blinker(k ? LOGICAL_W - x : x, LOGICAL_W), 'blinker');
       else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size, w));
-      else if (it.type === 'midboss') w.entities.push(new MidBoss(LOGICAL_W, r.stage, r.maxPower));
+      else if (it.type === 'midboss') w.entities.push(new MidBoss(LOGICAL_W, contentTier, r.maxPower));
       else if (it.type === 'capsule') {
         const weapon = it.weapon === 'random'
           ? ['vulcan', 'laser', 'homing'][Math.floor(r.rng() * 3)]
@@ -444,13 +447,13 @@ function update(dt) {
         ]));
       }
       // 대응형 신규 적 (완만한 스테이지 HP 스케일 — 체력벽이 아니라 조준·수단 전환을 요구)
-      else if (it.type === 'prismWarden') w.entities.push(new PrismWarden(x, r.stage));
-      else if (it.type === 'scavenger') w.entities.push(new Scavenger(x, r.stage));
+      else if (it.type === 'prismWarden') w.entities.push(new PrismWarden(x, difficultyLevel));
+      else if (it.type === 'scavenger') w.entities.push(new Scavenger(x, difficultyLevel));
       else if (it.type === 'corruptedGate') {
-        const gs = (g) => scaleGate(g, r.stage, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
+        const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
         const gate = new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right));
         w.entities.push(gate);
-        w.entities.push(new GateParasite(gate, it.infectedLane ?? 0, r.stage));
+        w.entities.push(new GateParasite(gate, it.infectedLane ?? 0, difficultyLevel));
       }
     }
 
@@ -462,14 +465,15 @@ function update(dt) {
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
       playBgm('boss'); // 보스 BGM으로 크로스페이드
-      // 무한 상승: 스테이지가 깊을수록 보스 2~3기 동시. 단, 네온 아비터(B22)는 항상 단독(STAGGER 대상 명확화)
-      const isArbiter = bossDefFor(r.stage).id === 'B22';
-      const bossN = isArbiter ? 1 : (r.stage >= BAL.boss.multiFromStage3 ? 3 : r.stage >= BAL.boss.multiFromStage2 ? 2 : 1);
+      // 보스 정체성·다중 수는 bossTier(=섹터). 구 동작 재현: 섹터2→2기, 섹터3+→3기. B22(아비터)는 항상 단독.
+      const { bossTier } = r.progression;
+      const isArbiter = bossDefFor(bossTier).id === 'B22';
+      const bossN = isArbiter ? 1 : (bossTier >= BAL.boss.multiFromSector3 ? 3 : bossTier >= BAL.boss.multiFromSector2 ? 2 : 1);
       const hpCap = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
       const totalMult = bossN > 1 ? BAL.boss.multiTotalMult : 1;                 // 다중 총 HP 배수(각=이/보스수)
       r.bosses = [];
       for (let i = 0; i < bossN; i++) {
-        const b = makeBoss(LOGICAL_W, r.mods.enemyRate, r.stage, bossN > 1 ? 0.72 : 1);
+        const b = makeBoss(LOGICAL_W, r.mods.enemyRate, bossTier, bossN > 1 ? 0.72 : 1);
         b.homeX = LOGICAL_W * (i + 1) / (bossN + 1);   // 가로 슬롯
         b.x = b.homeX;
         b.swayScale = 1 / bossN;                        // 좌우 폭 축소 → 겹침 방지
@@ -738,7 +742,7 @@ function draw() {
   ctx.fillStyle = '#05060f';
   ctx.fillRect(0, 0, LOGICAL_W, logicalH);
   const scroll = run ? run.scrollY : performance.now() * 0.02;
-  const bgImg = getBackground(getArtStyle(), run ? run.stage : save.get().stage);
+  const bgImg = getBackground(getArtStyle(), run ? run.sector : save.get().stage);   // 배경 전환 = 섹터(§4.3)
   if (bgImg) {
     // 성운 배경: 느린 패럴랙스 스크롤 (이미지 자체를 심리스 처리했으므로 단순 타일)
     const bgH = Math.round(bgImg.height * (LOGICAL_W / bgImg.width));

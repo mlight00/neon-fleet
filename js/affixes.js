@@ -20,16 +20,25 @@ function pick(list, rng) {
 }
 
 /**
- * 적 종류·스테이지에 따라 붙일 변이 키 배열을 추첨한다. 순수 함수.
- * 확률·최대 개수는 balance에서. 종류에 맞는 변이만 후보가 된다.
+ * 섹터 기반 변이 등장 확률 (지시서 §4.6, 순수 함수).
+ * 섹터 1 = 0(첫 원정엔 변이 없음), 이후 섹터마다 +0.08, 상한 0.50.
  */
-export function rollAffixes(kind, stage, rng, cfg = BAL.affix) {
-  const chance = Math.min(cfg.chanceCap, cfg.baseChance + cfg.chancePerStage * (Math.max(1, stage) - 1));
+export function affixChanceForSector(sector) {
+  if (sector <= 1) return 0;
+  return Math.min(0.50, 0.08 * (sector - 1));
+}
+
+/**
+ * 적 종류·섹터에 따라 붙일 변이 키 배열을 추첨한다. 순수 함수.
+ * 확률=affixChanceForSector(섹터), 2중 변이는 섹터 4부터. 종류에 맞는 변이만 후보가 된다.
+ */
+export function rollAffixes(kind, sector, rng, cfg = BAL.affix) {
+  const chance = affixChanceForSector(sector);
   if (rng() >= chance) return [];
   const eligible = Object.keys(cfg.defs).filter((k) => AFFIX_KINDS[k]?.includes(kind));
   if (!eligible.length) return [];
   const picks = [pick(eligible, rng)];
-  const maxCount = stage >= cfg.twoAffixStage ? 2 : 1;
+  const maxCount = sector >= 4 ? 2 : 1;   // 2중 변이는 섹터 4부터
   if (maxCount >= 2 && rng() < chance) {
     const rest = eligible.filter((k) => k !== picks[0]);
     if (rest.length) picks.push(pick(rest, rng));
@@ -70,9 +79,9 @@ export function applyAffixes(entity, keys, cfg = BAL.affix) {
   return entity;
 }
 
-/** 롤 + 적용을 한 번에 (스폰 시 호출). 변이가 없으면 그대로 반환. */
-export function maybeAffix(entity, kind, stage, rng) {
-  return applyAffixes(entity, rollAffixes(kind, stage, rng));
+/** 롤 + 적용을 한 번에 (스폰 시 호출). sector = 콘텐츠 티어. 변이가 없으면 그대로 반환. */
+export function maybeAffix(entity, kind, sector, rng) {
+  return applyAffixes(entity, rollAffixes(kind, sector, rng));
 }
 
 /** 보호막 흡수: 남은 충전이 있으면 1 소모하고 true(피격 무효) 반환. */

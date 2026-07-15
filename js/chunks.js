@@ -82,12 +82,13 @@ const ENEMY_MIN_STAGE = {
 };
 
 /**
- * 청크의 최소 등장 스테이지를 내용에서 자동 추론.
- * - 단일 종류 적: 그 적의 도입 스테이지.
- * - 2종 섞임: +1 스테이지, 3종 이상(조합 청크): 6스테이지 이후 → "도입 끝난 뒤 조합의 재미".
+ * 청크의 최소 해금 등급(콘텐츠 티어=섹터)을 내용에서 자동 추론 (지시서 §4.7).
+ * - 단일 종류 적: 그 적의 도입 티어.
+ * - 2종 섞임: +1 티어, 3종 이상(조합 청크): 6티어 이후 → "도입 끝난 뒤 조합의 재미".
+ * 값 1~6은 섹터와 동일 척도라, 비교는 chunkMinTier(chunk) <= contentTier(=sector).
  */
-export function chunkMinStage(chunk) {
-  if (chunk.minStage) return chunk.minStage; // 명시값 우선
+export function chunkMinTier(chunk) {
+  if (chunk.minStage) return chunk.minStage; // 명시값 우선 (데이터 필드명은 minStage 유지)
   let m = 1;
   const kinds = new Set();
   for (const it of chunk.items) {
@@ -99,6 +100,8 @@ export function chunkMinStage(chunk) {
   else if (kinds.size === 2) m += 1;
   return m;
 }
+/** 하위 호환 별칭 (구 이름). 티어=섹터 척도로 의미는 동일. */
+export const chunkMinStage = chunkMinTier;
 
 export const CHUNKS = [
   // ─── EASY (성장 위주) ───

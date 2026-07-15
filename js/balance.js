@@ -283,8 +283,8 @@ export const BAL = {
     // 무한 상승: 보스 크기 스테이지 비례 증가 + 다중 보스(2~3기 동시)
     sizePerStage: 0.06, sizeScaleMax: 1.7,   // 크기 = min(1.7, 1 + 0.06×(stage-1))
     multiTotalMult: 1.4,                      // 다중 보스 총 HP 배수(각=이/보스수), 크기 fit 축소
-    // 첫 섹터 보스(내부 stage 6)는 단일로: 다중 보스는 섹터2 보스(stage12)+, 3기는 섹터3 보스(stage18)+
-    multiFromStage2: 8, multiFromStage3: 14,
+    // 다중 보스는 bossTier(=섹터) 기준(§4.3): 섹터1=단일, 섹터2=2기, 섹터3+=3기 (구 stage 동작 재현).
+    multiFromSector2: 2, multiFromSector3: 3,
   },
 
   chunk: {

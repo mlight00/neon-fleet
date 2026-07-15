@@ -32,14 +32,35 @@ export function failureReward({ earned = 0, progress = 0, base = 0, perProgress 
 }
 
 /**
- * 적 복제 스폰 수 (순수 함수). 스테이지가 깊을수록 증가(밀도로 난이도 상승).
- * 첫 노드(tutorial=true)는 최대 2로 제한 → 조작 학습 구간의 밀집도를 낮춘다(지시서 A-3).
- * spawn = { enemyMult, enemyMultMax, enemyMultStageStep }.
+ * 진행 상태 순수 함수 (지시서 §4.2). 섹터·노드 열·맵 깊이로부터 세 축을 분리해 낸다.
+ *  - sector/nodeCol : 위치 (화면 표시·기록·노드 코인)
+ *  - contentTier    : 콘텐츠 해금 등급(=섹터). 노드 열과 무관 → 같은 섹터 내 해금이 일정.
+ *  - difficultyLevel: 난이도(소수). 섹터마다 +1.25, 노드 열마다 +col/depth 로 완만·단조 상승.
+ *  - bossTier       : 보스 정체성/순서(=섹터).
+ * 입력 최소값 보정: sector>=1, nodeCol>=0, depth>=1.
  */
-export function copyCount(stage, spawn, tutorial = false) {
-  let dup = Math.min(spawn.enemyMultMax, spawn.enemyMult + Math.floor((Math.max(1, stage) - 1) / spawn.enemyMultStageStep));
-  if (tutorial) dup = Math.min(dup, 2);
-  return dup;
+export function progressionFor(sector, nodeCol, depth) {
+  const s = Math.max(1, Math.floor(sector));
+  const c = Math.max(0, Math.floor(nodeCol));
+  const d = Math.max(1, Math.floor(depth));
+  return {
+    sector: s,
+    nodeCol: c,
+    contentTier: s,
+    difficultyLevel: 1 + (s - 1) * 1.25 + c / d,
+    bossTier: s,
+  };
+}
+
+/**
+ * 적 복제 스폰 수 (순수 함수, 지시서 §4.5). 난이도(difficultyLevel)에 따라 2→최대 8.
+ * 첫 노드(tutorial=true)는 최대 2로 제한 → 조작 학습 구간의 밀집도를 낮춘다(지시서 A-3).
+ * difficultyLevel = progressionFor가 돌려주는 소수 난이도.
+ */
+export function copyCount(difficultyLevel, tutorial = false) {
+  let copies = Math.min(8, 2 + Math.floor((Math.max(1, difficultyLevel) - 1) / 2));
+  if (tutorial) copies = Math.min(copies, 2);
+  return copies;
 }
 
 /** 크리스탈 피격: hp 감소, 0이 되면 broken과 함께 원래 보상 지급. */

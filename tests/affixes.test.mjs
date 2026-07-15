@@ -21,19 +21,20 @@ test('AFFIX_KINDS: 자성탄은 사격형만, 분열은 크리처 전용', () =>
   assert.ok(!AFFIX_KINDS.elite.includes('weaver')); // 위버는 엘리트 대상 아님
 });
 
-test('rollAffixes: 낮은 롤이면 종류에 맞는 변이 1개 (creature는 magnet 불가)', () => {
-  const keys = rollAffixes('creature', 1, () => 0, CFG);
+test('rollAffixes: 섹터 2+ 낮은 롤이면 종류에 맞는 변이 1개 (creature는 magnet 불가)', () => {
+  const keys = rollAffixes('creature', 2, () => 0, CFG);   // 섹터 2 = 확률 0.08, 롤 0 → 변이
   assert.equal(keys.length, 1);
   assert.ok(AFFIX_KINDS[keys[0]].includes('creature'));
   assert.notEqual(keys[0], 'magnet');
 });
 
-test('rollAffixes: 높은 롤이면 변이 없음', () => {
-  assert.deepEqual(rollAffixes('creature', 1, () => 0.99, CFG), []);
+test('rollAffixes: 섹터 1이면 변이 없음(첫 원정) + 높은 롤이면 변이 없음', () => {
+  assert.deepEqual(rollAffixes('creature', 1, () => 0, CFG), []);      // 섹터1 = 확률 0 → 항상 없음
+  assert.deepEqual(rollAffixes('creature', 2, () => 0.99, CFG), []);   // 높은 롤 → 없음
 });
 
-test('rollAffixes: twoAffixStage 이상이면 최대 2개, 서로 다름', () => {
-  const keys = rollAffixes('creature', 6, () => 0, CFG);
+test('rollAffixes: 섹터 4 이상이면 최대 2개, 서로 다름', () => {
+  const keys = rollAffixes('creature', 4, () => 0, CFG);   // 2중 변이는 섹터 4부터
   assert.equal(keys.length, 2);
   assert.notEqual(keys[0], keys[1]);
 });
