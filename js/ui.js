@@ -80,7 +80,7 @@ export const ui = {
       <p>네온 함대</p>
       <p class="big">최고 기록: 스테이지 ${stage}</p>
       <p style="font-size:12.5px;color:#9fb8d8;margin:10px 0 2px">좌우로 이동해 적과 적 탄환을 피하세요. 공격은 자동입니다.</p>
-      <p style="font-size:11.5px;color:#7f93b0;margin:0">스페이스바 또는 화면을 길게 눌러 차지 샷을 충전하세요.</p>
+      <p style="font-size:11.5px;color:#7f93b0;margin:0">차지 샷: PC는 Space·마우스 홀드, 모바일은 ⚡ 버튼 홀드.</p>
       ${saveOk ? '' : '<p style="color:#ff3d71;font-size:11px">⚠ 현재 브라우저에서는 기록을 저장할 수 없습니다.</p>'}
       <div class="btn-row">
         <button id="btn-start">출격하기</button>
@@ -95,6 +95,18 @@ export const ui = {
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
     if (onIntro) document.getElementById('btn-intro').addEventListener('click', onIntro);
     if (onReset) document.getElementById('btn-reset').addEventListener('click', onReset);
+  },
+
+  /** 첫 출격 조작 안내 (루트 노드 자동 진입 직전 1회만 표시) */
+  showFirstGuide({ onStart }) {
+    panel(`
+      <h2>첫 출격 안내</h2>
+      <p style="font-size:14px;color:#dbe8ff;margin:14px 0 6px">좌우로 이동해 경로를 선택하세요.</p>
+      <p style="font-size:13px;color:#9fb8d8;margin:0 0 6px"><b style="color:#3ff5e0">청록</b>은 성장, <b style="color:#ff3d71">자홍</b>은 손실입니다.</p>
+      <p style="font-size:12px;color:#7f93b0;margin:0 0 4px">PC: Space·마우스 홀드 · 모바일: ⚡ 버튼 홀드</p>
+      <button id="btn-guide-start">출격 시작 ▶</button>
+    `);
+    document.getElementById('btn-guide-start').addEventListener('click', onStart);
   },
 
   /** 초기화 확인 대화 */
@@ -164,15 +176,23 @@ export const ui = {
     if (onQuit) document.getElementById('btn-quit').addEventListener('click', onQuit);
   },
 
-  showLose({ stage, maxPower = 0, coins, best = 0, isRecord, modules = [], onRetry, onHangar }) {
+  showLose({ stage, maxPower = 0, coins, bonus = 0, best = 0, isRecord, modules = [], onRetry, onHangar }) {
     const mods = modules.length
       ? `<p style="font-size:16px;letter-spacing:2px;margin-top:6px">${modules.map((m) => m.icon + (m.count > 1 ? m.count : '')).join(' ')}</p>` : '';
+    const total = (coins || 0) + (bonus || 0);
+    const coinBlock = bonus > 0
+      ? `<div style="margin:6px 0;line-height:1.6">
+           <div>전투 획득 <b>🪙 +${(coins || 0).toLocaleString()}</b></div>
+           <div style="color:#7cff9c">원정 진행 보상 <b>+${bonus.toLocaleString()}</b></div>
+           <div>총 획득 <b>🪙 +${total.toLocaleString()}</b></div>
+         </div>`
+      : (total > 0 ? `<p>획득 코인: <b>🪙 +${total.toLocaleString()}</b></p>` : '');
     panel(`
       <h2 style="color:#ff3d71">출격 종료</h2>
       <p class="big">스테이지 ${stage} 도달</p>
       <p>최대 함대 화력: <b>${maxPower.toLocaleString()}</b> ${isRecord ? '<span class="record">★ 신기록!</span>' : ''}</p>
       ${mods}
-      ${coins > 0 ? `<p>획득 코인: <b>🪙 +${coins.toLocaleString()}</b></p>` : ''}
+      ${coinBlock}
       ${best > 0 && !isRecord ? `<p>역대 최고 화력: ${best.toLocaleString()}</p>` : ''}
       <p style="color:#9fb8d8"><small>격납고에서 영구 강화하고 더 멀리 진격하세요.</small></p>
       <div class="btn-row">

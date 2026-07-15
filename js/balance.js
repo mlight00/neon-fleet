@@ -296,7 +296,8 @@ export const BAL = {
   run: {
     failOverlayDelay: 0.5,  // 실패 후 오버레이까지(초)
     coinPerClear: 50,       // 클리어 보상 = 이 값 x 스테이지 번호
-    coinPerProgress: 20,    // 실패 시 진행도 x 이 값
+    failBaseCoins: 12,      // 실제 사망 시 기본 보상 (첫 원정 성장 단절 방지)
+    coinPerProgress: 30,    // 실제 사망 시 진행도(0~1) x 이 값 추가 (자발적 종료엔 없음)
   },
 
   // 섹터 분기 맵 (슬레이 더 스파이어식)

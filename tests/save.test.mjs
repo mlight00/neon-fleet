@@ -16,7 +16,7 @@ test('기본값: 저장 없으면 best 0, coins 0, stage 1, style C(미선택), 
   const fake = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
   const s = createSave(fake);
   assert.deepEqual(s.get(), {
-    best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false, introSeen: false, stageMigrated: true,
+    best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false, introSeen: false, firstGuideSeen: false, stageMigrated: true,
     up: { drones: 0, dmg: 0, rate: 0, coin: 0 },
     snd: { bgm: 0.5, sfx: 0.8, mute: false },
   });

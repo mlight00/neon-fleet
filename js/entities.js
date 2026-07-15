@@ -1365,16 +1365,22 @@ export class Scrolling {
 }
 
 // ───────────────────────── 에너지 크리스탈
+/** 생성 시점의 보상 배수(모듈·경제·군체 교리)를 반영해 실지급 드론 수를 확정한다. 표시=지급 (지시서 §3.6). */
+function fixedPayout(raw, world) {
+  return droneReward(raw, world?.mfx?.podRewardMult ?? 1, BAL.economy.droneGainMult, world?.squad?.rewardGainMult ?? 1);
+}
+
 export class Crystal extends Scrolling {
-  constructor(x, y, value) {
+  constructor(x, y, value, world) {
     super(x, y);
-    this.hp = value;
-    this.reward = value;
+    this.hp = this.maxHp = value;             // 격파에 필요한 화력(=체력)
+    this.reward = value;                      // 표적 우선순위·스캐빈저 대체값의 기준
+    this.payout = fixedPayout(value, world);  // 생성 시 확정된 실지급 드론 수(표시와 동일)
     this.r = value >= 150 ? 34 : value >= 40 ? 28 : 22;
   }
-  /** 실제 지급 드론 수 (보상 배수·경제·교리 반영). 스캐빈저도 이 값을 저장한다. */
-  getDroneReward(world) {
-    return droneReward(this.reward, world.mfx?.podRewardMult ?? 1, BAL.economy.droneGainMult, world.squad.rewardGainMult);
+  /** 실제 지급 드론 수 = 생성 시 확정된 payout. 스캐빈저도 이 값을 저장한다. (world 인자는 하위 호환용) */
+  getDroneReward() {
+    return this.payout;
   }
   hitByBullet(dmg, world) {
     const res = hitCrystal(this, dmg);
@@ -1382,7 +1388,7 @@ export class Crystal extends Scrolling {
     if (res.broken) {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.reward, 20);
-      world.squad.applyDelta(this.getDroneReward(world), world);
+      world.squad.applyDelta(this.payout, world);
       sfx('crystal');
     }
   }
@@ -1415,8 +1421,8 @@ export class Crystal extends Scrolling {
     ctx.moveTo(this.x, this.y - r);
     ctx.lineTo(this.x, this.y + r);
     ctx.stroke();
-    // 숫자: 정수만 표시 (레이저 감쇠 등으로 소수가 될 수 있음) + 어두운 외곽선
-    const num = String(Math.ceil(this.hp));
+    // 중앙 큰 숫자 = 실지급 드론(+payout). 표시와 지급이 같은 값(§3.6). 체력은 작은 상단 바로 이동.
+    const num = `+${this.payout}`;
     ctx.font = `bold ${r >= 34 ? 18 : 15}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.strokeStyle = 'rgba(5,6,15,0.85)';
@@ -1424,18 +1430,26 @@ export class Crystal extends Scrolling {
     ctx.strokeText(num, this.x, this.y + 5);
     ctx.fillStyle = COLORS.text;
     ctx.fillText(num, this.x, this.y + 5);
+    // 격파 진행(체력)은 상단 작은 바로 — 큰 숫자 자리를 보상 표시에 내준다
+    if (this.hp < this.maxHp) {
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(this.x - r, this.y - r - 8, r * 2, 3);
+      ctx.fillStyle = '#6fe3ff';
+      ctx.fillRect(this.x - r, this.y - r - 8, r * 2 * Math.max(0, this.hp / this.maxHp), 3);
+    }
   }
 }
 
 // ───────────────────────── 보급 수송선: 부수면 드론 지급 (파괴 = 드론 회수의 주력 공급원)
 export class DronePod extends Scrolling {
-  constructor(x, y, size) {
+  constructor(x, y, size, world) {
     super(x, y);
     const cfg = BAL.pod[size];
     this.size = size;
     this.hp = cfg.hp;
     this.maxHp = cfg.hp;
-    this.reward = cfg.reward;
+    this.reward = cfg.reward;                      // 표적 우선순위·스캐빈저 대체값의 기준
+    this.payout = fixedPayout(cfg.reward, world);  // 생성 시 확정된 실지급 드론 수(표시와 동일)
     this.r = cfg.r;
     this.baseX = x;
     this.t = Math.random() * 10;
@@ -1446,9 +1460,9 @@ export class DronePod extends Scrolling {
     this.x = this.baseX + Math.sin(this.t * BAL.pod.swayHz * Math.PI * 2) * BAL.pod.swayAmp;
     if (this.offscreen(world)) this.dead = true;
   }
-  /** 실제 지급 드론 수 (보상 배수·경제·교리 반영). 스캐빈저도 이 값을 저장한다. */
-  getDroneReward(world) {
-    return droneReward(this.reward, world.mfx?.podRewardMult ?? 1, BAL.economy.droneGainMult, world.squad.rewardGainMult);
+  /** 실제 지급 드론 수 = 생성 시 확정된 payout. 스캐빈저도 이 값을 저장한다. (world 인자는 하위 호환용) */
+  getDroneReward() {
+    return this.payout;
   }
   hitByBullet(dmg, world) {
     this.hp -= dmg;
@@ -1456,7 +1470,7 @@ export class DronePod extends Scrolling {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.ally, 18, 200);
       world.effects.ring(this.x, this.y, COLORS.ally);
-      world.squad.applyDelta(this.getDroneReward(world), world, '보급 획득!');
+      world.squad.applyDelta(this.payout, world, '보급 획득!');
       sfx('crystal');
     }
   }
@@ -1479,7 +1493,7 @@ export class DronePod extends Scrolling {
     // 내용 표기: ▲ + 드론 수
     ctx.font = `bold ${r >= 22 ? 15 : 12}px sans-serif`;
     ctx.textAlign = 'center';
-    const label = `▲${this.reward}`;
+    const label = `▲${this.payout}`;
     ctx.strokeStyle = 'rgba(5,6,15,0.85)';
     ctx.lineWidth = 3;
     ctx.strokeText(label, this.x, this.y + 4);

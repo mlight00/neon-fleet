@@ -21,6 +21,27 @@ export function scaleGate(gate, stage, scalePerStage = 0.6, scaleMax = 6) {
   return { op: gate.op, value: Math.max(1, Math.round(gate.value * f)) };
 }
 
+/**
+ * 원정 실패(사망) 정산 보상: 전투 획득 + 기본 + 진행도 비례. 순수 함수(테스트 가능).
+ * 자발적 종료(quit)에는 base·perProgress를 0으로 넘겨 전투 획득만 남긴다.
+ * 계약: progress=clamp(0~1) → round(earned + base + floor(progress*perProgress)).
+ */
+export function failureReward({ earned = 0, progress = 0, base = 0, perProgress = 0 }) {
+  const p = Math.max(0, Math.min(1, progress));
+  return Math.round(earned + base + Math.floor(p * perProgress));
+}
+
+/**
+ * 적 복제 스폰 수 (순수 함수). 스테이지가 깊을수록 증가(밀도로 난이도 상승).
+ * 첫 노드(tutorial=true)는 최대 2로 제한 → 조작 학습 구간의 밀집도를 낮춘다(지시서 A-3).
+ * spawn = { enemyMult, enemyMultMax, enemyMultStageStep }.
+ */
+export function copyCount(stage, spawn, tutorial = false) {
+  let dup = Math.min(spawn.enemyMultMax, spawn.enemyMult + Math.floor((Math.max(1, stage) - 1) / spawn.enemyMultStageStep));
+  if (tutorial) dup = Math.min(dup, 2);
+  return dup;
+}
+
 /** 크리스탈 피격: hp 감소, 0이 되면 broken과 함께 원래 보상 지급. */
 export function hitCrystal(crystal, damage) {
   const hp = Math.max(0, crystal.hp - damage);

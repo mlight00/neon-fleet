@@ -11,8 +11,8 @@ import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
 import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
-import { mulberry32, pickTier, pickChunk, isSafeChunk, chunkMinStage } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap } from './logic.js';
+import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinStage } from './chunks.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -159,6 +159,13 @@ function enterSectorMap() {
   const r = run;
   state = 'map';
   playBgm('title');
+  const d = save.get();
+  // 첫 출격: 루트 노드(단일 선택지)는 자동 진입하되, 그 전에 조작 안내를 1회 표시 (지시서 A-4 §3.5).
+  if (r.sector === 1 && r.done.length === 0 && !d.firstGuideSeen) {
+    const root = r.map.cols[0][0];
+    ui.showFirstGuide({ onStart: () => { save.set({ firstGuideSeen: true }); enterNode(root); } });
+    return;
+  }
   ui.showSectorMap({
     map: r.map, currentId: r.node ? r.node.id : null, doneIds: r.done,
     sector: r.sector, coins: r.world.coins, onPick: enterNode,
@@ -202,6 +209,7 @@ function buildEncounter(node) {
   const mods = stageMods(stage);
   r.mods = mods; w.stageMods = mods;
   r.isBossNode = node.type === 'boss';
+  r.tutorial = r.sector === 1 && node.col === 0;   // 첫 원정 첫 노드 = 조작 학습 구간(안전 청크·복제 제한)
   w.scrollSpeed = BAL.scrollSpeed;
   w.entities.length = 0; w.bullets.length = 0; w.enemyBullets.length = 0;
   r.boss = null; w.boss = null; r.bosses = []; w.bosses = [];
@@ -222,9 +230,11 @@ function buildEncounter(node) {
   let prev = null;
   // 위험 노드는 debris/mine이 콘텐츠인데 안전-시작(isSafeChunk)을 강제하면 필터가 모순되어 일반 청크로 샘 → 0으로.
   const safeCount = node.type === 'boss' ? 1 : node.type === 'hazard' ? 0 : Math.min(3, 1 + Math.floor((stage - 1) / 4));
+  // 첫 노드: 모든 청크를 튜토리얼-안전으로 제한(나쁜 게이트·위협 적 배제). 그 외: 앞 safeCount칸만 안전.
+  const tutFilt = (c) => filt(c) && isTutorialSafeChunk(c);
   for (let i = 0; i < perRun; i++) {
     const tier = pickTier(i / perRun, bounds);
-    const f = i < safeCount ? (c) => filt(c) && isSafeChunk(c) : filt;
+    const f = r.tutorial ? tutFilt : (i < safeCount ? (c) => filt(c) && isSafeChunk(c) : filt);
     const chunk = pickChunk(tier, rng, prev, f);
     prev = chunk;
     for (const it of chunk.items) {
@@ -385,8 +395,8 @@ function update(dt) {
       const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, r.stage, r.rng); w.entities.push(e); };
       // 적 항목은 enemyMult 배수만큼 복제 스폰: 복제본은 좌우 미러 + 세로로 살짝 시차.
       // 무한 상승: 스테이지가 깊을수록 복제 수↑ → 적이 많아 움직여야 생존
-      const dup = Math.min(BAL.spawn.enemyMultMax, BAL.spawn.enemyMult + Math.floor((r.stage - 1) / BAL.spawn.enemyMultStageStep));
-      if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal)));
+      const dup = copyCount(r.stage, BAL.spawn, r.tutorial);   // 첫 노드는 최대 2로 제한(logic.copyCount)
+      if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal), w));
       else if (it.type === 'gatePair') {
         const gs = (g) => scaleGate(g, r.stage, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
         w.entities.push(new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right)));
@@ -411,7 +421,7 @@ function update(dt) {
       else if (it.type === 'shielder') spawnEnemy(new Shielder(x), 'shielder');       // 단일(주기 방패)
       else if (it.type === 'carrier') spawnEnemy(new BroodCarrier(x), 'carrier');      // 단일(드론 사출)
       else if (it.type === 'blinker') for (let k = 0; k < dup; k++) spawnEnemy(new Blinker(k ? LOGICAL_W - x : x, LOGICAL_W), 'blinker');
-      else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size));
+      else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size, w));
       else if (it.type === 'midboss') w.entities.push(new MidBoss(LOGICAL_W, r.stage, r.maxPower));
       else if (it.type === 'capsule') {
         const weapon = it.weapon === 'random'
@@ -589,7 +599,7 @@ function update(dt) {
     r.endT = BAL.run.failOverlayDelay;
   }
   if (r.phase === 'lose' && (r.endT -= dt) <= 0) {
-    endExpedition();
+    endExpedition('death');
   }
 
   // 선택 요청 소비 (우선순위: 교리 > 무기 진화). 보스·연출 중엔 열지 않는다. 동시에 둘이 열리지 않음.
@@ -670,7 +680,9 @@ function openWeaponEvolution(weapon) {
 }
 
 // 원정 종료 (사망 또는 끝내기): 코인·기록 정산 → 결과 화면
-function endExpedition({ toTitle = false } = {}) {
+// reason: 'death'(실제 사망) | 'quit'(자발적 종료) | 'campaignClear'(캠페인 완료).
+//  death만 기본·진행도 보상을 더한다. quit은 전투 중 획득 코인만 저장.
+function endExpedition(reason = 'death', { toTitle = false } = {}) {
   state = 'done';
   drafting = false;
   betweenStages = false;
@@ -679,11 +691,20 @@ function endExpedition({ toTitle = false } = {}) {
   const data = save.get();
   const isRecord = r.maxPower > data.best;
   const best = Math.max(data.best, r.maxPower);
-  const coins = Math.round(r.world.coins * r.world.stats.coinMult);
-  // 기록 저장: '최고 도달 섹터'는 r.sector (표시용). r.stage는 내부 난이도 카운터라 저장하면 안 됨(오표시 원인).
-  save.set({ best, coins: data.coins + coins, stage: Math.max(data.stage, r.sector) });
+  const earned = Math.round(r.world.coins * r.world.stats.coinMult);   // 전투 중 획득 코인
+  // 진행도(0~1): 완료 섹터 + 현재 섹터 내 노드 진행 / 캠페인 섹터 수.
+  const CAMPAIGN_SECTORS = 6;
+  const progress = ((r.sector - 1) + (r.done.length / (BAL.sector.depth + 1))) / CAMPAIGN_SECTORS;
+  const total = reason === 'death'
+    ? failureReward({ earned, progress, base: BAL.run.failBaseCoins, perProgress: BAL.run.coinPerProgress })
+    : earned;   // quit·기타: 획득분만
+  const bonus = total - earned;   // UI 분할 표시용 (원정 진행 보상)
+  if (!r.settled) {   // 중복 정산 차단 (같은 원정을 두 번 저장하지 않음)
+    r.settled = true;
+    save.set({ best, coins: data.coins + total, stage: Math.max(data.stage, r.sector) });
+  }
   if (toTitle) { showTitleScreen(); return; }
-  ui.showLose({ stage: r.sector, maxPower: r.maxPower, coins, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
+  ui.showLose({ stage: r.sector, maxPower: r.maxPower, coins: earned, bonus, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
 }
 
 // ───────────────────────── 격납고 (영구 강화 상점)
@@ -805,7 +826,7 @@ function togglePause() {
 /** 일시정지에서 '끝내기': 원정을 포기하고 타이틀로. 모은 코인·최고 기록은 정산해 저장 */
 function quitRun() {
   paused = false;
-  endExpedition({ toTitle: true });
+  endExpedition('quit', { toTitle: true });
 }
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); }

@@ -52,6 +52,23 @@ export function isSafeChunk(chunk) {
   return chunk.items.every((it) => !THREAT_TYPES.has(it.type));
 }
 
+// 튜토리얼(첫 원정 첫 노드) 허용 아이템: 보급·성장만. 소형 생물·친화 게이트(+/×)는 별도 허용.
+const TUTORIAL_ALLOWED = new Set(['crystal', 'capsule', 'power', 'dronePod', 'bonusGate', 'weaponGate']);
+/** 게이트가 이득만 주는 친화형인지 (÷·− 감점, 감염 게이트 배제) */
+function isFriendlyGate(g) { return !!g && (g.op === '+' || g.op === 'x'); }
+/**
+ * 첫 노드용 안전 청크: 소형 생물·크리스탈·보급·친화 게이트만.
+ * 배제 대상 — 나쁜 게이트(−/÷)·감염 게이트, 중/대형·사격형·대응형 적, 기뢰/잔해/돌진병, 유성.
+ * (지시서 A-2: 첫 노드는 조작을 배우는 곳이라 불리한 규칙·위협적 적을 넣지 않는다.)
+ */
+export function isTutorialSafeChunk(chunk) {
+  return chunk.items.every((it) => {
+    if (it.type === 'creature') return it.size === 'small';           // 소형 생물만 허용
+    if (it.type === 'gatePair') return isFriendlyGate(it.left) && isFriendlyGate(it.right);
+    return TUTORIAL_ALLOWED.has(it.type);                             // 그 외는 보급/성장류만
+  });
+}
+
 // 적 종류별 첫 등장 스테이지 (점진적 도입)
 const ENEMY_MIN_STAGE = {
   creature_small: 1, meteor: 1,

@@ -31,21 +31,27 @@ function makeWorld() {
 // ─── 스캐빈저 보상·예약·도주 ───────────────────────────────
 test('Crystal(100) 기본 실수령 = round(100×droneGainMult)', () => {
   const w = makeWorld();
-  assert.equal(new Crystal(0, 0, 100).getDroneReward(w), REWARD_100);
+  const cr = new Crystal(0, 0, 100, w);
+  assert.equal(cr.payout, REWARD_100);
+  assert.equal(cr.getDroneReward(), cr.payout);   // 표시=지급 (§3.6)
 });
 
-test('podRewardMult·rewardGainMult가 Crystal·DronePod에 동일 적용', () => {
-  const w = makeWorld();
-  const cr = new Crystal(0, 0, 100), pod = new DronePod(0, 0, 'mid');
-  // 코드와 동일한 단일 반올림식으로 검증(round(raw×pod×econ×doctrine)) — pod1×2 식은 반올림 선형성을 가정해 취약
+test('podRewardMult·rewardGainMult가 생성 시 Crystal·DronePod payout에 반영 (표시=지급)', () => {
+  // 코드와 동일한 단일 반올림식(round(raw×pod×econ×doctrine))으로 검증. payout은 '생성 시점'의 배수로 확정된다(§3.6, 테스트 12).
   const G = BAL.economy.droneGainMult;
-  w.mfx.podRewardMult = 2;                        // 보상 모듈 ×2
-  assert.equal(cr.getDroneReward(w), Math.round(cr.reward * 2 * G));
-  assert.equal(pod.getDroneReward(w), Math.round(pod.reward * 2 * G));
-  w.mfx.podRewardMult = 1; w.squad.doctrine = 'swarm'; w.squad.cruisers = 1;  // 군체 교리 보너스
+  // ① 보상 모듈 ×2 상태에서 생성 → payout에 ×2 반영
+  let w = makeWorld(); w.mfx.podRewardMult = 2;
+  let cr = new Crystal(0, 0, 100, w), pod = new DronePod(0, 0, 'mid', w);
+  assert.equal(cr.payout, Math.round(cr.reward * 2 * G));
+  assert.equal(pod.payout, Math.round(pod.reward * 2 * G));
+  assert.equal(cr.getDroneReward(), cr.payout);   // 표시=지급
+  assert.equal(pod.getDroneReward(), pod.payout);
+  // ② 군체 교리 보너스 상태에서 생성 → payout에 반영
+  w = makeWorld(); w.squad.doctrine = 'swarm'; w.squad.cruisers = 1;
   const swarmMult = 1 + BAL.doctrine.swarm.droneGainBonus;
-  assert.equal(cr.getDroneReward(w), Math.round(cr.reward * G * swarmMult));
-  assert.equal(pod.getDroneReward(w), Math.round(pod.reward * G * swarmMult));
+  cr = new Crystal(0, 0, 100, w); pod = new DronePod(0, 0, 'mid', w);
+  assert.equal(cr.payout, Math.round(cr.reward * G * swarmMult));
+  assert.equal(pod.payout, Math.round(pod.reward * G * swarmMult));
 });
 
 test('스캐빈저가 Crystal(100)을 훔치면 원시값 100이 아니라 실수령을 저장', () => {

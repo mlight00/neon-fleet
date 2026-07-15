@@ -3,6 +3,7 @@ const KEY = 'neonFleet.v1';
 const DEFAULTS = {
   best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false,
   introSeen: false,                             // 인트로 크롤 시청 여부
+  firstGuideSeen: false,                        // 첫 출격 조작 안내 표시 여부(1회) — 이후 루트 노드 자동 진입 생략
   stageMigrated: true,                          // stage 기록 마이그레이션 완료 플래그(신규 저장은 항상 true)
   up: { drones: 0, dmg: 0, rate: 0, coin: 0 }, // 격납고 강화 레벨
   snd: { bgm: 0.5, sfx: 0.8, mute: false },     // 사운드 설정
