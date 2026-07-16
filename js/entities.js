@@ -358,6 +358,14 @@ export class Squad {
       return;
     }
     if (this.pendingWeaponEvolution) return;   // 이미 선택 대기 중
+    // 진화 사다리(maxLv 도달 후)는 evolveAdvanceCost회 모아야 한 칸 → 진화 속도 완화(사용자 요청)
+    const cost = BAL.weapons.evolveAdvanceCost || 1;
+    this._evoProg = (this._evoProg || 0) + 1;
+    if (this._evoProg < cost) {
+      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 진화 강화 축적 ${this._evoProg}/${cost}`, COLORS.reward, 14);
+      return;
+    }
+    this._evoProg = 0;
     const st = evolutionStage(w, this.weaponLv, BAL.weapons.maxLv, this.weaponEvolutions, this.evoLevels, this.weaponEvolutions2, this.superLevels);
     if (st === 'evoUp') {
       this.evoLevels[w] = (this.evoLevels[w] || 1) + 1;

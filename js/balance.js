@@ -179,6 +179,9 @@ export const BAL = {
     homing: { coef: 0.8, rate: 12, speedFrom: 300, speedTo: 480, turnRate: 5, cap: 16 }, // 자동조준 보정 완화(0.56→0.8: 호밍 위력 빈약 피드백)
     lvCoef: [1.0, 1.15, 1.3],
     maxLv: 3,
+    // 진화·초진화 강화 진행 속도 늦춤(사용자: 섹터 2에 이미 최종 진화). 베이스 Lv는 그대로,
+    // maxLv 도달 후의 진화 사다리(선택·강화)만 이 횟수만큼 캡슐/게이트를 모아야 한 칸 오른다.
+    evolveAdvanceCost: 2,
   },
 
   // 색깔 캡슐: 같은 색 = Lv+1, 다른 색 = 교체(Lv 유지)
@@ -294,8 +297,8 @@ export const BAL = {
   },
 
   // 전체 난이도 미세 조정 knob (사용자 요청). 적·보스 체력 ×globalMult, 적 발사 주기 ÷globalMult(더 빠름).
-  // 1.0 = 기준. 1.15 = 전체 +15%. 곡선(progression·stageMods)은 그대로 두고 체감만 일괄 상하 조정.
-  difficulty: { globalMult: 1.15 },
+  // 1.0 = 기준. 1.38 = 전체 +38%(1.15에서 다시 ×1.2). 곡선은 그대로 두고 체감만 일괄 상하 조정.
+  difficulty: { globalMult: 1.38 },
 
   run: {
     failOverlayDelay: 0.5,  // 실패 후 오버레이까지(초)
