@@ -450,19 +450,22 @@ export class Squad {
   }
 
   applyDelta(n, world, label) {
-    const before = this.count;
     this.count = Math.max(0, this.count + n);
+    // 전멸 판정 = '실제 손실(n<0)로 드론이 0이 됐는가'. 두 가지를 동시에 만족해야 한다:
+    //  (A) 성장 소모는 전멸이 아니다 — checkEvolution이 드론 130기를 순양함 1척으로 합체시키면
+    //      잔여가 0이 되는데, 이걸 전멸로 보면 승급 직후 등급이 거꾸로 강등된다(인터셉터 → 스카웃).
+    //      → 판정을 checkEvolution '이전'에, 그리고 n<0일 때만 한다.
+    //  (B) 합체로 이미 0인 상태에서 피해를 받으면 반드시 발동해야 한다 — 이전 구현의 `before > 0`
+    //      가드는 count가 이미 0이면 영영 참이 될 수 없어 사실상 무적이 됐다(회귀).
+    //      → 직전 값이 아니라 '이번 델타의 부호'로 판정한다.
+    const depletedByLoss = n < 0 && this.count === 0;
     if (n > 0) world.effects.text(this.x, this.y - 40, `+${n}`, COLORS.ally);
     else if (n < 0) {
       world.effects.text(this.x, this.y - 40, `${n}`, COLORS.danger);
       this.flash = 0.25;
     }
     if (label) world.effects.text(this.x, this.y - 64, label, COLORS.reward);
-    // 전멸 판정은 '이번 델타로 0이 됐는가'로 먼저 한다.
-    // checkEvolution은 드론을 순양함으로 합체시키며 count를 0으로 만들 수 있는데(130기 → 순양함 1척, 잔여 0),
-    // 그건 소모이지 전멸이 아니다. 순서가 반대면 승급 직후(순양함 소진) 합체로 0이 될 때 안전망이
-    // 오발동해 등급이 거꾸로 강등된다(인터셉터 → 스카웃 버그).
-    if (before > 0 && this.count === 0) { this.onDronesDepleted(world); return; }
+    if (depletedByLoss) { this.onDronesDepleted(world); return; }   // 피해로 전멸 → 안전망 1회
     this.checkEvolution(world);
   }
 
