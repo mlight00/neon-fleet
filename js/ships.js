@@ -2,6 +2,7 @@
 // 모든 좌표는 로컬 (0,0) 중심, 기수 = -y. 몸체는 프리렌더, 화염은 매 프레임 글로우 없이 그린다.
 import { COLORS, makeSprite } from './render.js';
 import { getSprite } from './sprites.js';
+import { flagshipProfile } from './creative-direction.js';
 
 const BODY_FILL = 'rgba(63,245,224,0.12)';
 const COCKPIT = 'rgba(255,255,255,0.85)';
@@ -197,6 +198,53 @@ export const SHIP_DEFS = SHIP_DEFS_RAW.map((d, t) => {
 });
 
 const spriteCache = [];
+const baseSpriteCache = [];
+
+function drawCapitalBase(ctx, d, tier) {
+  const halfW = d.w * 0.43, halfH = d.h * 0.43;
+  ctx.save();
+  ctx.shadowColor = COLORS.ally; ctx.shadowBlur = 8;
+  // 상위 함선은 기존 A5/A6 이미지에 섞인 라벨·부속 오브젝트를 쓰지 않고 정규화 좌표로 새 실루엣을 만든다.
+  const twin = tier >= 5;
+  ctx.fillStyle = 'rgba(18,43,55,.94)'; ctx.strokeStyle = '#88f7ed'; ctx.lineWidth = 1.35;
+  ctx.beginPath();
+  ctx.moveTo(0, -halfH);
+  ctx.lineTo(-halfW * 0.22, -halfH * 0.46);
+  ctx.lineTo(-halfW, halfH * 0.2);
+  ctx.lineTo(-halfW * 0.46, halfH * 0.12);
+  ctx.lineTo(-halfW * 0.27, halfH);
+  ctx.lineTo(0, halfH * 0.7);
+  ctx.lineTo(halfW * 0.27, halfH);
+  ctx.lineTo(halfW * 0.46, halfH * 0.12);
+  ctx.lineTo(halfW, halfH * 0.2);
+  ctx.lineTo(halfW * 0.22, -halfH * 0.46);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (twin) {
+    ctx.fillStyle = 'rgba(30,70,78,.88)';
+    for (const side of [-1, 1]) {
+      ctx.beginPath(); ctx.roundRect(side * halfW * 0.58 - halfW * 0.12, -halfH * 0.35, halfW * 0.24, halfH * 1.02, halfW * 0.08); ctx.fill(); ctx.stroke();
+    }
+  } else {
+    ctx.fillStyle = 'rgba(38,82,88,.7)';
+    ctx.fillRect(-halfW * 0.72, -halfH * 0.02, halfW * 1.44, halfH * 0.2);
+  }
+  ctx.fillStyle = '#eaffff';
+  ctx.beginPath(); ctx.moveTo(0, -halfH * 0.62); ctx.lineTo(-halfW * 0.1, -halfH * 0.32); ctx.lineTo(0, -halfH * 0.12); ctx.lineTo(halfW * 0.1, -halfH * 0.32); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+/** 무기 그림이 합쳐지지 않은 중립 함체. 기함은 이 위에 지휘 프레임과 무기 장착물을 조립한다. */
+export function shipBaseSprite(tier) {
+  // A5/A6 원본에는 잘린 글자·주변 오브젝트가 남아 있어 상위 2티어는 새 절차적 함체를 사용한다.
+  const gem = tier < 4 ? getSprite('A' + (tier + 1)) : null;
+  if (gem) return gem;
+  if (!baseSpriteCache[tier]) {
+    const d = SHIP_DEFS[tier];
+    baseSpriteCache[tier] = makeSprite(d.w, d.h, tier >= 4 ? (ctx) => drawCapitalBase(ctx, d, tier) : d.draw);
+  }
+  return baseSpriteCache[tier];
+}
+
 export function shipSprite(tier, weapon) {
   // 무기별 함선 변형 우선(A{n}{V=발칸/L=레이저/H=호밍}) → 기존 A{n} → 절차적 드로잉 폴백
   const wc = weapon === 'laser' ? 'L' : weapon === 'homing' ? 'H' : 'V';
@@ -207,6 +255,119 @@ export function shipSprite(tier, weapon) {
     spriteCache[tier] = makeSprite(d.w, d.h, d.draw);
   }
   return spriteCache[tier];
+}
+
+/**
+ * NF-0 LUMEN 전용 지휘 프레임.
+ * 호위 드론의 청록색과 겹치지 않는 금빛 척추·함교·티어 핀으로 기함을 즉시 구분한다.
+ */
+export function drawCommandFrame(ctx, tier, t) {
+  const d = SHIP_DEFS[tier];
+  const p = flagshipProfile(tier);
+  const pulse = 0.72 + 0.28 * Math.sin(t * 3.2);
+  const top = -d.h * 0.34, bottom = d.h * 0.28;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = `rgba(255,205,92,${0.58 + pulse * 0.24})`;
+  ctx.lineWidth = 1.4 + tier * 0.12;
+  ctx.beginPath(); ctx.moveTo(0, top); ctx.lineTo(0, bottom); ctx.stroke();
+  ctx.fillStyle = '#fff4c6';
+  ctx.beginPath(); ctx.moveTo(0, top - 5); ctx.lineTo(-3.6, top + 2); ctx.lineTo(0, top + 7); ctx.lineTo(3.6, top + 2); ctx.closePath(); ctx.fill();
+
+  const pins = p.commandLights;
+  for (let i = 0; i < pins; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const row = Math.floor(i / 2);
+    const x = side * (d.clearR * (0.34 + row * 0.1));
+    const y = -d.clearR * 0.1 + row * 5;
+    ctx.globalAlpha = 0.45 + pulse * 0.5;
+    ctx.fillStyle = i < 2 ? '#fff4c6' : '#ffbd4a';
+    ctx.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
+  }
+  ctx.globalAlpha = 0.2 + pulse * 0.1;
+  ctx.strokeStyle = '#ffbd4a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(0, 0, d.clearR * p.frameScale, d.clearR * p.frameScale * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+
+function drawVulcanRig(ctx, m, size, t, advanced) {
+  const recoil = Math.max(0, Math.sin(t * 22)) * (advanced ? 1.8 : 0.9);
+  ctx.strokeStyle = '#5dfff0'; ctx.lineWidth = advanced ? 2.2 : 1.7;
+  ctx.beginPath(); ctx.moveTo(m.x - size * 0.16, m.y + recoil); ctx.lineTo(m.x - size * 0.16, m.y - size);
+  ctx.moveTo(m.x + size * 0.16, m.y + recoil); ctx.lineTo(m.x + size * 0.16, m.y - size); ctx.stroke();
+  ctx.fillStyle = '#d8fffb'; ctx.fillRect(m.x - 1.5, m.y - size - 2, 3, 3);
+}
+
+function drawLaserRig(ctx, m, size, t, advanced) {
+  const pulse = 0.55 + 0.45 * Math.sin(t * 6 + m.x);
+  ctx.strokeStyle = advanced ? '#ffffff' : '#a8f0ff'; ctx.lineWidth = advanced ? 2.2 : 1.5;
+  ctx.beginPath(); ctx.moveTo(m.x, m.y + size * 0.2); ctx.lineTo(m.x, m.y - size); ctx.stroke();
+  ctx.globalAlpha = 0.48 + pulse * 0.42; ctx.fillStyle = '#a8f0ff';
+  ctx.beginPath(); ctx.moveTo(m.x, m.y - size - 4); ctx.lineTo(m.x - 3, m.y - size); ctx.lineTo(m.x, m.y - size + 4); ctx.lineTo(m.x + 3, m.y - size); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawHomingRig(ctx, m, size, t, advanced) {
+  const w = advanced ? 7 : 5.5, h = size * 0.7;
+  ctx.fillStyle = 'rgba(255,217,61,.22)'; ctx.strokeStyle = '#ffd93d'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.roundRect(m.x - w / 2, m.y - h * 0.7, w, h, 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff3a8';
+  const cells = advanced ? 3 : 2;
+  for (let i = 0; i < cells; i++) ctx.fillRect(m.x - w / 2 + 1.5 + i * ((w - 3) / cells), m.y - h * 0.55, 1.2, 2.2);
+}
+
+/** 현재 무기·레벨·진화가 선체 위 장착물의 형태와 크기로 보인다. */
+export function drawWeaponRig(ctx, tier, weapon, weaponLv, t, evolutionId = null, superId = null) {
+  const d = SHIP_DEFS[tier];
+  const p = flagshipProfile(tier);
+  const advanced = !!evolutionId;
+  const superAdvanced = !!superId;
+  const mountCount = Math.min(d.mounts.length, Math.max(1, 1 + tier + Math.max(0, weaponLv - 1)));
+  const size = (4.8 + weaponLv * 1.45 + tier * 0.38) * p.mountPresence * (advanced ? 1.16 : 1) * (superAdvanced ? 1.12 : 1);
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < mountCount; i++) {
+    const m = d.mounts[i];
+    if (weapon === 'laser') drawLaserRig(ctx, m, size, t, advanced || superAdvanced);
+    else if (weapon === 'homing') drawHomingRig(ctx, m, size, t, advanced || superAdvanced);
+    else drawVulcanRig(ctx, m, size, t, advanced || superAdvanced);
+  }
+  if (superAdvanced) {
+    ctx.globalAlpha = 0.28 + Math.sin(t * 5) * 0.08; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(0, -d.clearR * 0.08, d.clearR * 0.82, d.clearR * 0.48, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** U1~U5 조립 연출: 에너지 배선 → 장착 브래킷 → 점화. */
+export function drawUpgradeSequence(ctx, tier, fx) {
+  if (!fx || fx.t <= 0 || fx.max <= 0) return;
+  const d = SHIP_DEFS[tier];
+  const elapsed = Math.max(0, Math.min(1, 1 - fx.t / fx.max));
+  const grade = fx.grade || 1;
+  const radius = d.clearR + 6 + grade * 3;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  if (elapsed < 0.28) {
+    const p = elapsed / 0.28;
+    ctx.strokeStyle = `rgba(255,217,61,${0.2 + p * 0.7})`; ctx.lineWidth = 1.5 + grade * 0.25;
+    ctx.beginPath(); ctx.arc(0, 0, radius * (1.45 - p * 0.45), -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p); ctx.stroke();
+  } else if (elapsed < 0.72) {
+    const p = (elapsed - 0.28) / 0.44;
+    ctx.strokeStyle = '#ffd93d'; ctx.lineWidth = 1.4;
+    for (const side of [-1, 1]) {
+      const x = side * radius * (1.35 - p * 0.35);
+      ctx.beginPath(); ctx.moveTo(x, -radius * 0.55); ctx.lineTo(x - side * radius * 0.22, -radius * 0.55); ctx.lineTo(x - side * radius * 0.22, radius * 0.55); ctx.lineTo(x, radius * 0.55); ctx.stroke();
+    }
+    for (let i = 0; i < 2 + grade; i++) {
+      const a = (i / (2 + grade)) * Math.PI * 2 + p * 2;
+      ctx.fillStyle = '#fff5c7'; ctx.fillRect(Math.cos(a) * radius - 1, Math.sin(a) * radius * 0.65 - 1, 2, 2);
+    }
+  } else {
+    const p = (elapsed - 0.72) / 0.28;
+    ctx.globalAlpha = 1 - p; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5 - p * 3;
+    ctx.beginPath(); ctx.arc(0, 0, radius * (0.75 + p * 1.1), 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = (1 - p) * 0.35; ctx.fillStyle = fx.color || '#ffd93d'; ctx.beginPath(); ctx.arc(0, 0, radius * (1.2 + p), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
 }
 
 /** 엔진 배기 화염: 2겹 삼각형, 글로우 없음 (매 프레임). 로컬 좌표(함선 변환 안)에서 호출. */

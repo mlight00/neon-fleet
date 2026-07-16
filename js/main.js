@@ -13,11 +13,12 @@ import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, progressPatch } from './logic.js';
-import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
+import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
-import { initAudio, unlockAudio, playBgm, sfx, toggleMute, isMuted, setBgmVolume, setSfxVolume, getSettings } from './audio.js';
+import { initAudio, unlockAudio, playBgm, setBgmIntensity, sfx, toggleMute, isMuted, setBgmVolume, setSfxVolume, getSettings } from './audio.js';
 import { playIntro } from './intro.js';
+import { createZoneBackdrop } from './zone-backdrop.js';
 
 const LOGICAL_W = BAL.logicalW;
 const canvas = document.getElementById('game');
@@ -45,13 +46,14 @@ resize();
 
 const input = createInput(canvas, LOGICAL_W);
 const starfield = createStarfield(LOGICAL_W);
+const zoneBackdrop = createZoneBackdrop(LOGICAL_W);
 const save = createSave();
 
 // 오디오: 첫 사용자 제스처(탭/클릭/키)에서 AudioContext 잠금 해제 후 타이틀 BGM 시작
 initAudio(save);
 function firstGestureUnlock() {
   unlockAudio();
-  playBgm('title');
+  setBgmIntensity(0.2); playBgm('title');
   window.removeEventListener('pointerdown', firstGestureUnlock);
   window.removeEventListener('keydown', firstGestureUnlock);
 }
@@ -164,7 +166,7 @@ function startSector(sector) {
 function enterSectorMap() {
   const r = run;
   state = 'map';
-  playBgm('title');
+  setBgmIntensity(0.2); playBgm('title');
   const d = save.get();
   // 첫 출격: 루트 노드(단일 선택지)는 자동 진입하되, 그 전에 조작 안내를 1회 표시 (지시서 A-4 §3.5).
   if (r.sector === 1 && r.done.length === 0 && !d.firstGuideSeen) {
@@ -188,7 +190,7 @@ function enterNode(node) {
   if (node.type === 'repair') { enterRepair(node); return; }
   buildEncounter(node);
   state = 'play'; drafting = false; ui.hide();
-  playBgm('battle1'); sfx('start');
+  setBgmIntensity(0.3); playBgm('battle1'); sfx('start');
   const label = { combat: '교전', elite: '정예 교전', hazard: '위험 지대', supply: '보급', boss: '섹터 보스' }[node.type] || '교전';
   r.effects.text(LOGICAL_W / 2, logicalH * 0.4, label, node.type === 'boss' ? COLORS.danger : COLORS.reward);
   r.effects.flash(0.3);
@@ -393,6 +395,10 @@ function update(dt) {
   w.phase = r.phase;
   w.boss = r.boss; w.bosses = r.bosses;
   r.squad.update(dt, w);
+  // 트랙 후반·보스·NEON RUSH일수록 BGM의 고역과 속도가 열리는 적응형 강도.
+  const travelIntensity = r.totalTrack ? Math.min(1, r.traveled / r.totalTrack) : 0;
+  const musicIntensity = r.phase === 'boss' ? 0.86 : r.phase === 'bossDeath' ? 0.35 : 0.3 + travelIntensity * 0.38;
+  setBgmIntensity(Math.min(1, musicIntensity + (r.squad.inRush ? 0.2 : 0)));
   r.maxPower = Math.max(r.maxPower, r.squad.power);
 
   // 진행/스폰
@@ -484,7 +490,7 @@ function update(dt) {
       r.phase = 'boss';
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
-      playBgm('boss'); // 보스 BGM으로 크로스페이드
+      setBgmIntensity(0.86); playBgm('boss'); // 보스 BGM으로 크로스페이드
       // 보스 정체성 = 캠페인/엔드리스 순서(§6.2). 다중 수는 bossTier(섹터2→2기·섹터3+→3기). B22는 항상 단독.
       const { bossTier } = r.progression;
       const bossId = campaignBossId(r.sector, r.mode, BAL.campaign.bosses, BAL.campaign.endlessBosses);
@@ -518,7 +524,7 @@ function update(dt) {
       r.seqT = 0;
       r.chainT = 0;
       sfx('boss_die');
-      playBgm('title'); // 승리 여운 BGM으로 전환
+      setBgmIntensity(0.24); playBgm('title'); // 승리 여운 BGM으로 전환
     }
   } else if (r.phase === 'bossDeath') {
     // 보스 위에서 연쇄 폭발이 터지며 파괴
@@ -703,6 +709,7 @@ function openWeaponEvolution(weapon) {
       sfx('buy');
       r.effects.flash(0.6);
       r.effects.text(r.squad.x, r.squad.y - 60, `${opts.find((o) => o.id === id).name}!`, COLORS.reward, 18);
+      r.squad.triggerUpgradeFx(r.world, isSuper ? 'super' : 'evolution');
     },
   });
 }
@@ -714,7 +721,7 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
   state = 'done';
   drafting = false;
   betweenStages = false;
-  playBgm('title');
+  setBgmIntensity(0.2); playBgm('title');
   const r = run;
   const data = save.get();
   const isRecord = r.maxPower > data.best;
@@ -738,7 +745,7 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
 /** 캠페인 최종 보스(하이브 퀸) 격파 → 정산 + 무한 원정 해금 + 승리 화면 (§6.3). */
 function winCampaign() {
   const r = run;
-  state = 'done'; drafting = false; betweenStages = false; playBgm('title');
+  state = 'done'; drafting = false; betweenStages = false; setBgmIntensity(0.2); playBgm('title');
   const data = save.get();
   const best = Math.max(data.best, r.maxPower);
   const earned = Math.round(r.world.coins * r.world.stats.coinMult);
@@ -783,21 +790,9 @@ function draw() {
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
-  // 배경
-  ctx.fillStyle = '#05060f';
-  ctx.fillRect(0, 0, LOGICAL_W, logicalH);
+  // 6구역 × 3층 절차적 배경: 해상도·화면비에 무관하고 이미지 타일 이음새가 없다.
   const scroll = run ? run.scrollY : performance.now() * 0.02;
-  const bgImg = getBackground(getArtStyle(), run ? run.sector : save.get().stage);   // 배경 전환 = 섹터(§4.3)
-  if (bgImg) {
-    // 성운 배경: 느린 패럴랙스 스크롤 (이미지 자체를 심리스 처리했으므로 단순 타일)
-    const bgH = Math.round(bgImg.height * (LOGICAL_W / bgImg.width));
-    const off = ((scroll * 0.25) % bgH + bgH) % bgH;
-    ctx.globalAlpha = 0.75;
-    for (let y = off - bgH; y < logicalH; y += bgH) {
-      ctx.drawImage(bgImg, 0, y, LOGICAL_W, bgH);
-    }
-    ctx.globalAlpha = 1;
-  }
+  zoneBackdrop.draw(ctx, logicalH, scroll, run ? run.sector : save.get().stage);
   starfield.draw(ctx, logicalH, scroll);
 
   // 트랙 레인 가이드 (희미한 세로선)

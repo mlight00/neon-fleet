@@ -1,81 +1,100 @@
-// 스타워즈식 인트로 크롤 — 왜 싸우는지 + 최종 목표를 스크롤 텍스트로 전달.
-// playIntro(onDone): 전체화면 오버레이 표시, 끝나거나 스킵하면 onDone() 호출.
+// 전면 개편 Phase A 시네마틱 — 5장, 약 20초.
+// 긴 설명 대신 세계관의 질문(코어는 무엇인가, 다음 지배자는 누구인가)을 남긴다.
+import { STORY } from './creative-direction.js';
 
-const OPENING = '서기 2347년, 은하 변방.';
-const TITLE = 'NEON FLEET';
-const SUBTITLE = '네온 함대';
-const PARAGRAPHS = [
-  '외계 군체 ‘<b>보이드 스웜</b>’이\n은하를 집어삼켰다.',
-  '행성들은 하나둘 통신을 잃었고,\n인류의 함대는 무너졌다.',
-  '남은 희망은\n낡은 정찰 드론 편대 하나.',
-  '에너지 크리스탈을 모아 드론을 늘리고,\n함대를 강력한 전투 함선으로 진화시켜라.',
-  '워프 게이트를 돌파하고, 군체의 방어선을 넘어\n심장부로 진격하라.',
-  '최종 목표는 단 하나.\n‘<b>하이브 퀸</b>’을 격파하고\n은하를 되찾는 것.',
-  '파일럿, 출격하라.',
+const PANELS = [
+  {
+    eyebrow: '2347 · COLD WAKE',
+    title: '마지막 신호가 꺼졌다.',
+    copy: '보이드 스웜의 합창이 식민지를 삼켰고, 인류 함대는 빛이 끊긴 항로에 흩어졌다.',
+    tone: 'wake',
+  },
+  {
+    eyebrow: `${STORY.ai} // EMERGENCY BOOT`,
+    title: `${STORY.flagship}, 재점화.`,
+    copy: '무장도 함대도 없다. 남은 것은 부서진 정찰함 한 척과, 정체를 감춘 항법 AI뿐.',
+    tone: 'lumen',
+  },
+  {
+    eyebrow: 'UNKNOWN RELIC RECOVERED',
+    title: `${STORY.core}가 선체를 다시 쓴다.`,
+    copy: '적에게서 회수한 빛은 포신과 날개로 조립된다. 어떤 무기를 고르느냐에 따라 함선의 형태도 달라진다.',
+    tone: 'forge',
+  },
+  {
+    eyebrow: `${STORY.enemy} // INCOMING`,
+    title: '“왕관의 조각을 돌려다오.”',
+    copy: '군체는 코어를 잃어버린 왕관이라 부른다. 그리고 항로마다 더 거대한 지배자를 깨운다.',
+    tone: 'chorus',
+  },
+  {
+    eyebrow: 'EXPEDITION DIRECTIVE',
+    title: '강해져라. 조합하라. 다음 지배자를 부숴라.',
+    copy: '다음 무장은 어떤 모습일까? 항로 끝에는 무엇이 기다릴까? 답은 전진한 함대만이 확인할 수 있다.',
+    tone: 'launch',
+  },
 ];
+
+function panelMarkup(panel, index) {
+  return `
+    <section class="intro-shot intro-shot--${panel.tone}" data-shot="${index}" aria-hidden="${index ? 'true' : 'false'}">
+      <div class="intro-space" aria-hidden="true">
+        <i class="intro-orbit"></i><i class="intro-flare"></i><i class="intro-ship"><b></b></i>
+      </div>
+      <div class="intro-copy">
+        <span class="intro-eyebrow">${panel.eyebrow}</span>
+        <h1>${panel.title}</h1>
+        <p>${panel.copy}</p>
+      </div>
+    </section>`;
+}
 
 export function playIntro(onDone) {
   const el = document.createElement('div');
   el.id = 'intro';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', '네온 함대 프롤로그');
   el.innerHTML = `
-    <div id="intro-opening">${OPENING}</div>
-    <div id="intro-crawl-wrap">
-      <div id="intro-crawl">
-        <h1>${TITLE}</h1>
-        <h2>${SUBTITLE}</h2>
-        ${PARAGRAPHS.map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')}
-      </div>
-    </div>
-    <button id="intro-skip">건너뛰기 ▶</button>
+    <div class="intro-vignette"></div>
+    ${PANELS.map(panelMarkup).join('')}
+    <div class="intro-progress" aria-hidden="true">${PANELS.map((_, i) => `<i class="${i === 0 ? 'active' : ''}"></i>`).join('')}</div>
+    <button id="intro-next" aria-label="다음 장면">다음</button>
+    <button id="intro-skip">건너뛰기</button>
   `;
   document.getElementById('stage').appendChild(el);
 
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const shotMs = reduced ? 1800 : 3900;
+  const shots = [...el.querySelectorAll('.intro-shot')];
+  const dots = [...el.querySelectorAll('.intro-progress i')];
+  let index = 0;
   let done = false;
-  let raf = 0;
+  let timer = 0;
+
   const finish = () => {
     if (done) return;
     done = true;
-    cancelAnimationFrame(raf);
-    el.remove();
-    onDone();
+    clearTimeout(timer);
+    el.classList.add('intro-leave');
+    const removeDelay = reduced ? 0 : 420;
+    setTimeout(() => { el.remove(); onDone(); }, removeDelay);
   };
 
-  const opening = el.querySelector('#intro-opening');
-  const wrap = el.querySelector('#intro-crawl-wrap');
-  const crawl = el.querySelector('#intro-crawl');
+  const show = (next) => {
+    if (done) return;
+    if (next >= shots.length) { finish(); return; }
+    index = next;
+    shots.forEach((shot, i) => {
+      const active = i === index;
+      shot.classList.toggle('active', active);
+      shot.setAttribute('aria-hidden', active ? 'false' : 'true');
+      dots[i].classList.toggle('active', active);
+    });
+    clearTimeout(timer);
+    timer = setTimeout(() => show(index + 1), shotMs);
+  };
 
-  // 오프닝 문구 페이드
-  requestAnimationFrame(() => opening.classList.add('show'));
-  setTimeout(() => opening.classList.remove('show'), 3200);
-
-  // 크롤: JS로 매 프레임 transform 제어 (CSS 3D + %translate 버그 회피, 결정적 동작)
-  const OPENING_MS = 3600;
-  const SPEED = 42;          // px/s (위로 흐르는 속도)
-  const ROT = 30;            // 원근 기울기(도)
-  let startTime = 0;
-  const stageH = () => el.getBoundingClientRect().height || 640;
-  const contentH = () => crawl.getBoundingClientRect().height || 900;
-
-  function step(now) {
-    if (!startTime) startTime = now;
-    const elapsed = now - startTime;
-    if (elapsed < OPENING_MS) {
-      // 오프닝 동안 크롤은 화면 아래 대기
-      crawl.style.transform = `translateX(-50%) rotateX(${ROT}deg) translateY(${stageH()}px)`;
-      raf = requestAnimationFrame(step);
-      return;
-    }
-    const t = (elapsed - OPENING_MS) / 1000;
-    const y = stageH() - SPEED * t;                 // 화면 아래→위로 흐름
-    crawl.style.transform = `translateX(-50%) rotateX(${ROT}deg) translateY(${y}px)`;
-    // 크롤 전체가 화면 위로 완전히 빠져나가면 종료
-    if (y < -contentH() - 40) { finish(); return; }
-    raf = requestAnimationFrame(step);
-  }
-  raf = requestAnimationFrame(step);
-
-  el.querySelector('#intro-skip').addEventListener('click', (e) => {
-    e.stopPropagation();
-    finish();
-  });
+  requestAnimationFrame(() => show(0));
+  el.querySelector('#intro-next').addEventListener('click', (e) => { e.stopPropagation(); show(index + 1); });
+  el.querySelector('#intro-skip').addEventListener('click', (e) => { e.stopPropagation(); finish(); });
 }

@@ -6,7 +6,7 @@ import { BAL } from './balance.js';
 import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, bankUpgrade, bankDemote, invertGateOp } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
-import { shipSprite, drawFlames, drawDeckLights, SHIP_DEFS } from './ships.js';
+import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFrame, drawWeaponRig, drawUpgradeSequence, SHIP_DEFS } from './ships.js';
 import { getSprite, bossDefFor } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
 import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult, weaponProjectileColor } from './weapon-evolutions.js';
@@ -15,6 +15,7 @@ import { droneReward } from './adaptive-logic.js';
 import { addFlow, updateFlow, onFlowHit } from './flow.js';
 import { keystoneEffects, forgeOnKill } from './keystones.js';
 import { sfx } from './audio.js';
+import { UPGRADE_DURATIONS, upgradeGrade } from './creative-direction.js';
 
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
 export function createEffects() {
@@ -153,6 +154,7 @@ export class Squad {
     this.weaponLv = 1;
     this.shield = false;
     this.evolvePunch = 0;
+    this.upgradeFx = { t: 0, max: 0, grade: 0, kind: '', color: COLORS.reward };
     this.dead = false;
     this.charge = 0;          // 차지 랜스 누적 충전(초)
     this.chargeStage = 0;     // 현재 충전 단계
@@ -328,6 +330,17 @@ export class Squad {
     return Math.max(E.hitRadiusMin || 0, base + E.hitRadiusDelta);
   }
 
+  /** 전투 수치와 무관한 조립 연출만 시작한다. */
+  triggerUpgradeFx(world, kind = 'weapon', level = 1) {
+    const grade = upgradeGrade(kind, level);
+    const max = UPGRADE_DURATIONS[grade];
+    this.upgradeFx = { t: max, max, grade, kind, color: WEAPON_COLORS[this.weapon] || COLORS.reward };
+    this.evolvePunch = Math.max(this.evolvePunch, grade >= 4 ? 0.5 : 0.22);
+    if (grade >= 3) world?.effects?.ring?.(this.x, this.y, this.upgradeFx.color, 0, 80 + grade * 14);
+    if (grade >= 4) world?.effects?.halo?.(this.x, this.y, COLORS.reward);
+    if (grade >= 5) world?.effects?.flash?.(0.34);
+  }
+
   setWeapon(weapon, world) {
     if (this.weapon === weapon) {
       this.advanceWeapon(world);   // 같은 색 캡슐: 진행 사다리 한 칸 (베이스Lv→진화선택→진화Lv→초진화선택→초진화Lv→재선택)
@@ -344,6 +357,7 @@ export class Squad {
       } else {
         world.effects.text(this.x, this.y - 64, `무기 교체: ${WEAPON_LABELS[weapon]} · Lv${this.weaponLv} 유지`, WEAPON_COLORS[weapon]);
       }
+      this.triggerUpgradeFx(world, 'switch');
     }
     world.effects.burst(this.x, this.y - 20, WEAPON_COLORS[this.weapon], 14, 140);
     sfx('pickup');
@@ -355,6 +369,7 @@ export class Squad {
     if (this.weaponLv < BAL.weapons.maxLv) {
       this.weaponLv++;
       world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} Lv${this.weaponLv} 강화!`, WEAPON_COLORS[w]);
+      this.triggerUpgradeFx(world, 'weapon', this.weaponLv);
       return;
     }
     if (this.pendingWeaponEvolution) return;   // 이미 선택 대기 중
@@ -371,10 +386,12 @@ export class Squad {
       this.evoLevels[w] = (this.evoLevels[w] || 1) + 1;
       world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 진화 Lv${this.evoLevels[w]} 강화!`, COLORS.reward);
       world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
+      this.triggerUpgradeFx(world, 'evolution');
     } else if (st === 'superUp') {
       this.superLevels[w] = (this.superLevels[w] || 1) + 1;
       world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 초진화 Lv${this.superLevels[w]} 강화!`, COLORS.reward);
       world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
+      this.triggerUpgradeFx(world, 'super');
     } else if (st === 'pick1' || st === 'pick2' || st === 're') {
       this.pendingWeaponEvolution = w;
       this.pendingEvoStage = st;
@@ -426,6 +443,7 @@ export class Squad {
       this.cruisers -= need;
       ({ banked: this.banked, stack: this.bankStack } = bankUpgrade(this.banked || 0, this.bankStack, gain));  // 은행 적립(+롤백 스택)
       this.tier += 1;
+      this.triggerUpgradeFx(world, 'flagship');
       if (this.tier === 1 && !this.doctrine && !this.pendingDoctrine) this.pendingDoctrine = true;  // 첫 업그레이드(0→1) → 교리 선택
       this.shield = true;                        // 업그레이드 직후 사고사 방지
       this.invulnT = BAL.squad.evolveInvuln;     // 업그레이드 무적 (A3)
@@ -557,6 +575,7 @@ export class Squad {
       this._updateEchoes(dt, world);
     }
     if (this.evolvePunch > 0) this.evolvePunch -= dt;
+    if (this.upgradeFx.t > 0) this.upgradeFx.t = Math.max(0, this.upgradeFx.t - dt);
     this.recoil *= Math.pow(0.001, dt); // ≈ *0.7 per frame @60fps
 
     // 반응 실드 모듈: 보호막이 없을 때 주기적으로 재생성
@@ -959,7 +978,13 @@ export class Squad {
     const punch = this.evolvePunch > 0 ? 1 + 0.5 * (this.evolvePunch / 0.35) : 1;
     ctx.scale((1 - Math.abs(this.bank) * 0.25) * punch, punch);
     drawFlames(ctx, this.tier, this.t);
-    blit(ctx, shipSprite(this.tier, this.weapon), 0, 0);
+    // 중립 함체 + 금빛 지휘 프레임 + 현재 무기 장착물을 분리해, 성장 변화가 실루엣에 남도록 한다.
+    blit(ctx, shipBaseSprite(this.tier), 0, 0);
+    drawCommandFrame(ctx, this.tier, this.t);
+    drawWeaponRig(
+      ctx, this.tier, this.weapon, this.weaponLv, this.t,
+      this.weaponEvolutions[this.weapon], this.weaponEvolutions2[this.weapon],
+    );
     drawDeckLights(ctx, this.tier, this.t);
     // 주포 마운트에 현재 무기 색 표시 — 어떤 무기인지 기체만 봐도 알 수 있게
     ctx.fillStyle = WEAPON_COLORS[this.weapon];
@@ -968,6 +993,7 @@ export class Squad {
       ctx.arc(m.x, m.y, 2.2, 0, Math.PI * 2);
       ctx.fill();
     }
+    drawUpgradeSequence(ctx, this.tier, this.upgradeFx);
     if (this.flash > 0) {
       ctx.globalAlpha = Math.min(0.6, this.flash * 2.5);
       ctx.fillStyle = COLORS.danger;

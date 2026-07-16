@@ -105,79 +105,91 @@ html, body {
 
 .hidden { display: none !important; }
 
-/* ── 스타워즈식 인트로 크롤 ── */
+/* ── FORGED LIGHT 5장 시네마틱 ── */
 #intro {
   position: absolute;
   inset: 0;
   z-index: 40;
-  background: #000;
+  background: #02040a;
   overflow: hidden;
-  display: flex;
-  justify-content: center;
+  color: #edf9ff;
+  opacity: 1;
+  transition: opacity .42s ease;
 }
-
-#intro-opening {
-  position: absolute;
-  top: 42%;
-  left: 0;
-  right: 0;
-  text-align: center;
-  color: #3ff5e0;
-  font-size: 18px;
-  letter-spacing: 1px;
-  opacity: 0;
-  transition: opacity 1s ease;
-  text-shadow: 0 0 12px rgba(63, 245, 224, 0.6);
-}
-#intro-opening.show { opacity: 1; }
-
-#intro-crawl-wrap {
+#intro.intro-leave { opacity: 0; }
+.intro-vignette {
   position: absolute;
   inset: 0;
-  perspective: 400px;
-  perspective-origin: 50% 50%;
-  overflow: hidden;
-  mask-image: linear-gradient(to top, transparent 4%, #000 34%, #000 92%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to top, transparent 4%, #000 34%, #000 92%, transparent 100%);
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 44%, transparent 35%, rgba(0,0,0,.78) 100%), linear-gradient(180deg, rgba(0,0,0,.18), transparent 35%, rgba(0,0,0,.66));
 }
-
-#intro-crawl {
+.intro-shot {
   position: absolute;
-  left: 50%;
-  top: 0;
-  width: 82%;
-  max-width: 420px;
-  transform-origin: 50% 0%;
-  color: #ffd93d;
-  text-align: center;
-  text-shadow: 0 0 8px rgba(255, 180, 40, 0.4);
-  will-change: transform;
-  /* 위치는 intro.js가 transform으로 매 프레임 제어 (translateX -50% 중앙 + translateY 스크롤 + rotateX 원근) */
+  inset: 0;
+  opacity: 0;
+  transform: scale(1.035);
+  transition: opacity .75s ease, transform 3.9s cubic-bezier(.2,.7,.25,1);
+  pointer-events: none;
 }
-
-#intro-crawl h1 {
-  font-size: 40px;
-  letter-spacing: 4px;
-  color: #3ff5e0;
-  text-shadow: 0 0 18px rgba(63, 245, 224, 0.7);
-  margin-bottom: 4px;
-}
-#intro-crawl h2 { font-size: 22px; color: #cfefff; margin-bottom: 44px; letter-spacing: 3px; }
-#intro-crawl p { font-size: 20px; line-height: 1.75; margin-bottom: 36px; font-weight: 600; }
-#intro-crawl b { color: #ff7ce0; }
-
-#intro-skip {
+.intro-shot.active { opacity: 1; transform: scale(1); }
+.intro-space {
   position: absolute;
-  bottom: 18px;
-  right: 18px;
-  z-index: 41;
-  padding: 9px 18px;
-  font-size: 13px;
-  color: #cfefff;
-  background: rgba(8, 12, 28, 0.7);
-  border: 1px solid rgba(63, 245, 224, 0.35);
-  border-radius: 999px;
-  cursor: pointer;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 24%, rgba(122,202,255,.16) 0 1px, transparent 2px),
+    radial-gradient(circle at 76% 14%, rgba(255,255,255,.24) 0 1px, transparent 2px),
+    radial-gradient(circle at 63% 58%, rgba(255,255,255,.18) 0 1px, transparent 2px),
+    linear-gradient(155deg, #081325, #02040a 64%);
+  background-size: 110px 130px, 160px 170px, 210px 190px, auto;
+}
+.intro-orbit {
+  position: absolute;
+  width: min(70vw, 420px); aspect-ratio: 1;
+  right: -22%; top: -11%; border-radius: 50%;
+  border: 1px solid rgba(125,218,255,.16);
+  box-shadow: inset 22px -28px 70px rgba(20,83,126,.25), 0 0 80px rgba(67,153,255,.08);
+}
+.intro-flare { position: absolute; width: 34vw; height: 34vw; left: 11%; top: 22%; border-radius: 50%; background: radial-gradient(circle, rgba(87,224,255,.16), transparent 68%); }
+.intro-ship {
+  position: absolute;
+  left: 50%; top: 41%; width: 62px; height: 124px;
+  transform: translate(-50%,-50%);
+  filter: drop-shadow(0 0 16px rgba(63,245,224,.46));
+}
+.intro-ship::before { content: ''; position: absolute; inset: 0; clip-path: polygon(50% 0, 66% 34%, 96% 75%, 68% 68%, 58% 100%, 42% 100%, 32% 68%, 4% 75%, 34% 34%); background: linear-gradient(90deg,#142a39,#9bd6df 48%,#1a3342 52%,#0a151e); border: 1px solid rgba(211,250,255,.65); }
+.intro-ship::after { content: ''; position: absolute; left: 23px; top: 28px; width: 16px; height: 50px; background: linear-gradient(#fff7c5,#ffbd4a 28%,transparent); clip-path: polygon(50% 0,100% 22%,66% 100%,34% 100%,0 22%); filter: drop-shadow(0 0 9px #ffbd4a); }
+.intro-ship b { position: absolute; z-index: -1; left: 12px; top: 106px; width: 38px; height: 52px; background: linear-gradient(#3ff5e0,transparent); clip-path: polygon(0 0,100% 0,50% 100%); opacity: .72; }
+.intro-copy {
+  position: absolute;
+  z-index: 6;
+  left: 9%; right: 9%; bottom: 13%;
+  max-width: 520px;
+  text-shadow: 0 2px 18px rgba(0,0,0,.86);
+}
+.intro-eyebrow { display: block; margin-bottom: 9px; color: #ffcf66; font-size: 11px; font-weight: 700; letter-spacing: .2em; }
+.intro-copy h1 { margin: 0 0 11px; font-size: clamp(27px, 6vw, 42px); line-height: 1.12; letter-spacing: -.035em; }
+.intro-copy p { max-width: 460px; margin: 0; color: #c9d9e5; font-size: 14px; line-height: 1.68; }
+.intro-shot--forge .intro-space { background-color: #0c0714; background-image: radial-gradient(circle at 50% 38%, rgba(255,189,74,.22), transparent 20%), linear-gradient(155deg,#21102c,#02040a 67%); background-size: auto; background-repeat: no-repeat; }
+.intro-shot--forge .intro-ship { transform: translate(-50%,-50%) scale(1.24); }
+.intro-shot--chorus .intro-space { background: radial-gradient(ellipse at 50% 36%, rgba(255,76,210,.22), transparent 35%), repeating-radial-gradient(ellipse at 50% 30%, transparent 0 28px, rgba(180,76,255,.07) 30px 32px), #05020a; background-size: auto; }
+.intro-shot--chorus .intro-ship { opacity: .42; }
+.intro-shot--launch .intro-space { background: radial-gradient(circle at 50% 30%, rgba(255,225,122,.18), transparent 27%), linear-gradient(180deg,#11182b,#02040a 72%); background-size: auto; background-repeat: no-repeat; }
+.intro-shot--launch .intro-ship { top: 32%; transform: translate(-50%,-50%) scale(1.38); }
+.intro-progress {
+  position: absolute;
+  z-index: 7; left: 9%; bottom: 6%; display: flex; gap: 7px;
+}
+.intro-progress i { width: 20px; height: 2px; background: rgba(255,255,255,.16); transition: width .3s ease, background .3s ease; }
+.intro-progress i.active { width: 38px; background: #ffcf66; box-shadow: 0 0 8px rgba(255,207,102,.45); }
+#intro button { position: absolute; z-index: 8; bottom: 4.5%; padding: 7px 11px; border: 0; color: #9fb8c8; background: transparent; font: 700 11px Pretendard,sans-serif; letter-spacing: .08em; cursor: pointer; }
+#intro-next { right: 86px; }
+#intro-skip { right: 16px; }
+#intro button:hover { color: #fff4c6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-shot, #intro { transition-duration: .01ms !important; }
+  .intro-ship b { opacity: .35; }
 }
 
 /* 타이틀 하단 링크 버튼 */

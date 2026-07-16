@@ -21,6 +21,7 @@ const SFX_MASTER = 0.1;
 const bgmBuffers = {};  // name → AudioBuffer | null(로드실패)
 let bgmSlot = null;     // { name, src, gain }
 let pendingBgm = null;  // unlock 전에 요청된 BGM
+let bgmIntensity = 0.35; // 0=항해/여백, 1=보스 절정. 곡을 바꾸지 않고 음색·체감을 적응시킨다.
 
 // ElevenLabs 실효과음: id → 변형 개수. 있으면 합성음보다 우선 재생.
 const SFX_SAMPLES = {
@@ -143,11 +144,27 @@ export async function playBgm(name, { fade = 1.2 } = {}) {
   src.buffer = buffer;
   src.loop = true;
   const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.Q.value = 0.55;
+  filter.frequency.value = 1100 + bgmIntensity * 8900;
   gain.gain.setValueAtTime(0, now);
   gain.gain.linearRampToValueAtTime(1, now + fade);
-  src.connect(gain).connect(masterBgm);
+  src.connect(filter).connect(gain).connect(masterBgm);
   src.start(now);
-  bgmSlot = { name, src, gain };
+  bgmSlot = { name, src, gain, filter };
+}
+
+/**
+ * 전투 강도에 따라 BGM의 고역 개방과 미세한 재생 속도를 바꾼다.
+ * 새 음원이 들어오면 같은 API 뒤에 레이어를 추가할 수 있는 Phase A 기반이다.
+ */
+export function setBgmIntensity(value) {
+  bgmIntensity = Math.max(0, Math.min(1, Number(value) || 0));
+  if (!ctx || !bgmSlot) return;
+  const now = ctx.currentTime;
+  bgmSlot.filter?.frequency?.setTargetAtTime(1100 + bgmIntensity * 8900, now, 0.18);
+  bgmSlot.src.playbackRate?.setTargetAtTime(0.985 + bgmIntensity * 0.03, now, 0.25);
 }
 
 export function stopBgm({ fade = 0.6 } = {}) {

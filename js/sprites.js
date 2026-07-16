@@ -151,10 +151,7 @@ function loadSprite(id, style, px) {
   });
 }
 
-/** 한 스타일의 전체 에셋(+배경)을 미리 로드 (타이틀/스타일 전환 시 호출) */
+/** 한 스타일의 스프라이트를 미리 로드. 배경은 Phase A부터 절차적 3층 렌더러가 담당한다. */
 export function preloadStyle(style = artStyle) {
-  return Promise.all([
-    ...Object.entries(SPRITE_SIZES).map(([id, px]) => loadSprite(id, style, px)),
-    loadBackground(style),
-  ]);
+  return Promise.all(Object.entries(SPRITE_SIZES).map(([id, px]) => loadSprite(id, style, px)));
 }
