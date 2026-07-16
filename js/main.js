@@ -409,7 +409,8 @@ function update(dt) {
       // 화력 비례 HP 상한을 난이도에 따라 올려 깊은 판에선 즉사(방치 클리어) 방지
       const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (difficultyLevel - 1);
       const pf = 1 + Math.min(hpCapS, Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale);
-      const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1)); if (e.fireInterval) e.fireInterval *= mods.enemyRate; return e; };
+      const gMul = BAL.difficulty.globalMult;   // 전체 난이도 배수(사용자 조정): 체력 ×gMul, 발사 주기 ÷gMul(더 빠름)
+      const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1) * gMul); if (e.fireInterval) e.fireInterval *= mods.enemyRate / gMul; return e; };
       // 적 스폰 헬퍼: 난이도 스케일 + 변이(어픽스=섹터 확률) 롤 + 등록
       const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, contentTier, r.rng); w.entities.push(e); };
       // 적 항목은 난이도 비례 복제 스폰(§4.5): 복제본은 좌우 미러 + 세로로 살짝 시차.
@@ -495,7 +496,7 @@ function update(dt) {
         b.swayScale = 1 / bossN;                        // 좌우 폭 축소 → 겹침 방지
         const variantHp = 1 + BAL.bossVariant.hpPerLoop * b.variantLevel;
         const rawHp = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (b.pattern.tanky ?? 1) * variantHp;
-        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap));
+        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap) * BAL.difficulty.globalMult);   // 전체 난이도 배수
         r.bosses.push(b);
       }
       r.boss = r.bosses[0];   // 연출·클리어 배너 앵커용 선두

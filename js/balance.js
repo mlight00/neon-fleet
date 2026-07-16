@@ -293,6 +293,10 @@ export const BAL = {
     tierBounds: [0.3, 0.65], // 진행도 경계: <0.3 easy, <0.65 mid, 이후 hard
   },
 
+  // 전체 난이도 미세 조정 knob (사용자 요청). 적·보스 체력 ×globalMult, 적 발사 주기 ÷globalMult(더 빠름).
+  // 1.0 = 기준. 1.1 = 전체 +10%. 곡선(progression·stageMods)은 그대로 두고 체감만 일괄 상하 조정.
+  difficulty: { globalMult: 1.1 },
+
   run: {
     failOverlayDelay: 0.5,  // 실패 후 오버레이까지(초)
     coinPerClear: 50,       // (구) 클리어 보상 — Phase C에서 nodeReward로 대체(잔존 참조 없음)

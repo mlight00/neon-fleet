@@ -375,16 +375,16 @@ export const ui = {
       const glow = isReach ? 'box-shadow:0 0 12px #3ff5e0;' : '';
       const st = `position:absolute;left:${p.x - 22}px;top:${p.y - 22}px;width:44px;height:44px;border-radius:50%;border:2px solid ${bd};background:rgba(10,16,28,0.9);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:${op};${glow}${isReach ? 'cursor:pointer' : 'cursor:default'}`;
       nodes += isReach
-        ? `<button data-node="${node.id}" style="${st}" title="${m.label}">${m.icon}</button>`
-        : `<div style="${st}" title="${m.label}">${m.icon}</div>`;
+        ? `<button class="map-node" data-node="${node.id}" data-id="${node.id}" style="${st}" title="${m.label}">${m.icon}</button>`
+        : `<div class="map-node" data-id="${node.id}" style="${st}" title="${m.label}">${m.icon}</div>`;
     }
-    // 노드 정보(§5.6): 선택 가능한(도달) 노드 아이콘 아래에 보상 요약. 작은 화면 겹침 방지 위해 nowrap+말줄임+도달 노드만.
+    // 노드 정보(§5.6): 도달 노드 아이콘 아래 보상 요약. 배경 그림 위에서도 보이게 어두운 알약 배경+흰 글씨+그림자.
     const INFO = { combat: '코인 보통·모듈', supply: '드론 다수·짧음', hazard: '코인+20%·모듈', elite: '코인+80%·희귀', repair: '회복/정비', boss: '섹터 보스' };
     let infos = '';
     for (const col of map.cols) for (const node of col) {
       if (!reachIds.has(node.id) || !INFO[node.type]) continue;
       const p = pos(node);
-      infos += `<div style="position:absolute;left:${p.x - 40}px;top:${p.y + 21}px;width:80px;text-align:center;font-size:8px;line-height:1.1;color:#cfe0f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${INFO[node.type]}</div>`;
+      infos += `<div style="position:absolute;left:${p.x - 42}px;top:${p.y + 22}px;width:84px;text-align:center;font-size:9.5px;line-height:1.2;color:#eaf3ff;background:rgba(6,10,20,0.72);border-radius:5px;padding:1px 0;text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${INFO[node.type]}</div>`;
     }
     const legend = Object.values(META).map((m) => `<span style="white-space:nowrap">${m.icon}${m.label}</span>`).join(' · ');
     panel(`
@@ -394,10 +394,36 @@ export const ui = {
         <svg width="${W}" height="${H}" style="position:absolute;left:0;top:0;pointer-events:none">${lines}</svg>
         ${nodes}
         ${infos}
+        <div id="map-tip" style="position:absolute;display:none;transform:translate(-50%,-100%);font-size:13px;font-weight:600;line-height:1.3;color:#eaf3ff;background:rgba(4,8,16,0.96);border:1px solid #3ff5e0;border-radius:8px;padding:6px 11px;white-space:nowrap;pointer-events:none;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,0.6)"></div>
       </div>
       <p style="font-size:10.5px;color:#9fb8d8;line-height:1.6">${legend}</p>
-      <p style="font-size:10.5px;color:#9fb8d8">🖱 클릭 선택 · ⌨ ←→ 이동 · Space 확정 &nbsp; 보유 코인 🪙 ${coins.toLocaleString()}</p>
+      <p style="font-size:10.5px;color:#9fb8d8">🖱 클릭·마우스오버 설명 · ⌨ ←→ 이동 · Space 확정 &nbsp; 보유 코인 🪙 ${coins.toLocaleString()}</p>
     `);
+    // 마우스 오버(및 키보드 포커스) 시 노드 설명을 크게 팝업 — 배경 그림 위에서도 잘 보이게 (사용자 요청)
+    const TIP = {
+      combat: '⚔️ 전투 — 코인 보통 · 모듈 3택',
+      supply: '💎 보급 — 드론 다수 · 구간 짧음',
+      hazard: '☄️ 위험 지역 — 코인 +20% · 모듈 3택',
+      elite: '☠️ 정예 전투 — 코인 +80% · 모듈 4택(희귀 보장)',
+      repair: '🔧 수리 — 긴급 수리 또는 유료 모듈 정비',
+      boss: '👑 섹터 보스',
+    };
+    const tip = overlay.querySelector('#map-tip');
+    overlay.querySelectorAll('.map-node').forEach((el) => {
+      const node = idToNode[+el.dataset.id]; if (!node) return;
+      const p = pos(node);
+      const show = () => {
+        tip.textContent = TIP[node.type] || (META[node.type] && META[node.type].label) || '';
+        tip.style.left = Math.max(84, Math.min(W - 84, p.x)) + 'px';   // 가장자리 넘침 방지
+        tip.style.top = (p.y - 26) + 'px';
+        tip.style.display = 'block';
+      };
+      const hide = () => { tip.style.display = 'none'; };
+      el.addEventListener('mouseenter', show);
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('focus', show);
+      el.addEventListener('blur', hide);
+    });
     const pickNode = (b) => onPick(idToNode[+b.dataset.node]);
     overlay.querySelectorAll('[data-node]').forEach((b) => {
       b.addEventListener('click', () => pickNode(b));
