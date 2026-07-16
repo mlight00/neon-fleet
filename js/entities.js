@@ -458,8 +458,12 @@ export class Squad {
       this.flash = 0.25;
     }
     if (label) world.effects.text(this.x, this.y - 64, label, COLORS.reward);
+    // 전멸 판정은 '이번 델타로 0이 됐는가'로 먼저 한다.
+    // checkEvolution은 드론을 순양함으로 합체시키며 count를 0으로 만들 수 있는데(130기 → 순양함 1척, 잔여 0),
+    // 그건 소모이지 전멸이 아니다. 순서가 반대면 승급 직후(순양함 소진) 합체로 0이 될 때 안전망이
+    // 오발동해 등급이 거꾸로 강등된다(인터셉터 → 스카웃 버그).
+    if (before > 0 && this.count === 0) { this.onDronesDepleted(world); return; }
     this.checkEvolution(world);
-    if (before > 0 && this.count === 0) this.onDronesDepleted(world);
   }
 
   /**

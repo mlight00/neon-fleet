@@ -492,14 +492,17 @@ function update(dt) {
       const hpCap = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
       const totalMult = bossN > 1 ? BAL.boss.multiTotalMult : 1;                 // 다중 총 HP 배수(각=이/보스수)
       r.bosses = [];
+      // 보스 발사 주기: 보스는 scaleEnemy를 안 거쳐 globalMult 버프를 못 받으므로 여기서 bossRateMult로 보정(나눌수록 빠름)
+      const bossRate = r.mods.enemyRate / BAL.difficulty.bossRateMult;
       for (let i = 0; i < bossN; i++) {
-        const b = makeBoss(LOGICAL_W, r.mods.enemyRate, bossTier, bossN > 1 ? 0.72 : 1, bossId);
+        const b = makeBoss(LOGICAL_W, bossRate, bossTier, bossN > 1 ? 0.72 : 1, bossId);
         b.homeX = LOGICAL_W * (i + 1) / (bossN + 1);   // 가로 슬롯
         b.x = b.homeX;
         b.swayScale = 1 / bossN;                        // 좌우 폭 축소 → 겹침 방지
         const variantHp = 1 + BAL.bossVariant.hpPerLoop * b.variantLevel;
         const rawHp = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (b.pattern.tanky ?? 1) * variantHp;
-        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap) * BAL.difficulty.globalMult);   // 전체 난이도 배수
+        // 전체 난이도 배수 × 보스 전용 배수 (상한 이후에 곱해 '체력 상한' 자체를 함께 끌어올린다)
+        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap) * BAL.difficulty.globalMult * BAL.difficulty.bossHpMult);
         r.bosses.push(b);
       }
       r.boss = r.bosses[0];   // 연출·클리어 배너 앵커용 선두

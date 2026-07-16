@@ -298,7 +298,10 @@ export const BAL = {
 
   // 전체 난이도 미세 조정 knob (사용자 요청). 적·보스 체력 ×globalMult, 적 발사 주기 ÷globalMult(더 빠름).
   // 1.0 = 기준. 1.38 = 전체 +38%(1.15에서 다시 ×1.2). 곡선은 그대로 두고 체감만 일괄 상하 조정.
-  difficulty: { globalMult: 1.38 },
+  // bossHpMult/bossRateMult = 보스 전용 추가 배수(일반 적 난이도는 적절하다는 피드백 → 보스만 강화).
+  //  - 보스는 scaleEnemy를 안 거쳐 globalMult 발사 버프를 못 받았음 → bossRateMult로 별도 보정.
+  //  - bossRateMult는 발사 주기 나눗수(클수록 빠르게 쏨).
+  difficulty: { globalMult: 1.38, bossHpMult: 2.2, bossRateMult: 1.8 },
 
   run: {
     failOverlayDelay: 0.5,  // 실패 후 오버레이까지(초)
