@@ -162,7 +162,7 @@ export class GateParasite extends Scrolling {
     ctx.globalAlpha = 1;
     // 촉수(게이트로 연결) + 경고
     ctx.strokeStyle = '#7cff4c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, this.r); ctx.lineTo(0, AE().gateParasite.offsetY); ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚠', 0, 4);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚠', 0, 4);
     ctx.restore();
     drawEHp(ctx, this);
   }

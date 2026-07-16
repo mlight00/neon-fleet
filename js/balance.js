@@ -294,8 +294,8 @@ export const BAL = {
   },
 
   // 전체 난이도 미세 조정 knob (사용자 요청). 적·보스 체력 ×globalMult, 적 발사 주기 ÷globalMult(더 빠름).
-  // 1.0 = 기준. 1.1 = 전체 +10%. 곡선(progression·stageMods)은 그대로 두고 체감만 일괄 상하 조정.
-  difficulty: { globalMult: 1.1 },
+  // 1.0 = 기준. 1.15 = 전체 +15%. 곡선(progression·stageMods)은 그대로 두고 체감만 일괄 상하 조정.
+  difficulty: { globalMult: 1.15 },
 
   run: {
     failOverlayDelay: 0.5,  // 실패 후 오버레이까지(초)

@@ -121,7 +121,7 @@ export function createEffects() {
       ctx.textAlign = 'center';
       for (const t of texts) {
         ctx.globalAlpha = Math.max(0, t.life / t.max);
-        ctx.font = `bold ${t.size || 20}px sans-serif`;
+        ctx.font = `bold ${t.size || 20}px Pretendard, sans-serif`;
         glow(ctx, t.color, 8, (c) => { c.fillStyle = t.color; c.fillText(t.str, t.x, t.y); });
       }
       ctx.globalAlpha = 1;
@@ -981,7 +981,7 @@ export class Squad {
 
     // 편대 수 라벨
     if (this.count > 1) {
-      ctx.font = 'bold 16px sans-serif';
+      ctx.font = 'bold 16px Pretendard, sans-serif';
       ctx.textAlign = 'center';
       glow(ctx, color, 8, (c) => { c.fillStyle = COLORS.text; c.fillText(`x${this.count}`, this.x, this.y - w * 0.8 - 14); });
     }
@@ -1001,7 +1001,7 @@ export class Squad {
       ctx.strokeStyle = col; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(this.x, this.y, rr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
       if (stg > 0) {
-        ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+        ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.font = 'bold 15px Pretendard, sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('⚡' + stg, this.x, this.y - rr - 6);
       }
       ctx.globalAlpha = 1;
@@ -1427,7 +1427,7 @@ export class Crystal extends Scrolling {
     ctx.stroke();
     // 중앙 큰 숫자 = 실지급 드론(+payout). 표시와 지급이 같은 값(§3.6). 체력은 작은 상단 바로 이동.
     const num = `+${this.payout}`;
-    ctx.font = `bold ${r >= 34 ? 18 : 15}px sans-serif`;
+    ctx.font = `bold ${r >= 34 ? 18 : 15}px Pretendard, sans-serif`;
     ctx.textAlign = 'center';
     ctx.strokeStyle = 'rgba(5,6,15,0.85)';
     ctx.lineWidth = 3;
@@ -1495,7 +1495,7 @@ export class DronePod extends Scrolling {
       c.closePath(); c.fill(); c.stroke();
     });
     // 내용 표기: ▲ + 드론 수
-    ctx.font = `bold ${r >= 22 ? 15 : 12}px sans-serif`;
+    ctx.font = `bold ${r >= 22 ? 15 : 12}px Pretendard, sans-serif`;
     ctx.textAlign = 'center';
     const label = `▲${this.payout}`;
     ctx.strokeStyle = 'rgba(5,6,15,0.85)';
@@ -1703,12 +1703,12 @@ export class Capsule extends Scrolling {
     ctx.lineWidth = 3; ctx.strokeStyle = color; ctx.stroke();   // 무기색 테두리
     ctx.restore();
     // 2) "POW!" 중앙 (굵게, 검정 외곽 → 어디서나 읽힘)
-    ctx.font = '900 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '900 14px Pretendard, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.strokeStyle = '#2a1030'; ctx.strokeText('POW!', 0, 0);
     ctx.fillStyle = '#ffffff'; ctx.fillText('POW!', 0, 0);
     ctx.textBaseline = 'alphabetic';
     // 3) 무기 이름 (아래) — 어떤 무기인지
-    ctx.font = 'bold 11px sans-serif';
+    ctx.font = 'bold 11px Pretendard, sans-serif';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,14,28,0.85)'; ctx.strokeText(WEAPON_LABELS[this.weapon], 0, R + 13);
     ctx.fillStyle = color; ctx.fillText(WEAPON_LABELS[this.weapon], 0, R + 13);
     ctx.restore();
@@ -2121,7 +2121,7 @@ export class PowerModule extends Scrolling {
     ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0a2030'; ctx.stroke();
     ctx.fillStyle = '#ffffff'; ctx.fill();
     // "×2 10초" 라벨 (아래) — 일시적임을 명시
-    ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.font = 'bold 11px Pretendard, sans-serif'; ctx.textAlign = 'center';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,14,28,0.85)'; ctx.strokeText('×2 · 10초', 0, R + 13);
     ctx.fillStyle = C; ctx.fillText('×2 · 10초', 0, R + 13);
     ctx.restore();
@@ -2823,7 +2823,7 @@ export class MidBoss extends Scrolling {
     // 이름 + HP 바 (머리 위)
     const w = 84;
     const by = this.y - halfH - 12;
-    ctx.font = 'bold 10px sans-serif';
+    ctx.font = 'bold 10px Pretendard, sans-serif';
     ctx.textAlign = 'center';
     ctx.strokeStyle = 'rgba(5,6,15,0.85)';
     ctx.lineWidth = 3;

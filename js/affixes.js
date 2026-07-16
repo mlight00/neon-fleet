@@ -136,7 +136,7 @@ export function affixDraw(ctx, entity) {
   }
   ctx.globalAlpha = 1;
   // 아이콘 배지 (적 위에 가로로 나열)
-  ctx.font = 'bold 12px sans-serif';
+  ctx.font = 'bold 12px Pretendard, sans-serif';
   ctx.textAlign = 'center';
   const total = keys.length;
   for (let i = 0; i < total; i++) {

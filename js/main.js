@@ -23,6 +23,9 @@ const LOGICAL_W = BAL.logicalW;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+// Pretendard 즉시 로드 → 캔버스 텍스트가 폴백(Segoe UI) 대신 Pretendard로 렌더되게. 로드되면 매 프레임 재렌더가 반영.
+try { document.fonts?.load('700 16px Pretendard').then(() => document.fonts.load('400 16px Pretendard')); } catch { /* 폰트 API 미지원 시 CSS 폴백 */ }
+
 let scale = 1;
 let logicalH = 800;
 

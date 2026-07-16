@@ -122,7 +122,7 @@ export function drawGateBox(ctx, x, y, w, h, color, label, { t = 0, highlight = 
   }
 
   // 라벨: 그림자 + 본문 (선택 순간엔 글로우)
-  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.font = `bold ${fontSize}px Pretendard, sans-serif`;
   ctx.textAlign = 'center';
   const cx = x + w / 2;
   const cy = y + h / 2 + fontSize * 0.36;
@@ -184,7 +184,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillStyle = bo.dead ? 'rgba(150,150,170,0.5)' : COLORS.danger;
       ctx.fillRect(bx, 30, bw * Math.max(0, bo.hp / bo.maxHp), 10);
     }
-    ctx.font = 'bold 11px sans-serif';
+    ctx.font = 'bold 11px Pretendard, sans-serif';
     ctx.fillStyle = COLORS.text;
     if (n === 1) {
       ctx.textAlign = 'left';
@@ -203,12 +203,12 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       const sbw = logicalW - 120;
       if (bo.breakT > 0) {
         ctx.textAlign = 'center';
-        ctx.font = 'bold 11px sans-serif';
+        ctx.font = 'bold 11px Pretendard, sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.fillText(`무방비 ${bo.breakT.toFixed(1)}초 · 받는 피해 +25%`, logicalW / 2, 70);
       } else {
         ctx.textAlign = 'left';
-        ctx.font = 'bold 10px sans-serif';
+        ctx.font = 'bold 10px Pretendard, sans-serif';
         ctx.fillStyle = '#8affff';
         ctx.fillText(`무력화 게이지 ${bo.stagger}/${bo.staggerMax}`, 60, 64);
         ctx.fillStyle = 'rgba(138,255,255,0.18)';
@@ -222,7 +222,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
 
   // 좌상단(진행바 아래): 함대 구성 + 기함 + 기함강화 게이지 + 섹터
   ctx.fillStyle = COLORS.text;
-  ctx.font = 'bold 14px sans-serif';
+  ctx.font = 'bold 14px Pretendard, sans-serif';
   ctx.textAlign = 'left';
   // 보스전에는 기함 상세줄이 보스 HP바·이름과 겹치므로, 함대 줄(보스 HP바보다 위)에 기함 이름만 짧게 붙인다.
   const bossShip = bosses.length && shipName ? ` · 기함 ${shipName}${doctrine ? ' ' + doctrine : ''}` : '';
@@ -230,7 +230,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   // 상세줄(트레잇·화력·게이지·섹터)은 보스전엔 숨김 (겹침 방지)
   if (!bosses.length) {
     if (tierName) {
-      ctx.font = 'bold 11px sans-serif';
+      ctx.font = 'bold 11px Pretendard, sans-serif';
       ctx.fillStyle = COLORS.ally;
       const dTag = doctrine ? ` ${doctrine}` : '';
     ctx.fillText((tierPower > 0 ? `기함 ${tierName} · 함대 화력 ${tierPower}` : `기함 ${tierName}`) + dTag, 12, 42);
@@ -242,22 +242,22 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillRect(12, 48, gw, 5);
       ctx.fillStyle = COLORS.reward;
       ctx.fillRect(12, 48, gw * Math.min(1, upgradeCur / upgradeMax), 5);
-      ctx.font = 'bold 10px sans-serif';
+      ctx.font = 'bold 10px Pretendard, sans-serif';
       ctx.fillText(`다음 기함 등급까지: 순양함 ${upgradeCur}/${upgradeMax}`, 12 + gw + 6, 53);
     } else if (tierName) {
-      ctx.font = 'bold 10px sans-serif';
+      ctx.font = 'bold 10px Pretendard, sans-serif';
       ctx.fillStyle = COLORS.reward;
       ctx.fillText('기함 최고 등급 (MAX)', 12, 53);
     }
     if (stage) {
-      ctx.font = 'bold 11px sans-serif';
+      ctx.font = 'bold 11px Pretendard, sans-serif';
       ctx.fillStyle = COLORS.reward;
       ctx.fillText(`섹터 ${stage}`, 12, 67);
     }
   }
   // 보유 모듈 아이콘 줄 (빌드가 커지는 게 보인다)
   if (modules && modules.length) {
-    ctx.font = '13px sans-serif';
+    ctx.font = '13px Pretendard, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillStyle = COLORS.text;
     let mx = 12;
@@ -273,7 +273,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   if (weapon) {
     const color = WEAPON_COLORS[weapon];
     ctx.textAlign = 'right';
-    ctx.font = 'bold 12px sans-serif';
+    ctx.font = 'bold 12px Pretendard, sans-serif';
     ctx.fillStyle = color;
     const evoTag = weaponEvo ? ` · ${weaponEvo}` : '';
     ctx.fillText(WEAPON_LABELS[weapon] + evoTag + (shield ? ' ⛨' : ''), logicalW - 12, 34);
@@ -293,7 +293,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
     ctx.textAlign = 'center';
     if (inRush) {
       // RUSH: 텍스트 + 청록/자홍 게이지 (색상만이 아니라 RUSH 텍스트 병행)
-      ctx.font = 'bold 13px sans-serif';
+      ctx.font = 'bold 13px Pretendard, sans-serif';
       ctx.fillStyle = '#ff4cd2';
       ctx.fillText(`폭주 ${rushT.toFixed(1)}초`, logicalW / 2, by - 4);
       ctx.fillStyle = 'rgba(87,224,255,0.18)';
@@ -304,7 +304,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       // FLOW: 0일 땐 흐리게(시스템 존재 표시), 값 있으면 밝게. FLOW 텍스트 병행.
       const frac = Math.max(0, Math.min(1, flow / flowMax));
       ctx.globalAlpha = flow > 0 ? 1 : 0.4;
-      ctx.font = 'bold 11px sans-serif';
+      ctx.font = 'bold 11px Pretendard, sans-serif';
       ctx.fillStyle = COLORS.gateGood;
       ctx.fillText(`집중 게이지 ${Math.round(flow)}`, logicalW / 2, by - 3);
       ctx.fillStyle = 'rgba(255,255,255,0.12)';
@@ -315,7 +315,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
     }
     // 선택한 키스톤 아이콘 (하나만, FLOW 바 오른쪽에 짧게 — C3)
     if (keystoneIcon) {
-      ctx.font = '15px sans-serif';
+      ctx.font = '15px Pretendard, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillStyle = COLORS.reward;
       ctx.fillText(keystoneIcon, bx + bw + 8, by + bh);
