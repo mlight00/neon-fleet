@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { campaignBossId } from '../js/logic.js';
+import { campaignBossId, progressPatch } from '../js/logic.js';
 import { bossDefById } from '../js/sprites.js';
 import { createSave } from '../js/save.js';
 import { BAL } from '../js/balance.js';
@@ -69,4 +69,63 @@ test('endlessBest는 캠페인 best/stage와 별도 필드', () => {
   assert.equal(d.endlessBest, 9);            // 엔드리스 기록
   assert.equal(d.best, 500);                 // 캠페인 화력 기록 불변
   assert.equal(d.stage, 6);                  // 캠페인 최고 섹터 불변
+});
+
+// ─── 기록 분리 (후속 지시서 §4) ─────────────────────────────
+// 계약: 캠페인=stage, 엔드리스=endlessBest. 엔드리스는 캠페인 stage를 절대 바꾸지 않는다.
+test('progressPatch: 캠페인은 stage만, 엔드리스는 endlessBest만 갱신', () => {
+  assert.deepEqual(progressPatch('campaign', 4, { stage: 1, endlessBest: 0 }), { stage: 4 });
+  assert.deepEqual(progressPatch('endless', 7, { stage: 6, endlessBest: 0 }), { endlessBest: 7 });
+  // 엔드리스 패치에 stage 키가 절대 없어야 한다(오염 방지의 핵심)
+  assert.equal('stage' in progressPatch('endless', 9, { stage: 6, endlessBest: 7 }), false);
+});
+
+test('progressPatch: 기존 기록보다 크지 않으면 저장 변경 없음(빈 패치)', () => {
+  assert.deepEqual(progressPatch('campaign', 3, { stage: 6 }), {});
+  assert.deepEqual(progressPatch('endless', 7, { stage: 6, endlessBest: 9 }), {});
+});
+
+test('기록 분리 시나리오: 캠페인 6 완주 후 엔드리스를 돌려도 stage는 6을 유지', () => {
+  const s = mkSave({ stage: 6, endlessBest: 0, endlessUnlocked: true, campaignCleared: true, coins: 500, best: 800, stageMigrated: true, up: { drones: 3, dmg: 2, rate: 1, coin: 2 } });
+  const apply = (mode, sector) => { const p = progressPatch(mode, sector, s.get()); if (Object.keys(p).length) s.set(p); };
+
+  apply('endless', 7);                       // 엔드리스 시작(섹터 7 진입)
+  assert.equal(s.get().stage, 6, '엔드리스 시작만으로 stage가 7이 되면 안 된다');
+  assert.equal(s.get().endlessBest, 7);
+
+  apply('endless', 9);                       // 엔드리스 섹터 9 도달
+  assert.equal(s.get().stage, 6, '엔드리스 섹터 9에서도 캠페인 stage는 6');
+  assert.equal(s.get().endlessBest, 9);
+
+  // 새 캠페인에서 섹터 4까지만 가도 기존 최고(6)는 내려가지 않는다
+  apply('campaign', 4);
+  assert.equal(s.get().stage, 6, '캠페인 기록은 최고치 유지');
+
+  // 기존 사용자 데이터 보존
+  const d = s.get();
+  assert.equal(d.coins, 500); assert.equal(d.best, 800);
+  assert.equal(d.campaignCleared, true); assert.equal(d.endlessUnlocked, true);
+  assert.deepEqual(d.up, { drones: 3, dmg: 2, rate: 1, coin: 2 });
+});
+
+test('기록 분리: 새로고침(저장소 재로드) 후에도 두 기록이 분리 유지', () => {
+  const mem = new Map();
+  const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  const s1 = createSave(storage);
+  s1.set({ stage: 6, endlessBest: 0, endlessUnlocked: true, campaignCleared: true, stageMigrated: true });
+  const p = progressPatch('endless', 7, s1.get()); s1.set(p);
+  // 새로고침 = 같은 저장소로 새 인스턴스 생성
+  const s2 = createSave(storage).get();
+  assert.equal(s2.stage, 6, '새로고침 후에도 캠페인 stage=6');
+  assert.equal(s2.endlessBest, 7, '새로고침 후에도 endlessBest=7');
+  assert.equal(s2.endlessUnlocked, true);
+});
+
+test('캠페인 완주 정산: stage=6 + campaignCleared/endlessUnlocked 저장', () => {
+  const s = mkSave({ stage: 3, stageMigrated: true });
+  s.set({ ...progressPatch('campaign', BAL.campaign.sectors, s.get()), campaignCleared: true, endlessUnlocked: true });
+  const d = s.get();
+  assert.equal(d.stage, 6);
+  assert.equal(d.campaignCleared, true);
+  assert.equal(d.endlessUnlocked, true);
 });

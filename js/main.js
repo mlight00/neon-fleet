@@ -12,7 +12,7 @@ import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, progressPatch } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, getBackground, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -154,8 +154,9 @@ function startSector(sector) {
   r.sector = sector;
   r.map = generateSectorMap(sector, r.rng, BAL.sector.depth);
   r.node = null; r.done = [];
-  const d = save.get();
-  if (sector > (d.stage || 0)) save.set({ stage: sector });   // 최고 도달 섹터 기록
+  // 최고 도달 섹터 기록 — 캠페인은 stage, 엔드리스는 endlessBest에만 (기록 완전 분리)
+  const p = progressPatch(r.mode, sector, save.get());
+  if (Object.keys(p).length) save.set(p);
   enterSectorMap();
 }
 
@@ -727,9 +728,8 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
   const bonus = total - earned;   // UI 분할 표시용 (원정 진행 보상)
   if (!r.settled) {   // 중복 정산 차단 (같은 원정을 두 번 저장하지 않음)
     r.settled = true;
-    const patch = { best, coins: data.coins + total, stage: Math.max(data.stage, r.sector) };
-    if (r.mode === 'endless') patch.endlessBest = Math.max(data.endlessBest || 0, r.sector);   // 엔드리스 기록은 별도 필드(§6.5)
-    save.set(patch);
+    // 진행 기록은 모드별로 분리 저장(캠페인=stage, 엔드리스=endlessBest). 코인·최고화력은 공용.
+    save.set({ best, coins: data.coins + total, ...progressPatch(r.mode, r.sector, data) });
   }
   if (toTitle) { showTitleScreen(); return; }
   ui.showLose({ stage: r.sector, maxPower: r.maxPower, coins: earned, bonus, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
@@ -744,7 +744,8 @@ function winCampaign() {
   const earned = Math.round(r.world.coins * r.world.stats.coinMult);
   if (!r.settled) {
     r.settled = true;
-    save.set({ best, coins: data.coins + earned, stage: Math.max(data.stage, r.sector), campaignCleared: true, endlessUnlocked: true });
+    // 캠페인 완주 정산 (이 경로는 캠페인 전용) → stage 갱신 + 완주·해금 플래그
+    save.set({ best, coins: data.coins + earned, ...progressPatch('campaign', r.sector, data), campaignCleared: true, endlessUnlocked: true });
   }
   ui.showVictory({ coins: earned, best, onTitle: showTitleScreen, onEndless: startEndless, onRestart: startPlay });
 }

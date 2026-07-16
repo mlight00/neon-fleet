@@ -66,6 +66,22 @@ export function nodeCoinReward(sector, nodeCol, type, coinMult) {
 }
 
 /**
+ * 모드별 진행 기록 저장 패치 (순수 함수). 캠페인과 무한 원정 기록을 완전히 분리한다.
+ *  - campaign: 최고 도달 섹터를 `stage`에만 기록
+ *  - endless : 최고 도달 섹터를 `endlessBest`에만 기록 (캠페인 `stage`는 절대 건드리지 않음)
+ * 기존 기록보다 크지 않으면 빈 객체(=저장 변경 없음)를 돌려준다.
+ */
+export function progressPatch(mode, sector, data = {}) {
+  const s = Math.max(1, Math.floor(sector));
+  if (mode === 'endless') {
+    const best = data.endlessBest || 0;
+    return s > best ? { endlessBest: s } : {};
+  }
+  const stage = data.stage || 0;
+  return s > stage ? { stage: s } : {};
+}
+
+/**
  * 섹터·모드에 따른 보스 ID (순수, 지시서 §6.2). 순수 함수라 테스트 가능.
  * 캠페인: campaignBosses[sector-1] (섹터 1~6). 엔드리스: 캠페인 이후 섹터부터 endlessBosses를 순환.
  */
