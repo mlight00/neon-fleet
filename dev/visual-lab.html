@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>NEON FLEET — 함체 시각 검증 랩 (Phase B 작업묶음 A)</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  html, body { overflow: auto; height: auto; background: #06080f; }
+  body { padding: 18px 20px 60px; color: #cfe4ff; }
+  h1 { font-size: 19px; color: #3ff5e0; margin-bottom: 4px; letter-spacing: 1px; }
+  .sub { font-size: 12px; color: #7f93b0; margin-bottom: 14px; line-height: 1.6; }
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+         padding: 10px 12px; margin-bottom: 16px; background: rgba(8,12,28,.94);
+         border: 1px solid rgba(63,245,224,.28); border-radius: 10px; backdrop-filter: blur(4px); }
+  .bar label { font-size: 12px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  .bar .sep { width: 1px; height: 18px; background: rgba(120,160,200,.28); margin: 0 4px; }
+  button.tgl { padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 999px; cursor: pointer;
+               color: #cfe4ff; background: rgba(63,245,224,.10); border: 1px solid rgba(63,245,224,.38); }
+  button.tgl.on { color: #05060f; background: linear-gradient(135deg,#3ff5e0,#4c9dff); border-color: transparent; }
+  .row { display: flex; align-items: center; gap: 16px; padding: 10px 12px; margin-bottom: 10px;
+         border: 1px solid rgba(120,160,200,.18); border-radius: 12px; }
+  .row.light { background: #b9c9d8; }
+  .row.dark  { background: #070a14; }
+  .meta { min-width: 210px; font-size: 12px; line-height: 1.7; }
+  .meta b { color: #ffd93d; font-size: 13px; }
+  .row.light .meta { color: #12202e; }
+  .row.light .meta b { color: #8a4b00; }
+  .num { color: #57e0ff; } .row.light .num { color: #0b5f86; }
+  .warn { color: #ff7a7a; } .ok { color: #7cff6b; } .row.light .ok { color: #0a6b25; }
+  canvas { border-radius: 8px; display: block; }
+  .note { margin-top: 16px; font-size: 11.5px; color: #7f93b0; line-height: 1.8; }
+</style>
+</head>
+<body>
+<h1>함체 시각 검증 랩</h1>
+<div class="sub">
+  Phase B 작업묶음 A — 각 함체를 <b>실제 게임 크기</b>로, 순양함 1척 + 드론 6기와 함께 표시합니다.<br>
+  이 페이지는 개발 검증 전용입니다(공개 타이틀에 연결되지 않으며 세이브를 건드리지 않습니다).
+</div>
+
+<div class="bar">
+  <button class="tgl on" id="t-core">피격 핵 보기</button>
+  <button class="tgl on" id="t-mounts">포대 보기</button>
+  <button class="tgl on" id="t-frame">지휘 프레임</button>
+  <button class="tgl" id="t-escort">호위 숨기기</button>
+  <span class="sep"></span>
+  <label>무기
+    <select id="weapon">
+      <option value="vulcan">발칸</option><option value="laser">레이저</option><option value="homing">호밍</option>
+    </select>
+  </label>
+  <span class="sep"></span>
+  <button class="tgl on" id="t-bg">배경: 어두움/밝음 둘 다</button>
+</div>
+
+<div id="out"></div>
+
+<div class="note" id="note"></div>
+
+<script type="module">
+import { SHIP_DEFS, CRUISER_VISUAL_W, DRONE_VISUAL_W, cruiserBlitScale, droneBlitScale,
+         shipBaseSprite, shipSprite, drawCommandFrame, drawWeaponRig, drawDeckLights, drawFlames } from '../js/ships.js';
+import { preloadStyle } from '../js/sprites.js';
+
+const NAMES = ['H0 스카우트', 'H1 인터셉터', 'H2 스트라이커', 'H3 캐리어', 'H4 드레드노트', 'H5 타이탄'];
+const TARGET_W = [34, 50, 68, 88, 112, 140];
+const MIN_RATIO = [1.0, 1.4, 1.8, 2.3, 3.0, 3.5];
+
+const S = { core: true, mounts: true, frame: true, hideEscort: false, weapon: 'vulcan', bothBg: true };
+const CELL_W = 420, CELL_H = 230;
+
+function blit(ctx, sprite, x, y, scale = 1) {
+  if (!sprite) return false;
+  const w = (sprite.logicalW ?? sprite.width) * scale;
+  const h = (sprite.logicalH ?? sprite.height) * scale;
+  ctx.drawImage(sprite, x - w / 2, y - h / 2, w, h);
+  return true;
+}
+// 스프라이트가 없을 때(아트 미로드) 위계를 확인할 수 있게 목표 폭 상자로 폴백
+function fallbackBox(ctx, w, h, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.strokeRect(-w / 2, -h / 2, w, h); ctx.setLineDash([]);
+}
+
+function drawCell(canvas, tier, light) {
+  const ctx = canvas.getContext('2d');
+  const d = SHIP_DEFS[tier];
+  ctx.clearRect(0, 0, CELL_W, CELL_H);
+  ctx.fillStyle = light ? '#b9c9d8' : '#070a14';
+  ctx.fillRect(0, 0, CELL_W, CELL_H);
+
+  const cx = 140, cy = CELL_H / 2;
+
+  // 기함
+  ctx.save(); ctx.translate(cx, cy);
+  drawFlames(ctx, tier, 0.6);
+  const drew = blit(ctx, shipBaseSprite(tier), 0, 0);
+  if (!drew) fallbackBox(ctx, d.visualWidth, d.visualHeight, light ? '#12202e' : '#3ff5e0');
+  if (S.frame) drawCommandFrame(ctx, tier, 0.6);
+  if (S.mounts) {
+    drawWeaponRig(ctx, tier, S.weapon, 3, 0.6, null, null);
+    drawDeckLights(ctx, tier, 0.6);
+    ctx.fillStyle = '#ffd93d';
+    for (const m of d.weaponMounts) { ctx.beginPath(); ctx.arc(m.x, m.y, 2.4, 0, Math.PI * 2); ctx.fill(); }
+  }
+  if (S.core) {
+    const r = d.hitCoreRadius;
+    ctx.strokeStyle = 'rgba(255,214,92,.95)'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * .62);
+    g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(1, 'rgba(255,214,92,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r * .62, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  if (!S.hideEscort) {
+    // 순양함 1척 (실제 blit 배율)
+    const cxx = 300, cyy = cy - 34;
+    ctx.save(); ctx.translate(cxx, cyy);
+    if (!blit(ctx, shipSprite(1, S.weapon), 0, 0, cruiserBlitScale())) fallbackBox(ctx, CRUISER_VISUAL_W, CRUISER_VISUAL_W, '#57e0ff');
+    ctx.restore();
+    ctx.fillStyle = light ? '#12202e' : '#9fb8d8'; ctx.font = 'bold 10px Pretendard, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`순양함 ${CRUISER_VISUAL_W}px`, cxx, cyy + 30);
+
+    // 드론 6기
+    const scout = shipSprite(0, S.weapon);
+    for (let i = 0; i < 6; i++) {
+      const dx = 262 + (i % 3) * 34, dy = cy + 40 + Math.floor(i / 3) * 26;
+      ctx.save(); ctx.translate(dx, dy);
+      if (!blit(ctx, scout, 0, 0, droneBlitScale())) fallbackBox(ctx, DRONE_VISUAL_W, DRONE_VISUAL_W, '#3ff5e0');
+      ctx.restore();
+    }
+    ctx.fillStyle = light ? '#12202e' : '#9fb8d8';
+    ctx.fillText(`드론 6기 · 각 ${DRONE_VISUAL_W}px`, 296, cy + 96);
+  }
+
+  // 실제 폭 눈금자
+  ctx.strokeStyle = light ? 'rgba(18,32,46,.5)' : 'rgba(63,245,224,.45)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx - d.visualWidth / 2, CELL_H - 14); ctx.lineTo(cx + d.visualWidth / 2, CELL_H - 14); ctx.stroke();
+  ctx.fillStyle = light ? '#12202e' : '#3ff5e0'; ctx.font = '10px Pretendard, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(`${d.visualWidth}px`, cx, CELL_H - 4);
+}
+
+function render() {
+  const out = document.getElementById('out');
+  out.innerHTML = '';
+  const cw = SHIP_DEFS[1].visualWidth * cruiserBlitScale();
+  const bgs = S.bothBg ? ['dark', 'light'] : ['dark'];
+  SHIP_DEFS.forEach((d, t) => {
+    bgs.forEach((bg) => {
+      const row = document.createElement('div');
+      row.className = 'row ' + bg;
+      const ratio = d.visualWidth / cw;
+      const pass = ratio >= MIN_RATIO[t] - 1e-9;
+      row.innerHTML = `<div class="meta">
+        <b>${NAMES[t]}</b><br>
+        표시 폭 <span class="num">${d.visualWidth}px</span> (목표 ${TARGET_W[t]})<br>
+        피격 핵 R <span class="num">${d.hitCoreRadius}</span> · 대형 R <span class="num">${d.formationRadius}</span><br>
+        포대 <span class="num">${d.weaponMounts.length}</span> · 엔진 <span class="num">${d.engineMounts.length}</span><br>
+        순양함 대비 <span class="${pass ? 'ok' : 'warn'}">${ratio.toFixed(2)}배</span> (≥${MIN_RATIO[t]}) ${pass ? '✔' : '✖'}
+      </div>`;
+      const c = document.createElement('canvas');
+      c.width = CELL_W; c.height = CELL_H;
+      row.appendChild(c);
+      out.appendChild(row);
+      drawCell(c, t, bg === 'light');
+    });
+  });
+  document.getElementById('note').innerHTML =
+    `순양함 실제 렌더 폭 <b>${cw.toFixed(1)}px</b> · 드론 <b>${(SHIP_DEFS[0].visualWidth * droneBlitScale()).toFixed(1)}px</b><br>
+     시각 폭은 H0→H5에서 ${(SHIP_DEFS[5].visualWidth / SHIP_DEFS[0].visualWidth).toFixed(2)}배 커지지만,
+     피격 핵은 ${(SHIP_DEFS[5].hitCoreRadius / SHIP_DEFS[0].hitCoreRadius).toFixed(2)}배만 커집니다 — 위엄은 키우되 회피는 그대로.`;
+}
+
+function tgl(id, key, onLabel, offLabel) {
+  const b = document.getElementById(id);
+  b.addEventListener('click', () => {
+    S[key] = !S[key];
+    b.classList.toggle('on', key === 'hideEscort' ? S[key] : S[key]);
+    if (onLabel) b.textContent = S[key] ? onLabel : offLabel;
+    render();
+  });
+}
+tgl('t-core', 'core'); tgl('t-mounts', 'mounts'); tgl('t-frame', 'frame');
+tgl('t-escort', 'hideEscort', '호위 표시', '호위 숨기기');
+tgl('t-bg', 'bothBg', '배경: 어두움/밝음 둘 다', '배경: 어두움만');
+document.getElementById('weapon').addEventListener('change', (e) => { S.weapon = e.target.value; render(); });
+
+render();                       // 스프라이트 로드 전에도 폴백 상자로 위계 확인 가능
+preloadStyle('C').then(render); // 아트 로드 후 실제 함체로 다시 그림
+</script>
+</body>
+</html>

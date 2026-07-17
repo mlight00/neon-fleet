@@ -1,7 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SHIP_DEFS, CRUISER_VISUAL_W, DRONE_VISUAL_W } from '../js/ships.js';
+import { SHIP_DEFS, CRUISER_VISUAL_W, DRONE_VISUAL_W, cruiserBlitScale, droneBlitScale } from '../js/ships.js';
 import { BAL } from '../js/balance.js';
+
+// 실제 화면 렌더 폭 = 빌려 쓰는 스프라이트 폭 × blit 배율.
+// (선언한 상수가 아니라 '실제로 그려지는 크기'를 재야 위계가 진짜로 성립하는지 알 수 있다)
+const renderedCruiserW = () => SHIP_DEFS[1].visualWidth * cruiserBlitScale();
+const renderedDroneW = () => SHIP_DEFS[0].visualWidth * droneBlitScale();
 
 // Phase B 작업묶음 A — 기함 시각 위계와 피격 핵 분리 (지시서 §6.1)
 // F1: "기함이 작고 드론·순양함과 같은 색이라 안 보임"
@@ -26,18 +31,27 @@ test('H0~H5 표시 폭이 단조 증가한다 (상위 티어 축소 금지)', ()
   }
 });
 
-test('H1 이상이 순양함보다 지정 배율 이상 크다', () => {
+test('H1 이상이 순양함보다 지정 배율 이상 크다 — 실제 렌더 폭 기준', () => {
+  const cw = renderedCruiserW();
   SHIP_DEFS.forEach((d, t) => {
-    const ratio = d.visualWidth / CRUISER_VISUAL_W;
+    const ratio = d.visualWidth / cw;
     assert.ok(ratio >= MIN_VS_CRUISER[t] - 1e-9,
-      `H${t} 폭 ${d.visualWidth} / 순양함 ${CRUISER_VISUAL_W} = ${ratio.toFixed(2)}배 ≥ ${MIN_VS_CRUISER[t]}배`);
+      `H${t} 폭 ${d.visualWidth} / 순양함 실렌더 ${cw.toFixed(1)} = ${ratio.toFixed(2)}배 ≥ ${MIN_VS_CRUISER[t]}배`);
   });
 });
 
+test('호위는 기함 스프라이트를 빌려 쓰지만 실제 렌더 폭은 고정이다 (기함이 커져도 안 커짐)', () => {
+  // 이 계약이 깨지면 순양함이 H1과 함께 커져 위계가 1.0배로 무너진다(과거 결함).
+  assert.ok(Math.abs(renderedCruiserW() - CRUISER_VISUAL_W) < 0.5,
+    `순양함 실제 렌더 폭 ${renderedCruiserW().toFixed(1)} = 고정 상수 ${CRUISER_VISUAL_W}`);
+  assert.ok(Math.abs(renderedDroneW() - DRONE_VISUAL_W) < 0.5,
+    `드론 실제 렌더 폭 ${renderedDroneW().toFixed(1)} = 고정 상수 ${DRONE_VISUAL_W}`);
+});
+
 test('기함(H1+)은 순양함·드론보다 확실히 크다 — 위계가 눈으로 구분됨', () => {
-  assert.ok(CRUISER_VISUAL_W > DRONE_VISUAL_W, '순양함 > 드론');
+  assert.ok(renderedCruiserW() > renderedDroneW(), '순양함 > 드론');
   for (let t = 1; t < SHIP_DEFS.length; t++) {
-    assert.ok(SHIP_DEFS[t].visualWidth > CRUISER_VISUAL_W * 1.35, `H${t}는 순양함보다 확실히 큼`);
+    assert.ok(SHIP_DEFS[t].visualWidth > renderedCruiserW() * 1.35, `H${t}는 순양함보다 확실히 큼`);
   }
 });
 

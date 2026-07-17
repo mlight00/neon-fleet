@@ -6,7 +6,7 @@ import { BAL } from './balance.js';
 import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, bankUpgrade, bankDemote, invertGateOp } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
-import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFrame, drawWeaponRig, drawUpgradeSequence, SHIP_DEFS } from './ships.js';
+import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFrame, drawWeaponRig, drawUpgradeSequence, SHIP_DEFS, cruiserBlitScale, droneBlitScale } from './ships.js';
 import { getSprite, bossDefFor } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
 import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult, weaponProjectileColor } from './weapon-evolutions.js';
@@ -945,7 +945,7 @@ export class Squad {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(this.bank * 0.3);
-      blit(ctx, scout, 0, 0, 0.55);
+      blit(ctx, scout, 0, 0, droneBlitScale());   // 고정 표시 폭 — 기함이 커져도 드론은 그대로
       ctx.restore();
     }
 
@@ -975,7 +975,8 @@ export class Squad {
         ctx.save();
         ctx.translate(this.x + slot.x, this.y + slot.y + Math.sin(this.t * 3 + i) * 1.5);
         ctx.rotate(this.bank * 0.25);
-        blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, type === 'cruiser' ? 0.85 : 0.78);
+        // 고정 표시 폭에서 역산 — 기함 티어가 커져도 호위는 커지지 않아야 위계가 유지된다
+        blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, type === 'cruiser' ? cruiserBlitScale() : droneBlitScale() * 1.4);
         // 순양함 손상: 피격 플래시(붉은 링) + HP 낮으면 손상 표시
         if (type === 'cruiser') {
           const hp = this.cruiserHp[i] ?? cMax;

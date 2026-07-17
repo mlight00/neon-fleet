@@ -193,9 +193,13 @@ const SHIP_DEFS_RAW = [
 const SHIP_VISUAL_W = [34, 50, 68, 88, 112, 140];   // 지시서 §6.1 목표 표시 폭
 const SHIP_HIT_CORE = [11, 12, 13, 14, 15, 16];      // 피격 핵: 시각 폭이 4.1배 커져도 1.45배만
 
-/** 순양함·드론 표시 폭 — 기함 위계(H1 ≥ 1.4배 … H5 ≥ 3.5배) 비교의 기준 */
+/**
+ * 순양함·드론 표시 폭 — 기함 위계(H1 ≥ 1.4배 … H5 ≥ 3.5배)의 비교 기준.
+ * 이 둘은 기함 티어 크기에 딸려 커지면 안 된다. 순양함은 H1(인터셉터) 스프라이트를 재사용하므로
+ * H1이 커지면 같이 커져 위계가 무너진다 → 아래 고정 폭에서 blit 배율을 역산해 크기를 못박는다.
+ */
 export const CRUISER_VISUAL_W = 34;
-export const DRONE_VISUAL_W = 14;
+export const DRONE_VISUAL_W = 19;   // 기존 렌더(스카웃 34 × 0.55 ≈ 18.7)와 동일 — 드론 크기는 바꾸지 않는다
 
 export const SHIP_DEFS = SHIP_DEFS_RAW.map((d, t) => {
   const targetW = SHIP_VISUAL_W[t] ?? d.w;
@@ -219,6 +223,14 @@ export const SHIP_DEFS = SHIP_DEFS_RAW.map((d, t) => {
     mounts, nozzles, deckLights,
   };
 });
+
+/**
+ * 순양함·드론 blit 배율 (Phase B §6.1).
+ * 스프라이트를 기함 티어에서 빌려 쓰되, 표시 폭은 위 고정 상수로 못박는다.
+ * → 기함이 커져도 호위는 그대로 → 위계(H1 1.4배 … H5 3.5배)가 실제 화면에서 성립.
+ */
+export function cruiserBlitScale() { return CRUISER_VISUAL_W / SHIP_DEFS[1].visualWidth; }
+export function droneBlitScale() { return DRONE_VISUAL_W / SHIP_DEFS[0].visualWidth; }
 
 const spriteCache = [];
 const baseSpriteCache = [];
