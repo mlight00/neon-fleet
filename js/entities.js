@@ -324,10 +324,34 @@ export class Squad {
     return Math.max(base, Math.min(BAL.squad.maxWidth, 12 * Math.sqrt(this.count)));
   }
   get hitRadius() {
-    // 치명 판정은 작고 일정하게 (탄막게임식). 위상 기동 교리는 반경을 더 줄인다(하한 존중).
-    const base = 15 + this.tier * 2.2;   // T0 15 … T5 26
+    // 피격 핵은 함체 시각 폭과 독립이다(Phase B §6.1). 함체는 34→140px로 커지지만 핵은 11→16px만.
+    // 큰 날개·포대 끝은 위엄을 만들되 판정에 포함하지 않는다. 위상 기동 교리는 더 줄인다(하한 존중).
+    const base = SHIP_DEFS[this.tier].hitCoreRadius;
     const E = doctrineEffects(this.doctrine, BAL.doctrine);
     return Math.max(E.hitRadiusMin || 0, base + E.hitRadiusDelta);
+  }
+
+  /**
+   * 피격 핵 표시 (Phase B §6.1). 함체는 34→140px로 커지지만 실제 판정은 11→16px뿐이라,
+   * "어디가 맞는 곳인지"를 항상 보여줘야 큰 함체가 회피를 방해한다고 느끼지 않는다.
+   * 흰 코어 + 금빛 링. 좌표계는 기함 로컬(호출부에서 translate 완료).
+   */
+  drawHitCore(ctx) {
+    const r = this.hitRadius;
+    const pulse = 0.72 + 0.28 * Math.sin(this.t * 4);
+    ctx.save();
+    // 금빛 판정 링 — 정확한 피격 반경
+    ctx.strokeStyle = `rgba(255,214,92,${0.5 + 0.3 * pulse})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    // 흰 중앙 코어 — 큰 함체 위에서도 눈이 즉시 잡는 기준점
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.62);
+    g.addColorStop(0, `rgba(255,255,255,${0.92 * pulse})`);
+    g.addColorStop(0.55, 'rgba(255,240,190,0.5)');
+    g.addColorStop(1, 'rgba(255,214,92,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.62, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
 
   /** 전투 수치와 무관한 조립 연출만 시작한다. */
@@ -993,6 +1017,7 @@ export class Squad {
       ctx.arc(m.x, m.y, 2.2, 0, Math.PI * 2);
       ctx.fill();
     }
+    this.drawHitCore(ctx);
     drawUpgradeSequence(ctx, this.tier, this.upgradeFx);
     if (this.flash > 0) {
       ctx.globalAlpha = Math.min(0.6, this.flash * 2.5);

@@ -181,19 +181,42 @@ const SHIP_DEFS_RAW = [
   },
 ];
 
-// 진화 크기 개편: 상위 티어일수록 기함이 화면을 가려 회피가 불가능했다.
-// 스카웃(T1)은 그대로 두고, 상위 티어의 스프라이트·주포·노즐·궤도 좌표를 같은 비율로 축소해
-// "진화해도 탄을 피할 수 있는" 크기로 유지한다. 비율 = 새 크기 / 기존 크기 (SPRITE_SIZES 기준).
-const SHIP_SCALE = [1.0, 0.73, 0.67, 0.58, 0.52, 0.44];
+// ── 기함 시각 위계 (Phase B 작업묶음 A, 지시서 §6.1) ─────────────────────────
+// 이전 구현은 SHIP_SCALE=[1,0.73,0.67,0.58,0.52,0.44]로 "상위 티어일수록 더 축소"했다.
+// 그 결과 타이탄이 53px로 순양함(44px)과 겨우 1.2배 차이라 기함이 안 보였다(F1).
+// 회피 가능성은 '함체를 줄여서'가 아니라 '피격 핵을 작게 유지해서' 확보한다.
+//
+//  visualWidth/Height : 화면에 보이는 함체 (위엄 담당)
+//  hitCoreRadius      : 실제 피격 판정 중앙 코어 — 시각 폭과 독립, 작게 유지
+//  formationRadius    : 호위 대형 이격
+//  weaponMounts       : 포대 장착 좌표 / engineMounts : 엔진 위치
+const SHIP_VISUAL_W = [34, 50, 68, 88, 112, 140];   // 지시서 §6.1 목표 표시 폭
+const SHIP_HIT_CORE = [11, 12, 13, 14, 15, 16];      // 피격 핵: 시각 폭이 4.1배 커져도 1.45배만
+
+/** 순양함·드론 표시 폭 — 기함 위계(H1 ≥ 1.4배 … H5 ≥ 3.5배) 비교의 기준 */
+export const CRUISER_VISUAL_W = 34;
+export const DRONE_VISUAL_W = 14;
+
 export const SHIP_DEFS = SHIP_DEFS_RAW.map((d, t) => {
-  const s = SHIP_SCALE[t] ?? 1;
+  const targetW = SHIP_VISUAL_W[t] ?? d.w;
+  const s = targetW / d.w;                            // 원본 아트 폭 → 목표 표시 폭
+  const mounts = d.mounts.map((m) => ({ x: m.x * s, y: m.y * s }));
+  const nozzles = d.nozzles.map((n) => ({ x: n.x * s, y: n.y * s, len: n.len * s }));
+  const deckLights = d.deckLights ? d.deckLights.map(([x, y]) => [x * s, y * s]) : undefined;
+  const visualHeight = Math.round(d.h * s);
+  const formationRadius = Math.round(d.clearR * s);
   return {
     ...d,
-    w: Math.round(d.w * s), h: Math.round(d.h * s),
-    clearR: Math.round(d.clearR * s),
-    mounts: d.mounts.map((m) => ({ x: m.x * s, y: m.y * s })),
-    nozzles: d.nozzles.map((n) => ({ x: n.x * s, y: n.y * s, len: n.len * s })),
-    deckLights: d.deckLights ? d.deckLights.map(([x, y]) => [x * s, y * s]) : undefined,
+    // Phase B 명시 필드 (렌더러·판정이 각각 다른 값을 참조하도록 분리)
+    visualWidth: targetW,
+    visualHeight,
+    hitCoreRadius: SHIP_HIT_CORE[t] ?? 12,
+    formationRadius,
+    weaponMounts: mounts,
+    engineMounts: nozzles,
+    // 하위 호환 별칭 (기존 렌더 코드가 참조하는 이름)
+    w: targetW, h: visualHeight, clearR: formationRadius,
+    mounts, nozzles, deckLights,
   };
 });
 
