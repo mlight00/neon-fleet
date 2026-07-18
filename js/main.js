@@ -751,9 +751,10 @@ function startCampaign25(opts = {}) {
   w.onHullDepleted = () => finishCampaign25('hull');   // 내구도 소진 → 25분 결과 종료(regionResults 첨부, Codex P2)
   r.campaign25 = {
     mode, auto, build, buildId: build.id, cfg: G2, director, metrics,
-    region: 0, bossActive: false, bossSpawnT: 0, pendingBoss: null, resonActivated: false, resultShown: false, resultPending: false,
+    region: 0, bossActive: false, bossSpawnT: 0, bossQueue: [], resonActivated: false, resultShown: false, resultPending: false,
     regionResults: [],        // [{ region, boss, ttk, killed }]
     bossesKilled: 0, deferredEvents: [],
+    startHull: surv.hull, startTier: 0,   // 결과 화면용 실제 시작 스냅샷
   };
   // H0에서 시작 → H1~H5 승급 5회가 정확히 T1~T5를 만든다(측정도 동일, Codex P2). 측정은 생존/화력만 보정.
   sq.tier = 0; sq.cruisers = 0;
@@ -879,8 +880,8 @@ function campaign25Update(dt) {
     if (!act) continue;
     switch (act.kind) {
       case 'regionEnter': enterCampaignRegion(ev.region, t); break;
-      // 보스 사건이 이미 다른 보스 교전 중에 오면 버리지 않고 큐에 담아 현재 보스 처치 후 등장(Codex P1: 저화력 런 보스 누락 방지).
-      case 'bossStart': if (cl.bossActive) cl.pendingBoss = { region: ev.region, boss: ev.boss }; else spawnCampaignBoss(ev.region, ev.boss, t); break;
+      // 보스 사건이 이미 다른 보스 교전 중에 오면 버리지 않고 FIFO 큐에 담아 순서대로 등장(Codex P1: 겹침 다수여도 보스 누락 없음).
+      case 'bossStart': if (cl.bossActive) cl.bossQueue.push({ region: ev.region, boss: ev.boss }); else spawnCampaignBoss(ev.region, ev.boss, t); break;
       case 'hullTier': campaignHullTier(ev.tier, t); break;
       case 'equipWing': equipCampaignWing(); break;
       case 'resonanceReady': activateCampaignResonance(); break;
@@ -897,10 +898,10 @@ function campaign25Update(dt) {
     cl.bossActive = false; r.phase = 'track'; w.phase = 'track';
     r.bosses = []; w.bosses = []; r.boss = null; w.boss = null;
     if (res && res.boss === 'B7') { finishCampaign25('clear'); return; }
-    if (cl.pendingBoss) { const pb = cl.pendingBoss; cl.pendingBoss = null; spawnCampaignBoss(pb.region, pb.boss, t); }   // 대기 중인 지역 보스 등장(P1)
+    if (cl.bossQueue.length) { const pb = cl.bossQueue.shift(); spawnCampaignBoss(pb.region, pb.boss, t); }   // 대기 큐의 다음 지역 보스 등장(P1 FIFO)
     else refillCoreLoopTrack();
   }
-  if (cl.resultPending && ((!cl.bossActive && !cl.pendingBoss) || t > cl.cfg.totalSec + 120)) {
+  if (cl.resultPending && ((!cl.bossActive && cl.bossQueue.length === 0) || t > cl.cfg.totalSec + 120)) {
     finishCampaign25(cl.bossesKilled >= 6 ? 'clear' : 'timeout');
   }
 }
@@ -918,7 +919,7 @@ function finishCampaign25(reason = 'clear') {
   snap.campaignReason = reason;
   window.__nfRunMetrics = snap;
   state = 'done';
-  if (r.campaign25.mode === 'play') ui.showCoreLoopResult(snap, r.squad, { ...cl, buildId: cl.buildId });
+  if (cl.mode === 'play') showCoreLoopResult(snap, r.squad, cl);   // 로컬 헬퍼가 ui용 객체를 구성(Codex P2: ui 직접 3인자 호출 금지)
 }
 
 /** 지휘 프레임 자동 스킬을 실제 전투 행동으로 발동(RW-C, G1-05). */

@@ -27,9 +27,11 @@ test('G2-03: 지역 진입·지역 보스가 사건에서 배선(regionEnter/bos
 });
 
 test('G2-07: 미완 런타임 경로 보강(Codex G2-A 리뷰 반영)', () => {
-  // P1: 보스 교전 중 다음 보스 사건은 버리지 않고 큐잉 → 처치 후 등장(저화력 런 보스 누락 방지).
-  assert.ok(mainSrc.includes('cl.pendingBoss = { region: ev.region, boss: ev.boss }'), 'P1: 보스 사건 큐잉');
-  assert.ok(mainSrc.includes('if (cl.pendingBoss)') && mainSrc.includes('cl.pendingBoss = null; spawnCampaignBoss'), 'P1: 처치 후 대기 보스 등장');
+  // P1: 보스 교전 중 다음 보스 사건은 버리지 않고 FIFO 큐잉 → 처치 후 순서대로 등장(겹침 다수여도 누락 없음).
+  assert.ok(mainSrc.includes('cl.bossQueue.push({ region: ev.region, boss: ev.boss })'), 'P1: 보스 사건 FIFO 큐잉');
+  assert.ok(mainSrc.includes('cl.bossQueue.shift()') && mainSrc.includes('cl.bossQueue.length'), 'P1: 처치 후 큐의 다음 보스 등장');
+  // P2: play 결과는 로컬 showCoreLoopResult로(ui 직접 3인자 호출 금지 → 크래시 방지).
+  assert.ok(mainSrc.includes('showCoreLoopResult(snap, r.squad, cl)') && !mainSrc.includes('ui.showCoreLoopResult(snap, r.squad'), 'P2: 결과 UI 올바른 호출');
   // P2: 내구도 소진이 25분 결과로 종료(coreLoop처럼 특수처리).
   assert.ok(mainSrc.includes("if (r.campaign25) { finishCampaign25('hull'); return; }"), 'P2: hull 사망 → 캠페인 결과');
   assert.ok(mainSrc.includes("w.onHullDepleted = () => finishCampaign25('hull')"), 'P2: hull 콜백이 결과 종료');
