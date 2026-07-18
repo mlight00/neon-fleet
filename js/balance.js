@@ -436,6 +436,14 @@ export const BAL = {
       carrier: { doctrine: 'swarm',  name: '캐리어', icon: '🛰', glow: '#3fd0f5', auto: { intervalSec: 8, name: '호위 동기화', volleyMult: 1.5 } },
       phase:   { doctrine: 'phase',  name: '페이즈', icon: '◈', glow: '#b44cff', auto: { flowThreshold: 100, name: '위상 돌파', dashInvuln: 0.6 } },
     },
+    // 사람 플레이 생존 곡선(Codex 관찰: 초보가 1:15 사망). 초반 유예 + 시간 램프로 8분 완주 가능하게.
+    play: {
+      introSec: 55,         // 첫 구간: 사격 적 없이 이동·크리스탈 수집만(조작 학습)
+      graceSec: 150,        // 이 시각 이전엔 기함 내구도 피해 경감(조작 학습 유예)
+      graceDmgMult: 0.25,   // 유예 중 내구도 피해 배수
+      rampMidSec: 150,      // 스트림 밀도 램프: <150s 경량(1기), <320s 중간(2기), 이후 최대(3기)
+      rampLateSec: 320,
+    },
     // 보스 TTK 목표(§5.8). 실제 조정은 boss 계수 + 패턴, HP·탄수만 증가 금지.
     // 하네스 보스: HP=함대화력×hpPerPower + 초당 피해 상한(minTTKSec). 상한은 고DPS 빌드가 순삭하지 못하게
     //  '취약창을 눌러야 시간이 걸린다'는 §5.8 취지를 측정에서 근사한다 → 세 빌드 TTK가 45~60으로 수렴.

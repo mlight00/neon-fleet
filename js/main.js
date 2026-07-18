@@ -604,6 +604,8 @@ function coreLoopUpdate(dt) {
   if (cl.auto) coreLoopAutopilot(sq, w);                    // 자동 회피는 측정 모드에서만(사람 플레이 조작 보존)
   const { t, events } = tickDirector(cl.director, dt, false);
   cl.metrics.setDuration(t);
+  // 사람 플레이 초반 유예: 조작 학습 구간엔 기함 내구도 피해를 경감(측정 모드는 항상 1).
+  sq._hullDmgMult = (!cl.auto && t < BAL.gate1.play.graceSec) ? BAL.gate1.play.graceDmgMult : 1;
   // 공명 타이머 + 프레임 자동 스킬(실전 발동 — RW-C)
   resonTick(sq.reson, dt);
   const rushStarted = (cl._prevRushT ?? 0) <= 0 && (sq.rushT || 0) > 0;   // 이번 프레임 RUSH 시작(페이즈 프레임 트리거)
@@ -683,13 +685,19 @@ function applyFrameAuto(fr, sq, w) {
  *  램밍(크리처/차저)은 접촉 22피해로 헤드리스 회피가 어려워 제외하고, 회피 가능한 슈터만 쓴다. */
 function refillCoreLoopTrack(elite = false) {
   const r = run, cl = r.coreLoop, base = r.traveled + 340;
-  // 측정 모드=밀집 군집(공명이 여러 표적을 맞혀 기여도 산출). 사람 플레이=완만(내구도 100으로 8분 생존 가능).
+  // 측정 모드=밀집 군집(공명이 여러 표적을 맞혀 기여도 산출). 사람 플레이=완만+시간 램프(초반 경량→후반 증가).
   const dense = !cl || cl.auto;
-  const rows = elite ? 2 : (dense ? 2 : 1), per = elite ? 4 : (dense ? 5 : 3);
-  for (let row = 0; row < rows; row++) {
+  const P = BAL.gate1.play, t = cl ? elapsed(cl.director) : 0;
+  const playPer = t < P.rampMidSec ? 1 : t < P.rampLateSec ? 2 : 3;   // 사람 플레이: 초반 1기 → 중반 2기 → 후반 3기
+  const rows = elite ? 2 : (dense ? 2 : 1), per = elite ? 4 : (dense ? 5 : playPer);
+  const skipShooters = !dense && t < P.introSec;   // 사람 플레이 첫 구간: 사격 적 없이 이동·수집만
+  // 사람 플레이 스트림은 튜토리얼 미러 복제를 끄고(noDup) per가 정확한 적 수가 되게 한다(Codex P2).
+  //  측정 스트림은 기존 복제를 유지(Codex 승인 밀도·수치 보존).
+  if (!skipShooters) for (let row = 0; row < rows; row++) {
     for (let i = 0; i < per; i++) {
-      r.pending.push({ type: elite ? 'turret' : 'weaver', size: 'small',
-        x: 0.18 + 0.64 * (i / (per - 1)), trackY: base + row * (dense ? 360 : 460) });
+      const frac = per > 1 ? i / (per - 1) : 0.5;   // 1기일 때 0/0(NaN) 방지 — 중앙 배치
+      r.pending.push({ type: elite ? 'turret' : 'weaver', size: 'small', noDup: !dense,
+        x: 0.18 + 0.64 * frac, trackY: base + row * (dense ? 360 : 460) });
     }
   }
   // 생존 스트레스: 램밍(접촉 22피해) 크리처 다수 → 최강 함대도 회피 못한 접촉으로 내구도 0 도달(무적 방지 증명).
@@ -824,7 +832,7 @@ function update(dt) {
       // 적 스폰 헬퍼: 난이도 스케일 + 변이(어픽스=섹터 확률) 롤 + 등록
       const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, contentTier, r.rng); w.entities.push(e); };
       // 적 항목은 난이도 비례 복제 스폰(§4.5): 복제본은 좌우 미러 + 세로로 살짝 시차.
-      const dup = copyCount(difficultyLevel, r.tutorial);   // 첫 노드는 최대 2로 제한(logic.copyCount)
+      const dup = it.noDup ? 1 : copyCount(difficultyLevel, r.tutorial);   // 첫 노드는 최대 2로 제한. 코어루프 정밀 스트림은 noDup(정확한 수).
       if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal), w, supplyMult));
       else if (it.type === 'gatePair') {
         const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);

@@ -612,20 +612,22 @@ export class Squad {
       return;
     }
     const S = BAL.gate1.survivability;
-    const amount = hullAmount != null ? hullAmount : (elite ? S.dmgEliteShot : S.dmgNormalShot);
-    const out = resolveHit(this.surv, { amount, onCruiserIndex: (onCruiserIndex != null && onCruiserIndex >= 0) ? onCruiserIndex : null });
+    const base = hullAmount != null ? hullAmount : (elite ? S.dmgEliteShot : S.dmgNormalShot);
+    // 초반 유예(_hullDmgMult)는 '기함 내구도'에만 적용한다. 보호막·순양함 HP는 원피해(base) 그대로(Codex P2).
+    const hullAmt = Math.round(base * (this._hullDmgMult ?? 1));
+    const out = resolveHit(this.surv, { amount: hullAmt, onCruiserIndex: (onCruiserIndex != null && onCruiserIndex >= 0) ? onCruiserIndex : null });
     if (out.absorbedBy === 'shield') {
       world.effects.text(this.x, this.y - 40, '보호막 방어!', COLORS.gateGood);
       world.effects.ring(this.x, this.y, COLORS.gateGood); sfx('shield_pop');
       return;
     }
-    if (out.absorbedBy === 'cruiser') { this.hitCruiser(out.index, amount, world); return; }
+    if (out.absorbedBy === 'cruiser') { this.hitCruiser(out.index, base, world); return; }   // 순양함은 원피해
     // 기함 핵 피격 → 내구도 감소(드론은 그대로) + 짧은 무적(밀집 피격 순삭 방지).
     this.flash = 0.25;
     this.invulnT = Math.max(this.invulnT, BAL.gate1.survivability.hitInvuln ?? 0.5);
-    world.effects.text(this.x, this.y - 40, `-${amount}`, COLORS.danger);
+    world.effects.text(this.x, this.y - 40, `-${hullAmt}`, COLORS.danger);
     world.effects.ring(this.x, this.y, COLORS.danger);
-    world.metrics?.hullDamage(amount);
+    world.metrics?.hullDamage(hullAmt);
     this.onCombatHit(world);
     if (out.dead) { this.dead = true; world.onHullDepleted?.(this); return; }
     this.maybeEmergencyRebuild(world);   // 내구도 위급 시 1회 긴급 재건(§5.6, G1-04)
