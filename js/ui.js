@@ -76,8 +76,8 @@ export const ui = {
 
   showTitle({ best, stage, coins = 0, saveOk, onStart, onHangar, onIntro, onReset, onEndless = null, endlessUnlocked = false, endlessBest = 0 }) {
     panel(`
-      <h1>NEON FLEET</h1>
-      <p>네온 함대</p>
+      <img class="title-lockup" src="assets/art2-webp/branding/title_lockup.webp" alt="NEON FLEET">
+      <p class="title-kor">네온 함대</p>
       <p class="big">최고 기록: 스테이지 ${stage}</p>
       ${endlessUnlocked ? `<p style="font-size:12px;color:#ffd93d;margin:2px 0">🌌 은하 해방 · 무한 원정 최고 섹터 ${endlessBest}</p>` : ''}
       <p style="font-size:12.5px;color:#9fb8d8;margin:10px 0 2px">좌우로 이동해 적과 적 탄환을 피하세요. 공격은 자동입니다.</p>

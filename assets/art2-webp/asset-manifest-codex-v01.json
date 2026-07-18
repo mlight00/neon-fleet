@@ -1,0 +1,812 @@
+{
+  "generated": "2026-07-17",
+  "asset_count": 67,
+  "total_bytes": 11402692,
+  "min_psnr_db": 9.49,
+  "assets": [
+    {
+      "png": "assets/art2/backgrounds/nf2_bg01_helios_far.png",
+      "webp": "assets/art2-webp/backgrounds/nf2_bg01_helios_far.webp",
+      "mode": "quality88",
+      "size": [
+        1024,
+        1536
+      ],
+      "bytes": 135734,
+      "psnr_db": 42.04,
+      "sha256": "07a162e2158354343a33efc4b1d30030fc283e784d9b6564b853d697b0f4f187"
+    },
+    {
+      "png": "assets/art2/backgrounds/nf2_bg01_helios_mid.png",
+      "webp": "assets/art2-webp/backgrounds/nf2_bg01_helios_mid.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        1023,
+        1537
+      ],
+      "bytes": 391378,
+      "psnr_db": 27.81,
+      "sha256": "2bd56448c5190d5d9f96503504148f15215d1d75ff69a6903c8fc2080e714817"
+    },
+    {
+      "png": "assets/art2/backgrounds/nf2_bg02_hive_far.png",
+      "webp": "assets/art2-webp/backgrounds/nf2_bg02_hive_far.webp",
+      "mode": "quality88",
+      "size": [
+        1024,
+        1536
+      ],
+      "bytes": 141372,
+      "psnr_db": 41.25,
+      "sha256": "0b26c6a0f53981d45ceedd21f0aa955ee0aa036a75dcb9b0251639059ad5dc31"
+    },
+    {
+      "png": "assets/art2/backgrounds/nf2_bg02_hive_mid.png",
+      "webp": "assets/art2-webp/backgrounds/nf2_bg02_hive_mid.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        1024,
+        1536
+      ],
+      "bytes": 680428,
+      "psnr_db": 15.72,
+      "sha256": "66f0d060b28e8a57a45356af5c134edc0fa1677f5f1a258e094c46b23f45981d"
+    },
+    {
+      "png": "assets/art2/bosses/b22/B22.png",
+      "webp": "assets/art2-webp/bosses/b22/B22.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        705
+      ],
+      "bytes": 457768,
+      "psnr_db": 33.21,
+      "sha256": "9de2c271a0ed451cc70033661a9298b1531fe3fbe0dcd2561bcb45ba9b184be9"
+    },
+    {
+      "png": "assets/art2/bosses/b22/B22_arm_left.png",
+      "webp": "assets/art2-webp/bosses/b22/B22_arm_left.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        705
+      ],
+      "bytes": 66002,
+      "psnr_db": 15.75,
+      "sha256": "c39ae8b233d8a289dc361c03be56efd3dc8f14b8b016c3a22382abaa1c9b1f23"
+    },
+    {
+      "png": "assets/art2/bosses/b22/B22_arm_right.png",
+      "webp": "assets/art2-webp/bosses/b22/B22_arm_right.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        705
+      ],
+      "bytes": 62692,
+      "psnr_db": 37.42,
+      "sha256": "029e3bc3912d56999d39e8ccd079765386b06831ad82fbc1f0c6684554b7b178"
+    },
+    {
+      "png": "assets/art2/bosses/b22/B22_chassis.png",
+      "webp": "assets/art2-webp/bosses/b22/B22_chassis.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        705
+      ],
+      "bytes": 54942,
+      "psnr_db": 12.9,
+      "sha256": "7bf402e5c822280619c71a16294cb91c3e7eb565a27327cd07fd30a9ed8e055f"
+    },
+    {
+      "png": "assets/art2/bosses/b22/B22_core.png",
+      "webp": "assets/art2-webp/bosses/b22/B22_core.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        705
+      ],
+      "bytes": 30572,
+      "psnr_db": 21.29,
+      "sha256": "eea99b82317dcb394c1e110914a2ed2cbe418b505b962a421861beed73297c31"
+    },
+    {
+      "png": "assets/art2/bosses/b22/B22_crack_mask.png",
+      "webp": "assets/art2-webp/bosses/b22/B22_crack_mask.webp",
+      "mode": "quality88",
+      "size": [
+        768,
+        705
+      ],
+      "bytes": 4064,
+      "psnr_db": 59.61,
+      "sha256": "3ca1fffc4ad2cf9cc539a0304d2a84580a13a96487c6d8051900412e0288a64d"
+    },
+    {
+      "png": "assets/art2/bosses/b22/B22_ring.png",
+      "webp": "assets/art2-webp/bosses/b22/B22_ring.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        705
+      ],
+      "bytes": 263072,
+      "psnr_db": 30.22,
+      "sha256": "2915cc9549912cfaff95cc1cb5a190a47ce04063039783463a5db802604e5593"
+    },
+    {
+      "png": "assets/art2/bosses/b7/B7.png",
+      "webp": "assets/art2-webp/bosses/b7/B7.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        582
+      ],
+      "bytes": 497276,
+      "psnr_db": 31.45,
+      "sha256": "213fe78a5de88e3da666f89b967022b9818e2d90f61bcd55d34c1d6a3d551926"
+    },
+    {
+      "png": "assets/art2/bosses/b7/B7_body.png",
+      "webp": "assets/art2-webp/bosses/b7/B7_body.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        582
+      ],
+      "bytes": 49702,
+      "psnr_db": 37.69,
+      "sha256": "1d90655e5d7a0e172bb4043163e8df3493e6aea8785cf44de83cc3a3a6c965dd"
+    },
+    {
+      "png": "assets/art2/bosses/b7/B7_crown.png",
+      "webp": "assets/art2-webp/bosses/b7/B7_crown.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        582
+      ],
+      "bytes": 88812,
+      "psnr_db": 27.19,
+      "sha256": "2c3876dc9d21ac09b14b575cbd5201ff5108f02c4609cb43053dccf4aaaadbec"
+    },
+    {
+      "png": "assets/art2/bosses/b7/B7_debris_sheet.png",
+      "webp": "assets/art2-webp/bosses/b7/B7_debris_sheet.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        660
+      ],
+      "bytes": 389492,
+      "psnr_db": 35.92,
+      "sha256": "cb3691e9b9256f2d45fa811f42432ad285eb0e68777fb496709f31be57be3feb"
+    },
+    {
+      "png": "assets/art2/bosses/b7/B7_egg_left.png",
+      "webp": "assets/art2-webp/bosses/b7/B7_egg_left.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        582
+      ],
+      "bytes": 166236,
+      "psnr_db": 13.11,
+      "sha256": "c41f323172e56c7827b587e2f0b7df5f9b4a5c3ec725b32347c33cdfdb1ce8c8"
+    },
+    {
+      "png": "assets/art2/bosses/b7/B7_egg_right.png",
+      "webp": "assets/art2-webp/bosses/b7/B7_egg_right.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        582
+      ],
+      "bytes": 164538,
+      "psnr_db": 38.53,
+      "sha256": "9001141164a89cac7f214a52ec63b4ca4b02b49c49c870ae79dd4d439765126a"
+    },
+    {
+      "png": "assets/art2/bosses/b7/B7_escape_core.png",
+      "webp": "assets/art2-webp/bosses/b7/B7_escape_core.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        333,
+        512
+      ],
+      "bytes": 135916,
+      "psnr_db": 27.68,
+      "sha256": "472d7268587b0d599e3bafc28a904f76792b64c4d6212cc40647f196000fe891"
+    },
+    {
+      "png": "assets/art2/bosses/b7/B7_heart.png",
+      "webp": "assets/art2-webp/bosses/b7/B7_heart.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        768,
+        582
+      ],
+      "bytes": 44824,
+      "psnr_db": 20.61,
+      "sha256": "c120e5236160e460ced71caab91ccc01d2424b7a8901104ee79fad03fc1a2395"
+    },
+    {
+      "png": "assets/art2/branding/app_icon.png",
+      "webp": "assets/art2-webp/branding/app_icon.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 250018,
+      "psnr_db": 99.0,
+      "sha256": "a94acbe7f20dc324b8dc4bc5db17a73ea668769a117aee20ec3abd17358833fd"
+    },
+    {
+      "png": "assets/art2/branding/emblem.png",
+      "webp": "assets/art2-webp/branding/emblem.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        274,
+        640
+      ],
+      "bytes": 149052,
+      "psnr_db": 9.6,
+      "sha256": "55ead666a30b0de5fc177585759243d6cfcf58b534d1c355acfac16494a59a46"
+    },
+    {
+      "png": "assets/art2/branding/title_lockup.png",
+      "webp": "assets/art2-webp/branding/title_lockup.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        1600,
+        600
+      ],
+      "bytes": 112166,
+      "psnr_db": 9.49,
+      "sha256": "1b1499eab94cd7134aae6026172eb954829a8024033b02d8e1f6c07ad1d253bc"
+    },
+    {
+      "png": "assets/art2/ships/frames/H2_assault.png",
+      "webp": "assets/art2-webp/ships/frames/H2_assault.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        533,
+        768
+      ],
+      "bytes": 216672,
+      "psnr_db": 30.88,
+      "sha256": "f2b6a70aa3e99019f9db8dcb47ad25003d5d9fc8ab829239f75e923a4b0672aa"
+    },
+    {
+      "png": "assets/art2/ships/frames/H2_base_aligned.png",
+      "webp": "assets/art2-webp/ships/frames/H2_base_aligned.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        533,
+        768
+      ],
+      "bytes": 243710,
+      "psnr_db": 35.3,
+      "sha256": "0a07b7b725841d94ff9683b214f69a2ae721df5f0ebfb29d2610e185b11c2af0"
+    },
+    {
+      "png": "assets/art2/ships/frames/H2_carrier.png",
+      "webp": "assets/art2-webp/ships/frames/H2_carrier.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        533,
+        768
+      ],
+      "bytes": 187638,
+      "psnr_db": 31.99,
+      "sha256": "a1087e47ccfab24b2a2c471329bbe71b48ca3bbce0827cfda51c3dc5ad7fbfde"
+    },
+    {
+      "png": "assets/art2/story/nf2_portrait_echo7.png",
+      "webp": "assets/art2-webp/story/nf2_portrait_echo7.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        467,
+        640
+      ],
+      "bytes": 238026,
+      "psnr_db": 12.15,
+      "sha256": "3fba77b0c2cc471dd8d5e86aa9803ebcc346d587f8344bd3315a8176825743d1"
+    },
+    {
+      "png": "assets/art2/story/nf2_portrait_hive_queen.png",
+      "webp": "assets/art2-webp/story/nf2_portrait_hive_queen.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        448,
+        640
+      ],
+      "bytes": 322872,
+      "psnr_db": 29.32,
+      "sha256": "2e7f016f4129ff43fb50145f8fb2580e15741afc679d5caab34482a28f9e64dd"
+    },
+    {
+      "png": "assets/art2/story/nf2_story_intro_01_cold_wake.png",
+      "webp": "assets/art2-webp/story/nf2_story_intro_01_cold_wake.webp",
+      "mode": "quality88",
+      "size": [
+        1024,
+        1536
+      ],
+      "bytes": 116444,
+      "psnr_db": 43.13,
+      "sha256": "5b550dcb015327e8875e28a33887497d97580d55ece67e1f38cf9763a7b59dc0"
+    },
+    {
+      "png": "assets/art2/story/nf2_story_intro_02_lumen_boot.png",
+      "webp": "assets/art2-webp/story/nf2_story_intro_02_lumen_boot.webp",
+      "mode": "quality88",
+      "size": [
+        1024,
+        1536
+      ],
+      "bytes": 163216,
+      "psnr_db": 42.09,
+      "sha256": "3ddcd2dc7d4a3d7617b36f82a94ef007d1723d785c0f4948c73023b05d00b775"
+    },
+    {
+      "png": "assets/art2/story/nf2_story_intro_03_core_rewrite.png",
+      "webp": "assets/art2-webp/story/nf2_story_intro_03_core_rewrite.webp",
+      "mode": "quality88",
+      "size": [
+        1024,
+        1536
+      ],
+      "bytes": 237142,
+      "psnr_db": 39.62,
+      "sha256": "bbc39b7e2fbd846ca7c8a6e7d98af71cf231b49887d7b7b0f0681da295adba20"
+    },
+    {
+      "png": "assets/art2/story/nf2_story_intro_04_chorus.png",
+      "webp": "assets/art2-webp/story/nf2_story_intro_04_chorus.webp",
+      "mode": "quality88",
+      "size": [
+        1024,
+        1536
+      ],
+      "bytes": 225506,
+      "psnr_db": 39.26,
+      "sha256": "51b08a21cfe16ccbf0d123bfdad67c8cf9afcaba65627ce97ddc650024cdaa50"
+    },
+    {
+      "png": "assets/art2/story/nf2_story_intro_05_launch.png",
+      "webp": "assets/art2-webp/story/nf2_story_intro_05_launch.webp",
+      "mode": "quality88",
+      "size": [
+        1024,
+        1536
+      ],
+      "bytes": 254018,
+      "psnr_db": 40.5,
+      "sha256": "86ad47f7f5b0f5cc71fa2f9b609ba2d852d54da08a6f29c90b9c56a84f23243a"
+    },
+    {
+      "png": "assets/art2/styleC/A1.png",
+      "webp": "assets/art2-webp/styleC/A1.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        257,
+        512
+      ],
+      "bytes": 98608,
+      "psnr_db": 30.84,
+      "sha256": "99e6a75ee590fcf25a17a0ba8831c944d741e4c8d60c31fa2169be36db9b7d0c"
+    },
+    {
+      "png": "assets/art2/styleC/A2.png",
+      "webp": "assets/art2-webp/styleC/A2.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        478,
+        512
+      ],
+      "bytes": 154022,
+      "psnr_db": 34.33,
+      "sha256": "4d56e3b7bc350bfe5fcced9905b3d02cc03c710623b627e5a265fd919e2b614f"
+    },
+    {
+      "png": "assets/art2/styleC/A3.png",
+      "webp": "assets/art2-webp/styleC/A3.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        340,
+        512
+      ],
+      "bytes": 130584,
+      "psnr_db": 29.67,
+      "sha256": "ad675e796218d4a9321bdb255c57ebacc4031aff142a38955dec60bd48d48adb"
+    },
+    {
+      "png": "assets/art2/styleC/A4.png",
+      "webp": "assets/art2-webp/styleC/A4.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        356,
+        512
+      ],
+      "bytes": 131974,
+      "psnr_db": 15.53,
+      "sha256": "7c2ba4a2ce372e3d8386a451ae34710e1998c9a52daa5109c22db7494b2b3198"
+    },
+    {
+      "png": "assets/art2/styleC/A5.png",
+      "webp": "assets/art2-webp/styleC/A5.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        249,
+        512
+      ],
+      "bytes": 121714,
+      "psnr_db": 26.48,
+      "sha256": "912d778c1f8544edead95e3eb23b004c25fcddc2ec98803de8fb1a4aa490283a"
+    },
+    {
+      "png": "assets/art2/styleC/A6.png",
+      "webp": "assets/art2-webp/styleC/A6.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        336,
+        512
+      ],
+      "bytes": 146344,
+      "psnr_db": 29.4,
+      "sha256": "5ae8fa976e7a475e7ff7405e933cd42318d03f34c4ba28b7d85ee2a278aed9ce"
+    },
+    {
+      "png": "assets/art2/styleC/B16.png",
+      "webp": "assets/art2-webp/styleC/B16.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        368,
+        384
+      ],
+      "bytes": 147096,
+      "psnr_db": 15.84,
+      "sha256": "8fa3ae308f48b26edfcaa43174a5039ad2c2226a811c41a11a5ce02f73836b26"
+    },
+    {
+      "png": "assets/art2/styleC/B17.png",
+      "webp": "assets/art2-webp/styleC/B17.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        160,
+        384
+      ],
+      "bytes": 69766,
+      "psnr_db": 23.65,
+      "sha256": "920aa62f9a463093136af0ddf9817616c4085e3ceb5140d7548b767ef1b821ab"
+    },
+    {
+      "png": "assets/art2/styleC/B18.png",
+      "webp": "assets/art2-webp/styleC/B18.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        384,
+        383
+      ],
+      "bytes": 135666,
+      "psnr_db": 31.16,
+      "sha256": "c278da1bad5d90fc66aaea6ac4f8a6be09fdc0c7f348b39f10bce246ecb2bb9d"
+    },
+    {
+      "png": "assets/art2/styleC/B19.png",
+      "webp": "assets/art2-webp/styleC/B19.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        370,
+        384
+      ],
+      "bytes": 172246,
+      "psnr_db": 33.37,
+      "sha256": "915f84ad2c148cdb3aaaabecf77eb3a3b7bec92adc296cd8b348222f028cf34a"
+    },
+    {
+      "png": "assets/art2/styleC/B20.png",
+      "webp": "assets/art2-webp/styleC/B20.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        346,
+        384
+      ],
+      "bytes": 148346,
+      "psnr_db": 32.76,
+      "sha256": "292a1f239efb6d39cc78514c2421ef0cf7048677cb7139a195e32174b5b41b6b"
+    },
+    {
+      "png": "assets/art2/styleC/B21.png",
+      "webp": "assets/art2-webp/styleC/B21.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        129,
+        384
+      ],
+      "bytes": 60630,
+      "psnr_db": 67.17,
+      "sha256": "7372300eb1f2db2eba3f583822a84199929592b05063cf431ded6e8cf808c915"
+    },
+    {
+      "png": "assets/art2/vfx/nf2_vfx_armor_lock.png",
+      "webp": "assets/art2-webp/vfx/nf2_vfx_armor_lock.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        583,
+        640
+      ],
+      "bytes": 357488,
+      "psnr_db": 16.54,
+      "sha256": "6fbb3c25deae64ec08954f804481492484b6999d39734924d86dcff1f8735dcd"
+    },
+    {
+      "png": "assets/art2/vfx/nf2_vfx_boss_armor_break.png",
+      "webp": "assets/art2-webp/vfx/nf2_vfx_boss_armor_break.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        625,
+        640
+      ],
+      "bytes": 383306,
+      "psnr_db": 17.14,
+      "sha256": "b8b93dfb9d46f7ccf696e732c32778057d2497e7d69797562548ddbef682e034"
+    },
+    {
+      "png": "assets/art2/vfx/nf2_vfx_core_ignition.png",
+      "webp": "assets/art2-webp/vfx/nf2_vfx_core_ignition.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        640,
+        640
+      ],
+      "bytes": 367312,
+      "psnr_db": 13.94,
+      "sha256": "ec1f44f295f6a996a76c96b6864fd69b88062d4b1b8aef7ccb42e6679ccd54d8"
+    },
+    {
+      "png": "assets/art2/vfx/nf2_vfx_tier_ascension.png",
+      "webp": "assets/art2-webp/vfx/nf2_vfx_tier_ascension.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        348,
+        640
+      ],
+      "bytes": 146438,
+      "psnr_db": 15.43,
+      "sha256": "dd81228efc5e6dcaee5ae24e9273fbe3f42350b8cca53acad3df0d571d8761d5"
+    },
+    {
+      "png": "assets/art2/vfx/nf2_vfx_weapon_evolution.png",
+      "webp": "assets/art2-webp/vfx/nf2_vfx_weapon_evolution.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        640,
+        635
+      ],
+      "bytes": 283428,
+      "psnr_db": 21.08,
+      "sha256": "c7161d00fd4abf93f9de50fb2fef1ae06b9f22b200906aa1919168e9779f8bd1"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_homing_base.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_homing_base.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        377,
+        512
+      ],
+      "bytes": 208238,
+      "psnr_db": 35.63,
+      "sha256": "f7751160472b53dcfd574bd52668dec823a731a1c9253110de8f9a597fd4e32b"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_homing_siege.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_homing_siege.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        422,
+        512
+      ],
+      "bytes": 238276,
+      "psnr_db": 35.42,
+      "sha256": "661e484c753150f5bdaa4d27d7576c212d432f2ec3a4d959fa45553ca4aa66e6"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_homing_wasp.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_homing_wasp.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        365,
+        512
+      ],
+      "bytes": 172592,
+      "psnr_db": 36.77,
+      "sha256": "1f4c7c33a5130b3077e35264713afc8355f864307724c42d643c5fe2e27d98b2"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_laser_base.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_laser_base.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        317,
+        512
+      ],
+      "bytes": 157564,
+      "psnr_db": 38.17,
+      "sha256": "231da8be82febe09151cfc86450f961be51fb1a5c10f6cc4969874ae6912b230"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_laser_cutter.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_laser_cutter.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        201,
+        512
+      ],
+      "bytes": 91856,
+      "psnr_db": 31.29,
+      "sha256": "0432362207f40363b6d282201f81bd16451e9d06137c3764e54ba0f494dee217"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_laser_prism.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_laser_prism.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        386,
+        512
+      ],
+      "bytes": 193146,
+      "psnr_db": 48.34,
+      "sha256": "fa0d237937e378daaa0698c8ecdd317db8084eb44fb87b7988ded3fa12478a80"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_vulcan_base.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_vulcan_base.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        295,
+        512
+      ],
+      "bytes": 138128,
+      "psnr_db": 21.86,
+      "sha256": "92d799afc7ea055105d649a327e36348ef3dc966b76f007469a6588848101e3f"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_vulcan_needle.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_vulcan_needle.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        173,
+        512
+      ],
+      "bytes": 64052,
+      "psnr_db": 23.25,
+      "sha256": "c39d4f28405e9aab128dc6236de91b6f1e577106bbf0f3f6b71173ca19554461"
+    },
+    {
+      "png": "assets/art2/weapons/mounts/nf2_mount_vulcan_storm.png",
+      "webp": "assets/art2-webp/weapons/mounts/nf2_mount_vulcan_storm.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        512,
+        421
+      ],
+      "bytes": 197178,
+      "psnr_db": 33.45,
+      "sha256": "1261bf73222230896aab1e00338aece49c053474a7e804449b2e702f164c3b31"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_homing_base.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_homing_base.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        164,
+        320
+      ],
+      "bytes": 46044,
+      "psnr_db": 35.1,
+      "sha256": "4e5e2ea18dbacf06082a4eac9b12618fe93061a40e297a89df144b0f5c59d6d7"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_homing_siege.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_homing_siege.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        170,
+        320
+      ],
+      "bytes": 52326,
+      "psnr_db": 37.04,
+      "sha256": "8c8f8b39246b2b0b1304405367f736cbbda95418f8dc5194ebfb0677089a9c54"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_homing_wasp.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_homing_wasp.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        150,
+        320
+      ],
+      "bytes": 37334,
+      "psnr_db": 40.07,
+      "sha256": "1a559bc2a167dc9413be38cfeb7d331aa8f267f40a94b2e22ee6ec4c85b21716"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_laser_base.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_laser_base.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        131,
+        320
+      ],
+      "bytes": 37254,
+      "psnr_db": 35.73,
+      "sha256": "d8cd28cbf888ad768e90d902faa1bafcfe09492dc1a199d6508cb4a032cdff13"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_laser_cutter.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_laser_cutter.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        39,
+        320
+      ],
+      "bytes": 17192,
+      "psnr_db": 64.94,
+      "sha256": "c390228f566372c1b2abc30b402a74208e7351444d2a2b73f25377331843d4c7"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_laser_prism.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_laser_prism.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        190,
+        320
+      ],
+      "bytes": 56218,
+      "psnr_db": 30.74,
+      "sha256": "3e14c1924e9f02531e8c37147a0d4aab580b406d7d2783a7e027eb020252deb5"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_vulcan_base.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_base.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        143,
+        320
+      ],
+      "bytes": 39686,
+      "psnr_db": 34.54,
+      "sha256": "46924348397152318e71a3e4a0ed1f8ca040b24a83055627becbe5f2b02501af"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_vulcan_needle.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_needle.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        29,
+        320
+      ],
+      "bytes": 7596,
+      "psnr_db": 68.18,
+      "sha256": "31818f08cc5867349872dc752721d271d78da8c7a31aa67e557caca8685a3c37"
+    },
+    {
+      "png": "assets/art2/weapons/projectiles/nf2_proj_vulcan_storm.png",
+      "webp": "assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_storm.webp",
+      "mode": "lossless-alpha",
+      "size": [
+        172,
+        320
+      ],
+      "bytes": 51744,
+      "psnr_db": 27.8,
+      "sha256": "8cda9389b3c1bee1f19e13c8443fa6bc8ec97f8c977cf3d0c3979c457fb44136"
+    }
+  ]
+}

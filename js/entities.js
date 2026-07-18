@@ -6,7 +6,7 @@ import { BAL } from './balance.js';
 import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, bankUpgrade, bankDemote, invertGateOp } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
-import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFrame, drawWeaponRig, drawUpgradeSequence, SHIP_DEFS, cruiserBlitScale, droneBlitScale } from './ships.js';
+import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFrame, drawHullFrame, drawWeaponRig, drawUpgradeSequence, weaponProjectileSpriteId, SHIP_DEFS, cruiserBlitScale, droneBlitScale } from './ships.js';
 import { getSprite, bossDefFor } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
 import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult, weaponProjectileColor } from './weapon-evolutions.js';
@@ -151,6 +151,8 @@ export class Squad {
     this.t = 0;
     this.tier = 0;
     this.weapon = 'vulcan';
+    this.previousFrameWeapon = null;
+    this.frameBlend = 1;
     this.weaponLv = 1;
     this.shield = false;
     this.evolvePunch = 0;
@@ -369,6 +371,8 @@ export class Squad {
     if (this.weapon === weapon) {
       this.advanceWeapon(world);   // 같은 색 캡슐: 진행 사다리 한 칸 (베이스Lv→진화선택→진화Lv→초진화선택→초진화Lv→재선택)
     } else {
+      this.previousFrameWeapon = this.weapon;
+      this.frameBlend = 0;
       // 다른 색 캡슐 = 무기 교체. 강화 레벨은 유지(라이덴식). 단, 진화 단계였으면 새 무기는 진화 1단계부터.
       const wasEvolved = !!this.weaponEvolutions[this.weapon];
       this.weapon = weapon;
@@ -600,6 +604,10 @@ export class Squad {
     }
     if (this.evolvePunch > 0) this.evolvePunch -= dt;
     if (this.upgradeFx.t > 0) this.upgradeFx.t = Math.max(0, this.upgradeFx.t - dt);
+    if (this.frameBlend < 1) {
+      this.frameBlend = Math.min(1, this.frameBlend + dt / 0.18);
+      if (this.frameBlend >= 1) this.previousFrameWeapon = null;
+    }
     this.recoil *= Math.pow(0.001, dt); // ≈ *0.7 per frame @60fps
 
     // 반응 실드 모듈: 보호막이 없을 때 주기적으로 재생성
@@ -692,6 +700,7 @@ export class Squad {
     const evoMult = evoLevelMult(this.weaponEvolutions[this.weapon], this.evoLevels[this.weapon], WEB.evoLevelStep);   // 진화 레벨(1→3) 피해 배수
     const se = superEvoEffects(this.weaponEvolutions2[this.weapon], BAL.weaponSuperEvolution);   // 2단계 초진화 배수 (미선택이면 중립)
     const projColor = weaponProjectileColor(evo, this.weaponEvolutions2[this.weapon], WEAPON_COLORS[this.weapon]);   // 진화별 발사체 색 (초진화>진화>기본)
+    const projArt = weaponProjectileSpriteId(this.weapon, evo);
     const superLv = this.superLevels[this.weapon] || 0;
     const seDmg = se.dmgMult * (1 + Math.max(0, superLv - 1) * WEB.superLevelStep);   // 초진화 레벨(1→3) 추가 배수
     const pb = (mfx.pierceBonus || 0) + se.pierceBonus;
@@ -730,20 +739,20 @@ export class Squad {
         if (wasp) {
           // 소형 미사일: count발, 각 md × totalFrac/count (발당 위력↑), 서로 다른 표적 우선
           for (let k = 0; k < wasp.count && alive + k < cap; k++) {
-            const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, this.weaponLv, projColor);
+            const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, this.weaponLv, projColor, projArt);
             mis.wasp = true; mis.r *= 0.8;
             world.bullets.push(mis);
           }
           world.effects.muzzle(this.x, this.y - 14, '#ffd0a0', 6);
         } else if (siege) {
           // 대형 폭발 미사일: 느리지만 강함
-          const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 120, md * siege.dmgMult, this.weaponLv, projColor);
+          const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 120, md * siege.dmgMult, this.weaponLv, projColor, projArt);
           mis.r *= siege.sizeMult; mis.speedMult = siege.speedMult; mis.turnMult = siege.turnMult;
           mis.blast = { radius: siege.blastRadius, frac: siege.blastFrac, bossBonus: siege.bossBonus };
           world.bullets.push(mis);
           world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 8);
         } else {
-          world.bullets.push(new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 240, md, this.weaponLv, projColor));
+          world.bullets.push(new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 240, md, this.weaponLv, projColor, projArt));
           world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 5);
         }
         this.recoil = 1.5;
@@ -774,7 +783,7 @@ export class Squad {
         let pierce = W.laser.pierce[this.weaponLv - 1] + pb + trait.pierce + ascPierce;
         let ldmg = dmg, isCut = false;
         if (cutter) { this.cutterCount = (this.cutterCount || 0) + 1; if (this.cutterCount % cutter.every === 0) { beamW *= cutter.widthMult; pierce += cutter.pierceBonus; ldmg *= cutter.dmgMult; isCut = true; } }
-        const b = new Bullet(this.x + m.x, this.y + m.y, ldmg, { vy: -W.laser.speed, kind: 'laser', pierce, beamW, lv: this.weaponLv, color: projColor });
+        const b = new Bullet(this.x + m.x, this.y + m.y, ldmg, { vy: -W.laser.speed, kind: 'laser', pierce, beamW, lv: this.weaponLv, color: projColor, artId: projArt });
         if (prism) b.split = true;
         if (isCut) b.cutter = cutter.clearRadius;
         world.bullets.push(b);
@@ -788,7 +797,7 @@ export class Squad {
         const vpb = pb + (needle ? (needle.pierceBonus || 0) : 0);   // 니들: 관통 드릴
         const b = new Bullet(this.x + m.x, this.y + m.y, dmg, {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
-          pierce: (vpb + trait.pierce + ascPierce) > 0 ? 1 + vpb + trait.pierce + ascPierce : 0, lv: this.weaponLv, color: projColor,
+          pierce: (vpb + trait.pierce + ascPierce) > 0 ? 1 + vpb + trait.pierce + ascPierce : 0, lv: this.weaponLv, color: projColor, artId: projArt,
         });
         if (needle) b.scale = needle.sizeMult;
         if (storm) b.ricochet = true;
@@ -885,6 +894,7 @@ export class Squad {
     if (units <= 0 || dps <= 0) return;
     const W = BAL.weapons;
     const projColor = weaponProjectileColor(this.weaponEvolutions[this.weapon], this.weaponEvolutions2[this.weapon], WEAPON_COLORS[this.weapon]);   // 진화별 색 (기함과 동일)
+    const projArt = weaponProjectileSpriteId(this.weapon, this.weaponEvolutions[this.weapon]);
     const shotsPerSec = Math.min(20, 3 + units * 1.6);
     this.supportAcc = (this.supportAcc || 0) + shotsPerSec * dt;
     const tgt = this._nearestEnemy(world);   // 순양함은 능동 호위: 가장 가까운 적을 조준 사격
@@ -899,14 +909,14 @@ export class Squad {
       const aim = tgt ? Math.atan2(tgt.x - sx, sy - tgt.y) : 0;   // 조준 각(정면=0), 표적 없으면 위로
       if (this.weapon === 'laser') {
         // 레이저는 세로 빔 — 순양함 조준사격도 옆으로 눕히지 않고 정면(위)으로만 발사 (평행 레이저 버그 방지)
-        world.bullets.push(new Bullet(sx, sy, dmg, { vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv, color: projColor }));
+        world.bullets.push(new Bullet(sx, sy, dmg, { vy: -W.laser.speed, kind: 'laser', pierce: W.laser.pierce[this.weaponLv - 1], beamW: 2 + this.weaponLv, lv: this.weaponLv, color: projColor, artId: projArt }));
       } else if (this.weapon === 'homing') {
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
-        if (alive < W.homing.cap) world.bullets.push(new HomingMissile(sx, sy, (Math.random() - 0.5) * 180, dmg, this.weaponLv, projColor));
+        if (alive < W.homing.cap) world.bullets.push(new HomingMissile(sx, sy, (Math.random() - 0.5) * 180, dmg, this.weaponLv, projColor, projArt));
       } else {
         const spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180;
         const a = aim + (Math.random() - 0.5) * 2 * spread;
-        world.bullets.push(new Bullet(sx, sy, dmg, { vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan', lv: this.weaponLv, color: projColor }));
+        world.bullets.push(new Bullet(sx, sy, dmg, { vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan', lv: this.weaponLv, color: projColor, artId: projArt }));
       }
     }
   }
@@ -1005,6 +1015,7 @@ export class Squad {
     drawFlames(ctx, this.tier, this.t);
     // 중립 함체 + 금빛 지휘 프레임 + 현재 무기 장착물을 분리해, 성장 변화가 실루엣에 남도록 한다.
     blit(ctx, shipBaseSprite(this.tier), 0, 0);
+    drawHullFrame(ctx, this.tier, this.weapon, this.previousFrameWeapon, this.frameBlend);
     drawCommandFrame(ctx, this.tier, this.t);
     drawWeaponRig(
       ctx, this.tier, this.weapon, this.weaponLv, this.t,
@@ -1149,12 +1160,13 @@ function nearestTarget(world, x, y, radius, seen, side = 0) {
 }
 
 export class Bullet {
-  constructor(x, y, damage, { vx = 0, vy = -BAL.bullet.speed, kind = 'vulcan', pierce = 0, beamW = 4, lv = 1, color = null } = {}) {
+  constructor(x, y, damage, { vx = 0, vy = -BAL.bullet.speed, kind = 'vulcan', pierce = 0, beamW = 4, lv = 1, color = null, artId = null } = {}) {
     this.x = x; this.y = y;
     this.vx = vx; this.vy = vy;
     this.damage = damage;
     this.kind = kind;
     this.color = color;        // 진화별 발사체 색 (없으면 draw에서 기본색)
+    this.artId = artId;
     this.lv = lv;              // 무기 레벨 — 레벨별로 탄 디자인이 달라진다
     this.pierce = pierce;      // 남은 관통 수 (레이저)
     this.beamW = beamW;        // 레이저 볼트 굵기 (레벨 비례)
@@ -1231,6 +1243,19 @@ export class Bullet {
   }
 
   draw(ctx) {
+    const art = this.artId && getSprite(this.artId);
+    if (art && this.kind !== 'tracer') {
+      const a = Math.atan2(this.vx, -this.vy);
+      const sc = this.kind === 'laser' ? 0.58 + this.lv * 0.08 : 0.38 + this.lv * 0.07;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(a);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.9;
+      blit(ctx, art, 0, 0, sc * (this.scale || 1));
+      ctx.restore();
+      return;
+    }
     if (this.kind === 'laser') {
       this.drawLaser(ctx);
     } else if (this.kind === 'tracer') {
@@ -1256,7 +1281,7 @@ export class Bullet {
       if (t) {
         const ang = Math.atan2(t.x - this.x, -(t.y - this.y));
         const child = new Bullet(this.x, this.y, this.damage * WE.vulcan_storm.ricochetFrac, {
-          vx: Math.sin(ang) * BAL.weapons.vulcan.speed, vy: -Math.cos(ang) * BAL.weapons.vulcan.speed, kind: 'vulcan', lv: this.lv, color: this.color,
+            vx: Math.sin(ang) * BAL.weapons.vulcan.speed, vy: -Math.cos(ang) * BAL.weapons.vulcan.speed, kind: 'vulcan', lv: this.lv, color: this.color, artId: this.artId,
         });
         if (bouncesLeft > 0) { child.ricochet = true; child.bounces = bouncesLeft; }   // 남은 튕김 계승
         world.bullets.push(child);
@@ -1270,7 +1295,7 @@ export class Bullet {
         if (t && t !== world.boss) {   // 보스 분열 제외
           const ang = Math.atan2(t.x - this.x, -(t.y - this.y));
           world.bullets.push(new Bullet(this.x, this.y, this.damage * WE.laser_prism.splitFrac, {
-            vx: Math.sin(ang) * BAL.weapons.laser.speed, vy: -Math.cos(ang) * BAL.weapons.laser.speed, kind: 'laser', beamW: 4, lv: this.lv, pierce: WE.laser_prism.splitPierce ?? 0, color: this.color,
+            vx: Math.sin(ang) * BAL.weapons.laser.speed, vy: -Math.cos(ang) * BAL.weapons.laser.speed, kind: 'laser', beamW: 4, lv: this.lv, pierce: WE.laser_prism.splitPierce ?? 0, color: this.color, artId: this.artId,
           }));
         }
       }
@@ -1280,7 +1305,7 @@ export class Bullet {
 
 // ───────────────────────── 호밍 미사일 (금색, 유도)
 export class HomingMissile {
-  constructor(x, y, vx0, damage, lv = 1, color = null) {
+  constructor(x, y, vx0, damage, lv = 1, color = null, artId = null) {
     this.x = x; this.y = y;
     this.vx = vx0;
     this.vy = -BAL.weapons.homing.speedFrom;
@@ -1288,6 +1313,7 @@ export class HomingMissile {
     this.damage = damage;
     this.kind = 'homing';
     this.color = color;   // 진화별 발사체 색 (없으면 기본 금색)
+    this.artId = artId;
     this.lv = lv;
     this.r = 3.5 + lv * 1.2;    // 레벨이 오르면 미사일 자체가 커짐
     this.trailMax = 3 + lv * 2; // 꼬리 길이도 증가
@@ -1358,6 +1384,13 @@ export class HomingMissile {
     ctx.translate(this.x, this.y);
     ctx.rotate(Math.atan2(this.vx, -this.vy)); // 진행 방향으로 회전
     const r = this.r;
+    const art = this.artId && getSprite(this.artId);
+    if (art) {
+      ctx.globalCompositeOperation = 'lighter';
+      blit(ctx, art, 0, 0, (this.wasp ? 0.4 : this.blast ? 0.75 : 0.52) + this.lv * 0.04);
+      ctx.restore();
+      return;
+    }
     if (this.lv === 1) {
       // Lv1: 소형 로켓 (원형 탄두)
       ctx.fillStyle = c;

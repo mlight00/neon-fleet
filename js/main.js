@@ -3,7 +3,7 @@ import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, COLORS, glow } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects } from './entities.js';
-import { bossDefById } from './sprites.js';
+import { bossDefById, preloadBossArt } from './sprites.js';
 import { maybeAffix } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, superEvolutionOptions, evolutionDef } from './weapon-evolutions.js';
@@ -12,7 +12,7 @@ import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, progressPatch } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, progressPatch, bossCountFor } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -491,11 +491,12 @@ function update(dt) {
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
       setBgmIntensity(0.86); playBgm('boss'); // 보스 BGM으로 크로스페이드
-      // 보스 정체성 = 캠페인/엔드리스 순서(§6.2). 다중 수는 bossTier(섹터2→2기·섹터3+→3기). B22는 항상 단독.
+      // 보스 정체성 = 캠페인/엔드리스 순서(§6.2). 서사형 보스 B7/B22는 항상 단독.
       const { bossTier } = r.progression;
       const bossId = campaignBossId(r.sector, r.mode, BAL.campaign.bosses, BAL.campaign.endlessBosses);
-      const isArbiter = bossDefById(bossId).id === 'B22';
-      const bossN = isArbiter ? 1 : (bossTier >= BAL.boss.multiFromSector3 ? 3 : bossTier >= BAL.boss.multiFromSector2 ? 2 : 1);
+      const resolvedBossId = bossDefById(bossId).id;
+      preloadBossArt(resolvedBossId); // 등장 이동 시간 동안 전용 레이어를 지연 로드
+      const bossN = bossCountFor(resolvedBossId, bossTier, BAL.boss);
       const hpCap = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
       const totalMult = bossN > 1 ? BAL.boss.multiTotalMult : 1;                 // 다중 총 HP 배수(각=이/보스수)
       r.bosses = [];

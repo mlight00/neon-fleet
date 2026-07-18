@@ -27,3 +27,8 @@ assets/styleC/_backup_offcenter/
 # 아트 소스(나노바나나 원본) — 처리본만 assets/styleC 커밋
 작업중_아트에셋/
 assets/Gemini_Generated_Image_*.png
+
+# FORGED LIGHT 제작 원본·무손실 런타임 대체본(로컬 보관)
+# 공개 게임은 경량 assets/art2-webp/만 사용한다.
+source/
+assets/art2/

@@ -6,6 +6,7 @@ import { bossDefFor, bossDefById, getSprite } from './sprites.js';
 import { EnemyShot, Creature } from './entities.js';
 
 const AR = () => BAL.neonArbiter;
+function blitIf(ctx, sprite, x, y, scale = 1) { if (sprite) blit(ctx, sprite, x, y, scale); }
 
 export class Boss {
   constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1, bossIdOverride = null) {
@@ -382,6 +383,106 @@ export class Boss {
   }
 }
 
+// ── B7 하이브 퀸: 여러 마리 복제가 아니라 부위가 차례로 파괴되는 단일 최종 보스 ──
+export class HiveQueen extends Boss {
+  constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1) {
+    super(logicalW, rateMult, stage, sizeMul, 'B7');
+    this.hivePhase = 1; // 1 산란낭 → 2 왕관 → 3 심장 → 4 탈출 코어
+    this.phaseFlashT = 0;
+  }
+
+  sprite() { return getSprite('B7') || super.sprite(); }
+
+  _updateHivePhase(world) {
+    const ratio = this.hp / this.maxHp;
+    const next = ratio > 0.68 ? 1 : ratio > 0.38 ? 2 : ratio > 0.12 ? 3 : 4;
+    if (next === this.hivePhase) return;
+    this.hivePhase = next;
+    this.phaseFlashT = 0.75;
+    if (next >= 2) this.minionT = Infinity; // 산란낭 파괴 뒤에는 소환 대신 직접 패턴으로 전환
+    const labels = ['', '', '산란낭 파괴 · 왕관 방어', '왕관 파괴 · 심장 노출', '탈출 코어 분리'];
+    world.effects.text(this.x, this.y - 72, labels[next], next >= 3 ? '#ff9c41' : '#ff79c8', 17);
+    world.effects.burst(this.x, this.y, '#ff4cd2', 28, 220);
+    world.effects.ring(this.x, this.y, '#ff9c41');
+    world.effects.flash(next === 4 ? 0.32 : 0.2);
+  }
+
+  update(dt, world) {
+    this._updateHivePhase(world);
+    if (this.phaseFlashT > 0) this.phaseFlashT = Math.max(0, this.phaseFlashT - dt);
+    super.update(dt, world);
+    if (this.hivePhase === 4 && this.y >= this.targetY) {
+      // 마지막은 큰 탄막 대신 빠른 추격 코어가 좌우 안전지대를 흔든다.
+      this.x = Math.max(42, Math.min(this.logicalW - 42, this.homeX + Math.sin(this.t * 2.4) * this.logicalW * 0.32));
+    }
+  }
+
+  fireSignature(world) {
+    if (this.hivePhase === 1) { super.fireSignature(world); return; }
+    const B = BAL.boss;
+    const base = { r: 6, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin, color: '#ff79c8', shape: 'orb' };
+    if (this.hivePhase === 2) {
+      // 왕관 방어: 회전 고리에서 플레이어 방향 약 60도는 비워 읽을 수 있는 탈출구를 만든다.
+      this.fanT = this.interval(B.fanInterval * 0.82);
+      const gap = Math.atan2(world.squad.x - this.x, world.squad.y - this.y);
+      for (let i = 0; i < 18; i++) {
+        const a = (i / 18) * Math.PI * 2 + this.t * 0.35;
+        const d = Math.abs(((a - gap + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+        if (d < Math.PI / 6) continue;
+        world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * 145, Math.cos(a) * 145, base));
+      }
+      return;
+    }
+    if (this.hivePhase === 3) {
+      // 심장 노출: 현재 위치를 읽고 피하는 추적 3연사. 단순 탄 수 증가는 하지 않는다.
+      this.fanT = this.interval(B.fanInterval * 0.68);
+      for (const deg of [-14, 0, 14]) {
+        const aim = Math.atan2(world.squad.x - this.x, world.squad.y - this.y) + deg * Math.PI / 180;
+        world.spawnEnemyBullet(new EnemyShot(this.x, this.y + 22, Math.sin(aim) * 220, Math.cos(aim) * 220, { ...base, r: 7, color: '#ff9c41', shape: 'needle' }));
+      }
+      return;
+    }
+    this.fanT = this.interval(0.72);
+    const aim = Math.atan2(world.squad.x - this.x, world.squad.y - this.y);
+    for (const deg of [-7, 0, 7]) {
+      const a = aim + deg * Math.PI / 180;
+      world.spawnEnemyBullet(new EnemyShot(this.x, this.y + 12, Math.sin(a) * 270, Math.cos(a) * 270, { ...base, r: 5, color: '#fff0a8', shape: 'needle' }));
+    }
+  }
+
+  draw(ctx) {
+    if (this.dying) { this.drawDying(ctx, BAL.bossDeath.duration); return; }
+    const body = getSprite('B7_BODY');
+    if (!body) { super.draw(ctx); return; }
+    const sc = this.drawScale || 1;
+    ctx.save(); ctx.translate(this.x, this.y);
+    if (this.hivePhase < 4) {
+      blit(ctx, body, 0, 0, sc);
+      if (this.hivePhase === 1) {
+        blitIf(ctx, getSprite('B7_EGG_LEFT'), 0, 0, sc);
+        blitIf(ctx, getSprite('B7_EGG_RIGHT'), 0, 0, sc);
+      }
+      if (this.hivePhase <= 2) blitIf(ctx, getSprite('B7_CROWN'), 0, 0, sc);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = this.hivePhase >= 3 ? 0.92 : 0.28 + 0.08 * Math.sin(this.t * 4);
+      blitIf(ctx, getSprite('B7_HEART'), 0, 0, sc);
+      ctx.restore();
+    } else {
+      const core = getSprite('B7_ESCAPE');
+      if (core) {
+        ctx.globalCompositeOperation = 'lighter';
+        blit(ctx, core, 0, 0, 0.82 + Math.sin(this.t * 8) * 0.05);
+      }
+    }
+    if (this.phaseFlashT > 0) {
+      const fx = getSprite('VFX_BOSS_BREAK');
+      if (fx) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = this.phaseFlashT / 0.75; blit(ctx, fx, 0, 0, sc * 1.15); }
+    }
+    ctx.restore();
+  }
+}
+
 // ── B22 네온 아비터: 탄막 안전 틈 graze / 3단 랜스로 STAGGER → BREAK 상호작용형 보스 ──
 // 일반 자동사격도 항상 100% 기본 피해. STAGGER는 처치 시간을 단축하는 보너스(완전 면역 아님).
 export class NeonArbiter extends Boss {
@@ -397,7 +498,7 @@ export class NeonArbiter extends Boss {
     this._lastSafe = [];          // 직전 안전 통로(3회 연속 동일 방지)
     this._lastStaggerAttack = null;
   }
-  sprite() { return null; }        // 전용 Canvas 폴백 (B7 이미지 재사용 금지)
+  sprite() { return getSprite('B22') || null; }
   get intervalMult() { return this.arbiterPhase >= 3 ? AR().enrageIntervalMult : 1; }
 
   _staggerable() { return !this.dead && this.breakT <= 0 && this.staggerCooldownT <= 0; }
@@ -547,6 +648,28 @@ export class NeonArbiter extends Boss {
     const p3 = this.arbiterPhase >= 3;
     ctx.save();
     ctx.translate(this.x, this.y);
+    const chassis = getSprite('B22_CHASSIS');
+    if (chassis) {
+      blit(ctx, chassis, 0, 0, sc);
+      if (this.arbiterPhase <= 2) blitIf(ctx, getSprite('B22_RING'), 0, 0, sc);
+      if (this.arbiterPhase === 1) blitIf(ctx, getSprite('B22_ARM_LEFT'), 0, 0, sc);
+      if (this.arbiterPhase <= 2) blitIf(ctx, getSprite('B22_ARM_RIGHT'), 0, 0, sc);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = broken ? 1 : 0.68 + 0.22 * Math.sin(this.t * 5);
+      blitIf(ctx, getSprite('B22_CORE'), 0, 0, sc);
+      const crack = getSprite('B22_CRACK');
+      if (crack && (this.stagger > 0 || broken)) {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = broken ? 0.9 : Math.min(0.72, this.stagger / AR().staggerMax * 0.72);
+        blit(ctx, crack, 0, 0, sc);
+      }
+      if (broken) {
+        const fx = getSprite('VFX_BOSS_BREAK');
+        if (fx) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45 + 0.35 * Math.sin(this.t * 12); blit(ctx, fx, 0, 0, sc); }
+      }
+      ctx.restore();
+    } else {
     // 외곽 링 (단계3 붉은색, 그 외 청록) — 색+텍스트(HUD) 병행
     ctx.globalAlpha = broken ? 0.4 + 0.4 * Math.sin(this.t * 40) : 0.5;
     ctx.strokeStyle = p3 ? COLORS.danger : '#57e0ff';
@@ -576,6 +699,7 @@ export class NeonArbiter extends Boss {
     }
     ctx.fillStyle = p3 ? COLORS.danger : '#b44cff';
     ctx.beginPath(); ctx.arc(0, 0, R * 0.22, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
     // GAP WALL 경고선 (위험 슬롯에 세로 맥동선) — 실탄 발사 전 시각 구분
     if (this.warning) {
@@ -597,7 +721,7 @@ export class NeonArbiter extends Boss {
 /** 보스 생성: bossIdOverride(캠페인/엔드리스 순서)가 있으면 그 ID로, 없으면 로스터 순환. B22=네온 아비터(단독). */
 export function makeBoss(logicalW, rateMult, stage, sizeMul = 1, bossIdOverride = null) {
   const def = bossIdOverride ? bossDefById(bossIdOverride) : bossDefFor(stage);
-  return def.id === 'B22'
-    ? new NeonArbiter(logicalW, rateMult, stage, sizeMul)
-    : new Boss(logicalW, rateMult, stage, sizeMul, bossIdOverride);
+  if (def.id === 'B22') return new NeonArbiter(logicalW, rateMult, stage, sizeMul);
+  if (def.id === 'B7') return new HiveQueen(logicalW, rateMult, stage, sizeMul);
+  return new Boss(logicalW, rateMult, stage, sizeMul, bossIdOverride);
 }

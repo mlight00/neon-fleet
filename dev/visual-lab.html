@@ -58,12 +58,12 @@
 <div class="note" id="note"></div>
 
 <script type="module">
-import { SHIP_DEFS, CRUISER_VISUAL_W, DRONE_VISUAL_W, cruiserBlitScale, droneBlitScale,
-         shipBaseSprite, shipSprite, drawCommandFrame, drawWeaponRig, drawDeckLights, drawFlames } from '../js/ships.js';
+import { SHIP_DEFS, CRUISER_VISUAL_SIZE, DRONE_VISUAL_SIZE, cruiserBlitScale, droneBlitScale,
+         shipBaseSprite, shipSprite, drawCommandFrame, drawHullFrame, drawWeaponRig, drawDeckLights, drawFlames } from '../js/ships.js';
 import { preloadStyle } from '../js/sprites.js';
 
 const NAMES = ['H0 스카우트', 'H1 인터셉터', 'H2 스트라이커', 'H3 캐리어', 'H4 드레드노트', 'H5 타이탄'];
-const TARGET_W = [34, 50, 68, 88, 112, 140];
+const TARGET_SIZE = [34, 50, 68, 88, 112, 140];
 const MIN_RATIO = [1.0, 1.4, 1.8, 2.3, 3.0, 3.5];
 
 const S = { core: true, mounts: true, frame: true, hideEscort: false, weapon: 'vulcan', bothBg: true };
@@ -96,7 +96,7 @@ function drawCell(canvas, tier, light) {
   drawFlames(ctx, tier, 0.6);
   const drew = blit(ctx, shipBaseSprite(tier), 0, 0);
   if (!drew) fallbackBox(ctx, d.visualWidth, d.visualHeight, light ? '#12202e' : '#3ff5e0');
-  if (S.frame) drawCommandFrame(ctx, tier, 0.6);
+  if (S.frame) { drawHullFrame(ctx, tier, S.weapon); drawCommandFrame(ctx, tier, 0.6); }
   if (S.mounts) {
     drawWeaponRig(ctx, tier, S.weapon, 3, 0.6, null, null);
     drawDeckLights(ctx, tier, 0.6);
@@ -117,44 +117,44 @@ function drawCell(canvas, tier, light) {
     // 순양함 1척 (실제 blit 배율)
     const cxx = 300, cyy = cy - 34;
     ctx.save(); ctx.translate(cxx, cyy);
-    if (!blit(ctx, shipSprite(1, S.weapon), 0, 0, cruiserBlitScale())) fallbackBox(ctx, CRUISER_VISUAL_W, CRUISER_VISUAL_W, '#57e0ff');
+    if (!blit(ctx, shipSprite(1, S.weapon), 0, 0, cruiserBlitScale())) fallbackBox(ctx, CRUISER_VISUAL_SIZE, CRUISER_VISUAL_SIZE, '#57e0ff');
     ctx.restore();
     ctx.fillStyle = light ? '#12202e' : '#9fb8d8'; ctx.font = 'bold 10px Pretendard, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(`순양함 ${CRUISER_VISUAL_W}px`, cxx, cyy + 30);
+    ctx.fillText(`순양함 긴 변 ${CRUISER_VISUAL_SIZE}px`, cxx, cyy + 30);
 
     // 드론 6기
     const scout = shipSprite(0, S.weapon);
     for (let i = 0; i < 6; i++) {
       const dx = 262 + (i % 3) * 34, dy = cy + 40 + Math.floor(i / 3) * 26;
       ctx.save(); ctx.translate(dx, dy);
-      if (!blit(ctx, scout, 0, 0, droneBlitScale())) fallbackBox(ctx, DRONE_VISUAL_W, DRONE_VISUAL_W, '#3ff5e0');
+      if (!blit(ctx, scout, 0, 0, droneBlitScale())) fallbackBox(ctx, DRONE_VISUAL_SIZE, DRONE_VISUAL_SIZE, '#3ff5e0');
       ctx.restore();
     }
     ctx.fillStyle = light ? '#12202e' : '#9fb8d8';
-    ctx.fillText(`드론 6기 · 각 ${DRONE_VISUAL_W}px`, 296, cy + 96);
+    ctx.fillText(`드론 6기 · 긴 변 ${DRONE_VISUAL_SIZE}px`, 296, cy + 96);
   }
 
-  // 실제 폭 눈금자
+  // 실제 긴 변(세로) 눈금자
   ctx.strokeStyle = light ? 'rgba(18,32,46,.5)' : 'rgba(63,245,224,.45)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(cx - d.visualWidth / 2, CELL_H - 14); ctx.lineTo(cx + d.visualWidth / 2, CELL_H - 14); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + d.visualWidth / 2 + 8, cy - d.visualSize / 2); ctx.lineTo(cx + d.visualWidth / 2 + 8, cy + d.visualSize / 2); ctx.stroke();
   ctx.fillStyle = light ? '#12202e' : '#3ff5e0'; ctx.font = '10px Pretendard, sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(`${d.visualWidth}px`, cx, CELL_H - 4);
+  ctx.fillText(`${d.visualSize}px`, cx, CELL_H - 4);
 }
 
 function render() {
   const out = document.getElementById('out');
   out.innerHTML = '';
-  const cw = SHIP_DEFS[1].visualWidth * cruiserBlitScale();
+  const cw = SHIP_DEFS[1].visualSize * cruiserBlitScale();
   const bgs = S.bothBg ? ['dark', 'light'] : ['dark'];
   SHIP_DEFS.forEach((d, t) => {
     bgs.forEach((bg) => {
       const row = document.createElement('div');
       row.className = 'row ' + bg;
-      const ratio = d.visualWidth / cw;
+      const ratio = d.visualSize / cw;
       const pass = ratio >= MIN_RATIO[t] - 1e-9;
       row.innerHTML = `<div class="meta">
         <b>${NAMES[t]}</b><br>
-        표시 폭 <span class="num">${d.visualWidth}px</span> (목표 ${TARGET_W[t]})<br>
+        표시 긴 변 <span class="num">${d.visualSize}px</span> (목표 ${TARGET_SIZE[t]}) · 폭 ${d.visualWidth}px<br>
         피격 핵 R <span class="num">${d.hitCoreRadius}</span> · 대형 R <span class="num">${d.formationRadius}</span><br>
         포대 <span class="num">${d.weaponMounts.length}</span> · 엔진 <span class="num">${d.engineMounts.length}</span><br>
         순양함 대비 <span class="${pass ? 'ok' : 'warn'}">${ratio.toFixed(2)}배</span> (≥${MIN_RATIO[t]}) ${pass ? '✔' : '✖'}
@@ -167,8 +167,8 @@ function render() {
     });
   });
   document.getElementById('note').innerHTML =
-    `순양함 실제 렌더 폭 <b>${cw.toFixed(1)}px</b> · 드론 <b>${(SHIP_DEFS[0].visualWidth * droneBlitScale()).toFixed(1)}px</b><br>
-     시각 폭은 H0→H5에서 ${(SHIP_DEFS[5].visualWidth / SHIP_DEFS[0].visualWidth).toFixed(2)}배 커지지만,
+    `순양함 실제 렌더 긴 변 <b>${cw.toFixed(1)}px</b> · 드론 <b>${(SHIP_DEFS[0].visualSize * droneBlitScale()).toFixed(1)}px</b><br>
+     표시 긴 변은 H0→H5에서 ${(SHIP_DEFS[5].visualSize / SHIP_DEFS[0].visualSize).toFixed(2)}배 커지지만,
      피격 핵은 ${(SHIP_DEFS[5].hitCoreRadius / SHIP_DEFS[0].hitCoreRadius).toFixed(2)}배만 커집니다 — 위엄은 키우되 회피는 그대로.`;
 }
 

@@ -75,6 +75,8 @@ html, body {
 }
 
 #overlay h2 { font-size: 22px; margin-bottom: 10px; }
+#overlay .title-lockup { display:block; width:min(330px,82vw); max-height:124px; object-fit:contain; margin:0 auto 2px; filter:drop-shadow(0 0 18px rgba(80,213,255,.28)); }
+#overlay .title-kor { margin-top:0; letter-spacing:.18em; color:#b7c9d8; }
 #overlay p { font-size: 14px; line-height: 1.7; margin: 6px 0; color: #9fb8d8; }
 #overlay .big { font-size: 18px; color: #ffd93d; text-shadow: 0 0 10px rgba(255, 217, 61, 0.6); }
 #overlay .record { color: #ff7ce0; font-weight: bold; }
@@ -143,6 +145,8 @@ html, body {
     linear-gradient(155deg, #081325, #02040a 64%);
   background-size: 110px 130px, 160px 170px, 210px 190px, auto;
 }
+.intro-art { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; }
+.intro-portrait { position:absolute; z-index:2; right:4%; top:8%; width:min(36vw,210px); max-height:46%; object-fit:contain; filter:drop-shadow(0 0 24px rgba(128,215,255,.28)); opacity:.9; }
 .intro-orbit {
   position: absolute;
   width: min(70vw, 420px); aspect-ratio: 1;
@@ -190,6 +194,7 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .intro-shot, #intro { transition-duration: .01ms !important; }
   .intro-ship b { opacity: .35; }
+  .intro-shot { transform:none !important; }
 }
 
 /* 타이틀 하단 링크 버튼 */

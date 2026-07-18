@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEON FLEET — FORGED LIGHT 런타임 아트 검증</title>
+<style>
+  :root { color-scheme: dark; font-family: Pretendard, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; color: #d6e8ff; background: #050811; }
+  h1 { margin: 0; color: #49f5df; font-size: 22px; letter-spacing: .06em; }
+  h2 { margin: 28px 0 10px; color: #ffd96a; font-size: 16px; }
+  p { margin: 6px 0 18px; color: #8ea7c7; font-size: 12px; line-height: 1.7; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px; }
+  .card { min-height: 176px; padding: 12px; overflow: hidden; border: 1px solid #233551;
+          border-radius: 12px; background: linear-gradient(145deg,#0a1020,#060912); }
+  .card b { display: block; margin-bottom: 8px; color: #bfe4ff; font-size: 12px; }
+  .sprite { display: flex; align-items: center; justify-content: center; min-height: 130px; }
+  .sprite img { max-width: 100%; max-height: 150px; object-fit: contain; }
+  .ship-row { display: flex; align-items: end; justify-content: space-around; min-height: 190px; gap: 20px;
+              padding: 18px; overflow-x: auto; border: 1px solid #233551; border-radius: 12px;
+              background: radial-gradient(circle at 50% 50%,#101c36,#060912 68%); }
+  .ship { min-width: 150px; text-align: center; }
+  .ship .stage { margin-bottom: 10px; color: #ffd96a; font-size: 12px; }
+  .ship img { display: block; margin: auto; object-fit: contain; }
+  .weapon { display: grid; grid-template-rows: 104px 52px auto; align-items: center; text-align: center; }
+  .weapon img.mount { max-height: 96px; }
+  .weapon img.projectile { max-width: 78px; max-height: 44px; }
+  .weapon small { color: #7debdc; }
+  .boss-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 12px; }
+  .boss-card { padding: 12px; border: 1px solid #3a2b59; border-radius: 12px; background: #0a0713; }
+  .boss-card b { display: block; margin-bottom: 8px; color: #ffb2e7; font-size: 12px; }
+  .layers { position: relative; width: 100%; aspect-ratio: 768 / 705; overflow: hidden;
+            background: radial-gradient(circle,#251531,#090711 66%); }
+  .layers.b7 { aspect-ratio: 768 / 582; }
+  .layers img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .escape { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 768 / 582;
+            background: radial-gradient(circle,#251531,#090711 66%); }
+  .escape img { max-width: 42%; max-height: 86%; object-fit: contain; }
+  .status { position: sticky; bottom: 10px; z-index: 5; width: fit-content; margin: 24px auto 0; padding: 8px 16px;
+            border: 1px solid #3ff5e0; border-radius: 999px; color: #3ff5e0; background: rgba(5,8,17,.92); font-size: 12px; }
+  .status.fail { border-color: #ff657f; color: #ff657f; }
+  .jump { display: flex; gap: 8px; margin: 0 0 18px; }
+  .jump a { padding: 6px 10px; border: 1px solid #315175; border-radius: 999px; color: #9ed9ff;
+            text-decoration: none; font-size: 11px; }
+  @media (max-width: 560px) {
+    body { padding: 14px; }
+    .ship-row { justify-content: flex-start; }
+    .grid, .boss-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<h1>FORGED LIGHT 런타임 아트 검증</h1>
+<p>공개 게임과 분리된 개발 전용 화면입니다. 브라우저가 실제로 사용하는 WebP 경로와 정렬 원점을 그대로 검사합니다.</p>
+<nav class="jump" aria-label="검증 구역 바로가기"><a href="#b22-section">B22 단계</a><a href="#b7-section">B7 단계</a></nav>
+
+<h2>기함 계보 — 실제 긴 변 34 / 50 / 68 / 88 / 112 / 140px</h2>
+<div class="ship-row" id="ships"></div>
+
+<h2>무기 9종 — 기본 / 분기 A / 분기 B</h2>
+<div class="grid" id="weapons"></div>
+
+<h2>후반 적 역할 6종</h2>
+<div class="grid" id="enemies"></div>
+
+<h2 id="b22-section">B22 네온 아비터 — 부품 파괴 단계</h2>
+<div class="boss-grid" id="b22"></div>
+
+<h2 id="b7-section">B7 하이브 퀸 — 단일 보스 4단계</h2>
+<div class="boss-grid" id="b7"></div>
+
+<div class="status" id="status">이미지 확인 중…</div>
+
+<script type="module">
+import { ART_PATHS } from '../js/sprites.js';
+
+const path = (id) => '../' + ART_PATHS[id];
+let pending = 0;
+let failed = 0;
+
+function trackedImage(src, className = '') {
+  pending += 1;
+  const img = new Image();
+  img.className = className;
+  img.alt = '';
+  img.addEventListener('load', done, { once: true });
+  img.addEventListener('error', () => { failed += 1; done(); }, { once: true });
+  img.src = src;
+  return img;
+}
+
+function done() {
+  pending -= 1;
+  const el = document.getElementById('status');
+  if (pending > 0) el.textContent = `이미지 확인 중… ${pending}개 남음`;
+  else {
+    el.textContent = failed ? `실패: ${failed}개 이미지` : 'PASS · 런타임 이미지 누락 0';
+    el.classList.toggle('fail', failed > 0);
+    document.documentElement.dataset.qa = failed ? 'fail' : 'pass';
+  }
+}
+
+const shipNames = ['H0 스카우트','H1 인터셉터','H2 스트라이커','H3 캐리어','H4 드레드노트','H5 타이탄'];
+[34,50,68,88,112,140].forEach((size, i) => {
+  const item = document.createElement('div');
+  item.className = 'ship';
+  item.innerHTML = `<div class="stage">${shipNames[i]} · ${size}px</div>`;
+  const img = trackedImage(path(`A${i + 1}`));
+  img.style.width = `${size}px`;
+  img.style.height = `${size}px`;
+  item.append(img);
+  document.getElementById('ships').append(item);
+});
+
+const weaponDefs = [
+  ['발칸 기본','VULCAN_BASE'], ['발칸 니들','VULCAN_NEEDLE'], ['발칸 스톰','VULCAN_STORM'],
+  ['레이저 기본','LASER_BASE'], ['레이저 커터','LASER_CUTTER'], ['레이저 프리즘','LASER_PRISM'],
+  ['호밍 기본','HOMING_BASE'], ['호밍 와스프','HOMING_WASP'], ['호밍 시즈','HOMING_SIEGE'],
+];
+weaponDefs.forEach(([label, id]) => {
+  const card = document.createElement('div');
+  card.className = 'card weapon';
+  card.append(trackedImage(path(`MOUNT_${id}`), 'mount'));
+  card.append(trackedImage(path(`PROJ_${id}`), 'projectile'));
+  const text = document.createElement('small');
+  text.textContent = label;
+  card.append(text);
+  document.getElementById('weapons').append(card);
+});
+
+const enemyNames = ['B16 폭격기','B17 재퍼','B18 오비터','B19 실더','B20 브루드 캐리어','B21 블링커'];
+enemyNames.forEach((label, i) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<b>${label}</b>`;
+  const sprite = document.createElement('div');
+  sprite.className = 'sprite';
+  sprite.append(trackedImage(path(`B${i + 16}`)));
+  card.append(sprite);
+  document.getElementById('enemies').append(card);
+});
+
+function layeredCard(hostId, label, className, ids, opacity = {}) {
+  const card = document.createElement('div');
+  card.className = 'boss-card';
+  card.innerHTML = `<b>${label}</b>`;
+  const stage = document.createElement('div');
+  stage.className = `layers ${className}`;
+  ids.forEach((id) => {
+    const img = trackedImage(path(id));
+    if (opacity[id] != null) img.style.opacity = opacity[id];
+    stage.append(img);
+  });
+  card.append(stage);
+  document.getElementById(hostId).append(card);
+}
+
+layeredCard('b22','1단계 · 고리와 양팔 활성','', ['B22_CHASSIS','B22_RING','B22_ARM_LEFT','B22_ARM_RIGHT','B22_CORE']);
+layeredCard('b22','2단계 · 균열 누적','', ['B22_CHASSIS','B22_RING','B22_ARM_LEFT','B22_ARM_RIGHT','B22_CORE','B22_CRACK'], { B22_CRACK:.72 });
+layeredCard('b22','3단계 · 양팔 무력화 / 코어 노출','', ['B22_CHASSIS','B22_CORE','B22_CRACK'], { B22_CRACK:.9 });
+
+layeredCard('b7','1단계 · 좌우 산란낭','b7', ['B7_BODY','B7_EGG_LEFT','B7_EGG_RIGHT','B7_CROWN','B7_HEART'], { B7_HEART:.28 });
+layeredCard('b7','2단계 · 왕관 방어','b7', ['B7_BODY','B7_CROWN','B7_HEART'], { B7_HEART:.36 });
+layeredCard('b7','3단계 · 심장 노출','b7', ['B7_BODY','B7_HEART']);
+{
+  const card = document.createElement('div');
+  card.className = 'boss-card';
+  card.innerHTML = '<b>4단계 · 탈출 코어 추격</b>';
+  const stage = document.createElement('div');
+  stage.className = 'escape';
+  stage.append(trackedImage(path('B7_ESCAPE')));
+  card.append(stage);
+  document.getElementById('b7').append(card);
+}
+</script>
+</body>
+</html>

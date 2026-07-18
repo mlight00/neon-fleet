@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "asset_count": 68,
+  "decode_failures": 0,
+  "checks_failed": [],
+  "boss_recomposition": {
+    "B22_max_rgba_diff": 0,
+    "B7_max_rgba_diff": 0
+  },
+  "notes": [
+    "Far backgrounds, story panels, app icon, and crack mask are intentionally opaque.",
+    "All other delivered masters require alpha and transparent corners."
+  ]
+}

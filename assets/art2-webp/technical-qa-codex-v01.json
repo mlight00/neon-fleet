@@ -1,0 +1,6 @@
+{
+  "status": "PASS",
+  "count": 67,
+  "min_visible_psnr_db": 38.01,
+  "lossless_alpha_failures": []
+}

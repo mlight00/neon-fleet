@@ -95,6 +95,18 @@ export function campaignBossId(sector, mode, campaignBosses, endlessBosses) {
 }
 
 /**
+ * 한 전투에 동시에 등장하는 보스 수를 결정한다.
+ * 서사형 보스(B7 하이브 퀸, B22 아비터)는 단계별 부위 파괴가 핵심이므로
+ * 난이도 단계와 무관하게 반드시 단독으로 등장한다.
+ */
+export function bossCountFor(bossId, bossTier, bossConfig) {
+  if (bossId === 'B7' || bossId === 'B22') return 1;
+  if (bossTier >= bossConfig.multiFromSector3) return 3;
+  if (bossTier >= bossConfig.multiFromSector2) return 2;
+  return 1;
+}
+
+/**
  * 노드 완료 시 모듈 드래프트 계약 (순수, 지시서 §5.3).
  * combat·hazard=일반 3택, elite=eliteCount택(희귀 보장), 그 외(supply·repair·boss)=없음(null).
  */

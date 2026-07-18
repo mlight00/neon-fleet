@@ -1,6 +1,42 @@
 // 6구역 절차적 배경. 각 구역을 원경/중경/근경 3층으로 그려 패널 이음새 없이 패럴랙스를 만든다.
 import { zoneForSector } from './creative-direction.js';
 
+const BACKDROP_URLS = {
+  heliosFar: 'assets/art2-webp/backgrounds/nf2_bg01_helios_far.webp',
+  heliosMid: 'assets/art2-webp/backgrounds/nf2_bg01_helios_mid.webp',
+  hiveFar: 'assets/art2-webp/backgrounds/nf2_bg02_hive_far.webp',
+  hiveMid: 'assets/art2-webp/backgrounds/nf2_bg02_hive_mid.webp',
+};
+const backdropImages = new Map();
+
+function loadBackdrop(key) {
+  if (backdropImages.has(key) || typeof Image === 'undefined') return;
+  backdropImages.set(key, null);
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => backdropImages.set(key, img);
+  img.onerror = () => backdropImages.set(key, false);
+  img.src = BACKDROP_URLS[key];
+}
+
+export function preloadBackdropArt() { Object.keys(BACKDROP_URLS).forEach(loadBackdrop); }
+
+function drawVerticalArt(ctx, img, w, h, scroll, speed, alpha = 1) {
+  if (!img || !img.width) return false;
+  const tileH = img.height * (w / img.width);
+  const offset = wrap(scroll * speed, tileH);
+  ctx.save(); ctx.globalAlpha = alpha;
+  for (let i = -1; i <= Math.ceil(h / tileH) + 1; i++) {
+    const y = i * tileH - offset;
+    // 매 두 번째 타일을 상하 반전해 경계에서 동일 방향 특징이 반복되는 느낌을 줄인다.
+    if (i % 2) {
+      ctx.save(); ctx.translate(0, y + tileH); ctx.scale(1, -1); ctx.drawImage(img, 0, 0, w, tileH); ctx.restore();
+    } else ctx.drawImage(img, 0, y, w, tileH);
+  }
+  ctx.restore();
+  return true;
+}
+
 function mulberry32(seed) {
   return function rand() {
     let t = seed += 0x6D2B79F5;
@@ -62,6 +98,7 @@ function drawLandmark(ctx, w, h, zone, scroll) {
 }
 
 export function createZoneBackdrop(logicalW) {
+  preloadBackdropArt();
   const fields = Array.from({ length: 6 }, (_, i) => buildField(7429 + i * 1777, logicalW));
   return {
     draw(ctx, logicalH, scroll = 0, sector = 1) {
@@ -72,8 +109,12 @@ export function createZoneBackdrop(logicalW) {
       bg.addColorStop(0, zone.start); bg.addColorStop(0.56, zone.end); bg.addColorStop(1, '#02040a');
       ctx.fillStyle = bg; ctx.fillRect(0, 0, logicalW, logicalH);
 
-      // 원경: 구역 랜드마크와 고정 성운.
-      drawLandmark(ctx, logicalW, logicalH, zone, scroll);
+      const late = sector >= 5;
+      const far = backdropImages.get(late ? 'hiveFar' : 'heliosFar');
+      const mid = backdropImages.get(late ? 'hiveMid' : 'heliosMid');
+      // 새 원경이 로드되기 전/실패한 경우에만 기존 절차적 랜드마크를 폴백으로 사용한다.
+      if (!drawVerticalArt(ctx, far, logicalW, logicalH, scroll, 0.025, 0.92)) drawLandmark(ctx, logicalW, logicalH, zone, scroll);
+      drawVerticalArt(ctx, mid, logicalW, logicalH, scroll, 0.085, 0.72);
 
       // 중경: 작은 파편과 먼지. 속도 0.12.
       ctx.save();
