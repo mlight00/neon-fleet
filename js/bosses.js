@@ -676,10 +676,13 @@ export class NeonArbiter extends Boss {
   damageTakenMult() { return this.breakT > 0 ? AR().breakDamageMult : 1; }
 
   hitByBullet(dmg, world, ctx = null) {
+    // 받는피해 배수는 STAGGER 갱신 '전'에 확정한다 → 이 타격이 BREAK를 유발해도 여기엔 옛 배수를 적용하고
+    //  1.25×는 '다음' 타격부터. 코어루프 클램프 래퍼도 같은 시점의 배수를 미리 읽으므로 예산과 실손실이 일치한다(Codex 5차).
+    const mult = this.damageTakenMult();
     // 3단+ 원본 차지 랜스 직격 → STAGGER +2 (메아리·일반탄 제외, attackId 중복 방지)
     if (ctx && ctx.lance && ctx.stage >= 3 && !ctx.echo) this.addStagger(AR().lanceStagger, world, ctx.attackId);
     this.staggerFromDamage(dmg, world);                        // 누적 피해로 STAGGER (구 근접 회피 대체)
-    super.hitByBullet(dmg * this.damageTakenMult(), world);     // BREAK 중 받는 피해 ×1.25
+    super.hitByBullet(dmg * mult, world);                       // BREAK 중 받는 피해 ×1.25
   }
 
   draw(ctx) {
