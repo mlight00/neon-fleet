@@ -748,28 +748,29 @@ function startCampaign25(opts = {}) {
   const metrics = createRunMetrics({ runId: `campaign25-${mode}-${build.id}`, seed: (Math.random() * 2 ** 31) | 0 });
   const director = createRunDirector(G2, buildCampaign25Schedule(G2));
   w.metrics = metrics; w.reson = reson;
-  w.onHullDepleted = () => metrics.gameOver('hull', elapsed(director));
+  w.onHullDepleted = () => finishCampaign25('hull');   // 내구도 소진 → 25분 결과 종료(regionResults 첨부, Codex P2)
   r.campaign25 = {
     mode, auto, build, buildId: build.id, cfg: G2, director, metrics,
-    region: 0, bossActive: false, bossSpawnT: 0, resonActivated: false, resultShown: false, resultPending: false,
+    region: 0, bossActive: false, bossSpawnT: 0, pendingBoss: null, resonActivated: false, resultShown: false, resultPending: false,
     regionResults: [],        // [{ region, boss, ttk, killed }]
     bossesKilled: 0, deferredEvents: [],
   };
+  // H0에서 시작 → H1~H5 승급 5회가 정확히 T1~T5를 만든다(측정도 동일, Codex P2). 측정은 생존/화력만 보정.
+  sq.tier = 0; sq.cruisers = 0;
   if (auto) {
-    surv.hullMax = surv.hull = BAL.gate1.survivability.measureHullMax;   // 헤드리스 자동회피 보정(측정 전용)
-    sq.count = 70; sq.banked = 260; sq.tier = 2;
-    resonSetLoadout(reson, [startMain, null]);
+    surv.hullMax = surv.hull = BAL.gate1.survivability.measureHullMax;   // 헤드리스 자동회피 보정(측정 전용, tier와 무관)
+    sq.count = 70; sq.banked = 260;
   } else {
-    sq.tier = 0; sq.banked = 0; sq.cruisers = 0;
+    sq.banked = 0;
     sq.count = w.stats?.startCount ?? BAL.squad.start;
-    resonSetLoadout(reson, [startMain, null]);
   }
+  resonSetLoadout(reson, [startMain, null]);
   r.maxPower = sq.power;
   window.__nfRunMetrics = null;
   enterNode(r.map.cols[0][0]);   // 첫 전투 진입
   r.totalTrack = 1e12;           // 디렉터가 25분 관리(트랙 종료 조기 클리어 방지)
   r.pending = [];
-  refillCoreLoopTrack();
+  // 첫 1분(introSec)은 사격 적 없이 조작 학습(§7.1) → 여기서 스트림을 미리 채우지 않는다. campaign25Update가 intro 후 채운다.
   return r.campaign25;
 }
 
@@ -847,6 +848,14 @@ function pickCampaignFrame() {
   r.world.effects.text(sq.x, sq.y - 74, `지휘 프레임: ${BAL.gate1.frames[id].name}`, BAL.gate1.frames[id].glow, 16);
 }
 
+/** 행동 변화: 무기 레벨업/진화(측정=자동 첫 옵션). 25분에 걸쳐 화력이 성장한다(§1.3). play 선택 UI는 향후. */
+function campaignBehavior(t) {
+  const sq = run.squad, cl = run.campaign25;
+  const steps = coreLoopWeaponSteps(sq);
+  if (!steps.length) return;
+  if (cl.auto) { steps[0].apply(); cl.metrics.choice(t, { behavior: true }); }
+}
+
 /** 25분 캠페인 per-frame 진행. */
 function campaign25Update(dt) {
   const r = run, cl = r.campaign25, w = r.world, sq = r.squad;
@@ -862,19 +871,21 @@ function campaign25Update(dt) {
   if (cl.resonActivated) { const spec = resonTryProc(sq.reson, BAL.gate1.resonance, t); if (spec) spawnResonance(spec, sq, w); }
   const bo0 = r.bosses && r.bosses[0];
   if (bo0) updateBossClamp(bo0, dt);
-  // 지역 전투 스트림 재보충(보스 없을 때 25분 내내 전투 유지)
-  if (r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < 6 && !cl.bossActive) refillCoreLoopTrack();
+  // 지역 전투 스트림 재보충(보스 없을 때 25분 내내 전투 유지). intro(첫 1분)엔 사격 적 스폰 금지(§7.1).
+  if (t >= cl.cfg.introSec && r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < 6 && !cl.bossActive) refillCoreLoopTrack();
   // 디렉터 사건 처리
   for (const ev of events) {
     const act = eventAction25(ev.type);
     if (!act) continue;
     switch (act.kind) {
       case 'regionEnter': enterCampaignRegion(ev.region, t); break;
-      case 'bossStart': spawnCampaignBoss(ev.region, ev.boss, t); break;
+      // 보스 사건이 이미 다른 보스 교전 중에 오면 버리지 않고 큐에 담아 현재 보스 처치 후 등장(Codex P1: 저화력 런 보스 누락 방지).
+      case 'bossStart': if (cl.bossActive) cl.pendingBoss = { region: ev.region, boss: ev.boss }; else spawnCampaignBoss(ev.region, ev.boss, t); break;
       case 'hullTier': campaignHullTier(ev.tier, t); break;
       case 'equipWing': equipCampaignWing(); break;
       case 'resonanceReady': activateCampaignResonance(); break;
       case 'framePick': pickCampaignFrame(); break;
+      case 'behavior': campaignBehavior(t); break;   // 무기 레벨업 → 25분 힘 성장(§1.3)
       case 'result': cl.resultPending = true; break;
       default: cl.deferredEvents.push({ kind: act.kind, t: Math.round(t) }); break;   // fleet/path/apex 등 = G2-B~D 실배선
     }
@@ -886,9 +897,10 @@ function campaign25Update(dt) {
     cl.bossActive = false; r.phase = 'track'; w.phase = 'track';
     r.bosses = []; w.bosses = []; r.boss = null; w.boss = null;
     if (res && res.boss === 'B7') { finishCampaign25('clear'); return; }
-    refillCoreLoopTrack();
+    if (cl.pendingBoss) { const pb = cl.pendingBoss; cl.pendingBoss = null; spawnCampaignBoss(pb.region, pb.boss, t); }   // 대기 중인 지역 보스 등장(P1)
+    else refillCoreLoopTrack();
   }
-  if (cl.resultPending && (!cl.bossActive || t > cl.cfg.totalSec + 120)) {
+  if (cl.resultPending && ((!cl.bossActive && !cl.pendingBoss) || t > cl.cfg.totalSec + 120)) {
     finishCampaign25(cl.bossesKilled >= 6 ? 'clear' : 'timeout');
   }
 }
@@ -1174,7 +1186,7 @@ function update(dt) {
     r.scrollY += 30 * dt;
     for (const b of r.bosses) { if (b.dead) b.deathT += dt; else b.update(dt, w); }  // 죽은 보스는 페이드, 산 보스는 교전 지속
     w.boss = r.bosses.find((b) => !b.dead) || r.bosses[0];   // 호밍 표적 = 살아있는 선두
-    if (r.bosses.every((b) => b.dead) && !r.coreLoop) {      // 코어루프는 자체 finishCoreLoop가 종료 처리(캠페인 연출 미진입)
+    if (r.bosses.every((b) => b.dead) && !r.coreLoop && !r.campaign25) {   // 코어루프·25분캠페인은 자체 종료/재개 처리(캠페인 연출 미진입)
       // 전원 격파 → 파괴 연출 시작
       r.phase = 'bossDeath';
       r.seqT = 0;
@@ -1299,12 +1311,13 @@ function update(dt) {
     r.endT = BAL.run.failOverlayDelay;
   }
   if (r.phase === 'lose' && (r.endT -= dt) <= 0) {
-    if (r.coreLoop) { finishCoreLoop('hull'); return; }   // Gate 1 하네스: 내구도 소진 → 결과 화면
+    if (r.coreLoop) { finishCoreLoop('hull'); return; }        // Gate 1 하네스: 내구도 소진 → 결과 화면
+    if (r.campaign25) { finishCampaign25('hull'); return; }    // Gate 2: 내구도 소진 → 25분 결과(regionResults 첨부)
     endExpedition('death');
   }
 
   // 선택 요청 소비 (우선순위: 교리 > 무기 진화). 보스·연출 중엔 열지 않는다. 동시에 둘이 열리지 않음.
-  if (r.phase === 'track' && !drafting && !r.coreLoop) {
+  if (r.phase === 'track' && !drafting && !r.coreLoop && !r.campaign25) {
     if (r.squad.pendingDoctrine) openDoctrine();
     else if (r.squad.pendingWeaponEvolution) openWeaponEvolution(r.squad.pendingWeaponEvolution);
   }
@@ -1520,11 +1533,13 @@ function draw() {
       rushT: r.squad.rushT || 0,
       keystoneIcon: keystoneIcon(r.squad.keystone),
     });
-    // Gate 1 코어루프 HUD (내구도·두 무기·공명·프레임·8분 타이머)
-    if (r.coreLoop && r.squad.surv) {
-      const sq = r.squad, cl = r.coreLoop;
+    // Gate 1 코어루프 / Gate 2 25분 캠페인 HUD (내구도·두 무기·공명·프레임·타이머). 둘 다 surv·director를 가진다.
+    const cl = r.coreLoop || r.campaign25;
+    if (cl && r.squad.surv) {
+      const sq = r.squad;
       const nx = nextEvent(cl.director);
-      const evLabel = { behaviorUpgrade: '행동 변화', secondWeapon: '보조 무기', hullTier: '함체 승급', resonanceTelegraph: '공명 예고', firstResonance: '공명 완성', framePick: '지휘 프레임', eliteWave: '정예 웨이브', bossStart: '검증 보스', result: '결과' };
+      const evLabel = { behaviorUpgrade: '행동 변화', secondWeapon: '보조 무기', hullTier: '함체 승급', resonanceTelegraph: '공명 예고', firstResonance: '공명 완성', framePick: '지휘 프레임', eliteWave: '정예 웨이브', bossStart: '지역 보스', result: '결과',
+        regionEnter: '지역 진입', fleetTelegraph: '슬롯 예고', fleetSlot: '함대 슬롯', secondResonance: '두번째 공명', finalWeaponEvo: '최종 진화', apex: 'Apex', pathChoice: '경로 선택' };
       const fh = sq.frameId ? frameHud(BAL.gate1.frames, sq.frameId) : null;
       drawCoreLoopHud(ctx, LOGICAL_W, logicalH, {
         hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
