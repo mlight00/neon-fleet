@@ -104,17 +104,16 @@ test('G1-07: 무기/공명 피해를 실제 적용 피해(HP 감소)로 집계',
   assert.ok(mainSrc.includes('hpBefore - bo.hp') && mainSrc.includes('hpBefore - (e.hp'), '충돌 전후 HP 차이로 집계');
 });
 
-test('G1-08: 보스 HP는 등장 후 실측 재보정(중심) + 양측 클램프(dpsCap 하한·enrage 상한)로 TTK 수렴', () => {
-  // 피해량은 개별 누적기가 아니라 boss.hp 실감소로 재야 랜스 등 모든 경로가 포함된다(Codex P1 재지적 반영).
-  assert.ok(mainSrc.includes('bo0._hpWin - bo0.hp'), '표본창 실감소로 단일표적 DPS(모든 피해 경로)');
-  assert.ok(mainSrc.includes('bo0._provMax - bo0.hp'), '총 피해=임시최대−현재HP(치유 없음)');
-  assert.ok(mainSrc.includes('bossDps * bt.targetTTKSec'), '목표 TTK로 HP 중심추정');
-  assert.ok(mainSrc.includes('bo0._calibrated = true') && mainSrc.includes('bo0.dpsCap = bo0.maxHp / bt.minTTKSec'), '하한 클램프: 재보정 후 초당 상한');
-  // 양측 클램프는 보스 hitByBullet 래퍼에 있어야 '모든' 피해 경로(랜스·에코 포함)가 거친다(Codex P1a).
-  assert.ok(mainSrc.includes('boss.hitByBullet = (dmg, world, ctx)') && mainSrc.includes('d *= boss._enrageMult'), '클램프 래퍼: 모든 경로 적용');
+test('G1-08: 보스 HP는 고정 + 양측 클램프(dpsCap 하한·enrage 상한)로 TTK 수렴', () => {
+  // 고정 HP(재보정 없음) → maxHp가 STAGGER 분모·BREAK와 안 얽힘(Codex 3차 P1/P2 회피).
+  assert.ok(mainSrc.includes('avgDps * BAL.gate1.bossTtk.avgDpsMult') && mainSrc.includes('boss.dpsCap = boss.maxHp / BAL.gate1.bossTtk.minTTKSec'), '고정 HP + 하한 dpsCap');
+  assert.ok(!mainSrc.includes('_calibrated') && !mainSrc.includes('_provMax'), '재보정 로직 제거(HP 불변)');
+  // 클램프는 보스 hitByBullet 래퍼에 → 발사체·랜스·에코 등 '모든' 경로가 거친다(Codex P1a).
+  assert.ok(mainSrc.includes('boss.hitByBullet = (dmg, world, ctx)'), '클램프 래퍼: 모든 경로 적용');
   assert.ok(!/bossDmg \*= bo\._enrageMult/.test(mainSrc), '충돌 분기에 중복 클램프 없음(래퍼로 일원화)');
-  // 표본 부족 폴백(Codex P1b): 창에서 보스를 거의 못 때리면 avgDps 사전추정으로 HP 붕괴 방지.
-  assert.ok(mainSrc.includes('bossDps >= ref * 0.2') && mainSrc.includes('ref * bt.avgDpsMult'), '표본 부족 시 사전추정 폴백');
+  // 하한/상한 분리 + '실제 HP 감소' 기준(BREAK ×1.25 등 내부 수정 뒤 실손실, Codex 3차 P1).
+  assert.ok(mainSrc.includes('before - boss.hp') && mainSrc.includes('boss.hp = before - budget'), '하한: 실제 HP 감소로 예산 상한');
+  assert.ok(mainSrc.includes('boss.hp -= loss * (boss._enrageMult - 1)'), '상한: enrage는 예산 넘겨 추가 피해');
   // 잡몹 정리 시 표적 해제(Codex P2): dead 표식 + 시커 표식 해제로 유도/시커가 사라진 적을 추적하지 않음.
   assert.ok(mainSrc.includes('e.dead = true') && mainSrc.includes('resonEnemyRemoved(w.reson, e)'), '보스 등장 정리 시 표적 해제');
 });

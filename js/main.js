@@ -576,26 +576,34 @@ function spawnCoreLoopBoss() {
   const bossRate = r.mods.enemyRate / BAL.difficulty.bossRateMult;
   const boss = makeBoss(LOGICAL_W, bossRate, 5, 1, 'B22');   // 섹터 5 네온 아비터
   boss.homeX = LOGICAL_W / 2; boss.x = boss.homeX;
-  // 완성 빌드 기준 TTK 45~60초를 노린 HP: 함대 화력 비례(측정으로 계수 보정). 단순 HP벽이 아니라
-  //  패턴·STAGGER·BREAK 상호작용으로 시간을 만든다(§5.8).
-  // 등장 시엔 큰 임시 HP(샘플 구간 동안 안 죽게) → 몇 초간 '실제 보스 피해율'을 재서 HP를 재보정한다.
-  //  이렇게 하면 railStorm처럼 잡몹 관통으로 평균 DPS가 부풀려진 빌드도 단일 표적 보스 TTK가 수렴한다(Codex P1).
+  // TTK 45~60초 수렴: 고정 HP(이 판 평균화력 비례)로 대략의 중심을 잡고, 양측 클램프(하한 dpsCap·상한 enrage)가
+  //  나머지 편차를 흡수한다. 단순 HP벽이 아니라 패턴·STAGGER·BREAK 상호작용으로 시간을 만든다(§5.8).
+  //  ※ 등장 후 재보정(임시HP+maxHp 변경)은 폐기했다 — maxHp가 STAGGER 분모·재보정 타이밍과 얽혀 보스 내부 모델을
+  //    흔들었기 때문(Codex 3차 P1/P2). 대신 클램프가 편차를 흡수하므로 정밀 중심추정이 필요 없다.
   const snap = r.coreLoop.metrics.snapshot(elapsed(r.coreLoop.director));
   const totalDmg = Object.values(snap.damageByWeapon).reduce((a, c) => a + c, 0) + Object.values(snap.damageByResonance).reduce((a, c) => a + c, 0);
   const avgDps = snap.durationSec > 5 ? totalDmg / snap.durationSec : 60;
-  boss.hp = boss.maxHp = boss._provMax = Math.round(Math.max(BAL.boss.hp, avgDps * BAL.gate1.bossTtk.avgDpsMult * 3));   // 큰 임시 HP
-  boss.dpsCap = 0;                     // 샘플 중엔 상한 없음(진짜 DPS 측정)
-  // 표본·총피해는 개별 누적기 대신 boss.hp 실감소로 잰다 → 랜스·메아리 등 모든 피해 경로가 자동 포함(Codex P1).
-  boss._age = 0; boss._hpWin = null; boss._calibrated = false; boss._dmgSec = 0; boss._secT = 0;
-  boss._avgDps = avgDps;               // 표본 부족 시 폴백 기준(Codex P1: bossDps≈0 → HP 붕괴 방지)
-  // 양측 클램프(하한 dpsCap·상한 enrage)를 보스 hitByBullet에 래핑 → 발사체·랜스·에코 등 '모든' 피해 경로가 클램프를
-  //  거친다(Codex P1: 직접 hitByBullet 호출이 클램프를 우회하던 문제). coreLoop 보스에만 적용, 캠페인 보스는 무영향.
+  boss.hp = boss.maxHp = Math.round(Math.max(BAL.boss.hp * 0.25, avgDps * BAL.gate1.bossTtk.avgDpsMult));   // 고정 HP(불변) → STAGGER 분모 안정
+  boss.dpsCap = boss.maxHp / BAL.gate1.bossTtk.minTTKSec;   // 하한 클램프: 초당 피해 상한(TTK 하한)
+  boss._age = 0; boss._dmgSec = 0; boss._secT = 0; boss._enrageMult = 1;
+  // 양측 클램프를 보스 hitByBullet에 래핑 → 발사체·랜스·에코 등 '모든' 경로가 거친다(Codex P1a). coreLoop 보스에만 적용.
+  //  모두 '실제 HP 감소' 기준이라 BREAK 배수(×1.25) 등 보스 내부 수정 뒤의 실손실을 정확히 다룬다(Codex 3차 P1).
+  //  하한/상한 분리: 정상 피해는 초당 예산으로 상한(하한, 순삭 방지) → enrage는 예산을 '넘겨' 추가 피해를 얹는다
+  //   (상한, 느린 빌드를 ~maxTTK에 끝냄). 피해가 0이면 추가도 0이라 타이머 킬이 아니다.
   const rawHit = boss.hitByBullet.bind(boss);
   boss.hitByBullet = (dmg, world, ctx) => {
-    let d = dmg;
-    if (boss.dpsCap) { const budget = Math.max(0, boss.dpsCap - (boss._dmgSec || 0)); d = Math.min(d, budget); boss._dmgSec = (boss._dmgSec || 0) + d; }
-    if (boss._enrageMult > 1) d *= boss._enrageMult;   // dpsCap(원율) 다음에 증폭 → 상한만 밀어올림
-    return rawHit(d, world, ctx);
+    const before = boss.hp;
+    const ret = rawHit(dmg, world, ctx);                            // 정상 피해(BREAK 배수 등 내부 수정 포함)
+    let loss = before - boss.hp;
+    if (loss > 0) {
+      if (boss.dpsCap) {                                            // 하한: 정상 피해를 초당 예산으로 상한
+        const budget = Math.max(0, boss.dpsCap - (boss._dmgSec || 0));
+        if (loss > budget) { boss.hp = before - budget; loss = budget; }
+        boss._dmgSec = (boss._dmgSec || 0) + loss;
+      }
+      if (boss._enrageMult > 1) boss.hp -= loss * (boss._enrageMult - 1);   // 상한: 예산 초과 추가 피해
+    }
+    return ret;
   };
   r.bosses = [boss]; w.bosses = [boss];
   r.boss = boss; w.boss = boss;
@@ -640,37 +648,13 @@ function coreLoopUpdate(dt) {
     if (spec) { spawnResonance(spec, sq, w); recordFirstResonance(cl, t); }
     if (sq.reson.markId != null) recordFirstResonance(cl, t);   // 시커: 표식 성립도 완성으로 인정
   }
-  // 보스 HP 재보정 + 초당 피해 상한 창 리셋(TTK 수렴)
+  // 보스 양측 클램프 갱신: 나이 적산 + enrage(상한) 계수 + 초당 예산 창 리셋(하한). HP는 고정(재보정 없음).
   const bo0 = r.bosses && r.bosses[0];
   if (bo0) {
     const bt = BAL.gate1.bossTtk;
     bo0._age = (bo0._age || 0) + dt;
-    if (bo0._calibrated === false) {
-      // 등장 후 [sampleDelay, sampleDelay+sampleWin] 구간의 '실제 보스 피해율'로 HP를 중심추정한다.
-      //  피해량은 개별 누적기가 아니라 boss.hp 실감소로 재므로 랜스·메아리 등 모든 경로가 포함된다(Codex P1).
-      //  초반은 선충전 공명 버스트로 과대하므로 표본창을 sampleDelay 뒤로 잡는다. 잔여 노이즈는 아래 양측 클램프가 흡수.
-      if (bo0._age >= bt.sampleDelaySec && bo0._hpWin == null) bo0._hpWin = bo0.hp;   // 표본창 시작 HP 스냅샷
-      if (bo0._age >= bt.sampleDelaySec + bt.sampleWinSec && bo0._hpWin != null) {
-        const windowDmg = Math.max(0, bo0._hpWin - bo0.hp);            // 창 구간 실제 보스 피해(HP 감소=모든 경로)
-        const bossDps = windowDmg / bt.sampleWinSec;                   // 버스트 제외 지속 단일표적 DPS
-        const ref = bo0._avgDps || 0;
-        // 표본 부족(창에서 보스를 거의 안 때림: 이탈·충전 홀드) → HP가 바닥으로 붕괴해 조기 폭사하는 것 방지.
-        //  이 경우엔 사전추정(avgDps 기반)으로 폴백. 정상 명중(단일표적이 avg의 20% 이상)이면 표본을 그대로 쓴다(Codex P1).
-        const sampleOk = ref > 0 && bossDps >= ref * 0.2;
-        const est = sampleOk ? bossDps * bt.targetTTKSec : ref * bt.avgDpsMult;
-        bo0.maxHp = Math.max(Math.round(BAL.boss.hp * 0.25), Math.round(est));
-        const dealt = Math.max(0, bo0._provMax - bo0.hp);              // 등장 후 총 피해(모든 경로) = 임시최대 − 현재HP
-        // 조기 폭사 방지(하한 보장): 재보정 뒤 dpsCap로도 b22Min 전엔 못 죽게 최소 HP를 남긴다. 정상 플레이는
-        //  이 값(≈0.72·maxHp)보다 잔여가 많아 건드리지 않고, 표본창에 과다 버스트한 경우만 하한으로 들어올린다.
-        const minRemain = bo0.maxHp * Math.max(0, (bt.b22Min - bo0._age)) / bt.minTTKSec;
-        bo0.hp = Math.max(1, Math.min(bo0.maxHp, Math.max(bo0.maxHp - dealt, minRemain)));
-        bo0.dpsCap = bo0.maxHp / bt.minTTKSec;                          // 하한 클램프: 초당 상한(TTK 하한)
-        bo0._dmgSec = 0; bo0._secT = 0; bo0._calibrated = true;
-      }
-    } else if (bo0.dpsCap) {
-      bo0._secT = (bo0._secT || 0) + dt; if (bo0._secT >= 1) { bo0._secT -= 1; bo0._dmgSec = 0; }
-    }
-    // 상한 클램프: enrageStart 이후 보스 피격 피해 증폭 → 표본이 크게 빗나가도 ~maxTTK엔 끝난다.
+    if (bo0.dpsCap) { bo0._secT = (bo0._secT || 0) + dt; if (bo0._secT >= 1) { bo0._secT -= 1; bo0._dmgSec = 0; } }
+    // 상한 클램프: enrageStart 이후 보스 피격 피해 증폭 → HP가 조금 높게 잡혀도 ~maxTTK엔 끝난다.
     const over = bo0._age - bt.enrageStartSec;
     bo0._enrageMult = over > 0 ? 1 + over * bt.enrageRampPerSec : 1;
   }

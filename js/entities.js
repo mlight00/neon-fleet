@@ -629,31 +629,43 @@ export class Squad {
     world.effects.ring(this.x, this.y, COLORS.danger);
     world.metrics?.hullDamage(hullAmt);
     this.onCombatHit(world);
-    if (out.dead) { this.dead = true; world.onHullDepleted?.(this); return; }
-    this.maybeEmergencyRebuild(world);   // 내구도 위급 시 1회 긴급 재건(§5.6, G1-04)
+    if (out.dead) {
+      if (this.maybeEmergencyRebuild(world, true)) return;   // 격침 직전 긴급 재건(death-save) 성공 → 생존
+      this.dead = true; world.onHullDepleted?.(this); return;
+    }
+    this.maybeEmergencyRebuild(world);   // 내구도 위급(30% 미만) 시 사전 긴급 재건(§5.6, G1-04)
   }
 
   /**
-   * 긴급 재건(§5.6, G1-04): 내구도가 위급(최대치의 emergencyRebuildAtFrac 미만)해지는 순간 1회 자동 발동.
-   *  비용=내구도 소량 지불(모듈), 효과=순양함 복구(피탄 흡수) + 제한 수리(구조) + 짧은 무적·보호막. 실제 로그 기록.
+   * 긴급 재건(§5.6, G1-04): 출격당 1회. 두 계기 —
+   *  사전(fromDeath=false): 내구도가 위급(최대치의 emergencyRebuildAtFrac 미만)해지는 순간. 비용=내구도 소량 지불.
+   *  격침직전(fromDeath=true): 치명타로 내구도 0에 닿는 순간의 death-save. 임계·비용 없이 구조 수리로 되살린다.
+   *  효과=순양함 복구(피탄 흡수) + 제한 수리(구조) + 짧은 무적·보호막. 실제 로그 기록. 반환: 발동했으면 true.
    */
-  maybeEmergencyRebuild(world) {
-    if (!this.surv) return;
+  maybeEmergencyRebuild(world, fromDeath = false) {
+    if (!this.surv) return false;
     const cfg = BAL.gate1.survivability;
-    if (hullFrac(this.surv) >= (cfg.emergencyRebuildAtFrac ?? 0.3) || !canEmergencyRebuild(this.surv, cfg)) return;
-    const res = doEmergencyRebuild(this.surv, cfg);   // emergencyUsed++, 내구도 비용 지불, 순양함 수 반환
-    if (!res.ok) return;
-    this.cruisers = Math.min(BAL.escort.maxCruisers, (this.cruisers || 0) + res.cruisers);
+    if (this.surv.emergencyUsed >= (cfg.emergencyRebuildMax ?? 1)) return false;   // 출격당 1회
+    if (fromDeath) {
+      this.surv.emergencyUsed += 1;                   // 격침 직전: 임계·비용 우회, 구조 수리로 0에서 복귀
+    } else {
+      if (hullFrac(this.surv) >= (cfg.emergencyRebuildAtFrac ?? 0.3) || !canEmergencyRebuild(this.surv, cfg)) return false;
+      if (!doEmergencyRebuild(this.surv, cfg).ok) return false;   // emergencyUsed++, 내구도 비용 지불
+    }
+    const addC = cfg.emergencyRebuildCruisers ?? 1;
+    this.cruisers = Math.min(BAL.escort.maxCruisers, (this.cruisers || 0) + addC);
     this._syncCruiserHp();
     survRepair(this.surv, cfg);                        // 구조 수리(제한)
+    if (this.surv.hull <= 0) this.surv.hull = Math.max(1, Math.round(this.surv.hullMax * (cfg.repairFrac ?? 0.25)));  // death-save: 최소 생존 보장
     this.shield = true;
     this.invulnT = Math.max(this.invulnT, 1.0);
     world.metrics?.emergencyRebuild();
     world.metrics?.hullRepair();
     world.effects.halo(this.x, this.y, COLORS.reward);
     world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
-    world.effects.text(this.x, this.y - 56, `긴급 재건! 순양함 +${res.cruisers} · 구조 수리`, COLORS.reward, 16);
+    world.effects.text(this.x, this.y - 56, `긴급 재건! 순양함 +${addC} · 구조 수리`, COLORS.reward, 16);
     sfx('evolve');
+    return true;
   }
 
   update(dt, world) {
