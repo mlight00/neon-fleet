@@ -60,8 +60,8 @@ test('순양함 HP는 Gate 1 모드에서 노드 전환 뒤 유지된다(만피 
 test('공명 발사체는 fromResonance로 태그되어 충전을 재귀 유발하지 않는다', () => {
   assert.ok(mainSrc.includes('fromResonance = true'), '공명 발사체 재귀 잠금 태그');
   assert.ok(mainSrc.includes('resonanceId ='), '공명 피해 별도 귀속 태그');
-  // 충전은 발칸 명중에서만, 그리고 fromResonance면 제외(resonances.onHit 계약)
-  assert.ok(mainSrc.includes("sourceWeaponId === 'vulcan'") && mainSrc.includes('fromResonance: b.fromResonance'), '충전 소스·재귀 가드 전달');
+  // 충전은 쌍의 두 무기 명중을 모두 모듈에 전달하고(pair 검사가 필터), fromResonance면 재귀 제외.
+  assert.ok(mainSrc.includes('sourceWeaponId: b.sourceWeaponId') && mainSrc.includes('fromResonance: b.fromResonance'), '충전 소스·재귀 가드 전달');
 });
 
 // ── 재작업(Codex 반려 반영) 배선 검증 ────────────────────────────

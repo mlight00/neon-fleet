@@ -56,8 +56,9 @@ export function onHit(state, cfg, { sourceWeaponId, fromResonance = false } = {}
   if (!state.activeId || fromResonance) return false;      // 재귀 잠금
   const res = RESONANCES[state.activeId];
   if (res.trigger !== 'charge') return false;
-  // 충전은 쌍의 '기폭' 무기(발칸) 명중에서만 쌓인다(railStorm·microMissile 모두 발칸 기폭).
-  if (sourceWeaponId !== 'vulcan') return false;
+  // 충전은 쌍의 두 무기 명중 모두에서 쌓인다 → 단일 보스처럼 한 무기가 잘 안 맞는 상황에서도
+  //  기여도가 안정화된다(예: railStorm에서 발칸이 확산으로 보스를 빗나가도 레이저 명중이 충전).
+  if (!res.pair.includes(sourceWeaponId)) return false;
   const c = cfg[state.activeId];
   state.charge += c.chargePerHit;
   return true;

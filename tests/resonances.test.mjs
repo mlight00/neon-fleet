@@ -69,11 +69,14 @@ test('발동 후 쿨다운 동안 재발동 불가', () => {
   assert.ok(tryProc(s, CFG, 101));             // 재발동 가능
 });
 
-test('발칸이 아닌 무기 명중은 충전형 공명을 충전하지 않는다', () => {
+test('충전은 쌍의 두 무기 명중 모두에서 쌓이고, 쌍 밖 무기는 충전하지 않는다', () => {
   const s = createResonanceState();
-  setLoadout(s, ['vulcan', 'laser']);
-  onHit(s, CFG, { sourceWeaponId: 'laser' });
-  assert.equal(s.charge, 0);
+  setLoadout(s, ['vulcan', 'laser']);   // railStorm
+  onHit(s, CFG, { sourceWeaponId: 'vulcan' });
+  onHit(s, CFG, { sourceWeaponId: 'laser' });   // 쌍의 두 무기 모두 충전(기여도 안정화)
+  assert.equal(s.charge, CFG.railStorm.chargePerHit * 2);
+  onHit(s, CFG, { sourceWeaponId: 'homing' });   // 쌍 밖 무기는 충전 안 함
+  assert.equal(s.charge, CFG.railStorm.chargePerHit * 2);
 });
 
 test('시커 빔: 레이저 표식 → 대상 파괴 시 표식 이동(해제)', () => {

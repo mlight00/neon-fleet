@@ -408,8 +408,8 @@ export const BAL = {
     },
     // 무기 조합 공명 3종(§5.4). 발동은 피해배수만 금지 — 모양·표적·소리 중 2+ 변화.
     resonance: {
-      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 8, cooldown: 0.1, dmgFrac: 58, width: 36, pierce: 8 }, // 발칸명중 누적→레이저 하드포인트 관통 레일
-      microMissile: { pair: ['vulcan', 'homing'], chargePerHit: 1, threshold: 10, cooldown: 0.5, count: 6, dmgFrac: 3.9 },            // 발칸 연속명중/처치→소형 미사일 묶음 분산추적
+      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 18, cooldown: 0.14, dmgFrac: 58, width: 36, pierce: 8 }, // 발칸·레이저 명중 누적→관통 레일
+      microMissile: { pair: ['vulcan', 'homing'], chargePerHit: 1, threshold: 44, cooldown: 0.6, count: 6, dmgFrac: 3.9 },            // 발칸·유도 명중 누적→소형 미사일 묶음 분산추적
       seekerBeam: { pair: ['laser', 'homing'],  markDuration: 2.8, cooldown: 0.5, missileBonus: 2.0 },                                // 레이저 표식→미사일 우선추적·증폭, 파괴 시 표식 이동
       minFirstAt: 255, maxFirstAt: 285,  // 첫 공명 확정 완성 창
       telegraphLead: 30,                 // 완성 전 예고 시간(20~40s 창의 중앙)
@@ -447,7 +447,7 @@ export const BAL = {
     // 보스 TTK 목표(§5.8). 실제 조정은 boss 계수 + 패턴, HP·탄수만 증가 금지.
     // 하네스 보스: HP=함대화력×hpPerPower + 초당 피해 상한(minTTKSec). 상한은 고DPS 빌드가 순삭하지 못하게
     //  '취약창을 눌러야 시간이 걸린다'는 §5.8 취지를 측정에서 근사한다 → 세 빌드 TTK가 45~60으로 수렴.
-    bossTtk: { b22Min: 45, b22Max: 60, b7Min: 60, b7Max: 90, avgDpsMult: 106, minTTKSec: 46 },   // 보스 HP=실측 평균DPS×avgDpsMult(적응형)
+    bossTtk: { b22Min: 45, b22Max: 60, b7Min: 60, b7Max: 90, avgDpsMult: 98, minTTKSec: 45 },   // 보스 HP=실측 평균DPS×avgDpsMult(적응형)
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.

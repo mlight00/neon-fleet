@@ -719,10 +719,10 @@ function tallyBulletDamage(w, b, dealt, target) {
   // 시커 빔: 표식 대상을 맞힌 유도 미사일은 공명 피해로 귀속(우선추적 보상)
   if (reson && b.sourceWeaponId === 'homing' && isSeekerHit(reson, target)) { m.resonanceDamage('seekerBeam', dealt); }
   else m.weaponDamage(b.sourceWeaponId, dealt);
-  // 공명 충전(발칸 명중) / 시커 표식(레이저 명중)
+  // 공명 충전: 쌍의 두 무기 명중 모두 전달(모듈의 pair 검사가 필터). 시커 표식: 레이저 명중.
   if (reson && reson.activeId) {
-    if (b.sourceWeaponId === 'vulcan') resonOnHit(reson, BAL.gate1.resonance, { sourceWeaponId: 'vulcan', fromResonance: b.fromResonance });
-    else if (b.sourceWeaponId === 'laser' && reson.activeId === 'seekerBeam') resonLaserMark(reson, BAL.gate1.resonance, target, nowT);
+    resonOnHit(reson, BAL.gate1.resonance, { sourceWeaponId: b.sourceWeaponId, fromResonance: b.fromResonance });
+    if (b.sourceWeaponId === 'laser' && reson.activeId === 'seekerBeam') resonLaserMark(reson, BAL.gate1.resonance, target, nowT);
   }
 }
 
