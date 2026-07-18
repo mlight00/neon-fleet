@@ -452,6 +452,42 @@ export const BAL = {
     bossTtk: { b22Min: 45, b22Max: 60, b7Min: 60, b7Max: 90, avgDpsMult: 98, minTTKSec: 47, enrageStartSec: 47, enrageRampPerSec: 2.5 },
   },
 
+  // ═══ Gate 2 (전면개편 §7): 25분 6지역 시간 기반 캠페인 ═══
+  //  Gate 1(8분 하네스)의 검증된 시스템(로드아웃·공명·내구도·프레임·보스 클램프)을 실전 25분 캠페인으로 승격한다.
+  //  각 지역은 startSec에 진입, bossSec에 지역 보스 등장(끝은 다음 지역 진입 또는 totalSec). 노드형 맵은 폴백 보존.
+  gate2: {
+    totalSec: 1500,               // 25분
+    introSec: 60,                 // 0~1분 출격(사격 적 없이 조작 학습)
+    // §7.1 6개 지역. boss는 §7.5 처치시간 목표. backdrop=섹터 배경 인덱스(1~6, Gate 0 R2 매핑).
+    regions: [
+      { i: 1, id: 'coldWake',     name: 'COLD WAKE',     startSec: 60,   bossSec: 200,  boss: 'B8',  backdrop: 1, bossTtk: [30, 45] },
+      { i: 2, id: 'prismGrave',   name: 'PRISM GRAVE',   startSec: 240,  bossSec: 440,  boss: 'B9',  backdrop: 2, bossTtk: [30, 45] },
+      { i: 3, id: 'furnaceLine',  name: 'FURNACE LINE',  startSec: 480,  bossSec: 680,  boss: 'B10', backdrop: 3, bossTtk: [30, 45] },
+      { i: 4, id: 'brokenArmada', name: 'BROKEN ARMADA', startSec: 720,  bossSec: 920,  boss: 'B11', backdrop: 4, bossTtk: [30, 45] },
+      { i: 5, id: 'choirVeil',    name: 'CHOIR VEIL',    startSec: 960,  bossSec: 1140, boss: 'B22', backdrop: 5, bossTtk: [45, 60] },
+      { i: 6, id: 'crownCore',    name: 'CROWN CORE',    startSec: 1200, bossSec: 1380, boss: 'B7',  backdrop: 6, bossTtk: [60, 90] },
+    ],
+    // 함체 승급 시각(§7.3 H1~H5). 기능 변화는 G2-B에서 배선. at=승급 발동 시각(초).
+    hullTiers: [
+      { tier: 1, at: 135 },    // 섹터1
+      { tier: 2, at: 360 },    // 섹터2
+      { tier: 3, at: 600 },    // 섹터3
+      { tier: 4, at: 1020 },   // 섹터5
+      { tier: 5, at: 1260 },   // 섹터6 타이탄
+    ],
+    secondWeaponSec: 90,          // 1~4분 두 번째 무기(§7.1)
+    fleetTelegraphSec: 660,       // 섹터3 세 번째 슬롯 예고(§7.1)
+    fleetSlotSec: 780,            // 섹터4(12~16분) 함대 슬롯 해금(§7.2, 배선 G2-C)
+    firstResonanceSec: 330,       // 섹터2 첫 공명
+    secondResonanceSec: 840,      // 섹터4 두 번째 공명
+    framePickSec: 540,            // 섹터3 지휘 프레임 자동 스킬
+    finalWeaponEvoSec: 1050,      // 섹터5 최종 무기 진화
+    apexSec: 1290,                // 섹터6 Apex(§7.3 T5)
+    pathChoiceSec: [240, 480, 720, 960, 1200],  // ~4분마다 큰 경로 선택(§7.4, 배선 G2-D)
+    behaviorInterval: 45,         // 행동 변화 사건 간격(§7.1 지속 성장 체감)
+    resultSec: 1500,              // 25분 결과(B7 처치=완결점)
+  },
+
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.
   hangar: {
     costGrowth: 1.6,        // 레벨당 비용 배수

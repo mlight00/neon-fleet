@@ -26,11 +26,15 @@ function buildSchedule(cfg) {
   return s;
 }
 
-export function createRunDirector(cfg) {
+/**
+ * 디렉터 생성. schedule을 넘기지 않으면 Gate 1 8분 스케줄(buildSchedule)을 쓴다.
+ *  Gate 2(25분)는 campaign25가 만든 스케줄을 그대로 넘긴다 — tick/next/elapsed는 스케줄 형식만 맞으면 범용 동작.
+ */
+export function createRunDirector(cfg, schedule) {
   return {
     cfg,
     t: 0,
-    schedule: buildSchedule(cfg),
+    schedule: schedule || buildSchedule(cfg),
     firedKeys: new Set(),
   };
 }
@@ -46,7 +50,7 @@ export function tickDirector(dir, dt, paused = false) {
     for (const ev of dir.schedule) {
       if (ev.t <= dir.t && !dir.firedKeys.has(ev.key)) {
         dir.firedKeys.add(ev.key);
-        events.push({ type: ev.type, key: ev.key, t: dir.t });
+        events.push({ ...ev, t: dir.t });   // 스케줄 사건의 부가 필드(region·boss·tier·choice 등)까지 전달
       }
     }
   }

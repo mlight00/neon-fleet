@@ -29,10 +29,12 @@ import { createSurvivability, onTierUp as survTierUp, hullFrac, addShield } from
 import { createFrameState, setFrame as frameSet, frameOnKill, tickFrame, frameHud } from './command-frames.js';
 import { createLoadout, equip as loadoutEquip } from './weapon-loadout.js';
 import { CORE_LOOP_BUILDS, coreLoopBuild, eventAction, frameForBuild } from './core-loop.js';
+import { regionAt as c25RegionAt, regionByIndex as c25Region, buildCampaign25Schedule, eventAction25 } from './campaign25.js';
 
 const _clParams = new URLSearchParams(location.search);
 const CORE_LOOP = _clParams.has('coreLoopTest');        // 사람 플레이(H0·내구도100·무기1·조작 가능)
 const CORE_MEASURE = _clParams.has('coreLoopMeasure');  // 자동 측정 재생(autopilot+auto-select, 헤드리스 시뮬)
+const CAMPAIGN25 = _clParams.has('campaign25');         // Gate 2: 25분 6지역 시간 캠페인(측정·개발용 진입)
 
 const LOGICAL_W = BAL.logicalW;
 const canvas = document.getElementById('game');
@@ -354,6 +356,7 @@ function startPlay() {
   drafting = false;
   betweenStages = false;
   sfx('start');
+  if (CAMPAIGN25) { startCampaign25({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?campaign25=1: Gate 2 25분 캠페인(측정)
   if (CORE_MEASURE) { startCoreLoop({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?coreLoopMeasure=1: 자동 측정
   if (CORE_LOOP) { startCoreLoop({ mode: 'play' }); return; }   // ?coreLoopTest=1: 사람 플레이 8분 슬라이스
   newExpedition();   // → startSector(1) → enterSectorMap(): 섹터 맵 화면(state='map'). 노드 선택 시 전투 시작.
@@ -557,6 +560,58 @@ function spawnResonance(spec, sq, w) {
   }
 }
 
+// ── 보스 TTK 클램프(Gate 1에서 검증, Gate 2 지역 보스도 재사용) ─────────────────────
+/** 보스 TTK 목표 범위 → 클램프 계수. B22 기준(중앙 52초·avgDpsMult 98)으로 지역별 목표에 비례 스케일. */
+function ttkClampCfg(ttkRange) {
+  const [lo, hi] = ttkRange, mid = (lo + hi) / 2;
+  const minTTKSec = Math.max(1, Math.round(lo + 2));     // 하한(순삭 방지) = 목표 하한 +2
+  return {
+    hpMult: BAL.gate1.bossTtk.avgDpsMult * (mid / 52),   // 고정 HP 계수(목표 중앙 비례, B22 52초 기준)
+    minTTKSec,
+    enrageStartSec: minTTKSec,                           // 상한 램프 시작 = 하한(검증된 B22와 동일 구조)
+    enrageRampPerSec: BAL.gate1.bossTtk.enrageRampPerSec, // 2.5
+  };
+}
+
+/**
+ * 보스에 양측 클램프(하한 dpsCap·상한 enrage)를 설치한다(Codex 검증 최종형).
+ *  고정 HP = avgDps×hpMult, 클램프는 rawHit '이전' 입력에 적용해 STAGGER·사망·HP가 일관.
+ *  BREAK 등 내부 배수는 damageTakenMult()로 사전 조회해 실손실 기준으로 예산을 건다.
+ */
+function installBossTtkClamp(boss, avgDps, ttkRange) {
+  const c = ttkClampCfg(ttkRange);
+  boss.hp = boss.maxHp = Math.round(Math.max(BAL.boss.hp * 0.25, avgDps * c.hpMult));  // 고정 HP(불변) → STAGGER 분모 안정
+  boss.dpsCap = boss.maxHp / c.minTTKSec;                // 하한: 초당 피해 상한(TTK 하한)
+  boss._age = 0; boss._dmgSec = 0; boss._secT = 0; boss._enrageMult = 1;
+  boss._enrageStartSec = c.enrageStartSec; boss._enrageRampPerSec = c.enrageRampPerSec;
+  const rawHit = boss.hitByBullet.bind(boss);
+  boss.hitByBullet = (dmg, world, ctx) => {
+    const mult = boss.damageTakenMult ? boss.damageTakenMult() : 1;   // 내부 배수 사전 조회
+    let norm = dmg;
+    if (boss.dpsCap) {                                                // 하한: 실손실(norm×mult)이 초당 예산 넘지 않게 입력을 깎음
+      const budget = Math.max(0, boss.dpsCap - (boss._dmgSec || 0));
+      const maxNorm = mult > 0 ? budget / mult : budget;
+      if (norm > maxNorm) norm = maxNorm;
+      boss._dmgSec = (boss._dmgSec || 0) + norm * mult;              // 수용된 정상 손실만 예산 차감
+    }
+    let input = norm;
+    if (boss._enrageMult > 1) input += norm * (boss._enrageMult - 1); // 상한: enrage 추가 입력(예산 밖, 정상피해 비례)
+    if (input <= 0) return;                                          // 예산 소진·enrage 없음 → 피해·부작용 모두 없음
+    return rawHit(input, world, ctx);                               // 단일 호출: STAGGER·사망·HP 일관
+  };
+  return c;
+}
+
+/** 매 프레임 보스 클램프 갱신: 나이 적산 + 초당 예산 창 리셋(하한) + enrage 계수(상한). */
+function updateBossClamp(boss, dt) {
+  boss._age = (boss._age || 0) + dt;
+  if (boss.dpsCap) { boss._secT = (boss._secT || 0) + dt; if (boss._secT >= 1) { boss._secT -= 1; boss._dmgSec = 0; } }
+  const start = boss._enrageStartSec ?? BAL.gate1.bossTtk.enrageStartSec;
+  const ramp = boss._enrageRampPerSec ?? BAL.gate1.bossTtk.enrageRampPerSec;
+  const over = boss._age - start;
+  boss._enrageMult = over > 0 ? 1 + over * ramp : 1;
+}
+
 /** 하네스 검증 보스(B22 네온 아비터) 등장 — TTK 측정용. */
 function spawnCoreLoopBoss() {
   const r = run, w = r.world;
@@ -576,36 +631,11 @@ function spawnCoreLoopBoss() {
   const bossRate = r.mods.enemyRate / BAL.difficulty.bossRateMult;
   const boss = makeBoss(LOGICAL_W, bossRate, 5, 1, 'B22');   // 섹터 5 네온 아비터
   boss.homeX = LOGICAL_W / 2; boss.x = boss.homeX;
-  // TTK 45~60초 수렴: 고정 HP(이 판 평균화력 비례)로 대략의 중심을 잡고, 양측 클램프(하한 dpsCap·상한 enrage)가
-  //  나머지 편차를 흡수한다. 단순 HP벽이 아니라 패턴·STAGGER·BREAK 상호작용으로 시간을 만든다(§5.8).
-  //  ※ 등장 후 재보정(임시HP+maxHp 변경)은 폐기했다 — maxHp가 STAGGER 분모·재보정 타이밍과 얽혀 보스 내부 모델을
-  //    흔들었기 때문(Codex 3차 P1/P2). 대신 클램프가 편차를 흡수하므로 정밀 중심추정이 필요 없다.
+  // TTK 45~60초 수렴: 고정 HP + 양측 클램프(설치·갱신은 installBossTtkClamp/updateBossClamp 공용 헬퍼).
   const snap = r.coreLoop.metrics.snapshot(elapsed(r.coreLoop.director));
   const totalDmg = Object.values(snap.damageByWeapon).reduce((a, c) => a + c, 0) + Object.values(snap.damageByResonance).reduce((a, c) => a + c, 0);
   const avgDps = snap.durationSec > 5 ? totalDmg / snap.durationSec : 60;
-  boss.hp = boss.maxHp = Math.round(Math.max(BAL.boss.hp * 0.25, avgDps * BAL.gate1.bossTtk.avgDpsMult));   // 고정 HP(불변) → STAGGER 분모 안정
-  boss.dpsCap = boss.maxHp / BAL.gate1.bossTtk.minTTKSec;   // 하한 클램프: 초당 피해 상한(TTK 하한)
-  boss._age = 0; boss._dmgSec = 0; boss._secT = 0; boss._enrageMult = 1;
-  // 양측 클램프를 보스 hitByBullet에 래핑 → 발사체·랜스·에코 등 '모든' 경로가 거친다(Codex P1a). coreLoop 보스에만 적용.
-  //  ★ 클램프는 rawHit '이전' 입력에 적용한다 → rawHit 한 번으로 STAGGER·사망 전이·HP가 모두 최종 입력과 일관(Codex 4차 P1/P2).
-  //   보스 내부 배수(BREAK ×1.25)는 damageTakenMult()로 미리 조회해 실손실 기준으로 예산을 건다.
-  //   하한/상한 분리: 정상 입력은 예산 내로 깎고(순삭 방지) → enrage는 예산 밖 추가 입력을 얹는다(느린 빌드를 ~maxTTK에).
-  //   수용된 정상 피해가 0이면 enrage 추가도 0이라 타이머 킬이 아니다.
-  const rawHit = boss.hitByBullet.bind(boss);
-  boss.hitByBullet = (dmg, world, ctx) => {
-    const mult = boss.damageTakenMult ? boss.damageTakenMult() : 1;   // 내부 배수 사전 조회
-    let norm = dmg;
-    if (boss.dpsCap) {                                                // 하한: 실손실(norm×mult)이 초당 예산 넘지 않게 입력을 깎음
-      const budget = Math.max(0, boss.dpsCap - (boss._dmgSec || 0));
-      const maxNorm = mult > 0 ? budget / mult : budget;
-      if (norm > maxNorm) norm = maxNorm;
-      boss._dmgSec = (boss._dmgSec || 0) + norm * mult;              // 수용된 정상 손실만 예산 차감
-    }
-    let input = norm;
-    if (boss._enrageMult > 1) input += norm * (boss._enrageMult - 1); // 상한: enrage 추가 입력(예산 밖, 정상피해 비례)
-    if (input <= 0) return;                                          // 예산 소진·enrage 없음 → 피해·부작용 모두 없음
-    return rawHit(input, world, ctx);                               // 단일 호출: STAGGER·사망·HP 일관
-  };
+  installBossTtkClamp(boss, avgDps, [BAL.gate1.bossTtk.b22Min, BAL.gate1.bossTtk.b22Max]);
   r.bosses = [boss]; w.bosses = [boss];
   r.boss = boss; w.boss = boss;
   preloadBossArt('B22');
@@ -649,15 +679,10 @@ function coreLoopUpdate(dt) {
     if (spec) { spawnResonance(spec, sq, w); recordFirstResonance(cl, t); }
     if (sq.reson.markId != null) recordFirstResonance(cl, t);   // 시커: 표식 성립도 완성으로 인정
   }
-  // 보스 양측 클램프 갱신: 나이 적산 + enrage(상한) 계수 + 초당 예산 창 리셋(하한). HP는 고정(재보정 없음).
+  // 보스 양측 클램프 갱신(공용 헬퍼: 나이·초당 예산 리셋·enrage 계수). HP는 고정(재보정 없음).
   const bo0 = r.bosses && r.bosses[0];
   if (bo0) {
-    const bt = BAL.gate1.bossTtk;
-    bo0._age = (bo0._age || 0) + dt;
-    if (bo0.dpsCap) { bo0._secT = (bo0._secT || 0) + dt; if (bo0._secT >= 1) { bo0._secT -= 1; bo0._dmgSec = 0; } }
-    // 상한 클램프: enrageStart 이후 보스 피격 피해 증폭 → HP가 조금 높게 잡혀도 ~maxTTK엔 끝난다.
-    const over = bo0._age - bt.enrageStartSec;
-    bo0._enrageMult = over > 0 ? 1 + over * bt.enrageRampPerSec : 1;
+    updateBossClamp(bo0, dt);
   }
   // 8분 내내 전투가 이어지도록 트랙 재보충
   if (r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < 6 && !cl.bossSpawned) refillCoreLoopTrack();
@@ -699,6 +724,189 @@ function recordFirstResonance(cl, t) {
   if (cl.firstResonanceRecorded) return;
   cl.firstResonanceRecorded = true;
   cl.metrics.firstResonance(t);
+}
+
+// ═══════════ Gate 2: 25분 6지역 시간 캠페인 (?campaign25=1, 전면개편 §7) ═══════════
+// Gate 1 하네스의 검증된 시스템(로드아웃·공명·내구도·프레임·보스 클램프)을 25분 실전 캠페인으로 승격한다.
+// 노드형 캠페인은 폴백으로 보존(newExpedition 경로 그대로). 여기선 시간축 디렉터가 6지역·지역보스·성장을 몬다.
+
+/** 25분 캠페인 시작. startCoreLoop과 같은 설치에 25분 디렉터를 얹는다. mode: measure(자동)·play. */
+function startCampaign25(opts = {}) {
+  const mode = opts.mode === 'measure' ? 'measure' : 'play';
+  const auto = mode === 'measure';
+  const build = coreLoopBuild(opts.buildId || 'railStorm');
+  drafting = false; betweenStages = false;
+  newExpedition('campaign');
+  const r = run, sq = r.squad, w = r.world;
+  const surv = createSurvivability(BAL.gate1.survivability);
+  const reson = createResonanceState();
+  const frameState = createFrameState();
+  const startMain = auto ? build.main : (opts.startWeapon || build.main);
+  sq.installGate1({ surv, reson, frameState, frameId: null, mainWeapon: startMain });
+  sq.weapon = startMain; sq.weaponLv = 1;
+  const G2 = BAL.gate2;
+  const metrics = createRunMetrics({ runId: `campaign25-${mode}-${build.id}`, seed: (Math.random() * 2 ** 31) | 0 });
+  const director = createRunDirector(G2, buildCampaign25Schedule(G2));
+  w.metrics = metrics; w.reson = reson;
+  w.onHullDepleted = () => metrics.gameOver('hull', elapsed(director));
+  r.campaign25 = {
+    mode, auto, build, buildId: build.id, cfg: G2, director, metrics,
+    region: 0, bossActive: false, bossSpawnT: 0, resonActivated: false, resultShown: false, resultPending: false,
+    regionResults: [],        // [{ region, boss, ttk, killed }]
+    bossesKilled: 0, deferredEvents: [],
+  };
+  if (auto) {
+    surv.hullMax = surv.hull = BAL.gate1.survivability.measureHullMax;   // 헤드리스 자동회피 보정(측정 전용)
+    sq.count = 70; sq.banked = 260; sq.tier = 2;
+    resonSetLoadout(reson, [startMain, null]);
+  } else {
+    sq.tier = 0; sq.banked = 0; sq.cruisers = 0;
+    sq.count = w.stats?.startCount ?? BAL.squad.start;
+    resonSetLoadout(reson, [startMain, null]);
+  }
+  r.maxPower = sq.power;
+  window.__nfRunMetrics = null;
+  enterNode(r.map.cols[0][0]);   // 첫 전투 진입
+  r.totalTrack = 1e12;           // 디렉터가 25분 관리(트랙 종료 조기 클리어 방지)
+  r.pending = [];
+  refillCoreLoopTrack();
+  return r.campaign25;
+}
+
+/** 지역 진입: 배경 전환 + 지역 컨텍스트. (지역별 적 구성 정교화는 G2-E) */
+function enterCampaignRegion(i, t) {
+  const r = run, cl = r.campaign25;
+  const region = c25Region(cl.cfg, i);
+  if (!region) return;
+  cl.region = i;
+  r.sector = region.backdrop;                 // 배경 전환(Gate 0 R2 섹터 1:1 매핑)
+  r.stage = region.i;                          // 난이도·기록용 진행 카운터(임시: 지역 인덱스)
+  r.effects.text(LOGICAL_W / 2, logicalH * 0.28, `${region.i}. ${region.name}`, COLORS.reward, 20);
+}
+
+/** 지역 보스 등장: 잔여 정리 + 지역 TTK 목표로 양측 클램프 설치(공용 헬퍼). */
+function spawnCampaignBoss(i, bossId, t) {
+  const r = run, w = r.world, cl = r.campaign25;
+  const region = c25Region(cl.cfg, i);
+  if (!region || cl.bossActive) return;
+  r.phase = 'boss'; w.phase = 'boss'; r.pending = [];
+  for (let k = w.entities.length - 1; k >= 0; k--) {   // 잔여 잡몹 정리 + 표적 해제(Codex P2)
+    const e = w.entities[k]; if (!e.isEnemy) continue;
+    e.dead = true; if (w.reson) resonEnemyRemoved(w.reson, e); w.entities.splice(k, 1);
+  }
+  w.scrollSpeed = 40;
+  const boss = makeBoss(LOGICAL_W, r.mods.enemyRate / BAL.difficulty.bossRateMult, region.backdrop, 1, bossId);
+  boss.homeX = LOGICAL_W / 2; boss.x = boss.homeX;
+  const snap = cl.metrics.snapshot(t);
+  const totalDmg = Object.values(snap.damageByWeapon).reduce((a, c) => a + c, 0) + Object.values(snap.damageByResonance).reduce((a, c) => a + c, 0);
+  const avgDps = snap.durationSec > 5 ? totalDmg / snap.durationSec : 60;
+  installBossTtkClamp(boss, avgDps, region.bossTtk);   // 고정 HP + 지역 TTK 목표 클램프(하한·상한)
+  r.bosses = [boss]; w.bosses = [boss]; r.boss = boss; w.boss = boss;
+  preloadBossArt(bossId);
+  cl.bossActive = true; cl.bossSpawnT = t;
+  cl.regionResults.push({ region: i, boss: bossId, ttk: null, killed: false });
+  playBgm('boss'); setBgmIntensity(0.86); sfx('boss_in');
+  r.effects.text(LOGICAL_W / 2, logicalH * 0.35, boss.korName || bossId, COLORS.danger, 20);
+  r.effects.flash(0.4);
+}
+
+/** 함체 승급(외형+내구도 최대치, 기능 변화는 G2-B). */
+function campaignHullTier(tier, t) {
+  const r = run, sq = r.squad, w = r.world, cl = r.campaign25;
+  survTierUp(sq.surv, BAL.gate1.survivability);
+  sq.tier = Math.min(BAL.evolution.names.length - 1, sq.tier + 1);
+  cl.metrics.hullTier(t);
+  w.effects.halo(sq.x, sq.y, COLORS.reward);
+  w.effects.text(sq.x, sq.y - 74, `기함 승급 ${BAL.evolution.names[sq.tier]}`, COLORS.reward, 15);
+}
+
+/** 두 번째 무기 장착(측정=빌드 wing 자동, play=향후 선택 UI G2-B). */
+function equipCampaignWing() {
+  const r = run, sq = r.squad, cl = r.campaign25;
+  if (sq.wing.weaponId) return;
+  sq.wing.weaponId = cl.build.wing; sq.wing.level = 1; sq._wingAcc = 0;
+  r.world.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[cl.build.wing]}`, WEAPON_COLORS[cl.build.wing], 15);
+}
+
+/** 공명 회로 활성(두 무기 장착 후). */
+function activateCampaignResonance() {
+  const r = run, sq = r.squad, cl = r.campaign25;
+  if (!sq.wing.weaponId) return;
+  resonSetLoadout(sq.reson, [sq.weapon, sq.wing.weaponId]);
+  cl.resonActivated = true;
+  if (cl.auto) { const res = RESONANCES[sq.reson.activeId]; if (res?.trigger === 'charge') sq.reson.charge = BAL.gate1.resonance[sq.reson.activeId].threshold; }
+  r.world.effects.text(sq.x, sq.y - 74, `공명 회로 활성: ${RESONANCES[sq.reson.activeId]?.name || ''}`, '#9fe8ff', 16);
+}
+
+/** 지휘 프레임 자동 스킬(측정=빌드별 고정). */
+function pickCampaignFrame() {
+  const r = run, sq = r.squad, cl = r.campaign25;
+  if (sq.frameId) return;
+  const id = frameForBuild(cl.buildId);
+  frameSet(sq.frameState, id); sq.frameId = id; sq.doctrine = BAL.gate1.frames[id].doctrine;
+  r.world.effects.text(sq.x, sq.y - 74, `지휘 프레임: ${BAL.gate1.frames[id].name}`, BAL.gate1.frames[id].glow, 16);
+}
+
+/** 25분 캠페인 per-frame 진행. */
+function campaign25Update(dt) {
+  const r = run, cl = r.campaign25, w = r.world, sq = r.squad;
+  if (!cl || cl.resultShown) return;
+  if (cl.auto) coreLoopAutopilot(sq, w);
+  const { t, events } = tickDirector(cl.director, dt, false);
+  cl.metrics.setDuration(t);
+  resonTick(sq.reson, dt);
+  const rushStarted = (cl._prevRushT ?? 0) <= 0 && (sq.rushT || 0) > 0;
+  cl._prevRushT = sq.rushT || 0;
+  const fr = tickFrame(sq.frameState, BAL.gate1.frames, dt, { flow: sq.flow || 0, rushStarted });
+  applyFrameAuto(fr, sq, w);
+  if (cl.resonActivated) { const spec = resonTryProc(sq.reson, BAL.gate1.resonance, t); if (spec) spawnResonance(spec, sq, w); }
+  const bo0 = r.bosses && r.bosses[0];
+  if (bo0) updateBossClamp(bo0, dt);
+  // 지역 전투 스트림 재보충(보스 없을 때 25분 내내 전투 유지)
+  if (r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < 6 && !cl.bossActive) refillCoreLoopTrack();
+  // 디렉터 사건 처리
+  for (const ev of events) {
+    const act = eventAction25(ev.type);
+    if (!act) continue;
+    switch (act.kind) {
+      case 'regionEnter': enterCampaignRegion(ev.region, t); break;
+      case 'bossStart': spawnCampaignBoss(ev.region, ev.boss, t); break;
+      case 'hullTier': campaignHullTier(ev.tier, t); break;
+      case 'equipWing': equipCampaignWing(); break;
+      case 'resonanceReady': activateCampaignResonance(); break;
+      case 'framePick': pickCampaignFrame(); break;
+      case 'result': cl.resultPending = true; break;
+      default: cl.deferredEvents.push({ kind: act.kind, t: Math.round(t) }); break;   // fleet/path/apex 등 = G2-B~D 실배선
+    }
+  }
+  // 지역 보스 처치 → TTK 확정 + 스트림 재개(다음 지역까지). B7 처치 = 25분 완결점.
+  if (cl.bossActive && r.bosses.length && r.bosses.every((b) => b.dead)) {
+    const res = cl.regionResults[cl.regionResults.length - 1];
+    if (res && res.ttk == null) { res.ttk = Math.round((t - cl.bossSpawnT) * 10) / 10; res.killed = true; cl.bossesKilled += 1; }
+    cl.bossActive = false; r.phase = 'track'; w.phase = 'track';
+    r.bosses = []; w.bosses = []; r.boss = null; w.boss = null;
+    if (res && res.boss === 'B7') { finishCampaign25('clear'); return; }
+    refillCoreLoopTrack();
+  }
+  if (cl.resultPending && (!cl.bossActive || t > cl.cfg.totalSec + 120)) {
+    finishCampaign25(cl.bossesKilled >= 6 ? 'clear' : 'timeout');
+  }
+}
+
+/** 25분 캠페인 종료: 결과 스냅샷 + 지역별 보스 TTK 노출. */
+function finishCampaign25(reason = 'clear') {
+  const r = run, cl = r.campaign25;
+  if (!cl || cl.resultShown) return;
+  cl.resultShown = true;
+  const t = elapsed(cl.director);
+  cl.metrics.gameOver(reason, t);
+  const snap = cl.metrics.snapshot(t);
+  snap.regionResults = cl.regionResults;
+  snap.bossesKilled = cl.bossesKilled;
+  snap.campaignReason = reason;
+  window.__nfRunMetrics = snap;
+  state = 'done';
+  if (r.campaign25.mode === 'play') ui.showCoreLoopResult(snap, r.squad, { ...cl, buildId: cl.buildId });
 }
 
 /** 지휘 프레임 자동 스킬을 실제 전투 행동으로 발동(RW-C, G1-05). */
@@ -841,6 +1049,7 @@ function update(dt) {
   w.boss = r.boss; w.bosses = r.bosses;
   r.squad.update(dt, w);
   if (r.coreLoop) coreLoopUpdate(dt);   // Gate 1 하네스: 디렉터·공명·프레임·측정 진행
+  if (r.campaign25) campaign25Update(dt);   // Gate 2: 25분 6지역 시간 캠페인 진행
   // 트랙 후반·보스·NEON RUSH일수록 BGM의 고역과 속도가 열리는 적응형 강도.
   const travelIntensity = r.totalTrack ? Math.min(1, r.traveled / r.totalTrack) : 0;
   const musicIntensity = r.phase === 'boss' ? 0.86 : r.phase === 'bossDeath' ? 0.35 : 0.3 + travelIntensity * 0.38;
@@ -1481,6 +1690,36 @@ window.__nfCoreLoop = {
     const st = window.__nfRunMetrics;
     add('tankStress: 무적 아님(내구도 0 사망)', st.gameOverReason === 'hull', st.gameOverReason);
     add('긴급 재건 실런타임 발동', st.emergencyRebuilds >= 1, st.emergencyRebuilds);
+    const pass = checks.every((c) => c.ok);
+    return { pass, failed: checks.filter((c) => !c.ok).map((c) => c.name), checks };
+  },
+};
+
+// Gate 2 25분 캠페인 개발/측정 훅 (?campaign25=1). 헤드리스 완주 재생 + 지역별 보스 TTK.
+window.__nfCampaign25 = {
+  start(buildId = 'railStorm', mode = 'measure') { startCampaign25({ mode, buildId }); return run.campaign25; },
+  /** 헤드리스: 25분 캠페인을 결과까지 빠르게 재생(렌더 없음). 반환: 스냅샷(regionResults 포함). */
+  run(buildId = 'railStorm', maxSeconds = 1560, dt = 1 / 60) {
+    startCampaign25({ mode: 'measure', buildId });
+    const steps = Math.ceil(maxSeconds / dt);
+    for (let i = 0; i < steps; i++) { update(dt); if (run.campaign25?.resultShown) break; }
+    return window.__nfRunMetrics || run.campaign25?.metrics.snapshot();
+  },
+  metrics: () => window.__nfRunMetrics,
+  /** 25분 구조 검증: 6지역 보스 전부 처치 + 각 지역 TTK가 목표창 근사 + 완주. */
+  integrationCheck() {
+    const s = this.run('railStorm', 1560);
+    const rr = s.regionResults || [];
+    const checks = [];
+    const add = (name, ok, detail) => checks.push({ name, ok: !!ok, detail });
+    add('6지역 보스 전부 등장', rr.length === 6, rr.map((x) => x.boss).join(','));
+    add('6지역 보스 전부 처치', rr.filter((x) => x.killed).length === 6, rr.filter((x) => x.killed).length);
+    add('B7 최종 처치로 완주(clear)', s.campaignReason === 'clear', s.campaignReason);
+    for (const x of rr) {
+      const region = BAL.gate2.regions.find((g) => g.i === x.region);
+      const [lo, hi] = region ? region.bossTtk : [0, 999];
+      add(`${x.boss} TTK ${lo}~${hi} 근사`, x.ttk != null && x.ttk >= lo - 5 && x.ttk <= hi + 8, x.ttk);
+    }
     const pass = checks.every((c) => c.ok);
     return { pass, failed: checks.filter((c) => !c.ok).map((c) => c.name), checks };
   },

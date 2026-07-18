@@ -105,8 +105,9 @@ test('G1-07: 무기/공명 피해를 실제 적용 피해(HP 감소)로 집계',
 });
 
 test('G1-08: 보스 HP는 고정 + 양측 클램프(dpsCap 하한·enrage 상한)로 TTK 수렴', () => {
-  // 고정 HP(재보정 없음) → maxHp가 STAGGER 분모·BREAK와 안 얽힘(Codex 3차 P1/P2 회피).
-  assert.ok(mainSrc.includes('avgDps * BAL.gate1.bossTtk.avgDpsMult') && mainSrc.includes('boss.dpsCap = boss.maxHp / BAL.gate1.bossTtk.minTTKSec'), '고정 HP + 하한 dpsCap');
+  // 고정 HP(재보정 없음) → maxHp가 STAGGER 분모·BREAK와 안 얽힘(Codex 3차 P1/P2 회피). 설치=공용 헬퍼.
+  assert.ok(mainSrc.includes('avgDps * c.hpMult') && mainSrc.includes('boss.dpsCap = boss.maxHp / c.minTTKSec'), '고정 HP + 하한 dpsCap');
+  assert.ok(mainSrc.includes('installBossTtkClamp(boss, avgDps'), '보스 클램프 설치 헬퍼 사용(Gate 2 지역보스 재사용)');
   assert.ok(!mainSrc.includes('_calibrated') && !mainSrc.includes('_provMax'), '재보정 로직 제거(HP 불변)');
   // 클램프는 보스 hitByBullet 래퍼에 → 발사체·랜스·에코 등 '모든' 경로가 거친다(Codex P1a).
   assert.ok(mainSrc.includes('boss.hitByBullet = (dmg, world, ctx)'), '클램프 래퍼: 모든 경로 적용');
