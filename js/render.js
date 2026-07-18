@@ -332,47 +332,48 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
 export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
   ctx.save();
   ctx.textBaseline = 'alphabetic';
-  // ── 기함 내구도 바 (상단 좌, 캠페인 드론줄과 안 겹치게 y=96) ──
-  const hb = { x: 12, y: 96, w: 150, h: 12 };
-  const hf = Math.max(0, Math.min(1, d.hullFrac));
-  ctx.fillStyle = 'rgba(255,80,80,0.16)';
-  ctx.fillRect(hb.x, hb.y, hb.w, hb.h);
-  ctx.fillStyle = hf > 0.4 ? '#57e0ff' : hf > 0.18 ? '#ffd93d' : '#ff5a5a';
-  ctx.fillRect(hb.x, hb.y, hb.w * hf, hb.h);
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(hb.x, hb.y, hb.w, hb.h);
+  // 모든 코어루프 정보는 좌측 컬럼(x=12)에 세로로 쌓는다 — 우상단 사운드 버튼·좌상단 일시정지 버튼과
+  //  겹치지 않게(G1-09). 캠페인 좌측 HUD(드론/기함 줄)는 y≤83이라 y=92부터 시작한다.
+  const x = 12; let y = 92;
+  // ── 기함 내구도 바 ──
   ctx.font = 'bold 11px Pretendard, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#dff0ff';
-  ctx.fillText(`기함 내구도 ${Math.round(d.hull)}/${d.hullMax}`, hb.x, hb.y - 3);
+  ctx.fillText(`기함 내구도 ${Math.round(d.hull)}/${d.hullMax}`, x, y);
+  y += 4;
+  const hw = 150, hh = 11, hf = Math.max(0, Math.min(1, d.hullFrac));
+  ctx.fillStyle = 'rgba(255,80,80,0.16)'; ctx.fillRect(x, y, hw, hh);
+  ctx.fillStyle = hf > 0.4 ? '#57e0ff' : hf > 0.18 ? '#ffd93d' : '#ff5a5a'; ctx.fillRect(x, y, hw * hf, hh);
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, hw, hh);
+  y += hh + 15;
 
-  // ── 두 무기 슬롯 (상단 우) ──
-  ctx.textAlign = 'right';
-  const chip = (label, lv, color, y) => {
-    ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = color;
-    ctx.fillText(label, logicalW - 12, y);
-    for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < lv ? 1 : 0.25; ctx.fillRect(logicalW - 12 - (2 - i) * 10 - 6, y + 5, 6, 3); }
-    ctx.globalAlpha = 1;
+  // ── 두 무기 슬롯 (좌, 레벨 점) ──
+  const chip = (label, lv, color) => {
+    ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = color; ctx.textAlign = 'left';
+    ctx.fillText(label, x, y);
+    const tw = ctx.measureText(label).width;
+    for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < lv ? 1 : 0.25; ctx.fillRect(x + tw + 6 + i * 9, y - 8, 6, 3); }
+    ctx.globalAlpha = 1; y += 17;
   };
-  chip('주무기 ' + (WEAPON_LABELS[d.mainWeapon] || d.mainWeapon), d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff', 34);
-  if (d.wingWeapon) chip('보조 ' + (WEAPON_LABELS[d.wingWeapon] || d.wingWeapon), d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff', 52);
-  else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.fillText('보조 무기 슬롯 (미해금)', logicalW - 12, 52); ctx.globalAlpha = 1; }
+  chip('주무기 ' + (WEAPON_LABELS[d.mainWeapon] || d.mainWeapon), d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff');
+  if (d.wingWeapon) chip('보조 ' + (WEAPON_LABELS[d.wingWeapon] || d.wingWeapon), d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff');
+  else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText('보조 무기 슬롯 (미해금)', x, y); ctx.globalAlpha = 1; y += 17; }
 
-  // ── 공명 진행/예고 (우, 무기 아래) ──
+  // ── 공명 진행/예고 ──
   if (d.resonanceName) {
-    const rw = 120, rx = logicalW - 12 - rw, ry = 66;
-    ctx.textAlign = 'left';
-    ctx.font = 'bold 10px Pretendard, sans-serif';
+    ctx.font = 'bold 10px Pretendard, sans-serif'; ctx.textAlign = 'left';
     ctx.fillStyle = d.telegraph ? '#ffd93d' : '#9fe8ff';
-    ctx.fillText((d.telegraph ? '공명 예고: ' : '공명: ') + d.resonanceName, rx, ry - 2);
-    ctx.fillStyle = 'rgba(159,232,255,0.16)'; ctx.fillRect(rx, ry, rw, 5);
-    ctx.fillStyle = '#9fe8ff'; ctx.fillRect(rx, ry, rw * Math.max(0, Math.min(1, d.resonanceFrac)), 5);
+    ctx.fillText((d.telegraph ? '공명 예고: ' : '공명: ') + d.resonanceName, x, y); y += 4;
+    ctx.fillStyle = 'rgba(159,232,255,0.16)'; ctx.fillRect(x, y, 130, 5);
+    ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x, y, 130 * Math.max(0, Math.min(1, d.resonanceFrac)), 5);
+    y += 16;
   }
 
-  // ── 지휘 프레임 아이콘 (좌, 내구도 아래) ──
+  // ── 지휘 프레임 아이콘 ──
   if (d.frameIcon) {
-    ctx.textAlign = 'left'; ctx.font = '15px Pretendard, sans-serif'; ctx.fillStyle = d.frameGlow || '#fff';
-    ctx.fillText(`${d.frameIcon} ${d.frameName}`, hb.x, hb.y + 26);
+    ctx.textAlign = 'left'; ctx.font = '14px Pretendard, sans-serif'; ctx.fillStyle = d.frameGlow || '#fff';
+    ctx.fillText(`${d.frameIcon} ${d.frameName}`, x, y);
   }
 
-  // ── 8분 타이머 + 다음 사건 (상단 중앙) ──
+  // ── 8분 타이머 + 다음 사건 (상단 중앙, 좌/우 버튼과 겹치지 않는 안전지대) ──
   ctx.textAlign = 'center'; ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = '#cfe4ff';
   const mm = Math.floor(d.dirT / 60), ss = Math.floor(d.dirT % 60);
   ctx.fillText(`${mm}:${String(ss).padStart(2, '0')} / 8:00`, logicalW / 2, 20);

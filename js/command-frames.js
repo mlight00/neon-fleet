@@ -59,7 +59,10 @@ export function tickFrame(state, cfg, dt, ctx = {}) {
     }
   } else if (state.id === 'phase') {
     const p = cfg.phase.auto;
-    if ((ctx.flow ?? 0) >= p.flowThreshold && state.dashT <= 0) {
+    // FLOW는 max 도달 즉시 0이 되므로(flow.js) 임계값 대신 RUSH 시작 신호로 발동한다(G1-05).
+    //  ctx.rushStarted가 없으면 임계값 폴백(단위 테스트 호환).
+    const trigger = ctx.rushStarted != null ? ctx.rushStarted : ((ctx.flow ?? 0) >= p.flowThreshold);
+    if (trigger && state.dashT <= 0) {
       state.dashT = p.dashInvuln;
       return { type: 'dash', invuln: p.dashInvuln };
     }

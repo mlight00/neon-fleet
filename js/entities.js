@@ -15,7 +15,7 @@ import { droneReward } from './adaptive-logic.js';
 import { addFlow, updateFlow, onFlowHit } from './flow.js';
 import { keystoneEffects, forgeOnKill } from './keystones.js';
 import { frameDamageMult, frameInvulnActive } from './command-frames.js';
-import { resolveHit } from './survivability.js';
+import { resolveHit, canEmergencyRebuild, doEmergencyRebuild, repair as survRepair, hullFrac } from './survivability.js';
 import { sfx } from './audio.js';
 import { UPGRADE_DURATIONS, upgradeGrade } from './creative-direction.js';
 
@@ -627,7 +627,31 @@ export class Squad {
     world.effects.ring(this.x, this.y, COLORS.danger);
     world.metrics?.hullDamage(amount);
     this.onCombatHit(world);
-    if (out.dead) { this.dead = true; world.onHullDepleted?.(this); }
+    if (out.dead) { this.dead = true; world.onHullDepleted?.(this); return; }
+    this.maybeEmergencyRebuild(world);   // 내구도 위급 시 1회 긴급 재건(§5.6, G1-04)
+  }
+
+  /**
+   * 긴급 재건(§5.6, G1-04): 내구도가 위급(최대치의 emergencyRebuildAtFrac 미만)해지는 순간 1회 자동 발동.
+   *  비용=내구도 소량 지불(모듈), 효과=순양함 복구(피탄 흡수) + 제한 수리(구조) + 짧은 무적·보호막. 실제 로그 기록.
+   */
+  maybeEmergencyRebuild(world) {
+    if (!this.surv) return;
+    const cfg = BAL.gate1.survivability;
+    if (hullFrac(this.surv) >= (cfg.emergencyRebuildAtFrac ?? 0.3) || !canEmergencyRebuild(this.surv, cfg)) return;
+    const res = doEmergencyRebuild(this.surv, cfg);   // emergencyUsed++, 내구도 비용 지불, 순양함 수 반환
+    if (!res.ok) return;
+    this.cruisers = Math.min(BAL.escort.maxCruisers, (this.cruisers || 0) + res.cruisers);
+    this._syncCruiserHp();
+    survRepair(this.surv, cfg);                        // 구조 수리(제한)
+    this.shield = true;
+    this.invulnT = Math.max(this.invulnT, 1.0);
+    world.metrics?.emergencyRebuild();
+    world.metrics?.hullRepair();
+    world.effects.halo(this.x, this.y, COLORS.reward);
+    world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
+    world.effects.text(this.x, this.y - 56, `긴급 재건! 순양함 +${res.cruisers} · 구조 수리`, COLORS.reward, 16);
+    sfx('evolve');
   }
 
   update(dt, world) {
@@ -1423,6 +1447,10 @@ export class HomingMissile {
     this.dead = false;
   }
   pickTarget(world) {
+    // 시커 빔 공명(G1-06): 레이저가 지정한 표식 대상이 살아 있으면 유도 미사일이 최우선 추적한다.
+    //  표식 대상이 파괴·만료되면(reson.onEnemyRemoved/markT) 일반 점수로 다음 표적을 고른다.
+    const reson = world.reson;
+    if (reson && reson.activeId === 'seekerBeam' && reson.markId && !reson.markId.dead) { this.target = reson.markId; return; }
     // 우선순위: 크리처/사격형 적 > 크리스탈 > 운석 (최근접). 와스프는 근접 3표적 중 랜덤(분산).
     const cands = [];
     for (const e of world.entities) {
@@ -1441,7 +1469,9 @@ export class HomingMissile {
     const sp = BAL.weapons.homing, spdMul = this.speedMult || 1, trnMul = this.turnMult || 1;
     this.speed = Math.min(sp.speedTo * spdMul, this.speed + 260 * dt);
     if (this.age > 0.25) {
-      if (!this.target || this.target.dead) this.pickTarget(world);
+      // 시커 빔: 새 표식이 걸리면 즉시 그쪽으로 재조준(G1-06).
+      const mark = world.reson?.activeId === 'seekerBeam' ? world.reson.markId : null;
+      if (!this.target || this.target.dead || (mark && !mark.dead && this.target !== mark)) this.pickTarget(world);
       if (this.target && !this.target.dead) {
         const want = Math.atan2(this.target.x - this.x, -(this.target.y - this.y));
         const cur = Math.atan2(this.vx, -this.vy);

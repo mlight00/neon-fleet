@@ -1,7 +1,7 @@
 // 진입점: 캔버스 관리 + 게임 루프 + 상태 머신 + 트랙 생성
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
-import { createStarfield, drawHUD, drawCoreLoopHud, COLORS, glow, WEAPON_LABELS } from './render.js';
+import { createStarfield, drawHUD, drawCoreLoopHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
 import { bossDefById, preloadBossArt } from './sprites.js';
 import { maybeAffix } from './affixes.js';
@@ -30,7 +30,9 @@ import { createFrameState, setFrame as frameSet, frameOnKill, tickFrame, frameHu
 import { createLoadout, equip as loadoutEquip } from './weapon-loadout.js';
 import { CORE_LOOP_BUILDS, coreLoopBuild, eventAction, frameForBuild } from './core-loop.js';
 
-const CORE_LOOP = new URLSearchParams(location.search).has('coreLoopTest');
+const _clParams = new URLSearchParams(location.search);
+const CORE_LOOP = _clParams.has('coreLoopTest');        // 사람 플레이(H0·내구도100·무기1·조작 가능)
+const CORE_MEASURE = _clParams.has('coreLoopMeasure');  // 자동 측정 재생(autopilot+auto-select, 헤드리스 시뮬)
 
 const LOGICAL_W = BAL.logicalW;
 const canvas = document.getElementById('game');
@@ -352,7 +354,8 @@ function startPlay() {
   drafting = false;
   betweenStages = false;
   sfx('start');
-  if (CORE_LOOP) { startCoreLoop('railStorm'); return; }   // ?coreLoopTest=1: 8분 핵심 재미 하네스
+  if (CORE_MEASURE) { startCoreLoop({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?coreLoopMeasure=1: 자동 측정
+  if (CORE_LOOP) { startCoreLoop({ mode: 'play' }); return; }   // ?coreLoopTest=1: 사람 플레이 8분 슬라이스
   newExpedition();   // → startSector(1) → enterSectorMap(): 섹터 맵 화면(state='map'). 노드 선택 시 전투 시작.
 }
 
@@ -360,8 +363,16 @@ function startPlay() {
 // 기존 캠페인은 손대지 않는다. 이 하네스는 디렉터·무기 2슬롯·공명·기함 내구도·프레임·측정을
 // 한 판에서 구동해 통과 수치와 화면을 만든다.
 
-/** 하네스 시작: 원정 스캐폴딩 재사용 + Gate 1 시스템 설치 + 첫 전투 노드 직접 진입. */
-function startCoreLoop(buildId = 'railStorm') {
+/**
+ * Gate 1 8분 슬라이스 시작. 두 모드 (Codex G1-01/02 반영):
+ *  play    — 사람이 조작·선택. H0·내구도 100·무기 1개(시작 선택)·소편대. 자동 운전 없음.
+ *  measure — 자동 재생(autopilot + auto-select). 헤드리스 시뮬·TTK 측정 전용. 생존 보정 hullMax·완성빌드 화력.
+ * 결과 화면은 이 시점에 기록한 실제 시작 스냅샷(startTier/startHull/startWeapon)을 쓴다.
+ */
+function startCoreLoop(opts = {}) {
+  const mode = opts.mode === 'measure' ? 'measure' : 'play';
+  const auto = mode === 'measure';
+  const buildId = opts.buildId || 'railStorm';
   const build = coreLoopBuild(buildId);
   drafting = false; betweenStages = false;
   newExpedition('campaign');            // world/squad/run 생성
@@ -369,37 +380,145 @@ function startCoreLoop(buildId = 'railStorm') {
   const surv = createSurvivability(BAL.gate1.survivability);
   const reson = createResonanceState();
   const frameState = createFrameState();
-  sq.installGate1({ surv, reson, frameState, frameId: null, mainWeapon: build.main });
-  const metrics = createRunMetrics({ runId: 'coreLoop-' + buildId, seed: (Math.random() * 2 ** 31) | 0 });
+  // play: 시작 무기는 사람이 0:00에 선택(그때까지 vulcan 임시). measure: 빌드의 주무기 고정.
+  const startMain = auto ? build.main : 'vulcan';
+  sq.installGate1({ surv, reson, frameState, frameId: null, mainWeapon: startMain });
+  const metrics = createRunMetrics({ runId: `coreLoop-${mode}-${buildId}`, seed: (Math.random() * 2 ** 31) | 0 });
   const director = createRunDirector(BAL.gate1.timeline);
   w.metrics = metrics;
   w.reson = reson;
   w.onHullDepleted = () => metrics.gameOver('hull', elapsed(director));
-  r.coreLoop = { build, buildId, director, metrics, telegraph: false, resonActivated: false, bossSpawned: false, resultShown: false, startHull: surv.hull };
-  // 생존 스트레스 빌드: 타이탄 + 순양함 만석 + 드론 대량이어도 내구도가 실제로 감소하는지 검증(§6.2 무적 방지).
-  //  → hullMax는 권장 100 그대로 두어 "무적이 아님"(내구도 0 도달 가능)을 증명한다.
-  if (build.stress) {
-    sq.tier = BAL.evolution.names.length - 1;
-    sq.cruisers = BAL.escort.maxCruisers;
-    sq.count = 400;
-    sq.banked = 4000;
-  } else {
-    // 측정 빌드: 헤드리스 자동회피는 인간만큼 못 피하므로 8분 타임라인·보스 TTK를 끝까지 측정하도록
-    //  내구도 여유를 크게 준다(내구도 감소는 여전히 실측 — hullDamageTaken>0). 실제 플레이 값은 balance의 100.
-    surv.hullMax = surv.hull = BAL.gate1.survivability.measureHullMax;
-    // "완성 빌드" 화력 근사: 8분 시점의 드론·은행·티어를 미리 부여해 보스 TTK가 의미 있는 값이 되게.
-    sq.count = 70; sq.banked = 260; sq.tier = 2;
+  r.coreLoop = {
+    mode, auto, build, buildId, director, metrics,
+    telegraph: false, resonActivated: false, bossSpawned: false, resultShown: false, picking: false,
+    startTier: 0, startHull: surv.hull, startWeapon: null, awaitingStart: !auto,
+  };
+  if (auto) {
+    if (build.stress) {
+      // 무적 방지 검증: 타이탄+순양함 만석+드론 대량이어도 내구도 100 그대로(0 도달 가능).
+      sq.tier = BAL.evolution.names.length - 1; sq.cruisers = BAL.escort.maxCruisers; sq.count = 400; sq.banked = 4000;
+    } else {
+      // 측정 전용 보정: 헤드리스 자동회피가 사람만큼 못 피하므로 타임라인·TTK를 끝까지 재려고 내구도 여유.
+      surv.hullMax = surv.hull = BAL.gate1.survivability.measureHullMax;
+      sq.count = 70; sq.banked = 260; sq.tier = 2;
+    }
     r.maxPower = sq.power;
+    r.coreLoop.startTier = sq.tier; r.coreLoop.startHull = surv.hull; r.coreLoop.startWeapon = build.main;
+  } else {
+    // play: 정직한 시작 — H0·내구도 100·소편대·무기 1개(선택 대기).
+    sq.tier = 0; sq.banked = 0; sq.cruisers = 0;
+    sq.count = w.stats?.startCount ?? BAL.squad.start;
+    r.maxPower = sq.power;
+    r.coreLoop.startTier = 0; r.coreLoop.startHull = surv.hull;
   }
   window.__nfRunMetrics = null;
   enterNode(r.map.cols[0][0]);           // 첫 전투 노드 직접 진입 (맵 스킵) → state='play'
   r.totalTrack = 1e12;                    // 트랙 종료로 인한 조기 클리어 방지(디렉터가 8분을 관리)
-  r.pending = [];                         // 빌드 고정: 무기 캡슐·게이트 제거. refill이 유일한 적 공급원.
+  r.pending = [];
   refillCoreLoopTrack();
+  if (auto) resonSetLoadout(reson, [build.main, null]);   // 측정: 로드아웃 즉시 반영(공명은 4:30 활성)
+  else openCoreLoopStartPick();                            // play: 0:00 시작 무기 선택(게임 정지)
   return r.coreLoop;
 }
 
-/** 하네스 자동 회피(측정 재생용). 가까운 적탄에서 가장 먼 x로 조향해 8분간 생존하되 피격도 받는다. */
+/** 코어루프 선택창 열기(§5.1). play 모드=게임 정지 + DOM 카드. measure 모드=자동으로 index 0 선택. */
+function openCoreLoopPick({ title, subtitle, options, onPick, autoIdx = 0 }) {
+  const cl = run.coreLoop;
+  if (cl.auto) { onPick(options[autoIdx].id, autoIdx); return; }   // 측정: 자동 선택(정지 없음)
+  drafting = true; cl.picking = true; state = 'play';
+  ui.showCoreLoopPick({ title, subtitle, options, onPick: (id, idx) => { ui.hide(); drafting = false; cl.picking = false; sfx('buy'); onPick(id, idx); } });
+}
+
+/** 0:00 시작 무기 선택. */
+function openCoreLoopStartPick() {
+  const r = run, cl = r.coreLoop, sq = r.squad;
+  openCoreLoopPick({
+    title: '시작 무기 선택', subtitle: '이번 출격의 첫 정체성을 고르세요.',
+    options: [
+      { id: 'vulcan', label: WEAPON_LABELS.vulcan, desc: '넓게 퍼지는 연사', color: WEAPON_COLORS.vulcan, icon: '💥' },
+      { id: 'laser', label: WEAPON_LABELS.laser, desc: '적을 관통하는 빔', color: WEAPON_COLORS.laser, icon: '⚡' },
+      { id: 'homing', label: WEAPON_LABELS.homing, desc: '흩어진 적 자동 추적', color: WEAPON_COLORS.homing, icon: '🚀' },
+    ],
+    onPick(id) {
+      sq.weapon = id; sq.weaponLv = 1;
+      resonSetLoadout(sq.reson, [id, null]);
+      cl.startWeapon = id; cl.awaitingStart = false;
+      r.effects.text(sq.x, sq.y - 60, `시작 무기: ${WEAPON_LABELS[id]}`, WEAPON_COLORS[id], 15);
+    },
+  });
+}
+
+/** 현재 무기들의 '실제 행동 변화' 옵션(레벨업·진화·초진화). 없으면 빈 배열(→ 행동 변화로 기록 안 함). */
+function coreLoopWeaponSteps(sq) {
+  const steps = [];
+  const slots = [['main', sq.weapon], ['wing', sq.wing.weaponId]].filter(([, w]) => w);
+  for (const [slot, w] of slots) {
+    const lv = slot === 'main' ? sq.weaponLv : sq.wing.level;
+    const L = WEAPON_LABELS[w], C = WEAPON_COLORS[w];
+    const setLv = (n) => { if (slot === 'main') sq.weaponLv = n; else sq.wing.level = n; };
+    if (lv < 3) steps.push({ id: `lv-${slot}`, label: `${L} Lv${lv + 1}`, desc: '발사 수·확산·관통 강화', color: C, apply: () => setLv(lv + 1) });
+    else if (!sq.weaponEvolutions[w]) for (const evo of evolutionOptions(w)) steps.push({ id: `evo-${evo.id}`, label: `${L} 진화: ${evo.short}`, desc: evo.shape, color: '#ffd93d', apply: () => { sq.weaponEvolutions[w] = evo.id; sq.evoLevels[w] = 1; } });
+    else if ((sq.evoLevels[w] || 1) < 3) steps.push({ id: `evolv-${slot}`, label: `${L} 진화 Lv${(sq.evoLevels[w] || 1) + 1}`, desc: '진화 위력 상승', color: '#ffd93d', apply: () => { sq.evoLevels[w] = (sq.evoLevels[w] || 1) + 1; } });
+    else if (!sq.weaponEvolutions2[w]) for (const s of superEvolutionOptions(w)) steps.push({ id: `super-${s.id}`, label: `${L} 초진화: ${s.short}`, desc: s.shape, color: '#ff5c2a', apply: () => { sq.weaponEvolutions2[w] = s.id; sq.superLevels[w] = 1; } });
+    else if ((sq.superLevels[w] || 1) < 3) steps.push({ id: `superlv-${slot}`, label: `${L} 초진화 Lv${(sq.superLevels[w] || 1) + 1}`, desc: '초진화 위력 상승', color: '#ff5c2a', apply: () => { sq.superLevels[w] = (sq.superLevels[w] || 1) + 1; } });
+  }
+  return steps;
+}
+
+/** 0:30~ 행동 변화 카드. 실제 변화가 있을 때만 열고 기록(§G1-03). 반환: 열었으면 true. */
+function openCoreLoopBehaviorPick(t) {
+  const r = run, cl = r.coreLoop, sq = r.squad;
+  const steps = coreLoopWeaponSteps(sq);
+  if (!steps.length) return false;                       // 전 무기 최대 → 행동 변화 없음, 기록 안 함
+  const options = steps.slice(0, 3);
+  openCoreLoopPick({
+    title: '행동 변화 강화', subtitle: '발사 형태가 눈에 띄게 달라집니다.',
+    options,
+    onPick(id, idx) {
+      options[idx].apply();
+      cl.metrics.choice(t, { behavior: true });          // 실제 변화가 적용된 경우만 기록
+      r.effects.text(sq.x, sq.y - 64, options[idx].label, options[idx].color || COLORS.reward, 15);
+      sq.invulnT = Math.max(sq.invulnT, 0.8);            // 강화 직후 짧은 무적(§5.5)
+    },
+  });
+  return true;
+}
+
+/** 1:15 두 번째 무기 획득 — 미장착 무기 2종 중 선택해 wing 슬롯 장착. */
+function openCoreLoopSecondWeaponPick(t) {
+  const r = run, cl = r.coreLoop, sq = r.squad;
+  if (sq.wing.weaponId) return;
+  const cand = ['vulcan', 'laser', 'homing'].filter((w) => w !== sq.weapon);
+  openCoreLoopPick({
+    title: '두 번째 무기 획득', subtitle: '기존 무기를 유지한 채 두 무기가 동시에 발사됩니다.',
+    options: cand.map((w) => ({ id: w, label: WEAPON_LABELS[w], desc: '보조 하드포인트에 장착', color: WEAPON_COLORS[w] })),
+    autoIdx: Math.max(0, cand.indexOf(cl.build.wing)),   // 측정: 빌드의 보조 무기
+    onPick(w) {
+      sq.wing.weaponId = w; sq.wing.level = 1; sq._wingAcc = 0;
+      cl.metrics.secondWeapon(t);
+      r.effects.text(sq.x, sq.y - 74, `두 번째 무기: ${WEAPON_LABELS[w]}`, COLORS.reward, 15);
+    },
+  });
+}
+
+/** 5:30 지휘 프레임 선택. */
+function openCoreLoopFramePick(t) {
+  const r = run, cl = r.coreLoop, sq = r.squad;
+  if (sq.frameId) return;
+  const F = BAL.gate1.frames;
+  openCoreLoopPick({
+    title: '지휘 프레임 선택', subtitle: '함대 성격과 자동 스킬이 정해집니다.',
+    options: ['assault', 'carrier', 'phase'].map((id) => ({ id, label: F[id].name, desc: F[id].auto.name, color: F[id].glow, icon: F[id].icon })),
+    autoIdx: Math.max(0, ['assault', 'carrier', 'phase'].indexOf(frameForBuild(cl.buildId))),
+    onPick(id) {
+      frameSet(sq.frameState, id); sq.frameId = id; sq.doctrine = F[id].doctrine;
+      cl.metrics.framePick(t);
+      r.effects.text(sq.x, sq.y - 74, `지휘 프레임: ${F[id].name}`, F[id].glow, 15);
+    },
+  });
+}
+
+/** 하네스 자동 회피(측정 재생 전용, auto 모드에서만 호출). 가까운 적탄에서 가장 먼 x로 조향. */
 function coreLoopAutopilot(sq, w) {
   const near = [];
   for (const b of w.enemyBullets) { if (!b.dead && b.y > sq.y - 220 && b.y < sq.y + 90) near.push(b); }
@@ -449,7 +568,13 @@ function spawnCoreLoopBoss() {
   boss.homeX = LOGICAL_W / 2; boss.x = boss.homeX;
   // 완성 빌드 기준 TTK 45~60초를 노린 HP: 함대 화력 비례(측정으로 계수 보정). 단순 HP벽이 아니라
   //  패턴·STAGGER·BREAK 상호작용으로 시간을 만든다(§5.8).
-  boss.hp = boss.maxHp = Math.round(Math.max(BAL.boss.hp, r.squad.power * BAL.gate1.bossTtk.hpPerPower));
+  // 적응형 HP: 이 판의 실측 평균 DPS×계수. 플레이/측정 함대의 화력 편차와 무관하게 TTK가 45~60으로 수렴.
+  const snap = r.coreLoop.metrics.snapshot(elapsed(r.coreLoop.director));
+  const totalDmg = Object.values(snap.damageByWeapon).reduce((a, c) => a + c, 0) + Object.values(snap.damageByResonance).reduce((a, c) => a + c, 0);
+  const avgDps = snap.durationSec > 5 ? totalDmg / snap.durationSec : 60;
+  boss.hp = boss.maxHp = Math.round(Math.max(BAL.boss.hp * 0.25, avgDps * BAL.gate1.bossTtk.avgDpsMult));
+  boss.dpsCap = boss.maxHp / BAL.gate1.bossTtk.minTTKSec;   // 초당 피해 상한(TTK 하한 → 순삭 방지·수렴)
+  boss._dmgSec = 0; boss._secT = 0;
   r.bosses = [boss]; w.bosses = [boss];
   r.boss = boss; w.boss = boss;
   preloadBossArt('B22');
@@ -474,89 +599,106 @@ function finishCoreLoop(reason = 'clear') {
 /** 하네스 per-frame 진행 (update에서 run.coreLoop일 때만). */
 function coreLoopUpdate(dt) {
   const r = run, cl = r.coreLoop, w = r.world, sq = r.squad;
-  if (!cl || cl.resultShown) return;
+  if (!cl || cl.resultShown || cl.awaitingStart) return;   // 시작 무기 선택 전엔 진행 안 함(시간 정지)
   const RCFG = BAL.gate1.resonance;
-  coreLoopAutopilot(sq, w);              // 자동 회피(측정 재생)
+  if (cl.auto) coreLoopAutopilot(sq, w);                    // 자동 회피는 측정 모드에서만(사람 플레이 조작 보존)
   const { t, events } = tickDirector(cl.director, dt, false);
   cl.metrics.setDuration(t);
-  // 공명·프레임 per-frame
+  // 공명 타이머 + 프레임 자동 스킬(실전 발동 — RW-C)
   resonTick(sq.reson, dt);
-  const fr = tickFrame(sq.frameState, BAL.gate1.frames, dt, { flow: sq.flow || 0 });
-  if (fr?.type === 'dash') sq.invulnT = Math.max(sq.invulnT, fr.invuln);
-  if (fr?.type === 'volley') w.effects.ring(sq.x, sq.y, '#3fd0f5');   // 호위 동기화 신호(연출)
+  const rushStarted = (cl._prevRushT ?? 0) <= 0 && (sq.rushT || 0) > 0;   // 이번 프레임 RUSH 시작(페이즈 프레임 트리거)
+  cl._prevRushT = sq.rushT || 0;
+  const fr = tickFrame(sq.frameState, BAL.gate1.frames, dt, { flow: sq.flow || 0, rushStarted });
+  applyFrameAuto(fr, sq, w);
+  // 공명 발동 (활성 후): 충전형 발사 or 첫 발동 시각 기록
   if (cl.resonActivated) {
     const spec = resonTryProc(sq.reson, RCFG, t);
-    if (spec) spawnResonance(spec, sq, w);
+    if (spec) { spawnResonance(spec, sq, w); recordFirstResonance(cl, t); }
+    if (sq.reson.markId != null) recordFirstResonance(cl, t);   // 시커: 표식 성립도 완성으로 인정
   }
-  // 전투가 8분 내내 이어지도록 트랙 소진 시 경량 스트림 재보충 (하네스 전용)
+  // 보스 초당 피해 상한 창 리셋(TTK 하한)
+  const bo0 = r.bosses && r.bosses[0];
+  if (bo0 && bo0.dpsCap) { bo0._secT = (bo0._secT || 0) + dt; if (bo0._secT >= 1) { bo0._secT -= 1; bo0._dmgSec = 0; } }
+  // 8분 내내 전투가 이어지도록 트랙 재보충
   if (r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < 6 && !cl.bossSpawned) refillCoreLoopTrack();
-  // 디렉터 사건 처리
+  // 디렉터 사건 처리 (play=선택창, measure=자동)
   for (const ev of events) {
     const act = eventAction(ev.type);
     if (!act) continue;
-    if (act.kind === 'equipWing' && !sq.wing.weaponId) {
-      sq.wing.weaponId = cl.build.wing; sq.wing.level = 1; sq._wingAcc = 0;
-      cl.metrics.secondWeapon(ev.t);
-      w.effects.text(sq.x, sq.y - 74, `두 번째 무기 장착: ${WEAPON_LABELS[cl.build.wing]}`, COLORS.reward, 15);
-    } else if (act.kind === 'hullTier') {
+    if (act.kind === 'equipWing') openCoreLoopSecondWeaponPick(ev.t);
+    else if (act.kind === 'hullTier') {
       survTierUp(sq.surv, BAL.gate1.survivability);
-      sq.tier = Math.min(BAL.evolution.names.length - 1, sq.tier + 1);
+      sq.tier = Math.min(BAL.evolution.names.length - 1, sq.tier + 1);   // H0→H1 (자동 성장 + 외형·내구도 최대치 변화)
       cl.metrics.hullTier(ev.t);
-      w.effects.text(sq.x, sq.y - 74, `기함 승급 · 내구도 최대치 ↑`, COLORS.reward, 15);
-    } else if (act.kind === 'behavior') {
-      // 행동 변화: 두 무기 레벨을 번갈아 올려 발사 형태를 바꾼다(측정용).
-      const slot = (cl.metrics.snapshot().behaviorUpgradeTimes.length % 2 === 0) ? 'main' : 'wing';
-      if (slot === 'wing' && sq.wing.weaponId) sq.wing.level = Math.min(3, sq.wing.level + 1);
-      else sq.weaponLv = Math.min(3, sq.weaponLv + 1);
-      cl.metrics.choice(ev.t, { behavior: true });
-    } else if (act.kind === 'telegraph') {
-      cl.telegraph = true;
-    } else if (act.kind === 'resonanceReady') {
-      // 첫 공명 완성(§5.4): 이 시점에 공명을 활성화하고 확정 완성시킨다.
+      w.effects.halo(sq.x, sq.y, COLORS.reward);
+      w.effects.text(sq.x, sq.y - 74, `기함 승급 ${BAL.evolution.names[sq.tier]} · 내구도 최대치 ↑`, COLORS.reward, 15);
+    } else if (act.kind === 'behavior') openCoreLoopBehaviorPick(ev.t);   // 실제 변화 있을 때만 열고 기록
+    else if (act.kind === 'telegraph') cl.telegraph = true;
+    else if (act.kind === 'resonanceReady') {
+      // 공명 활성화(§5.4). 이후는 실제 플레이(발칸 명중 충전/레이저 표식)로 완성 → firstResonance는 실제 발동 시 기록.
       if (sq.wing.weaponId) {
         resonSetLoadout(sq.reson, [sq.weapon, sq.wing.weaponId]);
         cl.resonActivated = true;
-        const res = RESONANCES[sq.reson.activeId];
-        if (res && res.trigger === 'charge') sq.reson.charge = RCFG[sq.reson.activeId].threshold; // 다음 틱 발동
-        else if (res) resonLaserMark(sq.reson, RCFG, w.entities.find((e) => e.isEnemy && !e.dead) || 'seed', ev.t);
-        sq.reson.firstCompletedAt = sq.reson.firstCompletedAt ?? ev.t;
-        cl.metrics.firstResonance(ev.t);
-        w.effects.text(sq.x, sq.y - 74, `공명 완성: ${RESONANCES[sq.reson.activeId]?.name || ''}`, '#9fe8ff', 16);
+        if (cl.auto) { const res = RESONANCES[sq.reson.activeId]; if (res?.trigger === 'charge') sq.reson.charge = RCFG[sq.reson.activeId].threshold; }
+        w.effects.text(sq.x, sq.y - 74, `공명 회로 활성: ${RESONANCES[sq.reson.activeId]?.name || ''}`, '#9fe8ff', 16);
       }
-    } else if (act.kind === 'framePick') {
-      const fid = frameForBuild(cl.buildId);
-      frameSet(sq.frameState, fid); sq.frameId = fid; sq.doctrine = BAL.gate1.frames[fid].doctrine;
-      cl.metrics.framePick(ev.t);
-      w.effects.text(sq.x, sq.y - 74, `지휘 프레임: ${BAL.gate1.frames[fid].name}`, BAL.gate1.frames[fid].glow, 15);
-    } else if (act.kind === 'eliteWave') {
-      refillCoreLoopTrack(true);
-    } else if (act.kind === 'bossStart') {
-      if (!cl.bossSpawned) { cl.bossSpawned = true; spawnCoreLoopBoss(); cl.metrics.bossStart(ev.t, 'B22'); }
-    } else if (act.kind === 'result') {
-      cl.resultPending = true;   // 보스 TTK 측정을 위해 보스 처치까지 결과 대기(하드캡 있음)
-    }
+    } else if (act.kind === 'framePick') openCoreLoopFramePick(ev.t);
+    else if (act.kind === 'eliteWave') refillCoreLoopTrack(true);
+    else if (act.kind === 'bossStart') { if (!cl.bossSpawned) { cl.bossSpawned = true; spawnCoreLoopBoss(); cl.metrics.bossStart(ev.t, 'B22'); } }
+    else if (act.kind === 'result') cl.resultPending = true;   // 보스 TTK 측정 위해 처치까지 대기(하드캡)
   }
-  // 보스 처치 시 TTK 확정
-  if (cl.bossSpawned && !cl.bossEnded && r.bosses.length && r.bosses.every((b) => b.dead)) {
-    cl.bossEnded = true; cl.metrics.bossEnd(t);
-  }
-  // 결과: result 사건 이후 (보스 처치 완료) 또는 하드캡(보스가 안 죽어도 측정 종료) 도달 시.
+  // 보스 처치 → TTK 확정
+  if (cl.bossSpawned && !cl.bossEnded && r.bosses.length && r.bosses.every((b) => b.dead)) { cl.bossEnded = true; cl.metrics.bossEnd(t); }
   if (cl.resultPending && (cl.bossEnded || !cl.bossSpawned || t > BAL.gate1.timeline.resultAt + 100)) {
     finishCoreLoop(cl.bossEnded || !cl.bossSpawned ? 'clear' : 'timeout');
+  }
+}
+
+/** 첫 공명 완성 시각을 실제 발동/표식 성립 시점에 1회 기록(§5.4, 사건 시각 아님). */
+function recordFirstResonance(cl, t) {
+  if (cl.firstResonanceRecorded) return;
+  cl.firstResonanceRecorded = true;
+  cl.metrics.firstResonance(t);
+}
+
+/** 지휘 프레임 자동 스킬을 실제 전투 행동으로 발동(RW-C, G1-05). */
+function applyFrameAuto(fr, sq, w) {
+  if (!fr) return;
+  if (run.coreLoop) { if (fr.type === 'dash') run.coreLoop.sawDash = true; if (fr.type === 'volley') run.coreLoop.sawVolley = true; }   // 통합 검증 플래그
+  if (fr.type === 'dash') { sq.invulnT = Math.max(sq.invulnT, fr.invuln); w.effects.ring(sq.x, sq.y, BAL.gate1.frames.phase.glow); }
+  else if (fr.type === 'volley') {
+    // 캐리어 호위 동기화: 실제 일제사격(전방 부채꼴 탄) — 연출만이 아니라 피해 발생.
+    const dmg = Math.max(6, sq.flagPower * (w.stats?.damage ?? 1) * 0.05) * fr.volleyMult;
+    for (let i = -2; i <= 2; i++) {
+      const a = i * 0.12;
+      const b = new Bullet(sq.x, sq.y - 12, dmg, { vx: Math.sin(a) * 520, vy: -Math.cos(a) * 520, kind: 'vulcan', pierce: 1, lv: 3, color: BAL.gate1.frames.carrier.glow });
+      b.sourceWeaponId = null; b.frameVolley = true;
+      w.bullets.push(b);
+    }
+    w.effects.ring(sq.x, sq.y, BAL.gate1.frames.carrier.glow); sfx('vulcan');
   }
 }
 
 /** 하네스 경량 적 스트림: 자동 회피로 8분 생존 가능하되 피격(내구도 감소)은 받는 밀도.
  *  램밍(크리처/차저)은 접촉 22피해로 헤드리스 회피가 어려워 제외하고, 회피 가능한 슈터만 쓴다. */
 function refillCoreLoopTrack(elite = false) {
-  const r = run, base = r.traveled + 380;
-  // 소규모 군집(같은 줄 3기)으로 스폰 → 공명(관통 레일·분산 미사일)이 여러 표적을 맞혀 기여도가 산다.
-  const rows = elite ? 2 : 1, per = 3;
+  const r = run, cl = r.coreLoop, base = r.traveled + 340;
+  // 측정 모드=밀집 군집(공명이 여러 표적을 맞혀 기여도 산출). 사람 플레이=완만(내구도 100으로 8분 생존 가능).
+  const dense = !cl || cl.auto;
+  const rows = elite ? 2 : (dense ? 2 : 1), per = elite ? 4 : (dense ? 5 : 3);
   for (let row = 0; row < rows; row++) {
     for (let i = 0; i < per; i++) {
       r.pending.push({ type: elite ? 'turret' : 'weaver', size: 'small',
-        x: 0.25 + 0.5 * (i / (per - 1)), trackY: base + row * 420 });
+        x: 0.18 + 0.64 * (i / (per - 1)), trackY: base + row * (dense ? 360 : 460) });
     }
+  }
+  // 생존 스트레스: 램밍(접촉 22피해) 크리처 다수 → 최강 함대도 회피 못한 접촉으로 내구도 0 도달(무적 방지 증명).
+  if (cl?.build?.stress) {
+    for (let i = 0; i < 7; i++) r.pending.push({ type: 'creature', size: i % 2 ? 'large' : 'mid', x: 0.15 + 0.7 * r.rng(), trackY: base + 60 + i * 150 });
+  }
+  // 사람 플레이: 드론 크리스탈로 함대가 자라 보스 무렵 '완성 빌드'가 되게(무기 캡슐은 제외 — 빌드 정체성 유지).
+  if (cl && !cl.auto && !cl.build?.stress) {
+    for (let i = 0; i < 2; i++) r.pending.push({ type: 'crystal', value: 26, x: 0.2 + 0.6 * r.rng(), trackY: base + 200 + i * 300 });
   }
   r.pending.sort((a, b) => a.trackY - b.trackY);
 }
@@ -576,18 +718,20 @@ function tallyBulletDamage(w, b, dealt, target) {
   }
 }
 
-/** 8분 결과 화면(§5.9). 시작→최종 함체, 무기 2·공명, 피해 비율, 내구도, 다음 설계도 실루엣. */
+/** 8분 결과 화면(§5.9). 실제 시작(startTier/startHull)→최종 상태, 무기 2·공명, 피해 비율, 내구도. */
 function showCoreLoopResult(snap, sq, cl) {
   const build = cl.build;
+  const activeResonName = sq.reson.activeId ? RESONANCES[sq.reson.activeId]?.name : (RESONANCES[build.resonance]?.name || '');
+  const restart = (mode) => { ui.hide(); startCoreLoop({ mode, buildId: cl.buildId }); };
   ui.showCoreLoopResult({
     snap, build,
     startHull: cl.startHull, hull: sq.surv.hull, hullMax: sq.surv.hullMax,
-    startTier: 0, tier: sq.tier, tierNames: BAL.evolution.names,
+    startTier: cl.startTier, tier: sq.tier, tierNames: BAL.evolution.names,   // 실제 시작 티어(하드코딩 제거)
     mainWeapon: sq.weapon, wingWeapon: sq.wing.weaponId,
     weaponLabels: WEAPON_LABELS,
-    resonanceName: RESONANCES[build.resonance]?.name || '',
-    onSame: () => { ui.hide(); startCoreLoop(cl.buildId); },
-    onNew: () => { ui.hide(); const ids = Object.keys(CORE_LOOP_BUILDS); const i = (ids.indexOf(cl.buildId) + 1) % ids.length; startCoreLoop(ids[i]); },
+    resonanceName: activeResonName,
+    onSame: () => restart(cl.mode),
+    onNew: () => restart('play'),   // 새 조합: 사람 플레이로 시작 무기부터 다시 선택
   });
 }
 
@@ -636,7 +780,7 @@ function onEnemyKilled(e, w) {
   if (w.reson) resonEnemyRemoved(w.reson, e);
   if (w.squad.frameState) {
     const fp = frameOnKill(w.squad.frameState, BAL.gate1.frames);
-    if (fp?.type === 'focus') w.effects.ring(w.squad.x, w.squad.y, BAL.gate1.frames.assault.glow);
+    if (fp?.type === 'focus') { w.effects.ring(w.squad.x, w.squad.y, BAL.gate1.frames.assault.glow); if (run.coreLoop) run.coreLoop.frameFocusFired = true; }
   }
 }
 
@@ -775,7 +919,7 @@ function update(dt) {
     r.scrollY += 30 * dt;
     for (const b of r.bosses) { if (b.dead) b.deathT += dt; else b.update(dt, w); }  // 죽은 보스는 페이드, 산 보스는 교전 지속
     w.boss = r.bosses.find((b) => !b.dead) || r.bosses[0];   // 호밍 표적 = 살아있는 선두
-    if (r.bosses.every((b) => b.dead)) {
+    if (r.bosses.every((b) => b.dead) && !r.coreLoop) {      // 코어루프는 자체 finishCoreLoop가 종료 처리(캠페인 연출 미진입)
       // 전원 격파 → 파괴 연출 시작
       r.phase = 'bossDeath';
       r.seqT = 0;
@@ -846,9 +990,13 @@ function update(dt) {
         const dx = b.x - bo.x, dy = b.y - bo.y;
         if (dx * dx + dy * dy <= (bo.r * 1.4) ** 2) {
           const siegeBonus = b.blast ? (1 + b.blast.bossBonus) : 1;  // 시즈 토피도 보스 직격 +15%
-          const bossDmg = b.damage * (w.mfx?.bossDmgMult ?? 1) * siegeBonus;
+          let bossDmg = b.damage * (w.mfx?.bossDmgMult ?? 1) * siegeBonus;
+          if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, bo)) bossDmg *= BAL.gate1.resonance.seekerBeam.missileBonus;  // 시커 증폭
+          // 코어루프 B22(§5.8): 초당 피해 상한 → 고DPS 빌드가 순삭 못 하고 TTK가 45~60으로 수렴.
+          if (r.coreLoop && bo.dpsCap) { const budget = Math.max(0, bo.dpsCap - (bo._dmgSec || 0)); bossDmg = Math.min(bossDmg, budget); bo._dmgSec = (bo._dmgSec || 0) + bossDmg; }
+          const hpBefore = bo.hp;
           bo.hitByBullet(bossDmg, w, b);
-          if (w.metrics) tallyBulletDamage(w, b, bossDmg, bo);   // Gate 1: 무기·공명 피해 집계 + 공명 충전
+          if (w.metrics) tallyBulletDamage(w, b, Math.max(0, hpBefore - bo.hp), bo);   // Gate 1: 실제 적용 피해(HP 감소) 집계(G1-07)
           b.onHit?.(bo, w);            // 시즈 폭발(도탄/분열은 보스전에서 대상 없음)
           b.dead = true; hitBoss = true; // 보스는 관통 불가 (거대 표적)
           break;
@@ -863,9 +1011,12 @@ function update(dt) {
       const dx = b.x - e.x, dy = b.y - e.y;
       if (dx * dx + dy * dy <= rr * rr) {
         const wasAlive = !e.dead;
-        const dealt = e.def ? b.damage * (w.mfx?.bossDmgMult ?? 1) : b.damage;
+        let dealt = e.def ? b.damage * (w.mfx?.bossDmgMult ?? 1) : b.damage;
+        // 시커 빔(G1-06): 표식 대상을 맞힌 유도 미사일은 실제 피해가 증폭된다(우선추적 + 증폭).
+        if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, e)) dealt *= BAL.gate1.resonance.seekerBeam.missileBonus;
+        const hpBefore = e.hp ?? 0;
         e.hitByBullet(dealt, w, b); // 탄환 문맥 전달(프리즘 코어 등)
-        if (w.metrics) tallyBulletDamage(w, b, dealt, e);   // Gate 1: 무기·공명 피해 집계 + 공명 충전/표식
+        if (w.metrics) tallyBulletDamage(w, b, Math.max(0, hpBefore - (e.hp ?? 0)), e);   // 실제 적용 피해(HP 감소) 집계(G1-07)
         b.onHit?.(e, w);   // 진화 온-히트(도탄/분열/폭발) — 각 1회, 비재귀
         if (wasAlive && e.dead) onEnemyKilled(e, w);
         if (b.kind === 'homing') w.effects.burst(b.x, b.y, '#ff9c41', 8, 120); // 미사일 폭발
@@ -1241,11 +1392,14 @@ window.__NF = {
 
 // Gate 1 하네스 개발 훅 (?coreLoopTest=1 전용). 4시드 시뮬·측정 재생용.
 window.__nfCoreLoop = {
-  start(buildId = 'railStorm') { startCoreLoop(buildId); return run.coreLoop; },
+  // 사람 플레이(H0·내구도100·무기1·선택창). 브라우저에서 직접 조작·검증용.
+  startPlay() { startCoreLoop({ mode: 'play' }); return run.coreLoop; },
+  // 자동 측정 시작(autopilot+auto-select). 헤드리스 재생용.
+  startMeasure(buildId = 'railStorm') { startCoreLoop({ mode: 'measure', buildId }); return run.coreLoop; },
   builds: () => Object.keys(CORE_LOOP_BUILDS),
-  /** 헤드리스로 한 빌드를 결과까지 빠르게 재생(렌더 없음). 반환: 측정 스냅샷. */
-  run(buildId = 'railStorm', maxSeconds = 620, dt = 1 / 60) {
-    startCoreLoop(buildId);
+  /** 헤드리스 측정: 한 빌드를 결과까지 빠르게 재생(렌더 없음). 반환: 측정 스냅샷. */
+  run(buildId = 'railStorm', maxSeconds = 640, dt = 1 / 60) {
+    startCoreLoop({ mode: 'measure', buildId });
     const steps = Math.ceil(maxSeconds / dt);
     for (let i = 0; i < steps; i++) {
       update(dt);
@@ -1254,4 +1408,35 @@ window.__nfCoreLoop = {
     return window.__nfRunMetrics || run.coreLoop?.metrics.snapshot();
   },
   metrics: () => window.__nfRunMetrics,
+  /**
+   * 런타임 통합 검증(Codex 재검증 §5: 소스 문자열이 아니라 실제 게임 루프를 돌려 확인).
+   * 각 빌드를 measure 모드로 완주시켜 다음을 단언한다:
+   *  두 무기 실피해 · 공명 실피해(8~30%) · 프레임 자동 스킬 실발동 · 긴급 재건(스트레스) · TTK 45~60 · 내구도 감소.
+   * 반환: { pass, checks: [...] }.
+   */
+  integrationCheck() {
+    const checks = [];
+    const add = (name, ok, detail) => checks.push({ name, ok: !!ok, detail });
+    for (const b of ['railStorm', 'microMissile', 'seekerBeam']) {
+      startCoreLoop({ mode: 'measure', buildId: b });
+      const steps = Math.ceil(700 / (1 / 60));
+      for (let i = 0; i < steps; i++) { update(1 / 60); if (run.coreLoop?.resultShown) break; }
+      const s = window.__nfRunMetrics, cl = run.coreLoop, build = CORE_LOOP_BUILDS[b];
+      const dmgW = Object.keys(s.damageByWeapon);
+      add(`${b}: 두 무기 실피해`, dmgW.includes(build.main) && dmgW.includes(build.wing), dmgW);
+      add(`${b}: 공명 실피해 8~30%`, s.resonanceShare >= 0.08 && s.resonanceShare <= 0.30, +(s.resonanceShare * 100).toFixed(1) + '%');
+      const frameFired = { assault: cl.frameFocusFired, carrier: cl.sawVolley, phase: cl.sawDash }[frameForBuild(b)];
+      add(`${b}: ${frameForBuild(b)} 프레임 자동 스킬 실발동`, frameFired, { volley: !!cl.sawVolley, dash: !!cl.sawDash, focus: !!cl.frameFocusFired });
+      add(`${b}: B22 TTK 45~60`, s.bossTtkSec >= 45 && s.bossTtkSec <= 60, s.bossTtkSec);
+      add(`${b}: 내구도 감소`, s.hullDamageTaken > 0, s.hullDamageTaken);
+    }
+    // 무적 방지: 스트레스 빌드는 내구도 0 사망 + 긴급 재건 발동
+    startCoreLoop({ mode: 'measure', buildId: 'tankStress' });
+    for (let i = 0, n = Math.ceil(700 * 60); i < n; i++) { update(1 / 60); if (run.coreLoop?.resultShown) break; }
+    const st = window.__nfRunMetrics;
+    add('tankStress: 무적 아님(내구도 0 사망)', st.gameOverReason === 'hull', st.gameOverReason);
+    add('긴급 재건 실런타임 발동', st.emergencyRebuilds >= 1, st.emergencyRebuilds);
+    const pass = checks.every((c) => c.ok);
+    return { pass, failed: checks.filter((c) => !c.ok).map((c) => c.name), checks };
+  },
 };

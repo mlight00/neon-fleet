@@ -47,15 +47,22 @@ test('캐리어: 주기마다 호위 동기화 일제사격 자동 발동', () =
   assert.equal(fired, 2);   // 두 주기 동안 2회
 });
 
-test('페이즈: FLOW 최대에서 위상 돌파(무적) 자동 발동', () => {
+test('페이즈: RUSH 시작 신호에서 위상 돌파(무적) 자동 발동 (G1-05)', () => {
   const s = createFrameState();
   setFrame(s, 'phase');
-  const th = CFG.phase.auto.flowThreshold;
-  const below = tickFrame(s, CFG, 0.5, { flow: th - 1 });
-  assert.equal(below, null);                        // 아직 미달
-  const proc = tickFrame(s, CFG, 0.5, { flow: th });
+  // FLOW는 max 도달 즉시 0이 되므로 임계값이 아니라 RUSH 시작 신호로 발동한다.
+  const noRush = tickFrame(s, CFG, 0.5, { flow: 0, rushStarted: false });
+  assert.equal(noRush, null);
+  const proc = tickFrame(s, CFG, 0.5, { flow: 0, rushStarted: true });
   assert.ok(proc && proc.type === 'dash');
   assert.equal(frameInvulnActive(s), true);         // 위상 돌파 무적
+});
+
+test('페이즈: rushStarted 미제공 시 flowThreshold 폴백(단위 호환)', () => {
+  const s = createFrameState();
+  setFrame(s, 'phase');
+  assert.equal(tickFrame(s, CFG, 0.5, { flow: CFG.phase.auto.flowThreshold - 1 }), null);
+  assert.ok(tickFrame(s, CFG, 0.5, { flow: CFG.phase.auto.flowThreshold })?.type === 'dash');
 });
 
 test('프레임 미선택이면 자동 스킬·배수 중립', () => {

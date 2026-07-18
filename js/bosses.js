@@ -527,7 +527,7 @@ export class HiveQueen extends Boss {
 // 일반 자동사격도 항상 100% 기본 피해. STAGGER는 처치 시간을 단축하는 보너스(완전 면역 아님).
 export class NeonArbiter extends Boss {
   constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1) {
-    super(logicalW, rateMult, stage, sizeMul);
+    super(logicalW, rateMult, stage, sizeMul, 'B22');   // 정체성 고정(korName '네온 아비터'·B22 패턴·스프라이트)
     this.arbiterPhase = 1;
     this.stagger = 0;
     this.breakT = 0;

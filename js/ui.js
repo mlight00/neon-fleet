@@ -228,6 +228,25 @@ export const ui = {
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
   },
 
+  /** 코어루프 사람 플레이 선택창 (전면개편 §5.1: 시작 무기·행동 변화·두 번째 무기·프레임). 게임 정지. */
+  showCoreLoopPick({ title, subtitle = '', options, onPick }) {
+    clearNav();
+    const cards = options.map((o, i) => `
+      <button class="draft-card" data-idx="${i}" style="border-color:${o.color || '#3ff5e0'}">
+        <div style="font-size:22px">${o.icon || ''}</div>
+        <div style="font-weight:700;color:${o.color || '#dff0ff'};margin:4px 0">${o.label}</div>
+        <div style="font-size:12px;color:#9fb8d8;line-height:1.5">${o.desc || ''}</div>
+      </button>`).join('');
+    panel(`
+      <h2 style="color:#3ff5e0;font-size:19px">${title}</h2>
+      ${subtitle ? `<p style="color:#9fb8d8;font-size:13px;margin-top:2px">${subtitle}</p>` : ''}
+      <div class="draft-row" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px">${cards}</div>
+    `);
+    const btns = Array.from(overlay.querySelectorAll('.draft-card'));
+    btns.forEach((b) => b.addEventListener('click', () => onPick(options[+b.dataset.idx].id, +b.dataset.idx)));
+    attachKeyNav(btns, (i) => onPick(options[i].id, i));
+  },
+
   /** 8분 결과 화면 (전면개편 §5.9). 시작→최종 함체, 무기 2·공명, 피해 비율, 내구도, 다음 설계도 실루엣. */
   showCoreLoopResult({ snap, build, startHull, hull, hullMax, startTier, tier, tierNames, mainWeapon, wingWeapon, weaponLabels, resonanceName, onSame, onNew }) {
     const wl = (w) => (w ? (weaponLabels[w] || w) : '—');
