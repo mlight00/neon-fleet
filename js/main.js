@@ -564,7 +564,14 @@ function spawnCoreLoopBoss() {
   r.pending = [];
   // 보스 등장 = 섹터가 비워지는 피날레. 잔여 잡몹을 정리해 순수 단일표적 대결로 만든다.
   //  (railStorm처럼 관통 공명이 잔여 잡몹으로 충전을 과하게 벌어 보스 DPS 표본이 부풀려지는 것도 함께 차단 → TTK 수렴, Codex P1)
-  for (let i = w.entities.length - 1; i >= 0; i--) { if (w.entities[i].isEnemy) w.entities.splice(i, 1); }
+  //  정리 시 표적 해제 필수(Codex P2): dead 표식 → 유도 미사일이 재표적(this.target.dead), 시커 표식 해제.
+  for (let i = w.entities.length - 1; i >= 0; i--) {
+    const e = w.entities[i];
+    if (!e.isEnemy) continue;
+    e.dead = true;
+    if (w.reson) resonEnemyRemoved(w.reson, e);   // 사라진 적을 시커 표식이 계속 가리키지 않게
+    w.entities.splice(i, 1);
+  }
   w.scrollSpeed = 40;
   const bossRate = r.mods.enemyRate / BAL.difficulty.bossRateMult;
   const boss = makeBoss(LOGICAL_W, bossRate, 5, 1, 'B22');   // 섹터 5 네온 아비터
@@ -576,9 +583,10 @@ function spawnCoreLoopBoss() {
   const snap = r.coreLoop.metrics.snapshot(elapsed(r.coreLoop.director));
   const totalDmg = Object.values(snap.damageByWeapon).reduce((a, c) => a + c, 0) + Object.values(snap.damageByResonance).reduce((a, c) => a + c, 0);
   const avgDps = snap.durationSec > 5 ? totalDmg / snap.durationSec : 60;
-  boss.hp = boss.maxHp = Math.round(Math.max(BAL.boss.hp, avgDps * BAL.gate1.bossTtk.avgDpsMult * 3));   // 큰 임시 HP
+  boss.hp = boss.maxHp = boss._provMax = Math.round(Math.max(BAL.boss.hp, avgDps * BAL.gate1.bossTtk.avgDpsMult * 3));   // 큰 임시 HP
   boss.dpsCap = 0;                     // 샘플 중엔 상한 없음(진짜 DPS 측정)
-  boss._age = 0; boss._sampleDmg = 0; boss._totalDmg = 0; boss._calibrated = false; boss._dmgSec = 0; boss._secT = 0;
+  // 표본·총피해는 개별 누적기 대신 boss.hp 실감소로 잰다 → 랜스·메아리 등 모든 피해 경로가 자동 포함(Codex P1).
+  boss._age = 0; boss._hpWin = null; boss._calibrated = false; boss._dmgSec = 0; boss._secT = 0;
   r.bosses = [boss]; w.bosses = [boss];
   r.boss = boss; w.boss = boss;
   preloadBossArt('B22');
@@ -629,12 +637,15 @@ function coreLoopUpdate(dt) {
     bo0._age = (bo0._age || 0) + dt;
     if (bo0._calibrated === false) {
       // 등장 후 [sampleDelay, sampleDelay+sampleWin] 구간의 '실제 보스 피해율'로 HP를 중심추정한다.
-      //  초반은 선충전 공명 버스트로 과대하므로 제외. railStorm처럼 잡몹 관통으로 평균 DPS가 부풀려진 빌드도
-      //  여기선 보스 단일표적 피해만 보므로 편향이 준다(Codex P1). 잔여 노이즈는 아래 양측 클램프가 흡수.
-      if (bo0._age >= bt.sampleDelaySec + bt.sampleWinSec) {
-        const bossDps = (bo0._sampleDmg || 0) / bt.sampleWinSec;        // 버스트 제외 지속 DPS
+      //  피해량은 개별 누적기가 아니라 boss.hp 실감소로 재므로 랜스·메아리 등 모든 경로가 포함된다(Codex P1).
+      //  초반은 선충전 공명 버스트로 과대하므로 표본창을 sampleDelay 뒤로 잡는다. 잔여 노이즈는 아래 양측 클램프가 흡수.
+      if (bo0._age >= bt.sampleDelaySec && bo0._hpWin == null) bo0._hpWin = bo0.hp;   // 표본창 시작 HP 스냅샷
+      if (bo0._age >= bt.sampleDelaySec + bt.sampleWinSec && bo0._hpWin != null) {
+        const windowDmg = Math.max(0, bo0._hpWin - bo0.hp);            // 창 구간 실제 보스 피해(HP 감소=모든 경로)
+        const bossDps = windowDmg / bt.sampleWinSec;                   // 버스트 제외 지속 단일표적 DPS
         bo0.maxHp = Math.max(Math.round(BAL.boss.hp * 0.25), Math.round(bossDps * bt.targetTTKSec));
-        bo0.hp = Math.max(1, bo0.maxHp - (bo0._totalDmg || 0));         // 이미 꽂힌 총 피해만큼 차감
+        const dealt = Math.max(0, bo0._provMax - bo0.hp);              // 등장 후 총 피해(모든 경로) = 임시최대 − 현재HP
+        bo0.hp = Math.max(1, bo0.maxHp - dealt);                        // 이미 꽂힌 만큼 반영(치유 없음)
         bo0.dpsCap = bo0.maxHp / bt.minTTKSec;                          // 하한 클램프: 초당 상한(TTK 하한)
         bo0._dmgSec = 0; bo0._secT = 0; bo0._calibrated = true;
       }
@@ -1029,13 +1040,7 @@ function update(dt) {
           if (r.coreLoop && bo._enrageMult > 1) bossDmg *= bo._enrageMult;   // 상한 클램프: dpsCap(원율) 다음에 증폭 → 상한만 밀어올림
           const hpBefore = bo.hp;
           bo.hitByBullet(bossDmg, w, b);
-          const appliedToBoss = Math.max(0, hpBefore - bo.hp);
-          if (r.coreLoop && bo._calibrated === false) {
-            bo._totalDmg = (bo._totalDmg || 0) + appliedToBoss;                  // 등장 후 총 피해(재보정 시 잔여HP 계산용)
-            const bt = BAL.gate1.bossTtk;
-            if (bo._age >= bt.sampleDelaySec && bo._age < bt.sampleDelaySec + bt.sampleWinSec) bo._sampleDmg = (bo._sampleDmg || 0) + appliedToBoss;  // 버스트 지난 구간만 = 지속 DPS 표본
-          }
-          if (w.metrics) tallyBulletDamage(w, b, appliedToBoss, bo);   // Gate 1: 실제 적용 피해(HP 감소) 집계(G1-07)
+          if (w.metrics) tallyBulletDamage(w, b, Math.max(0, hpBefore - bo.hp), bo);   // Gate 1: 실제 적용 피해(HP 감소) 집계(G1-07)
           b.onHit?.(bo, w);            // 시즈 폭발(도탄/분열은 보스전에서 대상 없음)
           b.dead = true; hitBoss = true; // 보스는 관통 불가 (거대 표적)
           break;

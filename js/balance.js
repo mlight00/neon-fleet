@@ -450,7 +450,7 @@ export const BAL = {
     //  (2) 하한 dpsCap: 초당 피해 상한으로 고DPS 빌드 순삭 방지(TTK 하한 minTTKSec).
     //  (3) 상한 enrage: enrageStart 넘기면 보스 피격 피해가 초당 ramp만큼 증폭 → 표본이 크게 빗나가도 ~57초엔 끝난다.
     //   양측 클램프 덕에 원정별 함대 편차로 표본이 요동쳐도 TTK가 밴드 안에 안착(§5.8 "판을 뒤집는 순간").
-    bossTtk: { b22Min: 45, b22Max: 60, b7Min: 60, b7Max: 90, avgDpsMult: 98, minTTKSec: 47, sampleDelaySec: 3, sampleWinSec: 8, targetTTKSec: 52, enrageStartSec: 47, enrageRampPerSec: 1.3 },
+    bossTtk: { b22Min: 45, b22Max: 60, b7Min: 60, b7Max: 90, avgDpsMult: 98, minTTKSec: 47, sampleDelaySec: 3, sampleWinSec: 8, targetTTKSec: 52, enrageStartSec: 47, enrageRampPerSec: 2.5 },
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.

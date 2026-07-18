@@ -105,13 +105,15 @@ test('G1-07: 무기/공명 피해를 실제 적용 피해(HP 감소)로 집계',
 });
 
 test('G1-08: 보스 HP는 등장 후 실측 재보정(중심) + 양측 클램프(dpsCap 하한·enrage 상한)로 TTK 수렴', () => {
-  // 표본 구간 보스 단일표적 피해율로 HP 중심추정(관통빌드 TTK 과대 방지, Codex P1).
-  assert.ok(mainSrc.includes('bo0._sampleDmg') && mainSrc.includes('bt.sampleWinSec'), '보스 단일표적 실측 DPS(표본창)');
+  // 피해량은 개별 누적기가 아니라 boss.hp 실감소로 재야 랜스 등 모든 경로가 포함된다(Codex P1 재지적 반영).
+  assert.ok(mainSrc.includes('bo0._hpWin - bo0.hp'), '표본창 실감소로 단일표적 DPS(모든 피해 경로)');
+  assert.ok(mainSrc.includes('bo0._provMax - bo0.hp'), '총 피해=임시최대−현재HP(치유 없음)');
   assert.ok(mainSrc.includes('bossDps * bt.targetTTKSec'), '목표 TTK로 HP 중심추정');
   assert.ok(mainSrc.includes('bo0._calibrated = true') && mainSrc.includes('bo.dpsCap'), '하한 클램프: 재보정 후 초당 상한');
   // 노이즈 무관 수렴: enrageStart 이후 보스 피격 피해 증폭(상한). 잔여 잡몹 정리로 순수 단일표적 표본.
   assert.ok(mainSrc.includes('_enrageMult') && mainSrc.includes('bossDmg *= bo._enrageMult'), '상한 클램프: enrage 증폭');
-  assert.ok(mainSrc.includes("if (w.entities[i].isEnemy) w.entities.splice"), '보스 등장 시 잔여 잡몹 정리(순수 단일표적)');
+  // 잡몹 정리 시 표적 해제(Codex P2): dead 표식 + 시커 표식 해제로 유도/시커가 사라진 적을 추적하지 않음.
+  assert.ok(mainSrc.includes('e.dead = true') && mainSrc.includes('resonEnemyRemoved(w.reson, e)'), '보스 등장 정리 시 표적 해제');
 });
 
 // ── 밸런스 계약 ────────────────────────────────────────────────
