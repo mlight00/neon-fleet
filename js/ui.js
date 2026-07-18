@@ -228,6 +228,52 @@ export const ui = {
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
   },
 
+  /** 8분 결과 화면 (전면개편 §5.9). 시작→최종 함체, 무기 2·공명, 피해 비율, 내구도, 다음 설계도 실루엣. */
+  showCoreLoopResult({ snap, build, startHull, hull, hullMax, startTier, tier, tierNames, mainWeapon, wingWeapon, weaponLabels, resonanceName, onSame, onNew }) {
+    const wl = (w) => (w ? (weaponLabels[w] || w) : '—');
+    const dmgW = snap.damageByWeapon || {}, dmgR = snap.damageByResonance || {};
+    const total = Object.values(dmgW).reduce((a, b) => a + b, 0) + Object.values(dmgR).reduce((a, b) => a + b, 0) || 1;
+    const pct = (v) => Math.round((v / total) * 100);
+    const bar = (label, v, color) => `
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:13px">
+        <span style="min-width:120px;text-align:right;color:#bcd">${label}</span>
+        <span style="flex:1;height:12px;background:#0d1424;border-radius:6px;overflow:hidden">
+          <span style="display:block;height:100%;width:${pct(v)}%;background:${color}"></span></span>
+        <b style="min-width:38px;color:${color}">${pct(v)}%</b></div>`;
+    const rows = [
+      dmgW.vulcan ? bar('발칸', dmgW.vulcan, '#ffd36b') : '',
+      dmgW.laser ? bar('레이저', dmgW.laser, '#5cc8ff') : '',
+      dmgW.homing ? bar('유도 미사일', dmgW.homing, '#c8ff6b') : '',
+      dmgR.railStorm ? bar('공명·레일 스톰', dmgR.railStorm, '#9fe8ff') : '',
+      dmgR.microMissile ? bar('공명·미사일 포화', dmgR.microMissile, '#ffb0e0') : '',
+      dmgR.seekerBeam ? bar('공명·시커 빔', dmgR.seekerBeam, '#b0ffd0') : '',
+    ].join('');
+    const resShare = Math.round((snap.resonanceShare || 0) * 100);
+    const ttk = snap.bossTtkSec != null ? `${snap.bossTtkSec}초` : '—';
+    panel(`
+      <h2 style="color:#3ff5e0">8분 핵심 재미 결과</h2>
+      <p class="big" style="font-size:16px">${build.label}</p>
+      <div style="text-align:left;max-width:420px;margin:8px auto;line-height:1.7;font-size:14px">
+        <div>함체 <b>${tierNames[startTier]}</b> → <b style="color:#ffd93d">${tierNames[Math.min(tier, tierNames.length - 1)]}</b></div>
+        <div>무기 <b>${wl(mainWeapon)}</b> + <b>${wl(wingWeapon)}</b> · 공명 <b style="color:#9fe8ff">${resonanceName}</b></div>
+        <div>기함 내구도 <b>${Math.round(hull)}</b> / ${hullMax} <span style="color:#ff8a8a">(받은 피해 ${Math.round(snap.hullDamageTaken || 0)})</span></div>
+        <div>순양함 격침 <b>${snap.cruiserLosses || 0}</b>척 · 긴급 재건 <b>${snap.emergencyRebuilds || 0}</b>회</div>
+        <div>검증 보스 B22 TTK <b>${ttk}</b> · 공명 기여도 <b>${resShare}%</b></div>
+      </div>
+      <div style="margin:10px 0 4px;color:#8fb4d8;font-size:12px">피해 비율</div>
+      <div style="max-width:420px;margin:0 auto 10px">${rows}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin:8px 0;color:#7f93b0;font-size:12px">
+        <span style="font-size:26px;filter:blur(1px);opacity:.5">🛰️</span> 다음 설계도: <b style="letter-spacing:3px">? ? ?</b>
+      </div>
+      <div class="btn-row">
+        <button id="btn-cl-same">같은 조합 다시</button>
+        <button id="btn-cl-new" class="sub-btn">새 조합 시도</button>
+      </div>
+    `);
+    document.getElementById('btn-cl-same').addEventListener('click', onSame);
+    document.getElementById('btn-cl-new').addEventListener('click', onNew);
+  },
+
   /** 진화 모듈 드래프트: 3장 중 택1 (게임 일시 정지 중) */
   showDraft({ options, owned = [], onPick }) {
     const RARE = { common: '#3ff5e0', rare: '#ffd93d' };

@@ -381,6 +381,64 @@ export const BAL = {
   bossDeath: { duration: 1.8, chainInterval: 0.13 }, // 연쇄 폭발 단계
   flythrough: { startV: 140, accel: 1100, exitY: -90, invuln: 0.5 }, // 우주선 상승 통과 (invuln=클리어 통과 중 무적 유지 floor초)
 
+  // ── Gate 1: 8분 핵심 재미 수직 슬라이스 (전면개편 §5) ──────────
+  // 시간 기반 사건·무기 슬롯·공명·기함 내구도·지휘 프레임의 튜닝값. 로직은 역할별 모듈.
+  gate1: {
+    // 8분 타임라인 계약(§5.1). 초 단위. 허용오차 ±15s(첫 공명은 별도 창).
+    timeline: {
+      firstBehaviorUpgrade: 30,   // 0:30 첫 행동 변화 (통과창 25~45)
+      secondWeapon: 75,           // 1:15 두 번째 무기 (통과창 60~90)
+      hullTier1: 135,             // 2:15 H1 승급
+      resonanceTelegraph: 210,    // 3:30 첫 공명/진화 예고
+      firstResonance: 270,        // 4:30 첫 공명 완성 (확정창 255~285)
+      framePick: 330,             // 5:30 지휘 프레임 / H2
+      eliteWave: 390,             // 6:30 정예 웨이브
+      bossStart: 430,             // 7:10 검증 보스
+      resultAt: 480,              // 8:00 결과 요약
+      behaviorInterval: 40,       // 행동 변화 사건 간격(중앙값 30~50 목표)
+      tolerance: 15,              // 일반 사건 허용 오차(초)
+    },
+    // 무기 슬롯(§5.3). Gate 1은 main·wing 2슬롯.
+    loadout: {
+      slots: ['main', 'wing'],
+      wingUnlockSec: 75,          // wing 슬롯 해금 시점(런디렉터 secondWeapon과 동기)
+      // 두 하드포인트 오프셋(px, 기함 중심 기준) — 마운트 동시 표시
+      hardpointX: { main: 0, wing: 22 },
+      wingDpsScale: 0.5,          // wing 무기 직접사격 DPS 배수(두 번째 무기는 가산 보상, 총량 완만↑)
+    },
+    // 무기 조합 공명 3종(§5.4). 발동은 피해배수만 금지 — 모양·표적·소리 중 2+ 변화.
+    resonance: {
+      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 12, cooldown: 0.28, dmgFrac: 12, width: 30, pierce: 8 }, // 발칸명중 누적→레이저 하드포인트 관통 레일
+      microMissile: { pair: ['vulcan', 'homing'], chargePerHit: 1, threshold: 10, cooldown: 0.5, count: 6, dmgFrac: 1.5 },            // 발칸 연속명중/처치→소형 미사일 묶음 분산추적
+      seekerBeam: { pair: ['laser', 'homing'],  markDuration: 2.4, cooldown: 0.5, missileBonus: 1.6 },                                 // 레이저 표식→미사일 우선추적, 파괴 시 표식 이동
+      minFirstAt: 255, maxFirstAt: 285,  // 첫 공명 확정 완성 창
+      telegraphLead: 30,                 // 완성 전 예고 시간(20~40s 창의 중앙)
+    },
+    // 기함 내구도·함대 자원 분리(§5.6). 권장 초기값(고정답 아님).
+    survivability: {
+      hullMax: 100,                      // 기함 내구도 기본 최대
+      hullMaxPerTier: 22,                // H0~H5 승급당 최대치 증가
+      tierHealFrac: 0.5,                 // 승급 시 회복 = 최대치 증가분의 이 비율(만피 금지)
+      dmgNormalShot: 8,                  // 일반 적탄 내구도 피해(6~10)
+      dmgEliteShot: 16,                  // 정예·보스 주요탄(12~20)
+      dmgCollision: 22,                  // 충돌·레이저 경고 실패(18~28)
+      repairFrac: 0.20,                  // 제한 수리 = 최대치의 15~25%
+      hitInvuln: 0.6,                    // 내구도 피격 후 짧은 무적(밀집 피격 순삭 방지, 회피 여지)
+      measureHullMax: 1400,              // 측정 하네스 전용 내구도(헤드리스 자동회피 보정). 실제 플레이는 hullMax(100).
+      emergencyRebuildMax: 1,            // 긴급 재건 출격당 최대 횟수
+      emergencyRebuildCruisers: 3,       // 긴급 재건 시 복구 순양함 수
+      emergencyRebuildHullCost: 10,      // 긴급 재건 비용(내구도)
+    },
+    // 지휘 프레임 3종(§5.7). 교리 3종을 흡수. auto=자동 스킬.
+    frames: {
+      assault: { doctrine: 'lance',  name: '어썰트', icon: '⚔', glow: '#ff5c2a', auto: { killsPerProc: 24, name: '전방 집중', focusDmgMult: 1.6, focusDuration: 3 } },
+      carrier: { doctrine: 'swarm',  name: '캐리어', icon: '🛰', glow: '#3fd0f5', auto: { intervalSec: 8, name: '호위 동기화', volleyMult: 1.5 } },
+      phase:   { doctrine: 'phase',  name: '페이즈', icon: '◈', glow: '#b44cff', auto: { flowThreshold: 100, name: '위상 돌파', dashInvuln: 0.6 } },
+    },
+    // 보스 TTK 목표(§5.8). 실제 조정은 boss 계수 + 패턴, HP·탄수만 증가 금지.
+    bossTtk: { b22Min: 45, b22Max: 60, b7Min: 60, b7Max: 90, hpPerPower: 90 },   // 하네스 보스 HP=함대화력×hpPerPower(측정 보정)
+  },
+
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.
   hangar: {
     costGrowth: 1.6,        // 레벨당 비용 배수

@@ -324,3 +324,58 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   ctx.textAlign = 'left';
   ctx.restore();
 }
+
+/**
+ * Gate 1 코어루프 전용 HUD (전면개편 §5.3/5.4/5.6/5.7). 캠페인 HUD와 별개로 그린다.
+ * 기함 내구도 바 + 두 무기 슬롯 + 공명 진행/예고 + 지휘 프레임 + 8분 타이머를 한눈에.
+ */
+export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  // ── 기함 내구도 바 (상단 좌, 캠페인 드론줄과 안 겹치게 y=96) ──
+  const hb = { x: 12, y: 96, w: 150, h: 12 };
+  const hf = Math.max(0, Math.min(1, d.hullFrac));
+  ctx.fillStyle = 'rgba(255,80,80,0.16)';
+  ctx.fillRect(hb.x, hb.y, hb.w, hb.h);
+  ctx.fillStyle = hf > 0.4 ? '#57e0ff' : hf > 0.18 ? '#ffd93d' : '#ff5a5a';
+  ctx.fillRect(hb.x, hb.y, hb.w * hf, hb.h);
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(hb.x, hb.y, hb.w, hb.h);
+  ctx.font = 'bold 11px Pretendard, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#dff0ff';
+  ctx.fillText(`기함 내구도 ${Math.round(d.hull)}/${d.hullMax}`, hb.x, hb.y - 3);
+
+  // ── 두 무기 슬롯 (상단 우) ──
+  ctx.textAlign = 'right';
+  const chip = (label, lv, color, y) => {
+    ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = color;
+    ctx.fillText(label, logicalW - 12, y);
+    for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < lv ? 1 : 0.25; ctx.fillRect(logicalW - 12 - (2 - i) * 10 - 6, y + 5, 6, 3); }
+    ctx.globalAlpha = 1;
+  };
+  chip('주무기 ' + (WEAPON_LABELS[d.mainWeapon] || d.mainWeapon), d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff', 34);
+  if (d.wingWeapon) chip('보조 ' + (WEAPON_LABELS[d.wingWeapon] || d.wingWeapon), d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff', 52);
+  else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.fillText('보조 무기 슬롯 (미해금)', logicalW - 12, 52); ctx.globalAlpha = 1; }
+
+  // ── 공명 진행/예고 (우, 무기 아래) ──
+  if (d.resonanceName) {
+    const rw = 120, rx = logicalW - 12 - rw, ry = 66;
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 10px Pretendard, sans-serif';
+    ctx.fillStyle = d.telegraph ? '#ffd93d' : '#9fe8ff';
+    ctx.fillText((d.telegraph ? '공명 예고: ' : '공명: ') + d.resonanceName, rx, ry - 2);
+    ctx.fillStyle = 'rgba(159,232,255,0.16)'; ctx.fillRect(rx, ry, rw, 5);
+    ctx.fillStyle = '#9fe8ff'; ctx.fillRect(rx, ry, rw * Math.max(0, Math.min(1, d.resonanceFrac)), 5);
+  }
+
+  // ── 지휘 프레임 아이콘 (좌, 내구도 아래) ──
+  if (d.frameIcon) {
+    ctx.textAlign = 'left'; ctx.font = '15px Pretendard, sans-serif'; ctx.fillStyle = d.frameGlow || '#fff';
+    ctx.fillText(`${d.frameIcon} ${d.frameName}`, hb.x, hb.y + 26);
+  }
+
+  // ── 8분 타이머 + 다음 사건 (상단 중앙) ──
+  ctx.textAlign = 'center'; ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = '#cfe4ff';
+  const mm = Math.floor(d.dirT / 60), ss = Math.floor(d.dirT % 60);
+  ctx.fillText(`${mm}:${String(ss).padStart(2, '0')} / 8:00`, logicalW / 2, 20);
+  if (d.nextEventLabel) { ctx.font = '10px Pretendard, sans-serif'; ctx.fillStyle = '#8fb4d8'; ctx.fillText(`다음: ${d.nextEventLabel} (${Math.ceil(d.nextEventIn)}s)`, logicalW / 2, 33); }
+  ctx.restore();
+}

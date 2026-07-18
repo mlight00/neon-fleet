@@ -14,6 +14,8 @@ import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { droneReward } from './adaptive-logic.js';
 import { addFlow, updateFlow, onFlowHit } from './flow.js';
 import { keystoneEffects, forgeOnKill } from './keystones.js';
+import { frameDamageMult, frameInvulnActive } from './command-frames.js';
+import { resolveHit } from './survivability.js';
 import { sfx } from './audio.js';
 import { UPGRADE_DURATIONS, upgradeGrade } from './creative-direction.js';
 
@@ -186,6 +188,14 @@ export class Squad {
     this.grazeFxT = 0;        // GRAZE 문구·SFX 스팸 제한 타이머
     this.keystone = null;     // 선택한 키스톤 id (원정당 1개, C3)
     this.keystoneState = {};  // 키스톤 누적 상태 (킬 카운터 등, C3)
+    // ── Gate 1: 무기 wing 슬롯(§5.3). main은 기존 weapon/weaponLv, wing은 병렬 발사. ──
+    this.wing = { weaponId: null, level: 1 }; // 두 번째 무기 슬롯(빈 상태 시작). 진화 상태는 무기별 맵 공유.
+    this._wingAcc = 0;        // wing 슬롯 독립 발사 누적기
+    // ── Gate 1: 지휘 프레임·기함 내구도·공명은 원정 시작 시 install()에서 주입(외부 모듈 상태). ──
+    this.frameId = null;      // 'assault'|'carrier'|'phase'
+    this.frameState = null;   // command-frames 상태 (install 시 생성)
+    this.surv = null;         // survivability 상태 (install 시 생성 — 없으면 구 드론=체력 모델)
+    this.reson = null;        // resonances 상태 (install 시 생성)
     this._offsets = Squad.formationOffsets(BAL.squad.drawCap);
   }
 
@@ -567,10 +577,57 @@ export class Squad {
       sfx('shield_pop');
       return;
     }
+    // Gate 1: 기함 내구도 모델이 설치돼 있으면 충돌은 드론이 아니라 내구도를 지불(§5.6).
+    if (this.surv) { this.takeShot(world, { hullAmount: BAL.gate1.survivability.dmgCollision, onCruiserIndex: null }); sfx('damage'); return; }
     const cap = Math.max(2, Math.ceil(this.count * BAL.squad.contactCapPct * (world.mfx?.contactCapMult ?? 1)));
     this.applyDelta(-Math.min(n, cap), world);
     this.onCombatHit(world);   // 실제 접촉 손실 → FLOW/RUSH 규칙 (Phase 2)
     sfx('damage');
+  }
+
+  /** Gate 1 원정 시스템 주입(§11 모듈 분리). main.js가 상태 객체를 만들어 넘긴다. */
+  installGate1({ surv = null, reson = null, frameState = null, frameId = null, mainWeapon = 'vulcan' } = {}) {
+    this.surv = surv;
+    this.reson = reson;
+    this.frameState = frameState;
+    this.frameId = frameId;
+    this.weapon = mainWeapon;
+    this.wing = { weaponId: null, level: 1 };
+    this._wingAcc = 0;
+  }
+
+  /**
+   * 기함 피격 해석(§5.6). 내구도 모델이 설치된 Gate 1 모드에선 보호막→순양함→기함 내구도 순.
+   * 구 모델(surv 없음)에선 기존 드론=체력 경로를 그대로 쓴다(캠페인 호환).
+   *  legacyDmg   = 구 모델용 드론/순양함 피해량(count 비례)
+   *  hullAmount  = Gate 1 모델용 내구도 피해량(적탄 종류별 고정, 없으면 dmgNormalShot)
+   *  onCruiserIndex = 순양함 히트박스 인덱스(없으면 null)
+   */
+  takeShot(world, { legacyDmg = 0, hullAmount = null, onCruiserIndex = null, elite = false } = {}) {
+    if (this.invulnT > 0 || frameInvulnActive(this.frameState)) return;   // 무적(진화·위상돌파)
+    if (!this.surv) {
+      // 구 모델: 핵 피격=드론 손실, 순양함 히트박스=순양함 HP.
+      if (onCruiserIndex != null && onCruiserIndex >= 0) this.hitCruiser(onCruiserIndex, legacyDmg, world);
+      else { this.applyDelta(-legacyDmg, world); this.onCombatHit(world); }
+      return;
+    }
+    const S = BAL.gate1.survivability;
+    const amount = hullAmount != null ? hullAmount : (elite ? S.dmgEliteShot : S.dmgNormalShot);
+    const out = resolveHit(this.surv, { amount, onCruiserIndex: (onCruiserIndex != null && onCruiserIndex >= 0) ? onCruiserIndex : null });
+    if (out.absorbedBy === 'shield') {
+      world.effects.text(this.x, this.y - 40, '보호막 방어!', COLORS.gateGood);
+      world.effects.ring(this.x, this.y, COLORS.gateGood); sfx('shield_pop');
+      return;
+    }
+    if (out.absorbedBy === 'cruiser') { this.hitCruiser(out.index, amount, world); return; }
+    // 기함 핵 피격 → 내구도 감소(드론은 그대로) + 짧은 무적(밀집 피격 순삭 방지).
+    this.flash = 0.25;
+    this.invulnT = Math.max(this.invulnT, BAL.gate1.survivability.hitInvuln ?? 0.5);
+    world.effects.text(this.x, this.y - 40, `-${amount}`, COLORS.danger);
+    world.effects.ring(this.x, this.y, COLORS.danger);
+    world.metrics?.hullDamage(amount);
+    this.onCombatHit(world);
+    if (out.dead) { this.dead = true; world.onHullDepleted?.(this); }
   }
 
   update(dt, world) {
@@ -724,36 +781,76 @@ export class Squad {
     const escortShare = this.count > 1 ? 0.3 + dEff.escortShareBonus : 0;   // 군체 교리: 드론 사격 비중↑
     this.fireEscort(dt, world, baseDps * wCoef * escortShare * phaseMul * ks.supportMult);   // 위상 피해 + 군체 용광로 유령 보너스
 
-    if (this.weapon === 'homing') {
+    // 슬롯별 독립 발사(§5.3): main은 기존 하드포인트, wing은 추가 하드포인트에서 병렬 발사.
+    const shared = { mfx, fireRate, damage, powerMult, trait, escortShare, flagPower: this.flagPower, rush, ks };
+    this._spawnWeaponShots(this.weapon, this.weaponLv, dt, world, { ...shared, hx: 0, accKey: 'fireAcc', dpsScale: 1 });
+    if (this.wing.weaponId) {
+      this._spawnWeaponShots(this.wing.weaponId, this.wing.level, dt, world, {
+        ...shared, hx: BAL.gate1.loadout.hardpointX.wing, accKey: '_wingAcc', dpsScale: BAL.gate1.loadout.wingDpsScale ?? 0.5,
+      });
+    }
+  }
+
+  /**
+   * 한 무기 슬롯의 기함 직접 사격(§5.3). fire()에서 슬롯마다 호출한다. 무기별 진화 상태는
+   * this.weaponEvolutions[weaponId] 등 무기 키 맵을 그대로 읽으므로 슬롯이 달라도 독립적으로 동작한다.
+   * 발사체엔 sourceWeaponId·slot을 달아 피해 집계·공명 판정이 무기를 구분하게 한다.
+   */
+  _spawnWeaponShots(weaponId, level, dt, world, s) {
+    const W = BAL.weapons;
+    const WE = BAL.weaponEvolution;
+    const WEB = BAL.weaponEvolution;
+    const { mfx, fireRate, damage, powerMult, trait, escortShare, flagPower, rush, ks, hx, accKey, dpsScale } = s;
+    const evo = this.weaponEvolutions[weaponId];
+    const lvCoef = W.lvCoef[Math.min(level, W.lvCoef.length) - 1];
+    const evoMult = evoLevelMult(evo, this.evoLevels[weaponId], WEB.evoLevelStep);
+    const se = superEvoEffects(this.weaponEvolutions2[weaponId], BAL.weaponSuperEvolution);
+    const projColor = weaponProjectileColor(evo, this.weaponEvolutions2[weaponId], WEAPON_COLORS[weaponId]);
+    const projArt = weaponProjectileSpriteId(weaponId, evo);
+    const superLv = this.superLevels[weaponId] || 0;
+    const seDmg = se.dmgMult * (1 + Math.max(0, superLv - 1) * WEB.superLevelStep);
+    const pb = (mfx.pierceBonus || 0) + se.pierceBonus;
+    const rushAuto = rush * ks.autoMult;
+    const baseDps = flagPower * fireRate * damage * lvCoef * powerMult * rushAuto * evoMult * seDmg;
+    const dEff = doctrineEffects(this.doctrine, BAL.doctrine);
+    const needle = evo === 'vulcan_needle' ? WE.vulcan_needle : null;
+    const critP = (mfx.crit || 0) + (needle ? needle.critBonus : 0);
+    const phaseMul = phaseDamageMult(Math.abs(this.bank || 0), dEff.bankDmgMax) * frameDamageMult(this.frameState, BAL.gate1.frames);
+    const crit = (d) => (critP && Math.random() < critP ? d * (mfx.critMult || 2) : d) * phaseMul;
+    const ascPierce = 0;
+    const midKey = accKey + '_mountIdx';
+    const cutKey = accKey + '_cutterCount';
+
+    if (weaponId === 'homing') {
       const siege = evo === 'homing_siege' ? WE.homing_siege : null;
       const wasp = evo === 'homing_wasp' ? WE.homing_wasp : null;
       const rateMul = siege ? siege.rateMult : 1;
       const cap = wasp ? wasp.cap : W.homing.cap;
-      const dps = baseDps * W.homing.coef * (1 - escortShare) * ks.flagMult;   // 기함 직접 사격(군체 용광로 대가)
-      this.fireAcc += W.homing.rate * trait.rate * rateMul * dt * se.rateMult;   // 초진화 발사속도
-      while (this.fireAcc >= 1) {
-        this.fireAcc -= 1;
+      const dps = baseDps * W.homing.coef * (1 - escortShare) * ks.flagMult * dpsScale;
+      this[accKey] = (this[accKey] || 0) + W.homing.rate * trait.rate * rateMul * dt * se.rateMult;
+      while (this[accKey] >= 1) {
+        this[accKey] -= 1;
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
         if (alive >= cap) continue;
-        const md = crit(dps / W.homing.rate * trait.dmg);   // 기본 1발 피해
+        const md = crit(dps / W.homing.rate * trait.dmg);
         if (wasp) {
-          // 소형 미사일: count발, 각 md × totalFrac/count (발당 위력↑), 서로 다른 표적 우선
           for (let k = 0; k < wasp.count && alive + k < cap; k++) {
-            const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, this.weaponLv, projColor, projArt);
-            mis.wasp = true; mis.r *= 0.8;
+            const mis = new HomingMissile(this.x + hx, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, level, projColor, projArt);
+            mis.wasp = true; mis.r *= 0.8; mis.sourceWeaponId = weaponId;
             world.bullets.push(mis);
           }
-          world.effects.muzzle(this.x, this.y - 14, '#ffd0a0', 6);
+          world.effects.muzzle(this.x + hx, this.y - 14, '#ffd0a0', 6);
         } else if (siege) {
-          // 대형 폭발 미사일: 느리지만 강함
-          const mis = new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 120, md * siege.dmgMult, this.weaponLv, projColor, projArt);
-          mis.r *= siege.sizeMult; mis.speedMult = siege.speedMult; mis.turnMult = siege.turnMult;
+          const mis = new HomingMissile(this.x + hx, this.y - 14, (Math.random() - 0.5) * 120, md * siege.dmgMult, level, projColor, projArt);
+          mis.r *= siege.sizeMult; mis.speedMult = siege.speedMult; mis.turnMult = siege.turnMult; mis.sourceWeaponId = weaponId;
           mis.blast = { radius: siege.blastRadius, frac: siege.blastFrac, bossBonus: siege.bossBonus };
           world.bullets.push(mis);
-          world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 8);
+          world.effects.muzzle(this.x + hx, this.y - 14, '#ff9c41', 8);
         } else {
-          world.bullets.push(new HomingMissile(this.x, this.y - 14, (Math.random() - 0.5) * 240, md, this.weaponLv, projColor, projArt));
-          world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 5);
+          const mis = new HomingMissile(this.x + hx, this.y - 14, (Math.random() - 0.5) * 240, md, level, projColor, projArt);
+          mis.sourceWeaponId = weaponId;
+          world.bullets.push(mis);
+          world.effects.muzzle(this.x + hx, this.y - 14, '#ff9c41', 5);
         }
         this.recoil = 1.5;
         sfx('missile');
@@ -761,48 +858,50 @@ export class Squad {
       return;
     }
 
-    const isLaser = this.weapon === 'laser';
+    const isLaser = weaponId === 'laser';
     const storm = evo === 'vulcan_storm';
     const prism = evo === 'laser_prism';
     const cutter = evo === 'laser_cutter' ? WE.laser_cutter : null;
     const coef = isLaser ? W.laser.coef : W.vulcan.coef;
-    const dps = baseDps * coef * (1 - escortShare) * ks.flagMult;   // 기함 직접 사격(군체 용광로 대가)
+    const dps = baseDps * coef * (1 - escortShare) * ks.flagMult * dpsScale;
     let shotsBase = isLaser ? 18 : Math.min(25, Math.max(4, this.count * fireRate));
-    let shotsPerSec = shotsBase * trait.rate * se.rateMult;   // 초진화 발사속도
-    if (needle) { shotsBase *= needle.rate; shotsPerSec *= needle.rate; }  // 발사↑ + 탄당 피해↓ = DPS 중립·집중
-    this.fireAcc += shotsPerSec * dt;
+    let shotsPerSec = shotsBase * trait.rate * se.rateMult;
+    if (needle) { shotsBase *= needle.rate; shotsPerSec *= needle.rate; }
+    this[accKey] = (this[accKey] || 0) + shotsPerSec * dt;
     const mounts = SHIP_DEFS[this.tier].mounts;
-    while (this.fireAcc >= 1) {
-      this.fireAcc -= 1;
+    while (this[accKey] >= 1) {
+      this[accKey] -= 1;
       if (world.bullets.length >= BAL.bullet.cap) continue;
       const dmg = crit(dps / shotsBase * trait.dmg);
-      this.mountIdx = ((this.mountIdx || 0) + 1) % mounts.length;
-      const m = mounts[this.mountIdx];
+      this[midKey] = ((this[midKey] || 0) + 1) % mounts.length;
+      const m = mounts[this[midKey]];
       if (isLaser) {
-        let beamW = 3 + this.weaponLv * 1.5;
-        let pierce = W.laser.pierce[this.weaponLv - 1] + pb + trait.pierce + ascPierce;
+        let beamW = 3 + level * 1.5;
+        let pierce = W.laser.pierce[Math.min(level, W.laser.pierce.length) - 1] + pb + trait.pierce + ascPierce;
         let ldmg = dmg, isCut = false;
-        if (cutter) { this.cutterCount = (this.cutterCount || 0) + 1; if (this.cutterCount % cutter.every === 0) { beamW *= cutter.widthMult; pierce += cutter.pierceBonus; ldmg *= cutter.dmgMult; isCut = true; } }
-        const b = new Bullet(this.x + m.x, this.y + m.y, ldmg, { vy: -W.laser.speed, kind: 'laser', pierce, beamW, lv: this.weaponLv, color: projColor, artId: projArt });
+        if (cutter) { this[cutKey] = (this[cutKey] || 0) + 1; if (this[cutKey] % cutter.every === 0) { beamW *= cutter.widthMult; pierce += cutter.pierceBonus; ldmg *= cutter.dmgMult; isCut = true; } }
+        const b = new Bullet(this.x + hx + m.x, this.y + m.y, ldmg, { vy: -W.laser.speed, kind: 'laser', pierce, beamW, lv: level, color: projColor, artId: projArt });
         if (prism) b.split = true;
         if (isCut) b.cutter = cutter.clearRadius;
+        b.sourceWeaponId = weaponId;
         world.bullets.push(b);
-        world.effects.muzzle(this.x + m.x, this.y + m.y - 2, isCut ? '#ffffff' : '#a8f0ff', isCut ? 9 : 6);
+        world.effects.muzzle(this.x + hx + m.x, this.y + m.y - 2, isCut ? '#ffffff' : '#a8f0ff', isCut ? 9 : 6);
         sfx('laser');
       } else {
-        let spread = (W.vulcan.spreadDeg[this.weaponLv - 1] * Math.PI) / 180 * trait.spread * se.spreadMult;   // 초진화 확산
+        let spread = (W.vulcan.spreadDeg[Math.min(level, W.vulcan.spreadDeg.length) - 1] * Math.PI) / 180 * trait.spread * se.spreadMult;
         if (needle) spread *= needle.spread;
         if (storm) spread *= WE.vulcan_storm.spread;
         const a = (Math.random() - 0.5) * 2 * spread;
-        const vpb = pb + (needle ? (needle.pierceBonus || 0) : 0);   // 니들: 관통 드릴
-        const b = new Bullet(this.x + m.x, this.y + m.y, dmg, {
+        const vpb = pb + (needle ? (needle.pierceBonus || 0) : 0);
+        const b = new Bullet(this.x + hx + m.x, this.y + m.y, dmg, {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
-          pierce: (vpb + trait.pierce + ascPierce) > 0 ? 1 + vpb + trait.pierce + ascPierce : 0, lv: this.weaponLv, color: projColor, artId: projArt,
+          pierce: (vpb + trait.pierce + ascPierce) > 0 ? 1 + vpb + trait.pierce + ascPierce : 0, lv: level, color: projColor, artId: projArt,
         });
         if (needle) b.scale = needle.sizeMult;
         if (storm) b.ricochet = true;
+        b.sourceWeaponId = weaponId;
         world.bullets.push(b);
-        world.effects.muzzle(this.x + m.x, this.y + m.y - 2, COLORS.ally, 5);
+        world.effects.muzzle(this.x + hx + m.x, this.y + m.y - 2, COLORS.ally, 5);
         sfx('vulcan');
       }
       this.recoil = 1.2;
@@ -2265,18 +2364,15 @@ export class EnemyShot {
     if (dist <= this.r + sq.hitRadius) {
       // 실제 피격: 탄 제거 + (무적 아니면) 피해 + FLOW 규칙. 같은 프레임 graze 금지.
       this.dead = true;
-      if (sq.invulnT > 0) return;   // 진화 무적 (A3) — 실제 손실 0이므로 FLOW 규칙도 미적용
-      const dmg = Math.max(this.dmgMin, Math.round(sq.count * this.dmgPct));
-      sq.applyDelta(-dmg, world);
-      sq.onCombatHit(world);        // 실제 전투 손실 → FLOW/RUSH 규칙
+      const legacyDmg = Math.max(this.dmgMin, Math.round(sq.count * this.dmgPct));
+      sq.takeShot(world, { legacyDmg, onCruiserIndex: null, elite: !!this.elite });   // Gate 1: 기함 핵 → 내구도
       world.effects.burst(this.x, this.y, COLORS.danger, 10);
     } else if (sq.cruisers > 0) {
       // 순양함 피탄: 기함에 안 맞은 탄이 날개 순양함을 맞히면 HP가 깎인다(격침 가능). 탄 소모.
-      //  (구 '근접 회피'는 처치 콤보 방식으로 개편되어 여기서 제거됨)
       const ci = sq.cruiserHitIndex(this.x, this.y, this.r);
       if (ci >= 0) {
         this.dead = true;
-        if (sq.invulnT <= 0) sq.hitCruiser(ci, Math.max(this.dmgMin, Math.round(sq.count * this.dmgPct)), world);
+        sq.takeShot(world, { legacyDmg: Math.max(this.dmgMin, Math.round(sq.count * this.dmgPct)), onCruiserIndex: ci, elite: !!this.elite });
       }
     }
     if (this.y > world.logicalH + 30 || this.y < -40 || this.x < -30 || this.x > world.logicalW + 30) this.dead = true;

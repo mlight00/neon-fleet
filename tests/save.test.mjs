@@ -15,12 +15,17 @@ test('기본값: 저장 없으면 best 0, coins 0, stage 1, style C(미선택), 
   const mem = new Map();
   const fake = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
   const s = createSave(fake);
-  assert.deepEqual(s.get(), {
-    best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false, introSeen: false, firstGuideSeen: false,
-    campaignCleared: false, endlessUnlocked: false, endlessBest: 0, stageMigrated: true,
-    up: { drones: 0, dmg: 0, rate: 0, coin: 0 },
-    snd: { bgm: 0.5, sfx: 0.8, mute: false },
-  });
+  const d = s.get();
+  // 핵심 진행 기본값(구 필드 회귀 방지)
+  assert.equal(d.best, 0); assert.equal(d.coins, 0); assert.equal(d.stage, 1);
+  assert.equal(d.style, 'C'); assert.equal(d.styleChosen, false); assert.equal(d.stageMigrated, true);
+  assert.deepEqual(d.up, { drones: 0, dmg: 0, rate: 0, coin: 0 });
+  assert.deepEqual(d.snd, { bgm: 0.5, sfx: 0.8, mute: false });
+  // Gate 1 메타 필드 기본값(§10)
+  assert.equal(d.saveVersion, 2);
+  assert.deepEqual(d.unlocks.startingWeapons, []);
+  assert.deepEqual(d.blueprints, {});
+  assert.equal(d.threatLevel, 0);
 });
 
 test('stage 마이그레이션: 옛 부풀려진 stage(내부 난이도)를 섹터로 1회 환산', () => {

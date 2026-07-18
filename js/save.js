@@ -1,6 +1,8 @@
 // 저장 래퍼 — storage 주입식이라 테스트 가능, 실패 시 메모리 폴백
 const KEY = 'neonFleet.v1';
+export const SAVE_VERSION = 2;                   // Gate 1: 메타 해금·설계도·위협 구조 도입(§10)
 const DEFAULTS = {
+  saveVersion: SAVE_VERSION,
   best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false,
   introSeen: false,                             // 인트로 크롤 시청 여부
   firstGuideSeen: false,                        // 첫 출격 조작 안내 표시 여부(1회) — 이후 루트 노드 자동 진입 생략
@@ -10,7 +12,17 @@ const DEFAULTS = {
   stageMigrated: true,                          // stage 기록 마이그레이션 완료 플래그(신규 저장은 항상 true)
   up: { drones: 0, dmg: 0, rate: 0, coin: 0 }, // 격납고 강화 레벨
   snd: { bgm: 0.5, sfx: 0.8, mute: false },     // 사운드 설정
+  // ── Gate 1: 메타 진행 필드(§10.2). 구 저장은 안전 기본값으로 백필, 멱등. Gate 3에서 실제 해금 로직 사용. ──
+  threatLevel: 0,                               // 위협 단계(0=기본)
+  unlocks: { startingWeapons: [], commandFrames: [], fleetSystems: [], resonanceVariants: [] },
+  blueprints: {},                               // 설계도 해금 상태
+  discoveredEnemies: [],                        // 도감(발견 적 id)
+  bossMemories: [],                             // 보스 기억(처치 보스 id)
+  runHistorySummary: [],                        // 최근 런 요약(최대 N개)
 };
+
+// 중첩 객체 필드(구 저장에 없을 때 깊은 백필 대상). 얕은 spread로는 병합 안 되므로 개별 처리.
+const NESTED_KEYS = ['up', 'snd', 'unlocks', 'blueprints'];
 
 const SECTOR_SPAN = 6; // 옛 stage = (sector-1)×(depth+1) + col + 1, depth 5 → 6
 
@@ -32,11 +44,21 @@ export function createSave(storage = globalThis.localStorage) {
       const raw = storage.getItem(KEY);
       if (raw) {
         const data = JSON.parse(raw);
+        let dirty = false;
         if (data && !data.stageMigrated) {
           if (typeof data.stage === 'number') data.stage = Math.max(1, Math.floor((data.stage - 1) / SECTOR_SPAN) + 1);
           data.stageMigrated = true;
-          storage.setItem(KEY, JSON.stringify(data));
+          dirty = true;
         }
+        // Gate 1(§10): saveVersion 상향 + 새 메타 필드 안전 백필. 멱등 — 같은 저장을 여러 번 불러도
+        //  설계도·해금이 중복 생성되지 않는다(구조 병합만, 배열 append 없음).
+        if (data && data.saveVersion !== SAVE_VERSION) {
+          data.saveVersion = SAVE_VERSION;
+          for (const k of NESTED_KEYS) if (data[k] == null) data[k] = structuredClone(DEFAULTS[k]);
+          for (const k of ['threatLevel', 'discoveredEnemies', 'bossMemories', 'runHistorySummary']) if (data[k] == null) data[k] = structuredClone(DEFAULTS[k]);
+          dirty = true;
+        }
+        if (dirty) storage.setItem(KEY, JSON.stringify(data));
       }
     } catch { /* 손상된 데이터는 get()에서 기본값으로 복구 */ }
   }
@@ -51,8 +73,11 @@ export function createSave(storage = globalThis.localStorage) {
         const data = JSON.parse(raw);
         return {
           ...structuredClone(DEFAULTS), ...data,
+          saveVersion: SAVE_VERSION,                       // 항상 현재 버전으로 정규화(멱등)
           up: { ...DEFAULTS.up, ...(data.up || {}) },
           snd: { ...DEFAULTS.snd, ...(data.snd || {}) },
+          unlocks: { ...structuredClone(DEFAULTS.unlocks), ...(data.unlocks || {}) },  // 새 필드 깊은 백필
+          blueprints: { ...(data.blueprints || {}) },
         };
       } catch {
         return structuredClone(DEFAULTS);
