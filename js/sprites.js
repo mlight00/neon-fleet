@@ -61,15 +61,23 @@ export const ART_PATHS = Object.freeze({
   VFX_BOSS_BREAK: 'assets/art2-webp/vfx/nf2_vfx_boss_armor_break.webp',
 });
 
-const RASTER_ART = {
+// Gate 0 리모델링 v2 (지시서 §5·§6): 일반 적 12종 + 캠페인 보스 6종을 신규 WebP로 교체.
+// FORGED LIGHT(ART_PATHS)의 B16~B21·B22·B7 경로를 이 블록이 덮어써 단일 톤으로 통일한다.
+const REMODEL_V2_ENEMIES = Object.fromEntries(
+  ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B16', 'B17', 'B18', 'B19', 'B20', 'B21']
+    .map((id) => [id, `assets/remodel-v2/enemies/${id}.webp`]),
+);
+const REMODEL_V2_BOSSES = Object.fromEntries(
+  ['B8', 'B9', 'B10', 'B11', 'B22', 'B7'].map((id) => [id, `assets/remodel-v2/bosses/${id}.webp`]),
+);
+
+export const RASTER_ART = {
   C: {
     ...ART_PATHS,
-    B1: 'assets/styleC/B1.png', B2: 'assets/styleC/B2.png',
-    B3: 'assets/styleC/B3.png', B5: 'assets/styleC/B5.png',
-    B8: 'assets/styleC/B8.png', B9: 'assets/styleC/B9.png',
-    B10: 'assets/styleC/B10.png', B11: 'assets/styleC/B11.png',
     C1: 'assets/styleC/C1.png', C2: 'assets/styleC/C2.png',
-    // B4/B6/운석/파워모듈은 벡터 메탈 아트 유지 (추가 생성 시 교체)
+    ...REMODEL_V2_ENEMIES,     // B1~B6, B16~B21 (B4/B6 포함 — 벡터 폴백 해제)
+    ...REMODEL_V2_BOSSES,      // B8~B11, B22, B7 (구 카툰 PNG·레이어 합본 대체)
+    // 운석/파워모듈은 벡터 메탈 아트 유지. B12~B15(엔드리스)는 이번 범위 밖.
   },
 };
 
@@ -224,10 +232,13 @@ export function preloadStyle(style = artStyle) {
 }
 
 export function preloadBossArt(id, style = artStyle) {
+  // Gate 0 §11: B22/B7은 단일 베이스(remodel-v2) + 파괴 VFX만 렌더한다.
+  // 구형 부품 레이어(chassis/ring/arm/core/crack, body/egg/crown/heart/debris)는
+  // 더 이상 합성하지 않으므로 프리로드에서 제외한다. B7_ESCAPE만 4단계 전용으로 유지.
   const ids = id === 'B22'
-    ? ['B22', 'B22_CHASSIS', 'B22_RING', 'B22_ARM_LEFT', 'B22_ARM_RIGHT', 'B22_CORE', 'B22_CRACK', 'VFX_BOSS_BREAK']
+    ? ['B22', 'VFX_BOSS_BREAK']
     : id === 'B7'
-      ? ['B7', 'B7_BODY', 'B7_EGG_LEFT', 'B7_EGG_RIGHT', 'B7_CROWN', 'B7_HEART', 'B7_ESCAPE', 'B7_DEBRIS', 'VFX_BOSS_BREAK']
+      ? ['B7', 'B7_ESCAPE', 'VFX_BOSS_BREAK']
       : [id];
   return preloadSprites(ids, style);
 }

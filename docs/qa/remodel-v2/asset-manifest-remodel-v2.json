@@ -1,0 +1,273 @@
+{
+  "generator": "Codex imagegen + chroma matte postprocess",
+  "backgrounds": {
+    "S1": {
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector01_cold_wake_codex_v02.png",
+      "runtime": "assets/remodel-v2/backgrounds/s1.webp",
+      "width": 768,
+      "height": 1536,
+      "center_luma": 15.98,
+      "edge_luma": 32.84,
+      "center_to_edge_ratio": 0.487,
+      "bytes": 123800,
+      "sha256": "5bc35ed7aa812f3baa8ab57c17e5c16d7eb677ae7f3f521517872684dd04597e"
+    },
+    "S2": {
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector02_prism_grave_codex_v02.png",
+      "runtime": "assets/remodel-v2/backgrounds/s2.webp",
+      "width": 768,
+      "height": 1536,
+      "center_luma": 7.48,
+      "edge_luma": 29.11,
+      "center_to_edge_ratio": 0.257,
+      "bytes": 162728,
+      "sha256": "be49e925d42c76a88aa5955e86faf772caa1a3ddef430166ce45ba6ca4334a8e"
+    },
+    "S3": {
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector03_furnace_line_codex_v02.png",
+      "runtime": "assets/remodel-v2/backgrounds/s3.webp",
+      "width": 768,
+      "height": 1536,
+      "center_luma": 12.99,
+      "edge_luma": 32.41,
+      "center_to_edge_ratio": 0.401,
+      "bytes": 150728,
+      "sha256": "08fcbd74e0294ce7382e550738150730db1adb4f1add7501fafb175b5bc3dfd6"
+    },
+    "S4": {
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector04_broken_armada_codex_v02.png",
+      "runtime": "assets/remodel-v2/backgrounds/s4.webp",
+      "width": 768,
+      "height": 1536,
+      "center_luma": 17.33,
+      "edge_luma": 30.19,
+      "center_to_edge_ratio": 0.574,
+      "bytes": 132244,
+      "sha256": "61a4a45aa1c5d672c1e3ec4b350a342383fb03a530eacbe4308c57bd5e5010f7"
+    },
+    "S5": {
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector05_choir_veil_codex_v02.png",
+      "runtime": "assets/remodel-v2/backgrounds/s5.webp",
+      "width": 768,
+      "height": 1536,
+      "center_luma": 3.37,
+      "edge_luma": 22.11,
+      "center_to_edge_ratio": 0.153,
+      "bytes": 115182,
+      "sha256": "3ad6eae93f26ef28acb1e0249b633c418c247199092c34983b347bb2d086f1d6"
+    },
+    "S6": {
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector06_crown_core_codex_v02.png",
+      "runtime": "assets/remodel-v2/backgrounds/s6.webp",
+      "width": 768,
+      "height": 1536,
+      "center_luma": 11.67,
+      "edge_luma": 24.19,
+      "center_to_edge_ratio": 0.483,
+      "bytes": 139250,
+      "sha256": "cc13c1360b703a7f561604f7680fc805f5aaaea732250d2fdfd4068308c8234e"
+    }
+  },
+  "enemies": {
+    "B1": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b01_shard_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B1.webp",
+      "width": 260,
+      "height": 512,
+      "visible_pixels": 50827,
+      "soft_edge_pixels": 5330,
+      "green_spill_pixels": 10,
+      "bytes": 86870,
+      "sha256": "e2e51b42540565d081a4bc54960a9483e4b55ce9e093796fee75f4d953f32e16"
+    },
+    "B2": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b02_reaper_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B2.webp",
+      "width": 401,
+      "height": 512,
+      "visible_pixels": 90586,
+      "soft_edge_pixels": 9676,
+      "green_spill_pixels": 7,
+      "bytes": 173400,
+      "sha256": "7481703c43df44f21c2367a8c004230166401b77cf20781e2dc5ff91ce0ddbfc"
+    },
+    "B3": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b03_brood_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B3.webp",
+      "width": 365,
+      "height": 512,
+      "visible_pixels": 104146,
+      "soft_edge_pixels": 4529,
+      "green_spill_pixels": 8,
+      "bytes": 188832,
+      "sha256": "c8b19812bdae28a7ef8d47c381add3a51630ba7d47bf92f54d236c24c510ec2d"
+    },
+    "B4": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b04_sniper_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B4.webp",
+      "width": 204,
+      "height": 512,
+      "visible_pixels": 31021,
+      "soft_edge_pixels": 4494,
+      "green_spill_pixels": 40,
+      "bytes": 64450,
+      "sha256": "9df047899e0c5791361b68a286eeb986300ade234c3e91313f51ca87de573953"
+    },
+    "B5": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b05_turret_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B5.webp",
+      "width": 468,
+      "height": 512,
+      "visible_pixels": 118397,
+      "soft_edge_pixels": 6183,
+      "green_spill_pixels": 6,
+      "bytes": 208086,
+      "sha256": "8a1da9d03b5a42a6d633658cce28f7c02ee6e6c6ecb7792bb97de1b8cde9bf0f"
+    },
+    "B6": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b06_weaver_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B6.webp",
+      "width": 455,
+      "height": 512,
+      "visible_pixels": 70719,
+      "soft_edge_pixels": 12990,
+      "green_spill_pixels": 144,
+      "bytes": 166250,
+      "sha256": "48dc777913cdd1e235a7c08e22a7a718362a34cd35f3a94afd0c34979fc5ed34"
+    },
+    "B16": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b16_bomber_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B16.webp",
+      "width": 476,
+      "height": 512,
+      "visible_pixels": 95762,
+      "soft_edge_pixels": 4696,
+      "green_spill_pixels": 0,
+      "bytes": 175518,
+      "sha256": "5ac75141f15708e800ffeb9059c8b267816f78427c2dd3e937d00795cc59a282"
+    },
+    "B17": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b17_volt_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B17.webp",
+      "width": 189,
+      "height": 512,
+      "visible_pixels": 37973,
+      "soft_edge_pixels": 6509,
+      "green_spill_pixels": 53,
+      "bytes": 86788,
+      "sha256": "cda775b16f58edf1b678be573c0da533ce937655c2b60e1e63fe23f46cfb0ef0"
+    },
+    "B18": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b18_orbit_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B18.webp",
+      "width": 489,
+      "height": 512,
+      "visible_pixels": 110061,
+      "soft_edge_pixels": 10343,
+      "green_spill_pixels": 8,
+      "bytes": 196800,
+      "sha256": "674c5688a7c235b5a5d7e06e4a665ef9b357b90bdc4aa49101225d4f865a4c99"
+    },
+    "B19": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b19_shield_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B19.webp",
+      "width": 512,
+      "height": 490,
+      "visible_pixels": 134132,
+      "soft_edge_pixels": 6491,
+      "green_spill_pixels": 4,
+      "bytes": 246494,
+      "sha256": "cb045c249733676ee222e0f25524ca91582ef6175bbd16184d7a319eb3c9e3c0"
+    },
+    "B20": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b20_carrier_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B20.webp",
+      "width": 405,
+      "height": 512,
+      "visible_pixels": 113304,
+      "soft_edge_pixels": 6118,
+      "green_spill_pixels": 16,
+      "bytes": 207698,
+      "sha256": "d3943246d721caa81ad1810d84e3f9b235e480283150b309dc382f52197b4c15"
+    },
+    "B21": {
+      "source": "source/masters/remodel-v2/enemies/nf2_enemy_b21_blink_codex_v02.png",
+      "runtime": "assets/remodel-v2/enemies/B21.webp",
+      "width": 297,
+      "height": 512,
+      "visible_pixels": 64633,
+      "soft_edge_pixels": 9804,
+      "green_spill_pixels": 17,
+      "bytes": 134566,
+      "sha256": "e49956b472f4c5be7ba4edc02b12c8939ec35fc9f1bad355f2b871eb2b8e9197"
+    }
+  },
+  "bosses": {
+    "B8": {
+      "source": "source/masters/remodel-v2/bosses/nf2_boss_b08_reaper_lord_codex_v02.png",
+      "runtime": "assets/remodel-v2/bosses/B8.webp",
+      "width": 1024,
+      "height": 868,
+      "visible_pixels": 339996,
+      "soft_edge_pixels": 26058,
+      "green_spill_pixels": 68,
+      "bytes": 637424,
+      "sha256": "3a555bfb766ff243b469983a81858dd8111df4e1b17df02da52de56f009e3b96"
+    },
+    "B9": {
+      "source": "source/masters/remodel-v2/bosses/nf2_boss_b09_vortex_maw_codex_v02.png",
+      "runtime": "assets/remodel-v2/bosses/B9.webp",
+      "width": 1024,
+      "height": 906,
+      "visible_pixels": 546261,
+      "soft_edge_pixels": 20231,
+      "green_spill_pixels": 280,
+      "bytes": 1034040,
+      "sha256": "77449d3d73f503f337f0f5bade609e0fa2048a7700e44931afa57f5c52200d35"
+    },
+    "B10": {
+      "source": "source/masters/remodel-v2/bosses/nf2_boss_b10_obsidian_claw_codex_v02.png",
+      "runtime": "assets/remodel-v2/bosses/B10.webp",
+      "width": 1024,
+      "height": 694,
+      "visible_pixels": 310646,
+      "soft_edge_pixels": 19980,
+      "green_spill_pixels": 106,
+      "bytes": 598028,
+      "sha256": "9e3374bb1bfa1963466e88a6c9f1b6888da2d8f0ac1024d7d95941a991440b2e"
+    },
+    "B11": {
+      "source": "source/masters/remodel-v2/bosses/nf2_boss_b11_void_seraph_codex_v02.png",
+      "runtime": "assets/remodel-v2/bosses/B11.webp",
+      "width": 1024,
+      "height": 783,
+      "visible_pixels": 277694,
+      "soft_edge_pixels": 26654,
+      "green_spill_pixels": 92,
+      "bytes": 608144,
+      "sha256": "63d0218f8bd1b514bbb07b52e4f5be27fbd01bcc7e9fd8a68bbe75b6a5ebe39f"
+    },
+    "B22": {
+      "source": "source/masters/remodel-v2/bosses/nf2_boss_b22_neon_arbiter_codex_v02.png",
+      "runtime": "assets/remodel-v2/bosses/B22.webp",
+      "width": 1024,
+      "height": 718,
+      "visible_pixels": 335655,
+      "soft_edge_pixels": 18330,
+      "green_spill_pixels": 64,
+      "bytes": 660374,
+      "sha256": "a37ad15d37b9bfdbcd17b2aa9d1f41f2242aacb51741b7ee1e0b34f78a8b384e"
+    },
+    "B7": {
+      "source": "source/masters/remodel-v2/bosses/nf2_boss_b07_hive_queen_codex_v03.png",
+      "runtime": "assets/remodel-v2/bosses/B7.webp",
+      "width": 1024,
+      "height": 645,
+      "visible_pixels": 320761,
+      "soft_edge_pixels": 20521,
+      "green_spill_pixels": 11,
+      "bytes": 622248,
+      "sha256": "6f8940c3d04a82b12a7274ff83e4086029b08192a3b5c399af503e5ce7ef23d7"
+    }
+  }
+}

@@ -8,6 +8,37 @@ import { EnemyShot, Creature } from './entities.js';
 const AR = () => BAL.neonArbiter;
 function blitIf(ctx, sprite, x, y, scale = 1) { if (sprite) blit(ctx, sprite, x, y, scale); }
 
+// Gate 0 R4 — 보스 부위 손상 국소 VFX. 신규 단일 베이스 위에 균열·발광·암전을 얹어
+// "부품 통째로 사라짐" 대신 "손상된 하나의 함선"으로 읽히게 한다. 좌표는 보스 로컬(중심 0,0).
+function bossGlow(ctx, x, y, r, color, alpha = 1) {
+  if (r <= 0) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = alpha;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color); g.addColorStop(0.5, color.replace(/[\d.]+\)$/, '0.35)')); g.addColorStop(1, color.replace(/[\d.]+\)$/, '0)'));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+/** 부위 손상: 국소 암전 + 균열 발광(파괴됐음을 베이스 삭제 없이 표현) */
+function bossPartDamage(ctx, x, y, r, t, tint = '#ff9c41', destroyed = true) {
+  ctx.save();
+  if (destroyed) {   // 암전: 해당 부위를 어둡게
+    ctx.globalAlpha = 0.42;
+    const d = ctx.createRadialGradient(x, y, 0, x, y, r);
+    d.addColorStop(0, 'rgba(2,3,8,0.9)'); d.addColorStop(1, 'rgba(2,3,8,0)');
+    ctx.fillStyle = d; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  // 균열 발광 (맥동)
+  const flick = 0.4 + 0.4 * Math.abs(Math.sin(t * 6 + x * 0.05));
+  bossGlow(ctx, x, y, r * 0.7, tint.startsWith('#') ? hexGlow(tint, 0.85) : tint, destroyed ? flick * 0.7 : flick);
+}
+function hexGlow(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
 export class Boss {
   constructor(logicalW, rateMult = 1, stage = 1, sizeMul = 1, bossIdOverride = null) {
     // 보스 정체성: 캠페인 ID override가 있으면 그걸, 없으면 로스터 순환. PNG 없으면 하이브 퀸 폴백.
@@ -452,32 +483,41 @@ export class HiveQueen extends Boss {
 
   draw(ctx) {
     if (this.dying) { this.drawDying(ctx, BAL.bossDeath.duration); return; }
-    const body = getSprite('B7_BODY');
-    if (!body) { super.draw(ctx); return; }
+    // Gate 0 R4/§8: 신규 B7 단일 여왕 베이스를 모든 페이즈에서 유지. 구형 부위 이미지를
+    // (좌표가 다른) 위에 겹치지 않는다. 산란낭·왕관·심장 상태는 국소 VFX로만 표현.
+    const base = getSprite('B7');
+    if (!base) { super.draw(ctx); return; }
     const sc = this.drawScale || 1;
+    const w = base.logicalW * sc, h = base.logicalH * sc;
     ctx.save(); ctx.translate(this.x, this.y);
     if (this.hivePhase < 4) {
-      blit(ctx, body, 0, 0, sc);
+      blit(ctx, base, 0, 0, sc);                                  // 항상 100% 여왕 베이스
+      const lx = -w * 0.30, rx = w * 0.30, ey = h * 0.08, er = w * 0.16;
       if (this.hivePhase === 1) {
-        blitIf(ctx, getSprite('B7_EGG_LEFT'), 0, 0, sc);
-        blitIf(ctx, getSprite('B7_EGG_RIGHT'), 0, 0, sc);
+        // 산란낭 활성: 좌우에 주황 맥동(소환 근원임을 학습)
+        const pu = 0.5 + 0.3 * Math.sin(this.t * 3.5);
+        bossGlow(ctx, lx, ey, er, 'rgba(255,150,60,1)', pu);
+        bossGlow(ctx, rx, ey, er, 'rgba(255,150,60,1)', 0.5 + 0.3 * Math.sin(this.t * 3.5 + 1));
+      } else {
+        // 산란낭 파괴: 좌우 국소 암전+균열
+        bossPartDamage(ctx, lx, ey, er, this.t, '#ff9c41');
+        bossPartDamage(ctx, rx, ey, er, this.t + 1.1, '#ff9c41');
       }
-      if (this.hivePhase <= 2) blitIf(ctx, getSprite('B7_CROWN'), 0, 0, sc);
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = this.hivePhase >= 3 ? 0.92 : 0.28 + 0.08 * Math.sin(this.t * 4);
-      blitIf(ctx, getSprite('B7_HEART'), 0, 0, sc);
-      ctx.restore();
+      // 왕관: 페이즈 ≤2 금빛 발광, 페이즈 3 파괴(금빛 팁 암전+균열)
+      const cy = -h * 0.34, cr = w * 0.24;
+      if (this.hivePhase <= 2) bossGlow(ctx, 0, cy, cr, 'rgba(255,225,122,1)', 0.35 + 0.12 * Math.sin(this.t * 3));
+      else bossPartDamage(ctx, 0, cy, cr, this.t + 0.6, '#ffe17a');
+      // 심장: 페이즈 3+ 중앙 주황 맥동(노출 약점)
+      if (this.hivePhase >= 3) bossGlow(ctx, 0, h * 0.02, w * 0.2, 'rgba(255,120,50,1)', 0.6 + 0.28 * Math.sin(this.t * 6));
     } else {
+      // 4단계 탈출 코어만 별도 개체로 (§8 허용)
       const core = getSprite('B7_ESCAPE');
-      if (core) {
-        ctx.globalCompositeOperation = 'lighter';
-        blit(ctx, core, 0, 0, 0.82 + Math.sin(this.t * 8) * 0.05);
-      }
+      if (core) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; blit(ctx, core, 0, 0, 0.82 + Math.sin(this.t * 8) * 0.05); ctx.restore(); }
+      else bossGlow(ctx, 0, 0, w * 0.2, 'rgba(255,150,60,1)', 0.7 + 0.25 * Math.sin(this.t * 8));
     }
     if (this.phaseFlashT > 0) {
       const fx = getSprite('VFX_BOSS_BREAK');
-      if (fx) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = this.phaseFlashT / 0.75; blit(ctx, fx, 0, 0, sc * 1.15); }
+      if (fx) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = this.phaseFlashT / 0.75; blit(ctx, fx, 0, 0, sc * 1.15); ctx.restore(); }
     }
     ctx.restore();
   }
@@ -648,27 +688,26 @@ export class NeonArbiter extends Boss {
     const p3 = this.arbiterPhase >= 3;
     ctx.save();
     ctx.translate(this.x, this.y);
-    const chassis = getSprite('B22_CHASSIS');
-    if (chassis) {
-      blit(ctx, chassis, 0, 0, sc);
-      if (this.arbiterPhase <= 2) blitIf(ctx, getSprite('B22_RING'), 0, 0, sc);
-      if (this.arbiterPhase === 1) blitIf(ctx, getSprite('B22_ARM_LEFT'), 0, 0, sc);
-      if (this.arbiterPhase <= 2) blitIf(ctx, getSprite('B22_ARM_RIGHT'), 0, 0, sc);
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = broken ? 1 : 0.68 + 0.22 * Math.sin(this.t * 5);
-      blitIf(ctx, getSprite('B22_CORE'), 0, 0, sc);
-      const crack = getSprite('B22_CRACK');
-      if (crack && (this.stagger > 0 || broken)) {
-        ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = broken ? 0.9 : Math.min(0.72, this.stagger / AR().staggerMax * 0.72);
-        blit(ctx, crack, 0, 0, sc);
-      }
+    // Gate 0 R4: 신규 B22 단일 베이스를 모든 페이즈에서 100% 유지. 고리·양팔을 통째로 숨겨
+    // 실루엣을 바꾸지 않는다. 손상은 국소 균열·발광·암전 VFX로만 표현한다.
+    const base = getSprite('B22');
+    if (base) {
+      const w = base.logicalW * sc, h = base.logicalH * sc;
+      blit(ctx, base, 0, 0, sc);                                   // 항상 100% 베이스
+      // 중앙 판결 코어 맥동
+      const corePulse = broken ? 0.95 : 0.5 + 0.28 * Math.sin(this.t * 5);
+      bossGlow(ctx, 0, 0, w * 0.17, 'rgba(255,248,210,1)', corePulse);
+      // STAGGER 누적 → 중앙 균열 발광 강화 (베이스 삭제 없이)
+      const st = this.stagger / AR().staggerMax;
+      if (st > 0 || broken) bossGlow(ctx, 0, 0, w * 0.27, 'rgba(255,120,90,1)', broken ? 0.9 : Math.min(0.62, st * 0.62));
+      // 페이즈 2·3: 좌·우 무장 무력화 = 국소 균열/암전 (부위 통째 소거 금지)
+      if (this.arbiterPhase >= 2) bossPartDamage(ctx, -w * 0.33, h * 0.03, w * 0.17, this.t, '#57e0ff');       // 왼팔 손상
+      if (this.arbiterPhase >= 3) bossPartDamage(ctx, w * 0.33, h * 0.03, w * 0.17, this.t + 1.4, '#ff4cd2');   // 우팔 손상
       if (broken) {
         const fx = getSprite('VFX_BOSS_BREAK');
-        if (fx) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45 + 0.35 * Math.sin(this.t * 12); blit(ctx, fx, 0, 0, sc); }
+        if (fx) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45 + 0.35 * Math.sin(this.t * 12); blit(ctx, fx, 0, 0, sc); ctx.restore(); }
+        else bossGlow(ctx, 0, 0, w * 0.42, 'rgba(255,255,255,1)', 0.3 + 0.35 * Math.abs(Math.sin(this.t * 20)));
       }
-      ctx.restore();
     } else {
     // 외곽 링 (단계3 붉은색, 그 외 청록) — 색+텍스트(HUD) 병행
     ctx.globalAlpha = broken ? 0.4 + 0.4 * Math.sin(this.t * 40) : 0.5;

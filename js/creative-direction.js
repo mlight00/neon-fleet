@@ -18,9 +18,17 @@ export const ZONES = Object.freeze([
   { id: 'crown-core', name: 'CROWN CORE', korName: '왕관 핵', start: '#02050a', end: '#191126', glow: '#ffe17a', accent: '#ff4cd2', motif: 'crown' },
 ]);
 
+/**
+ * 섹터 → 구역 인덱스 (Gate 0 §4.4). 섹터 1~6이 S1~S6에 1:1 대응한다.
+ * 이전 (sector-1)/2 방식은 1~2, 3~4, 5~6을 한 구역으로 묶어 "6섹터가 3종 배경처럼" 보이게 했다.
+ * 섹터 7 이상은 후속 자산이 생기기 전까지 마지막 구역(인덱스 5)에 고정한다.
+ */
+export function zoneIndexForSector(sector = 1) {
+  return Math.min(ZONES.length - 1, Math.max(1, Math.floor(sector)) - 1);
+}
+
 export function zoneForSector(sector = 1) {
-  const index = Math.min(ZONES.length - 1, Math.floor((Math.max(1, sector) - 1) / 2));
-  return ZONES[index];
+  return ZONES[zoneIndexForSector(sector)];
 }
 
 export const UPGRADE_DURATIONS = Object.freeze([0, 0.46, 0.64, 0.84, 1.08, 1.36]);

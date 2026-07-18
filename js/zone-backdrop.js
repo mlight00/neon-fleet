@@ -1,37 +1,58 @@
-// 6구역 절차적 배경. 각 구역을 원경/중경/근경 3층으로 그려 패널 이음새 없이 패럴랙스를 만든다.
-import { zoneForSector } from './creative-direction.js';
+// 섹터별 리모델 배경(Gate 0). 섹터 1~6 → S1~S6 베이스 플레이트 1장 + 절제된 먼지/파편/항적 3층.
+// 모든 레이어가 화면 위에서 들어와 아래로 빠져 "함대가 위로 전진"하는 느낌을 준다.
+import { zoneForSector, zoneIndexForSector } from './creative-direction.js';
 
-const BACKDROP_URLS = {
-  heliosFar: 'assets/art2-webp/backgrounds/nf2_bg01_helios_far.webp',
-  heliosMid: 'assets/art2-webp/backgrounds/nf2_bg01_helios_mid.webp',
-  hiveFar: 'assets/art2-webp/backgrounds/nf2_bg02_hive_far.webp',
-  hiveMid: 'assets/art2-webp/backgrounds/nf2_bg02_hive_mid.webp',
-};
+/** 섹터별 배경 플레이트 (지시서 §4.1). 인덱스 0~5 = 섹터 1~6. */
+export const SECTOR_BACKDROP = Object.freeze(
+  Array.from({ length: 6 }, (_, i) => ({ key: `s${i + 1}`, url: `assets/remodel-v2/backgrounds/s${i + 1}.webp` })),
+);
+
+/** 레이어 속도 (아래 방향). FAR < MID < NEAR (§4.4). base=원경 플레이트. */
+export const LAYER_SPEEDS = Object.freeze({ base: 0.032, far: 0.032, dust: 0.12, mid: 0.2, near: 0.48 });
+
+/** 섹터 → 배경 인덱스 (1:1, 7+는 5 고정) */
+export function sectorBackdropIndex(sector = 1) { return zoneIndexForSector(sector); }
+
 const backdropImages = new Map();
 
-function loadBackdrop(key) {
+function loadBackdropIndex(i) {
+  const { key, url } = SECTOR_BACKDROP[i];
   if (backdropImages.has(key) || typeof Image === 'undefined') return;
   backdropImages.set(key, null);
   const img = new Image();
   img.decoding = 'async';
   img.onload = () => backdropImages.set(key, img);
   img.onerror = () => backdropImages.set(key, false);
-  img.src = BACKDROP_URLS[key];
+  img.src = url;
 }
 
-export function preloadBackdropArt() { Object.keys(BACKDROP_URLS).forEach(loadBackdrop); }
+/** 현재 섹터 배경만 필수 로드, 다음 섹터를 미리 로드 (§9). */
+export function preloadBackdropArt(sector = 1) {
+  const i = sectorBackdropIndex(sector);
+  loadBackdropIndex(i);
+  if (i + 1 < SECTOR_BACKDROP.length) loadBackdropIndex(i + 1);
+}
+
+/**
+ * 배경 타일의 화면 y (순수 함수, 지시서 §4.3). scroll이 증가하면 y도 증가한다 = 아래로 흐른다.
+ *  y = i*tileH + wrap(scroll*speed, tileH) - tileH
+ * 미러 반전(scale(1,-1)) 없이 같은 방향 두 장을 겹쳐 순환한다.
+ */
+export function backdropTileY(i, scroll, tileH, speed) {
+  return i * tileH + wrap(scroll * speed, tileH) - tileH;
+}
+
+/** 입자 레이어 y (순수). base=정규화(0~1) 초기 위치. 배경과 같은 방향(+scroll*speed)으로 순환. */
+export function backdropLayerY(base, scroll, span, speed) {
+  return wrap(base * span + scroll * speed, span);
+}
 
 function drawVerticalArt(ctx, img, w, h, scroll, speed, alpha = 1) {
   if (!img || !img.width) return false;
   const tileH = img.height * (w / img.width);
-  const offset = wrap(scroll * speed, tileH);
   ctx.save(); ctx.globalAlpha = alpha;
   for (let i = -1; i <= Math.ceil(h / tileH) + 1; i++) {
-    const y = i * tileH - offset;
-    // 매 두 번째 타일을 상하 반전해 경계에서 동일 방향 특징이 반복되는 느낌을 줄인다.
-    if (i % 2) {
-      ctx.save(); ctx.translate(0, y + tileH); ctx.scale(1, -1); ctx.drawImage(img, 0, 0, w, tileH); ctx.restore();
-    } else ctx.drawImage(img, 0, y, w, tileH);
+    ctx.drawImage(img, 0, backdropTileY(i, scroll, tileH, speed), w, tileH);
   }
   ctx.restore();
   return true;
@@ -98,42 +119,43 @@ function drawLandmark(ctx, w, h, zone, scroll) {
 }
 
 export function createZoneBackdrop(logicalW) {
-  preloadBackdropArt();
+  preloadBackdropArt(1);
   const fields = Array.from({ length: 6 }, (_, i) => buildField(7429 + i * 1777, logicalW));
+  let lastSector = 1;
   return {
     draw(ctx, logicalH, scroll = 0, sector = 1) {
+      if (sector !== lastSector) { preloadBackdropArt(sector); lastSector = sector; }
       const zone = zoneForSector(sector);
-      const zi = Math.min(5, Math.floor((Math.max(1, sector) - 1) / 2));
+      const zi = sectorBackdropIndex(sector);   // 섹터 1~6 → 0~5 (1:1, R2)
       const field = fields[zi];
       const bg = ctx.createLinearGradient(0, 0, 0, logicalH);
       bg.addColorStop(0, zone.start); bg.addColorStop(0.56, zone.end); bg.addColorStop(1, '#02040a');
       ctx.fillStyle = bg; ctx.fillRect(0, 0, logicalW, logicalH);
 
-      const late = sector >= 5;
-      const far = backdropImages.get(late ? 'hiveFar' : 'heliosFar');
-      const mid = backdropImages.get(late ? 'hiveMid' : 'heliosMid');
-      // 새 원경이 로드되기 전/실패한 경우에만 기존 절차적 랜드마크를 폴백으로 사용한다.
-      if (!drawVerticalArt(ctx, far, logicalW, logicalH, scroll, 0.025, 0.92)) drawLandmark(ctx, logicalW, logicalH, zone, scroll);
-      drawVerticalArt(ctx, mid, logicalW, logicalH, scroll, 0.085, 0.72);
+      // 섹터별 베이스 플레이트 1장. 로드 전/실패 시에만 절차적 랜드마크 폴백.
+      const plate = backdropImages.get(SECTOR_BACKDROP[zi].key);
+      if (!drawVerticalArt(ctx, plate, logicalW, logicalH, scroll, LAYER_SPEEDS.base, 0.94)) {
+        drawLandmark(ctx, logicalW, logicalH, zone, scroll);
+      }
 
-      // 중경: 작은 파편과 먼지. 속도 0.12.
+      // 중경: 먼지·파편. 배경과 같은 방향(아래)으로 순환 — backdropLayerY.
       ctx.save();
       for (const d of field.dust) {
-        const y = wrap(d.y * logicalH + scroll * 0.12, logicalH);
+        const y = backdropLayerY(d.y, scroll, logicalH, LAYER_SPEEDS.dust);
         ctx.globalAlpha = d.a; ctx.fillStyle = zone.accent; ctx.fillRect(d.x, y, d.r, d.r);
       }
       for (const s of field.shards) {
-        const y = wrap(s.y * (logicalH + 100) + scroll * 0.2, logicalH + 100) - 50;
+        const y = backdropLayerY(s.y, scroll, logicalH + 100, LAYER_SPEEDS.mid) - 50;
         ctx.save(); ctx.translate(s.x, y); ctx.rotate(s.rot + scroll * 0.00035); ctx.globalAlpha = s.a; ctx.strokeStyle = zone.glow; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(0, -s.s); ctx.lineTo(s.s * 0.36, s.s * 0.4); ctx.lineTo(-s.s * 0.22, s.s); ctx.closePath(); ctx.stroke(); ctx.restore();
       }
       ctx.restore();
 
-      // 근경: 빠른 항적. 전투 오브젝트보다 어둡게 유지해 가독성을 해치지 않는다.
+      // 근경: 빠른 항적. 아래로 흐르는 꼬리(위→아래 전진감). 전투 오브젝트보다 어둡게.
       ctx.save(); ctx.lineWidth = 1;
       for (const s of field.streaks) {
-        const y = wrap(s.y * (logicalH + 160) + scroll * 0.48, logicalH + 160) - 80;
-        const g = ctx.createLinearGradient(s.x, y, s.x, y + s.len); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, zone.glow);
+        const y = backdropLayerY(s.y, scroll, logicalH + 160, LAYER_SPEEDS.near) - 80;
+        const g = ctx.createLinearGradient(s.x, y, s.x, y + s.len); g.addColorStop(0, zone.glow); g.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.globalAlpha = s.a; ctx.strokeStyle = g; ctx.beginPath(); ctx.moveTo(s.x, y); ctx.lineTo(s.x, y + s.len); ctx.stroke();
       }
       ctx.restore(); ctx.globalAlpha = 1;
