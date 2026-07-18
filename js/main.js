@@ -587,23 +587,24 @@ function spawnCoreLoopBoss() {
   boss.dpsCap = boss.maxHp / BAL.gate1.bossTtk.minTTKSec;   // 하한 클램프: 초당 피해 상한(TTK 하한)
   boss._age = 0; boss._dmgSec = 0; boss._secT = 0; boss._enrageMult = 1;
   // 양측 클램프를 보스 hitByBullet에 래핑 → 발사체·랜스·에코 등 '모든' 경로가 거친다(Codex P1a). coreLoop 보스에만 적용.
-  //  모두 '실제 HP 감소' 기준이라 BREAK 배수(×1.25) 등 보스 내부 수정 뒤의 실손실을 정확히 다룬다(Codex 3차 P1).
-  //  하한/상한 분리: 정상 피해는 초당 예산으로 상한(하한, 순삭 방지) → enrage는 예산을 '넘겨' 추가 피해를 얹는다
-  //   (상한, 느린 빌드를 ~maxTTK에 끝냄). 피해가 0이면 추가도 0이라 타이머 킬이 아니다.
+  //  ★ 클램프는 rawHit '이전' 입력에 적용한다 → rawHit 한 번으로 STAGGER·사망 전이·HP가 모두 최종 입력과 일관(Codex 4차 P1/P2).
+  //   보스 내부 배수(BREAK ×1.25)는 damageTakenMult()로 미리 조회해 실손실 기준으로 예산을 건다.
+  //   하한/상한 분리: 정상 입력은 예산 내로 깎고(순삭 방지) → enrage는 예산 밖 추가 입력을 얹는다(느린 빌드를 ~maxTTK에).
+  //   수용된 정상 피해가 0이면 enrage 추가도 0이라 타이머 킬이 아니다.
   const rawHit = boss.hitByBullet.bind(boss);
   boss.hitByBullet = (dmg, world, ctx) => {
-    const before = boss.hp;
-    const ret = rawHit(dmg, world, ctx);                            // 정상 피해(BREAK 배수 등 내부 수정 포함)
-    let loss = before - boss.hp;
-    if (loss > 0) {
-      if (boss.dpsCap) {                                            // 하한: 정상 피해를 초당 예산으로 상한
-        const budget = Math.max(0, boss.dpsCap - (boss._dmgSec || 0));
-        if (loss > budget) { boss.hp = before - budget; loss = budget; }
-        boss._dmgSec = (boss._dmgSec || 0) + loss;
-      }
-      if (boss._enrageMult > 1) boss.hp -= loss * (boss._enrageMult - 1);   // 상한: 예산 초과 추가 피해
+    const mult = boss.damageTakenMult ? boss.damageTakenMult() : 1;   // 내부 배수 사전 조회
+    let norm = dmg;
+    if (boss.dpsCap) {                                                // 하한: 실손실(norm×mult)이 초당 예산 넘지 않게 입력을 깎음
+      const budget = Math.max(0, boss.dpsCap - (boss._dmgSec || 0));
+      const maxNorm = mult > 0 ? budget / mult : budget;
+      if (norm > maxNorm) norm = maxNorm;
+      boss._dmgSec = (boss._dmgSec || 0) + norm * mult;              // 수용된 정상 손실만 예산 차감
     }
-    return ret;
+    let input = norm;
+    if (boss._enrageMult > 1) input += norm * (boss._enrageMult - 1); // 상한: enrage 추가 입력(예산 밖, 정상피해 비례)
+    if (input <= 0) return;                                          // 예산 소진·enrage 없음 → 피해·부작용 모두 없음
+    return rawHit(input, world, ctx);                               // 단일 호출: STAGGER·사망·HP 일관
   };
   r.bosses = [boss]; w.bosses = [boss];
   r.boss = boss; w.boss = boss;

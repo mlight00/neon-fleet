@@ -672,12 +672,14 @@ export class NeonArbiter extends Boss {
     }
   }
 
+  /** 받는 피해 배수(BREAK 중 ×1.25). 외부(코어루프 클램프)가 입력 산정에 미리 조회할 수 있게 노출. */
+  damageTakenMult() { return this.breakT > 0 ? AR().breakDamageMult : 1; }
+
   hitByBullet(dmg, world, ctx = null) {
     // 3단+ 원본 차지 랜스 직격 → STAGGER +2 (메아리·일반탄 제외, attackId 중복 방지)
     if (ctx && ctx.lance && ctx.stage >= 3 && !ctx.echo) this.addStagger(AR().lanceStagger, world, ctx.attackId);
     this.staggerFromDamage(dmg, world);                        // 누적 피해로 STAGGER (구 근접 회피 대체)
-    const mult = this.breakT > 0 ? AR().breakDamageMult : 1;   // BREAK 중 받는 피해 ×1.25
-    super.hitByBullet(dmg * mult, world);                       // 일반 자동사격도 100% 기본 피해
+    super.hitByBullet(dmg * this.damageTakenMult(), world);     // BREAK 중 받는 피해 ×1.25
   }
 
   draw(ctx) {

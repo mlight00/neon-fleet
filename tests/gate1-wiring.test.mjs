@@ -111,9 +111,13 @@ test('G1-08: 보스 HP는 고정 + 양측 클램프(dpsCap 하한·enrage 상한
   // 클램프는 보스 hitByBullet 래퍼에 → 발사체·랜스·에코 등 '모든' 경로가 거친다(Codex P1a).
   assert.ok(mainSrc.includes('boss.hitByBullet = (dmg, world, ctx)'), '클램프 래퍼: 모든 경로 적용');
   assert.ok(!/bossDmg \*= bo\._enrageMult/.test(mainSrc), '충돌 분기에 중복 클램프 없음(래퍼로 일원화)');
-  // 하한/상한 분리 + '실제 HP 감소' 기준(BREAK ×1.25 등 내부 수정 뒤 실손실, Codex 3차 P1).
-  assert.ok(mainSrc.includes('before - boss.hp') && mainSrc.includes('boss.hp = before - budget'), '하한: 실제 HP 감소로 예산 상한');
-  assert.ok(mainSrc.includes('boss.hp -= loss * (boss._enrageMult - 1)'), '상한: enrage는 예산 넘겨 추가 피해');
+  // 클램프는 rawHit '이전' 입력에 적용 → 단일 호출로 STAGGER·사망·HP 일관(Codex 4차 P1/P2).
+  assert.ok(mainSrc.includes('boss.damageTakenMult') && mainSrc.includes('budget / mult'), '보스 배수 사전 조회 + 실손실 기준 입력 상한');
+  assert.ok(mainSrc.includes('boss._dmgSec || 0) + norm * mult'), '수용된 정상 손실만 예산 차감');
+  assert.ok(mainSrc.includes('norm * (boss._enrageMult - 1)') && mainSrc.includes('if (input <= 0) return'), '상한: enrage 추가 입력(피해0이면 부작용 없음)');
+  // B22가 배수를 외부에 노출(STAGGER는 수용 입력 기준으로만 누적).
+  const bossesSrc = readFileSync(new URL('../js/bosses.js', import.meta.url), 'utf8');
+  assert.ok(bossesSrc.includes('damageTakenMult()'), 'NeonArbiter가 받는피해 배수 노출');
   // 잡몹 정리 시 표적 해제(Codex P2): dead 표식 + 시커 표식 해제로 유도/시커가 사라진 적을 추적하지 않음.
   assert.ok(mainSrc.includes('e.dead = true') && mainSrc.includes('resonEnemyRemoved(w.reson, e)'), '보스 등장 정리 시 표적 해제');
 });
