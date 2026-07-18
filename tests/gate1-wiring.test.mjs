@@ -109,9 +109,12 @@ test('G1-08: 보스 HP는 등장 후 실측 재보정(중심) + 양측 클램프
   assert.ok(mainSrc.includes('bo0._hpWin - bo0.hp'), '표본창 실감소로 단일표적 DPS(모든 피해 경로)');
   assert.ok(mainSrc.includes('bo0._provMax - bo0.hp'), '총 피해=임시최대−현재HP(치유 없음)');
   assert.ok(mainSrc.includes('bossDps * bt.targetTTKSec'), '목표 TTK로 HP 중심추정');
-  assert.ok(mainSrc.includes('bo0._calibrated = true') && mainSrc.includes('bo.dpsCap'), '하한 클램프: 재보정 후 초당 상한');
-  // 노이즈 무관 수렴: enrageStart 이후 보스 피격 피해 증폭(상한). 잔여 잡몹 정리로 순수 단일표적 표본.
-  assert.ok(mainSrc.includes('_enrageMult') && mainSrc.includes('bossDmg *= bo._enrageMult'), '상한 클램프: enrage 증폭');
+  assert.ok(mainSrc.includes('bo0._calibrated = true') && mainSrc.includes('bo0.dpsCap = bo0.maxHp / bt.minTTKSec'), '하한 클램프: 재보정 후 초당 상한');
+  // 양측 클램프는 보스 hitByBullet 래퍼에 있어야 '모든' 피해 경로(랜스·에코 포함)가 거친다(Codex P1a).
+  assert.ok(mainSrc.includes('boss.hitByBullet = (dmg, world, ctx)') && mainSrc.includes('d *= boss._enrageMult'), '클램프 래퍼: 모든 경로 적용');
+  assert.ok(!/bossDmg \*= bo\._enrageMult/.test(mainSrc), '충돌 분기에 중복 클램프 없음(래퍼로 일원화)');
+  // 표본 부족 폴백(Codex P1b): 창에서 보스를 거의 못 때리면 avgDps 사전추정으로 HP 붕괴 방지.
+  assert.ok(mainSrc.includes('bossDps >= ref * 0.2') && mainSrc.includes('ref * bt.avgDpsMult'), '표본 부족 시 사전추정 폴백');
   // 잡몹 정리 시 표적 해제(Codex P2): dead 표식 + 시커 표식 해제로 유도/시커가 사라진 적을 추적하지 않음.
   assert.ok(mainSrc.includes('e.dead = true') && mainSrc.includes('resonEnemyRemoved(w.reson, e)'), '보스 등장 정리 시 표적 해제');
 });

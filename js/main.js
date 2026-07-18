@@ -587,6 +587,16 @@ function spawnCoreLoopBoss() {
   boss.dpsCap = 0;                     // 샘플 중엔 상한 없음(진짜 DPS 측정)
   // 표본·총피해는 개별 누적기 대신 boss.hp 실감소로 잰다 → 랜스·메아리 등 모든 피해 경로가 자동 포함(Codex P1).
   boss._age = 0; boss._hpWin = null; boss._calibrated = false; boss._dmgSec = 0; boss._secT = 0;
+  boss._avgDps = avgDps;               // 표본 부족 시 폴백 기준(Codex P1: bossDps≈0 → HP 붕괴 방지)
+  // 양측 클램프(하한 dpsCap·상한 enrage)를 보스 hitByBullet에 래핑 → 발사체·랜스·에코 등 '모든' 피해 경로가 클램프를
+  //  거친다(Codex P1: 직접 hitByBullet 호출이 클램프를 우회하던 문제). coreLoop 보스에만 적용, 캠페인 보스는 무영향.
+  const rawHit = boss.hitByBullet.bind(boss);
+  boss.hitByBullet = (dmg, world, ctx) => {
+    let d = dmg;
+    if (boss.dpsCap) { const budget = Math.max(0, boss.dpsCap - (boss._dmgSec || 0)); d = Math.min(d, budget); boss._dmgSec = (boss._dmgSec || 0) + d; }
+    if (boss._enrageMult > 1) d *= boss._enrageMult;   // dpsCap(원율) 다음에 증폭 → 상한만 밀어올림
+    return rawHit(d, world, ctx);
+  };
   r.bosses = [boss]; w.bosses = [boss];
   r.boss = boss; w.boss = boss;
   preloadBossArt('B22');
@@ -643,9 +653,17 @@ function coreLoopUpdate(dt) {
       if (bo0._age >= bt.sampleDelaySec + bt.sampleWinSec && bo0._hpWin != null) {
         const windowDmg = Math.max(0, bo0._hpWin - bo0.hp);            // 창 구간 실제 보스 피해(HP 감소=모든 경로)
         const bossDps = windowDmg / bt.sampleWinSec;                   // 버스트 제외 지속 단일표적 DPS
-        bo0.maxHp = Math.max(Math.round(BAL.boss.hp * 0.25), Math.round(bossDps * bt.targetTTKSec));
+        const ref = bo0._avgDps || 0;
+        // 표본 부족(창에서 보스를 거의 안 때림: 이탈·충전 홀드) → HP가 바닥으로 붕괴해 조기 폭사하는 것 방지.
+        //  이 경우엔 사전추정(avgDps 기반)으로 폴백. 정상 명중(단일표적이 avg의 20% 이상)이면 표본을 그대로 쓴다(Codex P1).
+        const sampleOk = ref > 0 && bossDps >= ref * 0.2;
+        const est = sampleOk ? bossDps * bt.targetTTKSec : ref * bt.avgDpsMult;
+        bo0.maxHp = Math.max(Math.round(BAL.boss.hp * 0.25), Math.round(est));
         const dealt = Math.max(0, bo0._provMax - bo0.hp);              // 등장 후 총 피해(모든 경로) = 임시최대 − 현재HP
-        bo0.hp = Math.max(1, bo0.maxHp - dealt);                        // 이미 꽂힌 만큼 반영(치유 없음)
+        // 조기 폭사 방지(하한 보장): 재보정 뒤 dpsCap로도 b22Min 전엔 못 죽게 최소 HP를 남긴다. 정상 플레이는
+        //  이 값(≈0.72·maxHp)보다 잔여가 많아 건드리지 않고, 표본창에 과다 버스트한 경우만 하한으로 들어올린다.
+        const minRemain = bo0.maxHp * Math.max(0, (bt.b22Min - bo0._age)) / bt.minTTKSec;
+        bo0.hp = Math.max(1, Math.min(bo0.maxHp, Math.max(bo0.maxHp - dealt, minRemain)));
         bo0.dpsCap = bo0.maxHp / bt.minTTKSec;                          // 하한 클램프: 초당 상한(TTK 하한)
         bo0._dmgSec = 0; bo0._secT = 0; bo0._calibrated = true;
       }
@@ -1035,9 +1053,7 @@ function update(dt) {
           const siegeBonus = b.blast ? (1 + b.blast.bossBonus) : 1;  // 시즈 토피도 보스 직격 +15%
           let bossDmg = b.damage * (w.mfx?.bossDmgMult ?? 1) * siegeBonus;
           if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, bo)) bossDmg *= BAL.gate1.resonance.seekerBeam.missileBonus;  // 시커 증폭
-          // 코어루프 B22(§5.8): 초당 피해 상한 → 고DPS 빌드가 순삭 못 하고 TTK가 45~60으로 수렴.
-          if (r.coreLoop && bo.dpsCap) { const budget = Math.max(0, bo.dpsCap - (bo._dmgSec || 0)); bossDmg = Math.min(bossDmg, budget); bo._dmgSec = (bo._dmgSec || 0) + bossDmg; }
-          if (r.coreLoop && bo._enrageMult > 1) bossDmg *= bo._enrageMult;   // 상한 클램프: dpsCap(원율) 다음에 증폭 → 상한만 밀어올림
+          // 코어루프 B22 양측 클램프(dpsCap 하한·enrage 상한)는 보스 hitByBullet 래퍼가 '모든' 경로에 적용한다(§5.8, Codex P1).
           const hpBefore = bo.hp;
           bo.hitByBullet(bossDmg, w, b);
           if (w.metrics) tallyBulletDamage(w, b, Math.max(0, hpBefore - bo.hp), bo);   // Gate 1: 실제 적용 피해(HP 감소) 집계(G1-07)
