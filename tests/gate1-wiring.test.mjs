@@ -104,9 +104,14 @@ test('G1-07: 무기/공명 피해를 실제 적용 피해(HP 감소)로 집계',
   assert.ok(mainSrc.includes('hpBefore - bo.hp') && mainSrc.includes('hpBefore - (e.hp'), '충돌 전후 HP 차이로 집계');
 });
 
-test('G1-08: 보스 HP는 실측 평균 DPS 적응형 + 초당 상한(TTK 수렴)', () => {
-  assert.ok(mainSrc.includes('avgDps * BAL.gate1.bossTtk.avgDpsMult'), '적응형 HP');
-  assert.ok(mainSrc.includes('bo.dpsCap'), '초당 피해 상한');
+test('G1-08: 보스 HP는 등장 후 실측 재보정(중심) + 양측 클램프(dpsCap 하한·enrage 상한)로 TTK 수렴', () => {
+  // 표본 구간 보스 단일표적 피해율로 HP 중심추정(관통빌드 TTK 과대 방지, Codex P1).
+  assert.ok(mainSrc.includes('bo0._sampleDmg') && mainSrc.includes('bt.sampleWinSec'), '보스 단일표적 실측 DPS(표본창)');
+  assert.ok(mainSrc.includes('bossDps * bt.targetTTKSec'), '목표 TTK로 HP 중심추정');
+  assert.ok(mainSrc.includes('bo0._calibrated = true') && mainSrc.includes('bo.dpsCap'), '하한 클램프: 재보정 후 초당 상한');
+  // 노이즈 무관 수렴: enrageStart 이후 보스 피격 피해 증폭(상한). 잔여 잡몹 정리로 순수 단일표적 표본.
+  assert.ok(mainSrc.includes('_enrageMult') && mainSrc.includes('bossDmg *= bo._enrageMult'), '상한 클램프: enrage 증폭');
+  assert.ok(mainSrc.includes("if (w.entities[i].isEnemy) w.entities.splice"), '보스 등장 시 잔여 잡몹 정리(순수 단일표적)');
 });
 
 // ── 밸런스 계약 ────────────────────────────────────────────────

@@ -408,7 +408,7 @@ export const BAL = {
     },
     // 무기 조합 공명 3종(§5.4). 발동은 피해배수만 금지 — 모양·표적·소리 중 2+ 변화.
     resonance: {
-      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 18, cooldown: 0.14, dmgFrac: 58, width: 36, pierce: 8 }, // 발칸·레이저 명중 누적→관통 레일
+      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 18, cooldown: 0.14, dmgFrac: 46, width: 36, pierce: 8 }, // 발칸·레이저 명중 누적→관통 레일
       microMissile: { pair: ['vulcan', 'homing'], chargePerHit: 1, threshold: 44, cooldown: 0.6, count: 6, dmgFrac: 3.9 },            // 발칸·유도 명중 누적→소형 미사일 묶음 분산추적
       seekerBeam: { pair: ['laser', 'homing'],  markDuration: 2.8, cooldown: 0.5, missileBonus: 2.0 },                                // 레이저 표식→미사일 우선추적·증폭, 파괴 시 표식 이동
       minFirstAt: 255, maxFirstAt: 285,  // 첫 공명 확정 완성 창
@@ -444,10 +444,13 @@ export const BAL = {
       rampMidSec: 150,      // 스트림 밀도 램프: <150s 경량(1기), <320s 중간(2기), 이후 최대(3기)
       rampLateSec: 320,
     },
-    // 보스 TTK 목표(§5.8). 실제 조정은 boss 계수 + 패턴, HP·탄수만 증가 금지.
-    // 하네스 보스: HP=함대화력×hpPerPower + 초당 피해 상한(minTTKSec). 상한은 고DPS 빌드가 순삭하지 못하게
-    //  '취약창을 눌러야 시간이 걸린다'는 §5.8 취지를 측정에서 근사한다 → 세 빌드 TTK가 45~60으로 수렴.
-    bossTtk: { b22Min: 45, b22Max: 60, b7Min: 60, b7Max: 90, avgDpsMult: 98, minTTKSec: 45 },   // 보스 HP=실측 평균DPS×avgDpsMult(적응형)
+    // 보스 TTK 목표(§5.8): 세 빌드 모두 B22를 45~60초에 잡게 한다. HP·탄수만 늘리는 벽 금지 — 계수·패턴으로 만든다.
+    //  수렴 3단: (1) 등장 후 잔여 잡몹 정리 + [sampleDelay,+sampleWin] 구간 '실제 단일표적 보스 피해율'로 HP 중심추정
+    //   → 잡몹 관통으로 부풀려진 avgDps 대신 진짜 보스 DPS를 써 railStorm의 다표적 편향 제거(Codex P1).
+    //  (2) 하한 dpsCap: 초당 피해 상한으로 고DPS 빌드 순삭 방지(TTK 하한 minTTKSec).
+    //  (3) 상한 enrage: enrageStart 넘기면 보스 피격 피해가 초당 ramp만큼 증폭 → 표본이 크게 빗나가도 ~57초엔 끝난다.
+    //   양측 클램프 덕에 원정별 함대 편차로 표본이 요동쳐도 TTK가 밴드 안에 안착(§5.8 "판을 뒤집는 순간").
+    bossTtk: { b22Min: 45, b22Max: 60, b7Min: 60, b7Max: 90, avgDpsMult: 98, minTTKSec: 47, sampleDelaySec: 3, sampleWinSec: 8, targetTTKSec: 52, enrageStartSec: 47, enrageRampPerSec: 1.3 },
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.
