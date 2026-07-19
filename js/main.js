@@ -1500,7 +1500,7 @@ function update(dt) {
       const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (difficultyLevel - 1);
       const pf = 1 + Math.min(hpCapS, Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale);
       const gMul = BAL.difficulty.globalMult;   // 전체 난이도 배수(사용자 조정): 체력 ×gMul, 발사 주기 ÷gMul(더 빠름)
-      const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1) * gMul); if (e.fireInterval) e.fireInterval *= mods.enemyRate / gMul; return e; };
+      const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1) * gMul * BAL.difficulty.enemyHpMult); if (e.fireInterval) e.fireInterval *= mods.enemyRate / gMul; return e; };
       // 적 스폰 헬퍼: 난이도 스케일 + 변이(어픽스=섹터 확률) 롤 + 등록
       // §7.5 정예 웨이브=정예 변이 강제(★ 3.2×HP). 단, 정예 스케일을 '1회만' 렌더하는 타입만(creature·turret)
       //  — sniper 등은 spriteScale 무시(2차), charger는 this.r+캔버스 이중 스케일(3차)이라 제외 → 그 외는 일반 변이로 폴백.

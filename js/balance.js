@@ -301,7 +301,7 @@ export const BAL = {
   // bossHpMult/bossRateMult = 보스 전용 추가 배수(일반 적 난이도는 적절하다는 피드백 → 보스만 강화).
   //  - 보스는 scaleEnemy를 안 거쳐 globalMult 발사 버프를 못 받았음 → bossRateMult로 별도 보정.
   //  - bossRateMult는 발사 주기 나눗수(클수록 빠르게 쏨).
-  difficulty: { globalMult: 1.38, bossHpMult: 1.3, bossRateMult: 1.8 },
+  difficulty: { globalMult: 1.38, bossHpMult: 1.3, bossRateMult: 1.8, enemyHpMult: 1.3 },   // enemyHpMult=잡몹 HP 전용 30%↑(발사 주기는 불변, 이사 플레이피드백)
 
   run: {
     failOverlayDelay: 0.5,  // 실패 후 오버레이까지(초)

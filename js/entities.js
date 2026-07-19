@@ -1635,7 +1635,8 @@ export class Crystal extends Scrolling {
     this.hp = this.maxHp = value;             // 격파에 필요한 화력(=체력)
     this.reward = value;                      // 표적 우선순위·스캐빈저 대체값의 기준
     this.payout = fixedPayout(value, world, extraMult);  // 생성 시 확정된 실지급 드론 수(표시와 동일)
-    this.r = value >= 150 ? 34 : value >= 40 ? 28 : 22;
+    // 크기를 표시 숫자(payout=드론 지급)에 연속 비례 — 큰 숫자 크리스탈이 크게(이사: 계단식 3단계→비례). 체력(hp=value)은 droneReward가 선형이라 이미 payout에 정비례.
+    this.r = Math.max(18, Math.min(52, 15 + this.payout * 0.55));
   }
   /** 실제 지급 드론 수 = 생성 시 확정된 payout. 스캐빈저도 이 값을 저장한다. (world 인자는 하위 호환용) */
   getDroneReward() {
