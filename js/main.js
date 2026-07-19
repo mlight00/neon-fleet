@@ -356,7 +356,7 @@ function startPlay() {
   drafting = false;
   betweenStages = false;
   sfx('start');
-  if (CAMPAIGN25) { startCampaign25({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?campaign25=1: Gate 2 25분 캠페인(측정)
+  if (CAMPAIGN25) { startCampaign25({ mode: _clParams.has('play') ? 'play' : 'measure', buildId: 'railStorm' }); return; }  // ?campaign25=1 자동시연 / &play=1 사람 조작
   if (CORE_MEASURE) { startCoreLoop({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?coreLoopMeasure=1: 자동 측정
   if (CORE_LOOP) { startCoreLoop({ mode: 'play' }); return; }   // ?coreLoopTest=1: 사람 플레이 8분 슬라이스
   newExpedition();   // → startSector(1) → enterSectorMap(): 섹터 맵 화면(state='map'). 노드 선택 시 전투 시작.
