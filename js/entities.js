@@ -1657,29 +1657,34 @@ export class Crystal extends Scrolling {
   }
   draw(ctx) {
     const r = this.r;
-    // 단일 결정 젬 (기존 C1.png는 큰 결정+떨어진 작은 결정 2조각이라 '깨진/쪼개진' 것처럼 보였음 → 코드 단일 젬으로 교체)
-    glow(ctx, '#6fe3ff', 10, (c) => {
-      c.fillStyle = 'rgba(110,210,255,0.9)';
-      c.strokeStyle = '#dff6ff';
-      c.lineWidth = 2;
-      c.beginPath();
-      c.moveTo(this.x, this.y - r);
-      c.lineTo(this.x + r * 0.72, this.y - r * 0.2);
-      c.lineTo(this.x + r * 0.44, this.y + r);
-      c.lineTo(this.x - r * 0.44, this.y + r);
-      c.lineTo(this.x - r * 0.72, this.y - r * 0.2);
-      c.closePath(); c.fill(); c.stroke();
-    });
-    // 패싯 하이라이트 (단일 젬 컷)
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(this.x - r * 0.72, this.y - r * 0.2);
-    ctx.lineTo(this.x, this.y - r * 0.05);
-    ctx.lineTo(this.x + r * 0.72, this.y - r * 0.2);
-    ctx.moveTo(this.x, this.y - r);
-    ctx.lineTo(this.x, this.y + r);
-    ctx.stroke();
+    const gem = getSprite('C1');
+    if (gem) {
+      // 새 크리스탈 스프라이트(발광·프리즘 굴절 포함, 이사 제작 → 크로마키). r 비례 표시.
+      blit(ctx, gem, this.x, this.y, (r * 2.8) / gem.logicalH);
+    } else {
+      // 폴백: 코드 단일 젬
+      glow(ctx, '#6fe3ff', 10, (c) => {
+        c.fillStyle = 'rgba(110,210,255,0.9)';
+        c.strokeStyle = '#dff6ff';
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(this.x, this.y - r);
+        c.lineTo(this.x + r * 0.72, this.y - r * 0.2);
+        c.lineTo(this.x + r * 0.44, this.y + r);
+        c.lineTo(this.x - r * 0.44, this.y + r);
+        c.lineTo(this.x - r * 0.72, this.y - r * 0.2);
+        c.closePath(); c.fill(); c.stroke();
+      });
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(this.x - r * 0.72, this.y - r * 0.2);
+      ctx.lineTo(this.x, this.y - r * 0.05);
+      ctx.lineTo(this.x + r * 0.72, this.y - r * 0.2);
+      ctx.moveTo(this.x, this.y - r);
+      ctx.lineTo(this.x, this.y + r);
+      ctx.stroke();
+    }
     // 중앙 큰 숫자 = 실지급 드론(+payout). 표시와 지급이 같은 값(§3.6). 체력은 작은 상단 바로 이동.
     const num = `+${this.payout}`;
     ctx.font = `bold ${r >= 34 ? 18 : 15}px Pretendard, sans-serif`;
