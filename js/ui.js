@@ -233,14 +233,14 @@ export const ui = {
     clearNav();
     const cards = options.map((o, i) => `
       <button class="draft-card" data-idx="${i}" style="border-color:${o.color || '#3ff5e0'}">
-        <div style="font-size:22px">${o.icon || ''}</div>
-        <div style="font-weight:700;color:${o.color || '#dff0ff'};margin:4px 0">${o.label}</div>
-        <div style="font-size:12px;color:#9fb8d8;line-height:1.5">${o.desc || ''}</div>
+        <div class="card-icon">${o.icon || ''}</div>
+        <div class="card-label" style="color:${o.color || '#eaf4ff'}">${o.label}</div>
+        <div class="card-desc">${o.desc || ''}</div>
       </button>`).join('');
     panel(`
       <h2 style="color:#3ff5e0;font-size:19px">${title}</h2>
       ${subtitle ? `<p style="color:#9fb8d8;font-size:13px;margin-top:2px">${subtitle}</p>` : ''}
-      <div class="draft-row" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px">${cards}</div>
+      <div class="draft-row">${cards}</div>
     `);
     const btns = Array.from(overlay.querySelectorAll('.draft-card'));
     btns.forEach((b) => b.addEventListener('click', () => onPick(options[+b.dataset.idx].id, +b.dataset.idx)));

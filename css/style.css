@@ -99,6 +99,29 @@ html, body {
 #overlay button:hover { transform: scale(1.08); box-shadow: 0 0 26px rgba(63, 245, 224, 0.8); }
 #overlay button:active { transform: scale(0.97); }
 
+/* 선택 카드(코어루프 시작무기·행동변화·프레임 + 25분 캠페인). 일반 청록 pill 버튼을 덮어
+   다크 카드·가독 텍스트·게임 스트립 폭에 맞춘 작은 크기로. (텍스트 안 보임·촌스러움·오버플로 해결) */
+#overlay .draft-row { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+#overlay .draft-card {
+  margin-top: 0;
+  flex: 0 0 auto;
+  width: 116px;
+  min-height: 104px;
+  padding: 12px 9px;
+  color: #eaf4ff;
+  background: rgba(13, 20, 42, 0.94);
+  border: 1.5px solid rgba(63, 245, 224, 0.5);
+  border-radius: 14px;
+  box-shadow: inset 0 0 22px rgba(63, 245, 224, 0.06);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  letter-spacing: 0; font-weight: 500; white-space: normal;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+#overlay .draft-card:hover { transform: translateY(-3px); background: rgba(20, 32, 62, 0.97); box-shadow: 0 0 18px rgba(63, 245, 224, 0.4); }
+#overlay .draft-card .card-icon { font-size: 22px; line-height: 1; }
+#overlay .draft-card .card-label { font-weight: 700; font-size: 14px; margin: 5px 0 4px; }
+#overlay .draft-card .card-desc { font-size: 11px; color: #cdddf2; line-height: 1.4; }
+
 /* 주 액션 버튼(출격/도전) + 격납고를 같은 크기로 나란히 */
 #overlay .btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
 #overlay .btn-row button { flex: 1 1 0; margin-top: 0; padding: 14px 6px; max-width: 200px; font-size: 16px; white-space: nowrap; }

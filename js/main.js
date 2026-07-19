@@ -955,11 +955,14 @@ function refillCoreLoopTrack(elite = false) {
   const rows = elite ? 2 : (dense ? 2 : 1), per = elite ? 4 : (dense ? 5 : playPer);
   const skipShooters = !dense && t < P.introSec;   // 사람 플레이 첫 구간: 사격 적 없이 이동·수집만
   // 사람 플레이 스트림은 튜토리얼 미러 복제를 끄고(noDup) per가 정확한 적 수가 되게 한다(Codex P2).
-  //  측정 스트림은 기존 복제를 유지(Codex 승인 밀도·수치 보존).
+  //  측정 스트림은 weaver 고정(Codex 승인 TTK·밀도 보존). 사람 플레이는 램밍 제외 슈터를 시간 따라 다양화(테스터: 단조로움).
+  const SHOOTERS = ['weaver', 'turret', 'sniper', 'zapper', 'orbiter', 'blinker'];
+  const poolN = Math.min(SHOOTERS.length, 2 + Math.floor(t / 80));   // 시간 지날수록 등장 종류 확대
   if (!skipShooters) for (let row = 0; row < rows; row++) {
     for (let i = 0; i < per; i++) {
       const frac = per > 1 ? i / (per - 1) : 0.5;   // 1기일 때 0/0(NaN) 방지 — 중앙 배치
-      r.pending.push({ type: elite ? 'turret' : 'weaver', size: 'small', noDup: !dense,
+      const type = elite ? 'turret' : (dense ? 'weaver' : SHOOTERS[(row * per + i + Math.floor(t / 18)) % poolN]);
+      r.pending.push({ type, size: 'small', noDup: !dense,
         x: 0.18 + 0.64 * frac, trackY: base + row * (dense ? 360 : 460) });
     }
   }

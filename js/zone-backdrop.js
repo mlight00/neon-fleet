@@ -7,8 +7,8 @@ export const SECTOR_BACKDROP = Object.freeze(
   Array.from({ length: 6 }, (_, i) => ({ key: `s${i + 1}`, url: `assets/remodel-v2/backgrounds/s${i + 1}.webp` })),
 );
 
-/** 레이어 속도 (아래 방향). FAR < MID < NEAR (§4.4). base=원경 플레이트. */
-export const LAYER_SPEEDS = Object.freeze({ base: 0.032, far: 0.032, dust: 0.12, mid: 0.2, near: 0.48 });
+/** 레이어 속도 (아래 방향). FAR < MID < NEAR (§4.4). base=원경 플레이트. 배경이 확실히 전진하도록 상향(테스터 피드백). */
+export const LAYER_SPEEDS = Object.freeze({ base: 0.13, far: 0.13, dust: 0.2, mid: 0.32, near: 0.62 });
 
 /** 섹터 → 배경 인덱스 (1:1, 7+는 5 고정) */
 export function sectorBackdropIndex(sector = 1) { return zoneIndexForSector(sector); }
@@ -51,8 +51,21 @@ function drawVerticalArt(ctx, img, w, h, scroll, speed, alpha = 1) {
   if (!img || !img.width) return false;
   const tileH = img.height * (w / img.width);
   ctx.save(); ctx.globalAlpha = alpha;
-  for (let i = -1; i <= Math.ceil(h / tileH) + 1; i++) {
+  const n = Math.ceil(h / tileH) + 1;
+  for (let i = -1; i <= n; i++) {
     ctx.drawImage(img, 0, backdropTileY(i, scroll, tileH, speed), w, tileH);
+  }
+  ctx.restore();
+  // 이음매 은폐: 이미지가 상하로 연속되지 않아 타일 경계에 하드 컷이 보인다(테스터 피드백).
+  //  각 경계에 부드러운 어두운 밴드를 얹어 배경 저부 톤으로 녹여 단절감을 없앤다.
+  const seamH = Math.max(60, tileH * 0.16);
+  ctx.save();
+  for (let i = -1; i <= n; i++) {
+    const seamY = backdropTileY(i, scroll, tileH, speed) + tileH;   // 타일 하단 = 다음 타일 상단
+    if (seamY < -seamH || seamY > h + seamH) continue;
+    const g = ctx.createLinearGradient(0, seamY - seamH, 0, seamY + seamH);
+    g.addColorStop(0, 'rgba(3,5,12,0)'); g.addColorStop(0.5, 'rgba(3,5,12,0.62)'); g.addColorStop(1, 'rgba(3,5,12,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, seamY - seamH, w, seamH * 2);
   }
   ctx.restore();
   return true;
