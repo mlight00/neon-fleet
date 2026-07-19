@@ -61,9 +61,9 @@ window.addEventListener('keydown', (e) => {
   else { const b = navState.buttons[navState.idx], cb = navState.onConfirm; clearNav(); cb(b); }
 }, true);
 
-function panel(html) {
+function panel(html, cls = '') {
   clearNav();
-  overlay.innerHTML = `<div class="panel">${html}</div>`;
+  overlay.innerHTML = `<div class="panel${cls ? ' ' + cls : ''}">${html}</div>`;
   overlay.classList.remove('hidden');
 }
 
@@ -92,7 +92,7 @@ export const ui = {
         ${onIntro ? '<button id="btn-intro" class="link-btn">📖 스토리 다시 보기</button>' : ''}
         ${onReset ? '<button id="btn-reset" class="link-btn danger">기록 초기화</button>' : ''}
       </div>
-    `);
+    `, 'title-screen');
     document.getElementById('btn-start').addEventListener('click', onStart);
     if (onEndless) document.getElementById('btn-endless').addEventListener('click', onEndless);
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
