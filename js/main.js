@@ -929,8 +929,13 @@ function triggerApex() {
   for (let i = w.entities.length - 1; i >= 0; i--) {
     const e = w.entities[i];
     if (!e.isEnemy || e.dead || !e.hitByBullet || e.indestructible) continue;
+    e.shieldCharges = 0;                    // 보호막 변이 무시 → 확정 소거(1발이 보호막만 까고 생존하던 문제, Codex 3차 P2)
+    const before = e.hp || 0;
     e.hitByBullet(99999, w);
-    if (e.dead) { w.notifyEnemyKilled?.(e); w.entities.splice(i, 1); }   // 중앙 킬 처리 + 즉시 제거(사망 후 접촉·발사 방지, Codex 2차 P2)
+    if (e.dead) {
+      w.metrics?.weaponDamage('apex', Math.max(0, before));   // 소거한 실효 HP를 apex 기여로 기록(overkill 원값 아님 → avgDps/B7 스케일 정직, Codex 3차 P2)
+      w.notifyEnemyKilled?.(e); w.entities.splice(i, 1);       // 중앙 킬 처리 + 즉시 제거(사망 후 접촉·발사 방지, Codex 2차 P2)
+    }
   }
   for (const bo of (r.bosses || [])) {
     if (bo.dead) continue;

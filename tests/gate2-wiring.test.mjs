@@ -8,6 +8,7 @@ import { BAL } from '../js/balance.js';
 const mainSrc = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
 const dirSrc = readFileSync(new URL('../js/run-director.js', import.meta.url), 'utf8');
 const entSrc = readFileSync(new URL('../js/entities.js', import.meta.url), 'utf8');
+const uiSrc = readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8');
 
 test('G2-01: 25분 캠페인 모드가 startPlay·update·개발훅에 배선', () => {
   assert.ok(mainSrc.includes("_clParams.has('campaign25')"), '?campaign25=1 진입 플래그');
@@ -93,4 +94,20 @@ test('G2-09: 함체 T0~T5 등급별 기능 변화(§7.3, G2-B)', () => {
   assert.ok(mainSrc.includes('campaignHullFnTick(dt)') && mainSrc.includes('function triggerApex'), '측면 포대 발사 + Apex 발동');
   // Apex는 T5 해금 시 + 사건에서 발동.
   assert.ok(mainSrc.includes("case 'apex': cl.apexUnlocked = true"), 'Apex 사건 배선');
+});
+
+test('G2-10: G2-B 견고화(Codex 2·3차 반영) — 등급동기·Apex 정합·소스 분리', () => {
+  // 2차 P2: 함체 기능을 매 프레임 현재 sq.tier에서 재적용 → 진화/강등 유기적 변화와 동기.
+  assert.ok(/campaignHullFnTick\(dt\)\s*\{[\s\S]{0,160}applyCampaignHullFn\(sq, cl\)/.test(mainSrc), '2차: 매 프레임 등급 기능 재동기');
+  // 2차 P2: Apex 처치 적은 즉시 제거(사망 후 접촉·발사 방지).
+  assert.ok(/function triggerApex[\s\S]{0,800}w\.entities\.splice\(i, 1\)/.test(mainSrc), '2차: Apex 처치 즉시 제거');
+  // 2차 P2: 측면 포대는 별도 소스(공명 충전·벌컨 통계 오염 방지).
+  assert.ok(mainSrc.includes("b.sourceWeaponId = 'sideGun'"), '2차: 측면 포대 별도 소스');
+  // 2차 P2 + 3차 P2: Apex 피해를 metrics에 기록(보스 펄스 + 잡몹 소거 둘 다).
+  assert.ok(mainSrc.includes("weaponDamage('apex', Math.max(0, before))"), '3차: 잡몹 소거 실효 HP 기록');
+  assert.ok(mainSrc.includes("weaponDamage('apex', Math.max(0, before - bo.hp))"), '2차: 보스 펄스 실효 피해 기록');
+  // 3차 P2: Apex는 보호막 변이를 무시하고 확정 소거.
+  assert.ok(/function triggerApex[\s\S]{0,500}e\.shieldCharges = 0/.test(mainSrc), '3차: Apex 보호막 변이 무시');
+  // 3차 P2: 새 피해 소스(sideGun·apex)도 결과 화면에 행 렌더 → 비율 100% 정합.
+  assert.ok(uiSrc.includes('dmgW.sideGun ? bar(') && uiSrc.includes('dmgW.apex ? bar('), '3차: 결과 화면 sideGun·apex 행');
 });
