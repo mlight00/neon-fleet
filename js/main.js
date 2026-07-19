@@ -952,7 +952,15 @@ function applyPathChoice(opt, t) {
   if (m.resonCharge && !applyResonBoost(sq, w, m.resonCharge, t)) capped++;   // 공명 무효(무대상/미활성) → 폴백
   if (m.droneGain) sq.applyDelta(m.droneGain, w);         // 호위 편대 — 보상 축(항상 유효)
   if (m.shield) addShield(sq.surv, 1);                    // 방어 축: 단일 일회성 보호막(surv=접촉+투사체 모두 takeShot 경유, Codex P2)
-  if (capped > 0) sq.applyDelta(BAL.gate2.pathFallbackDrones * capped, w);   // 상한 무효 mod마다 대체 혜택 → 2축 보존(Codex 2차 P2)
+  if (capped > 0) {   // 상한 무효화된 mod → 옵션에 '없는' 항상유효 축(보호막/호위)으로 대체 → 중복 축 붕괴 방지·2축 보존(Codex 4차 P2)
+    const pool = [];
+    if (!m.shield) pool.push('shield');
+    if (!m.droneGain) pool.push('drone');
+    for (let i = 0; i < capped; i++) {
+      if ((pool[i] || 'drone') === 'shield') addShield(sq.surv, 1);
+      else sq.applyDelta(BAL.gate2.pathFallbackDrones, w);
+    }
+  }
   cl.pathChoicesMade = (cl.pathChoicesMade || 0) + 1;
   cl.metrics.choice(t);
   w.effects.text(sq.x, sq.y - 80, `경로: ${opt.label}`, '#c9b8ff', 16);
