@@ -904,6 +904,7 @@ function campaignPick({ title, subtitle, options, autoId, onPick }) {
   const cl = run.campaign25;
   if (!cl || cl.auto) { onPick(autoId != null ? autoId : (options[0] && options[0].id)); return; }   // 측정: 자동 선택(정지 없음)
   drafting = true; cl.picking = true; state = 'play';
+  if (run.squad) run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln);   // 여는 프레임도 보호(현재 update의 남은 적탄 충돌 방지, Codex G2-G 4차)
   ui.showCoreLoopPick({ title, subtitle, options, onPick: (id) => {
     ui.hide(); drafting = false; cl.picking = false;
     if (run.squad) run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln);   // 전투 재개 시 짧은 무적(겹친 적탄 불가피 피해 방지, Codex G2-G 2차)
@@ -1018,6 +1019,7 @@ function presentPathChoice(index, t) {
   if (!pair) return;
   if (cl.auto) { applyPathChoice(index % 2 === 0 ? pair.a : pair.b, t); return; }   // 측정: 교대 선택(양 옵션 다 검증)
   drafting = true; cl.picking = true; state = 'play';   // play: 게임 정지 + 카드
+  run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln);   // 여는 프레임도 보호(Codex G2-G 4차)
   ui.showCoreLoopPick({
     title: '경로 선택', subtitle: '4분마다의 큰 갈림길 — 항로를 정하세요.',
     options: [

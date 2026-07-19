@@ -265,6 +265,8 @@ test('G2-18: 캠페인 play 완전 무기 선택제(이사 요청, G2-G)', () =>
   assert.ok(mainSrc.includes('cl.build = { ...base, main, wing, label:') && mainSrc.includes('const base = buildForPair(main, wing);'), '2차: 보조 선택 시 슬롯 순서 보존(조합 파생)');
   assert.ok(mainSrc.includes('else if (cl.pickedMain && cl.pickedWing)'), '2차: 완성 조합만 슬롯 복원(미완성은 재선택)');
   assert.ok(mainSrc.includes('run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln)'), '2차: 선택창 재개 무적');
+  // Codex G2-G 4차: 선택창 여는 프레임도 무적(현재 update의 남은 적탄 충돌 방지) — drafting=true 직후.
+  assert.ok(/drafting = true; cl\.picking = true; state = 'play';\s*\n\s*if \(run\.squad\) run\.squad\.invulnT = Math\.max/.test(mainSrc), '4차: 선택창 여는 프레임 무적');
   // Codex G2-G 3차: 주무기만이면 미완성 정체성(레일스톰 오귀속 방지), 최종 진화도 play 선택 카드.
   assert.ok(mainSrc.includes('id: `main-${main}`') && mainSrc.includes('resonance: null'), '3차: 주무기만=미완성 정체성(공명 없음)');
   assert.ok(mainSrc.includes("campaignPick({ title: '최종 무기 진화 선택'") && mainSrc.includes('if (!cl.pickWeapons) { applyEvo(opts[0].id)'), '3차: 최종 진화도 play 선택 카드(측정은 자동)');
