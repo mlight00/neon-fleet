@@ -916,7 +916,10 @@ function campaignHullFnTick(dt) {
       }
     }
   }
-  if (cl.apexUnlocked) {   // 타이탄 Apex: 주기적 화면 지배(적탄 소거 + 광역 펄스)
+  // 타이탄 Apex: 주기적 화면 지배(적탄 소거 + 광역 펄스). 게이트 = 사건 해금 + 현재 함체 T5 적격.
+  // 강등(onDronesDepleted 등)으로 tier가 T5 밑이면 다른 T5 기능처럼 Apex도 멈춘다(hullFn이 Apex=T5 전용, Codex 4차 P2).
+  const apexEligible = G2.hullFn[Math.min(sq.tier, G2.hullFn.length - 1)]?.apex;
+  if (cl.apexUnlocked && apexEligible) {
     cl._apexT = (cl._apexT ?? G2.apexIntervalSec) - dt;
     if (cl._apexT <= 0) { cl._apexT = G2.apexIntervalSec; triggerApex(); }
   }
