@@ -77,7 +77,7 @@ export const BAL = {
     duplicateReward: { drones: 20, coin: 10 },  // (미사용) 옛 대체 보상
     // 양갈래를 정반대 스타일로 확실히 구분 (광역/연쇄 ↔ 단일/관통)
     vulcan_storm:  { spread: 1.7, ricochetFrac: 0.75, ricochetRadius: 165, bounces: 2 },                       // 폭풍: 넓게 뿌리고 적 사이를 2번 튕김(다수전) · 반동피해 0.6→0.75
-    vulcan_needle: { spread: 0.12, rate: 1.9, critBonus: 0.2, sizeMult: 0.7, pierceBonus: 2 },                 // 니들: 일직선 초고속 관통 드릴(단일)
+    vulcan_needle: { spread: 0.12, rate: 1.9, critBonus: 0.2, sizeMult: 0.82, pierceBonus: 2 },                // 니들: 일직선 초고속 관통 드릴(단일) — 발사체 원본이 이미 가늘어(폭 29px) sizeMult를 너무 낮추면 폭 1px로 실종 → 0.82로 완화(백열 코어와 합쳐 가시)
     laser_prism:   { splitFrac: 0.5, splitRadius: 200, splitPierce: 2 },                                        // 프리즘: 관통 후 좌우로 크게 분열(다수전)
     laser_cutter:  { every: 5, widthMult: 2.3, pierceBonus: 4, clearRadius: 16, dmgMult: 1.6 },                // 커터: 5발마다 굵은 절단탄 + 적탄 제거(반경 34→16·빈도 3→5로 하향, 대신 dmg 1.5→1.6)
     homing_wasp:   { count: 4, totalFrac: 2.8, cap: 34 },                                                       // 와스프: 소형 4발 군집(분산 표적) · 발당 위력 대폭↑(5발×0.34→4발×0.7), 총 1.7→2.8

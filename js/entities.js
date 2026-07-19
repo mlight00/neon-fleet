@@ -1388,9 +1388,20 @@ export class Bullet {
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.rotate(a);
+      const s = sc * (this.scale || 1);
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.9;
-      blit(ctx, art, 0, 0, sc * (this.scale || 1));
+      blit(ctx, art, 0, 0, s);
+      // 발칸 발사체 스프라이트는 세로로 길고 폭이 7~9px로 얇은 데다 가산합성이라, 밝은 폭발 위나
+      // 오렌지 계열 진화(템페스트)에서는 배경·이펙트에 묻혀 잘 안 보인다. 밝은 백열 코어를 '덮어쓰기'로
+      // 항상 덧그려, 어떤 배경·발사체 색에서도 탄의 형태가 또렷하게 남게 한다.
+      if (this.kind === 'vulcan') {
+        const h = art.logicalH * s;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fffefb';
+        ctx.fillRect(-1.4, -h * 0.46, 2.8, h * 0.92);
+      }
       ctx.restore();
       return;
     }
