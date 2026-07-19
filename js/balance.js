@@ -197,7 +197,7 @@ export const BAL = {
     burstCount: 3, burstGap: 0.11 },         // 두 번에 한 번 3점사
   turret: { hp: 52, fireInterval: 2.3, shotSpeed: 190, fanDeg: 25, fanCount: 5, dmgPct: 0.052, dmgMin: 3, coin: 5, radius: 16,
     ringCount: 8, ringSpeed: 150 },          // 부채꼴 ↔ 8방향 원형탄 번갈아
-  weaver: { hp: 13, y: 160, speed: 150, fireInterval: 0.55, shotSpeed: 260, dmgPct: 0.039, dmgMin: 3, radius: 11,
+  weaver: { hp: 13, y: 160, speed: 150, fireInterval: 0.55, shotSpeed: 260, dmgPct: 0.039, dmgMin: 3, radius: 18,
     aimedEvery: 3 },                         // 3발마다 1발은 편대 조준탄
   brood: { spawnInterval: 2.5 },             // 브루드 캐리어 샤드 사출 주기
 
@@ -248,7 +248,7 @@ export const BAL = {
     contactMult: 3,
     contactPct: { small: 0.05, mid: 0.10, large: 0.18 }, // 편대 %비례 피해 (대군 트리비얼 해결)
     bounty: { small: 0, mid: 2, large: 6 },   // 격파 시 드론 회수 (하향)
-    radius: { small: 12, mid: 20, large: 32 },
+    radius: { small: 26, mid: 34, large: 46 },   // 시각 확대(B1~B3)에 맞춰 히트박스도 확대(이사: 위→아래 크리처 크게)
     speed: 100,       // 하강 속도 (스크롤에 더해짐)
     homing: 60,       // 편대 방향 유도 속도
   },
