@@ -770,6 +770,7 @@ function startCampaign25(opts = {}) {
   const reson = createResonanceState();
   const frameState = createFrameState();
   const startMain = auto ? build.main : (opts.startWeapon || build.main);
+  const startWing = opts.wing || build.wing;   // 재시작('같은 조합')은 선택 슬롯 순서 그대로 복원(Codex G2-G)
   sq.installGate1({ surv, reson, frameState, frameId: null, mainWeapon: startMain });
   sq.weapon = startMain; sq.weaponLv = 1;
   sq.fleet = { active: false, systemId: null, ships: [] };   // §7.2 세 번째 슬롯(함대) — fleetSlot 사건에서 해금
@@ -780,7 +781,8 @@ function startCampaign25(opts = {}) {
   w.noFlagshipEvolve = true;   // 함체 등급은 디렉터 스케줄(H1~H5)만 — 드론 유기 진화 비활성(Codex 홀리스틱)
   w.onHullDepleted = () => finishCampaign25('hull');   // 내구도 소진 → 25분 결과 종료(regionResults 첨부, Codex P2)
   r.campaign25 = {
-    mode, auto, build, buildId: build.id, cfg: G2, director, metrics,
+    mode, auto, build: { ...build, main: startMain, wing: startWing }, buildId: build.id, cfg: G2, director, metrics,
+    pickedMain: opts.startWeapon || null, pickedWing: opts.wing || null,   // 플레이어 실제 선택 추적(재시작 슬롯 보존·조기사망 표시, Codex G2-G)
     region: 0, bossActive: false, bossSpawnT: 0, bossQueue: [], resonActivated: false, resultShown: false, resultPending: false,
     regionResults: [],        // [{ region, boss, ttk, killed }]
     bossesKilled: 0, deferredEvents: [],
@@ -881,6 +883,17 @@ function buildForPair(a, b) {
   return Object.values(CORE_LOOP_BUILDS).find((bd) => !bd.stress && match(bd)) || CORE_LOOP_BUILDS.railStorm;
 }
 
+/** 선택된 주/보조 무기로 빌드(공명·프레임)·buildId·메트릭 라벨을 파생하되 슬롯 순서는 선택 그대로 유지(Codex G2-G).
+ *  주무기만 선택된 상태(90s 전 사망 대비)에서도 cl.build.main을 갱신해 결과·재시작이 실제 선택을 반영한다. */
+function deriveCampaignBuild() {
+  const cl = run.campaign25, main = cl.pickedMain || cl.build.main, wing = cl.pickedWing;
+  const base = wing ? buildForPair(main, wing) : coreLoopBuild(cl.buildId);
+  const label = wing ? `${WEAPON_LABELS[main]}+${WEAPON_LABELS[wing]} / ${RESONANCES[base.resonance]?.name || ''}` : `${WEAPON_LABELS[main]} + ?`;
+  cl.build = { ...base, main, wing: wing || base.wing, label };   // 슬롯 순서 = 선택한 main/wing 그대로
+  cl.buildId = base.id;
+  cl.metrics.relabel(`campaign25-${cl.mode}-${base.id}`);   // 메트릭 귀속 갱신(Codex G2-G #3)
+}
+
 /** 캠페인 선택창(게임 정지). 측정=자동(autoId) 선택. play=drafting 정지 + showCoreLoopPick 카드. */
 function campaignPick({ title, subtitle, options, autoId, onPick }) {
   const cl = run.campaign25;
@@ -905,6 +918,7 @@ function campaignStartWeaponPick() {
     onPick: (id) => {
       sq.weapon = id; sq.weaponLv = 1;
       resonSetLoadout(sq.reson, [id, null]);
+      cl.pickedMain = id; deriveCampaignBuild();   // 시작 무기를 즉시 빌드에 반영(조기 사망·재시작 대비, Codex G2-G #2)
       r.effects.text(sq.x, sq.y - 60, `시작 무기: ${WEAPON_LABELS[id]}`, WEAPON_COLORS[id], 15);
     },
   });
@@ -916,7 +930,7 @@ function equipCampaignWing(t) {
   if (sq.wing.weaponId) return;
   const setWing = (id) => {
     sq.wing.weaponId = id; sq.wing.level = 1; sq._wingAcc = 0;
-    if (cl.pickWeapons) { cl.build = buildForPair(sq.weapon, id); cl.buildId = cl.build.id; }   // 선택 조합 → 공명·프레임 빌드 파생
+    if (cl.pickWeapons) { cl.pickedWing = id; deriveCampaignBuild(); }   // 선택 조합 → 공명·프레임·라벨·메트릭 파생(슬롯 순서 보존, Codex G2-G)
     cl.metrics.secondWeapon(t);   // 마일스톤 기록(Codex P2)
     r.world.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[id]}`, WEAPON_COLORS[id], 15);
   };
@@ -1260,7 +1274,7 @@ function finishCampaign25(reason = 'clear') {
   if (cl.mode === 'play') showCampaign25Result(snap, r.squad, cl, (mode, which) => {
     ui.hide();
     if (which === 'new') startCampaign25({ mode: 'play', pick: true });
-    else startCampaign25({ mode, buildId: cl.buildId, pick: false });
+    else startCampaign25({ mode, buildId: cl.buildId, startWeapon: cl.pickedMain || cl.build.main, wing: cl.pickedWing || cl.build.wing, pick: false });   // 선택 슬롯 순서 보존(Codex G2-G #1)
   });
 }
 

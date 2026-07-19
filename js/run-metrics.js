@@ -37,6 +37,7 @@ export function createRunMetrics({ runId = 'run', seed = 0 } = {}) {
       m.choiceTimes.push(round1(t));
       if (behavior) m.behaviorUpgradeTimes.push(round1(t));
     },
+    relabel(id) { if (id) m.runId = id; },   // 조합 확정 후 빌드 귀속 갱신(Codex G2-G: 선택 조합으로 runId 재라벨)
     secondWeapon(t) { once('secondWeaponSec', t); },
     fleetSlot(t) { once('fleetSlotSec', t); },
     firstResonance(t) { once('firstResonanceSec', t); },

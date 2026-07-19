@@ -235,7 +235,7 @@ test('G2-16: Codex 홀리스틱 2차 — 지역별 난이도·후반 성장·새
   assert.ok(/function enterCampaignRegion[\s\S]{0,500}progressionFor\(region\.i, 0, BAL\.sector\.depth\)/.test(mainSrc), 'P1: 지역 진입 시 진행도 재계산');
   assert.ok(/function enterCampaignRegion[\s\S]{0,560}r\.mods = mods; r\.world\.stageMods = mods/.test(mainSrc), 'P1: 지역 진입 시 스테이지 모드 갱신');
   // P2: 새 조합 버튼이 다른 빌드로 회전(같은 조합 재시작과 구분).
-  assert.ok(mainSrc.includes("restartFn('play', 'new')") && mainSrc.includes("startCampaign25({ mode: 'play', pick: true })") && mainSrc.includes("startCampaign25({ mode, buildId: cl.buildId, pick: false })"), 'P2: 새 조합=무기 재선택 / 같은 조합=같은 빌드 자동');
+  assert.ok(mainSrc.includes("restartFn('play', 'new')") && mainSrc.includes("startCampaign25({ mode: 'play', pick: true })") && /startCampaign25\(\{ mode, buildId: cl\.buildId,[\s\S]{0,120}pick: false \}\)/.test(mainSrc), 'P2: 새 조합=무기 재선택 / 같은 조합=같은 빌드(선택 슬롯) 자동');
 });
 
 test('G2-17: showCoreLoopPick 키보드 확정이 카드 인덱스로(Codex 홀리스틱 3차)', () => {
@@ -250,9 +250,15 @@ test('G2-18: 캠페인 play 완전 무기 선택제(이사 요청, G2-G)', () =>
   assert.ok(mainSrc.includes('function campaignPick') && /function campaignPick[\s\S]{0,260}cl\.auto[\s\S]{0,120}onPick\(autoId/.test(mainSrc), '선택창: 측정 자동 / play 카드');
   // 시작 무기·보조 무기·강화 선택 실배선.
   assert.ok(mainSrc.includes('function campaignStartWeaponPick') && mainSrc.includes('r.campaign25.pickWeapons) campaignStartWeaponPick()'), '출격 시 시작 무기 선택');
-  assert.ok(mainSrc.includes("campaignPick({ title: '보조 무기 선택'") && mainSrc.includes('cl.build = buildForPair(sq.weapon, id)'), '보조 무기 선택(조합 파생)');
+  assert.ok(mainSrc.includes("campaignPick({ title: '보조 무기 선택'") && mainSrc.includes('cl.pickedWing = id; deriveCampaignBuild()'), '보조 무기 선택(조합 파생)');
   assert.ok(mainSrc.includes("campaignPick({ title: '무기 강화 선택'"), '무기 강화 선택 카드');
   // pickWeapons 플래그: play+pick만(측정은 자동), fresh play·재시작 배선.
   assert.ok(mainSrc.includes('pickWeapons: !auto && !!opts.pick'), 'pickWeapons=play+pick');
   assert.ok(mainSrc.includes('pick: play }'), 'fresh play는 무기 선택');
+  // Codex G2-G: 선택 조합 파생·보존. #2 시작무기 즉시 반영, #3 메트릭 재라벨, #1 재시작 슬롯 보존.
+  assert.ok(mainSrc.includes('function deriveCampaignBuild'), '조합→빌드·라벨·메트릭 파생 헬퍼');
+  assert.ok(mainSrc.includes('cl.pickedMain = id; deriveCampaignBuild()'), '#2: 시작 무기 즉시 빌드 반영');
+  assert.ok(rmSrc.includes('relabel(id)') && mainSrc.includes('cl.metrics.relabel('), '#3: 메트릭 runId 재라벨');
+  assert.ok(mainSrc.includes('startWeapon: cl.pickedMain || cl.build.main, wing: cl.pickedWing || cl.build.wing'), '#1: 재시작 선택 슬롯 순서 보존');
+  assert.ok(mainSrc.includes("build: { ...build, main: startMain, wing: startWing }"), '#1: cl.build이 실제 슬롯 반영');
 });
