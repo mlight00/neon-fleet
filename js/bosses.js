@@ -146,6 +146,7 @@ export class Boss {
       this.shotT = this.interval(BAL.boss.shotInterval) * (this.pattern.shotMult ?? 1);
       world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, { r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin, color: this.shotStyle().color }));
     }
+    if (this.rainWarnT > 0) this.rainWarnT = Math.max(0, this.rainWarnT - dt);   // 융단 폭격 예고 타이머
     // 서명 공격: 보스 종류별 고유 패턴 (기존 부채꼴 슬롯)
     this.fanT -= dt;
     if (this.fanT <= 0) this.fireSignature(world);
@@ -233,12 +234,31 @@ export class Boss {
         }
         break;
       }
-      case 'rain': { // 스톰브링어: 상단 무작위 위치에서 쏟아지는 융단 폭격
-        this.fanT = this.interval(P.interval);
-        const n = P.count + fb;
-        for (let i = 0; i < n; i++) {
-          const px = 30 + Math.random() * (world.logicalW - 60);
-          world.spawnEnemyBullet(new EnemyShot(px, this.y - this.r * 0.5, (Math.random() - 0.5) * 40, P.speed, { ...fanOpts, r: 7 }));
+      case 'rain': { // 스톰브링어 융단 폭격: 위험 컬럼 예고 → 안전 컬럼으로 이동 요구 → 밀집 낙하(패턴 학습 시험)
+        const cols = P.cols || 7;
+        if ((this.rainStrikes || 0) <= 0) {
+          // 예고: 위험 컬럼을 고른다(광폭화면 +1). 남은 안전 컬럼으로 이동해야 한다.
+          const pool = [...Array(cols).keys()];
+          const nDanger = Math.min(cols - 2, (P.dangerCols || 3) + (this.enraged ? 1 : 0));
+          this.rainCols = [];
+          for (let k = 0; k < nDanger; k++) this.rainCols.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+          this.rainCols.sort((a, b) => a - b);
+          this.rainColN = cols;
+          this.rainWarnT = P.warnSec;
+          this.rainStrikes = P.strikes;
+          this.fanT = P.warnSec;   // 예고가 끝난 뒤 첫 낙하
+        } else {
+          // 낙하: 위험 컬럼에만 밀집 잉걸(안전 컬럼은 비운다). 살짝 안쪽으로 유도해 컬럼 경계에서도 압박.
+          const colW = world.logicalW / this.rainColN;
+          for (const c of this.rainCols) {
+            const cx = colW * (c + 0.5);
+            for (let j = 0; j < (P.perCol || 2); j++) {
+              const px = cx + (Math.random() - 0.5) * colW * 0.66;
+              world.spawnEnemyBullet(new EnemyShot(px, this.y - this.r * 0.5 - Math.random() * 46, (Math.random() - 0.5) * 22, P.speed, { ...fanOpts, r: 7 }));
+            }
+          }
+          this.rainStrikes -= 1;
+          this.fanT = this.rainStrikes > 0 ? (P.strikeInterval || 0.13) : (P.gapSec || 1.3);
         }
         break;
       }
@@ -325,6 +345,20 @@ export class Boss {
 
   draw(ctx) {
     if (this.dying) { this.drawDying(ctx, BAL.bossDeath.duration); return; }
+    // 융단 폭격 예고: 위험 컬럼을 붉은 맥동 기둥으로 표시(안전 컬럼으로 이동 안내). rainWarnT 동안만.
+    if (this.rainWarnT > 0 && this.rainCols && this.rainCols.length) {
+      const colW = this.logicalW / this.rainColN;
+      const pulse = 0.5 + 0.5 * Math.abs(Math.sin(this.t * 9));
+      ctx.save();
+      for (const c of this.rainCols) {
+        const cx = colW * (c + 0.5), halfW = colW * 0.42;
+        const g = ctx.createLinearGradient(0, this.y, 0, this.y + 1100);
+        g.addColorStop(0, `rgba(255,64,44,${0.06 + pulse * 0.20})`); g.addColorStop(1, 'rgba(255,64,44,0)');
+        ctx.fillStyle = g; ctx.fillRect(cx - halfW, this.y, halfW * 2, 1100);
+        ctx.fillStyle = `rgba(255,96,64,${0.45 + pulse * 0.45})`; ctx.fillRect(cx - halfW, this.y - 5, halfW * 2, 6);   // 상단 경고 바
+      }
+      ctx.restore();
+    }
     const pc = this.phaseColor();
     const gem = this.sprite();
     if (gem) {

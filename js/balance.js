@@ -348,7 +348,8 @@ export const BAL = {
     // 신규 보스 4종
     B12: { kind: 'cross', arms: 4, spinHz: 0.6, speed: 175, interval: 0.14, shotMult: 1.3 },              // 프리즘 타이런트: 회전 십자 빔
     B13: { kind: 'wave', count: 7, spanW: 260, waveHz: 0.5, phase: 0.6, amp: 0.5, speed: 170, interval: 0.5, shotMult: 1.2 }, // 타이달 리바이어던: 파동 커튼
-    B14: { kind: 'rain', count: 4, speed: 150, interval: 0.35, shotMult: 1.3 },                            // 스톰브링어: 융단 폭격
+    // 스톰브링어 융단 폭격 재설계(테스터: 무작위·무의미·저난도): 위험 컬럼 예고 → 안전 컬럼으로 이동 요구 → 밀집 낙하.
+    B14: { kind: 'rain', speed: 230, dangerCols: 3, warnSec: 0.85, strikes: 10, perCol: 2, strikeInterval: 0.12, gapSec: 1.3, cols: 7, shotMult: 1.3 },
     B15: { kind: 'laserSweep', stack: 3, sweepHz: 0.35, sweepW: 200, speed: 340, interval: 0.05, shotMult: 1.4 }, // 옵틱 워든: 소탕 레이저
   },
 
