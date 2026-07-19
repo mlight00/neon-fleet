@@ -260,7 +260,7 @@ test('G2-18: 캠페인 play 완전 무기 선택제(이사 요청, G2-G)', () =>
   assert.ok(mainSrc.includes('cl.pickedMain = id; deriveCampaignBuild()'), '#2: 시작 무기 즉시 빌드 반영');
   assert.ok(rmSrc.includes('relabel(id)') && mainSrc.includes('cl.metrics.relabel('), '#3: 메트릭 runId 재라벨');
   assert.ok(mainSrc.includes('startWeapon: cl.pickedMain, wing: cl.pickedWing, pick: false'), '#1: 재시작 선택 슬롯 순서 보존(완성 조합)');
-  assert.ok(mainSrc.includes("build: { ...build, main: startMain, wing: startWing }"), '#1: cl.build이 실제 슬롯 반영');
+  assert.ok(mainSrc.includes('build: { ...build, main: startMain, wing: startWing, label:'), '#1: cl.build이 실제 슬롯+라벨 반영');
   // Codex G2-G 2차: 보조 미선택(조기 사망) wing null 유지 / 미완성 조합 재시작=재선택 / 선택창 재개 무적.
   assert.ok(mainSrc.includes('cl.build = { ...base, main, wing, label:') && mainSrc.includes('const base = buildForPair(main, wing);'), '2차: 보조 선택 시 슬롯 순서 보존(조합 파생)');
   assert.ok(mainSrc.includes('else if (cl.pickedMain && cl.pickedWing)'), '2차: 완성 조합만 슬롯 복원(미완성은 재선택)');

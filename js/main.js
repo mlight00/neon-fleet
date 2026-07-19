@@ -781,7 +781,8 @@ function startCampaign25(opts = {}) {
   w.noFlagshipEvolve = true;   // 함체 등급은 디렉터 스케줄(H1~H5)만 — 드론 유기 진화 비활성(Codex 홀리스틱)
   w.onHullDepleted = () => finishCampaign25('hull');   // 내구도 소진 → 25분 결과 종료(regionResults 첨부, Codex P2)
   r.campaign25 = {
-    mode, auto, build: { ...build, main: startMain, wing: startWing }, buildId: build.id, cfg: G2, director, metrics,
+    // 라벨도 실제 슬롯(startMain/startWing)에서 재구성 — '같은 조합' 복원 시 뒤집힌 순서가 결과에 정확히 표기(Codex G2-G 5차).
+    mode, auto, build: { ...build, main: startMain, wing: startWing, label: `${WEAPON_LABELS[startMain]}+${WEAPON_LABELS[startWing]} / ${RESONANCES[build.resonance]?.name || ''}` }, buildId: build.id, cfg: G2, director, metrics,
     pickedMain: opts.startWeapon || null, pickedWing: opts.wing || null,   // 플레이어 실제 선택 추적(재시작 슬롯 보존·조기사망 표시, Codex G2-G)
     region: 0, bossActive: false, bossSpawnT: 0, bossQueue: [], resonActivated: false, resultShown: false, resultPending: false,
     regionResults: [],        // [{ region, boss, ttk, killed }]
