@@ -51,21 +51,9 @@ function drawVerticalArt(ctx, img, w, h, scroll, speed, alpha = 1) {
   if (!img || !img.width) return false;
   const tileH = img.height * (w / img.width);
   ctx.save(); ctx.globalAlpha = alpha;
-  const n = Math.ceil(h / tileH) + 1;
-  for (let i = -1; i <= n; i++) {
+  // 배경은 세로 심리스(상하 12%가 동일한 근흑색 #03050C로 감쇠)라 그냥 반복해도 이음매가 없다(Codex 재생성 v03).
+  for (let i = -1; i <= Math.ceil(h / tileH) + 1; i++) {
     ctx.drawImage(img, 0, backdropTileY(i, scroll, tileH, speed), w, tileH);
-  }
-  ctx.restore();
-  // 이음매 은폐: 이미지가 상하로 연속되지 않아 타일 경계에 하드 컷이 보인다(테스터 피드백).
-  //  각 경계에 부드러운 어두운 밴드를 얹어 배경 저부 톤으로 녹여 단절감을 없앤다.
-  const seamH = Math.max(60, tileH * 0.16);
-  ctx.save();
-  for (let i = -1; i <= n; i++) {
-    const seamY = backdropTileY(i, scroll, tileH, speed) + tileH;   // 타일 하단 = 다음 타일 상단
-    if (seamY < -seamH || seamY > h + seamH) continue;
-    const g = ctx.createLinearGradient(0, seamY - seamH, 0, seamY + seamH);
-    g.addColorStop(0, 'rgba(3,5,12,0)'); g.addColorStop(0.5, 'rgba(3,5,12,0.62)'); g.addColorStop(1, 'rgba(3,5,12,0)');
-    ctx.fillStyle = g; ctx.fillRect(0, seamY - seamH, w, seamH * 2);
   }
   ctx.restore();
   return true;

@@ -1,0 +1,85 @@
+{
+  "version": "v03-seamless",
+  "edge_color": "#03050C",
+  "fade_fraction": 0.12,
+  "assets": {
+    "s1": {
+      "master": "source/masters/remodel-v2/backgrounds-seamless-v03/masters/nf2_sector01_cold_wake_codex_v03.png",
+      "runtime_candidate": "source/masters/remodel-v2/backgrounds-seamless-v03/runtime/s1.webp",
+      "width": 768,
+      "height": 1536,
+      "bytes": 44068,
+      "sha256": "ec38af92b1700cea621968976af531df842896973f20da5f9075afb23a50c93f",
+      "seam_mean_abs_diff": 0.0104,
+      "seam_max_abs_diff": 2,
+      "top12_luma": 4.69,
+      "bottom12_luma": 4.64,
+      "center_luma": 9.85
+    },
+    "s2": {
+      "master": "source/masters/remodel-v2/backgrounds-seamless-v03/masters/nf2_sector02_prism_grave_codex_v03.png",
+      "runtime_candidate": "source/masters/remodel-v2/backgrounds-seamless-v03/runtime/s2.webp",
+      "width": 768,
+      "height": 1536,
+      "bytes": 55840,
+      "sha256": "887ba702964c590ef7c511644021a89852c33e29f12123ac11000e79abd4cb35",
+      "seam_mean_abs_diff": 0.0,
+      "seam_max_abs_diff": 0,
+      "top12_luma": 2.62,
+      "bottom12_luma": 2.64,
+      "center_luma": 13.28
+    },
+    "s3": {
+      "master": "source/masters/remodel-v2/backgrounds-seamless-v03/masters/nf2_sector03_furnace_line_codex_v03.png",
+      "runtime_candidate": "source/masters/remodel-v2/backgrounds-seamless-v03/runtime/s3.webp",
+      "width": 768,
+      "height": 1536,
+      "bytes": 59716,
+      "sha256": "b9bc5d4ca9e052726a0af97d12972f895c54bfde818b27488f21c816450029bf",
+      "seam_mean_abs_diff": 0.0,
+      "seam_max_abs_diff": 0,
+      "top12_luma": 4.79,
+      "bottom12_luma": 4.79,
+      "center_luma": 21.2
+    },
+    "s4": {
+      "master": "source/masters/remodel-v2/backgrounds-seamless-v03/masters/nf2_sector04_broken_armada_codex_v03.png",
+      "runtime_candidate": "source/masters/remodel-v2/backgrounds-seamless-v03/runtime/s4.webp",
+      "width": 768,
+      "height": 1536,
+      "bytes": 36042,
+      "sha256": "9263f67781baf294e290aa2482dab69e47a66cc3d097c562f8743c1f0a4218c2",
+      "seam_mean_abs_diff": 0.0,
+      "seam_max_abs_diff": 0,
+      "top12_luma": 4.67,
+      "bottom12_luma": 5.07,
+      "center_luma": 24.12
+    },
+    "s5": {
+      "master": "source/masters/remodel-v2/backgrounds-seamless-v03/masters/nf2_sector05_choir_veil_codex_v03.png",
+      "runtime_candidate": "source/masters/remodel-v2/backgrounds-seamless-v03/runtime/s5.webp",
+      "width": 768,
+      "height": 1536,
+      "bytes": 56874,
+      "sha256": "7dec01b8b11ef34731ead9ed947d5c12669b09a9a98e218015f294df2d4457b9",
+      "seam_mean_abs_diff": 0.0,
+      "seam_max_abs_diff": 0,
+      "top12_luma": 3.7,
+      "bottom12_luma": 4.0,
+      "center_luma": 26.32
+    },
+    "s6": {
+      "master": "source/masters/remodel-v2/backgrounds-seamless-v03/masters/nf2_sector06_crown_core_codex_v03.png",
+      "runtime_candidate": "source/masters/remodel-v2/backgrounds-seamless-v03/runtime/s6.webp",
+      "width": 768,
+      "height": 1536,
+      "bytes": 32412,
+      "sha256": "838397324b45963d4f6d46dbd9249e089e2dc5b7e4eb3e2976aa373b53ad8abb",
+      "seam_mean_abs_diff": 0.0,
+      "seam_max_abs_diff": 0,
+      "top12_luma": 3.59,
+      "bottom12_luma": 3.59,
+      "center_luma": 11.07
+    }
+  }
+}

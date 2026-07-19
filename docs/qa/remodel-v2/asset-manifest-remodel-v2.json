@@ -1,71 +1,71 @@
 {
-  "generator": "Codex imagegen + chroma matte postprocess",
+  "generator": "Codex imagegen + deterministic 12% vertical edge fade postprocess",
   "backgrounds": {
     "S1": {
-      "source": "source/masters/remodel-v2/backgrounds/nf2_sector01_cold_wake_codex_v02.png",
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector01_cold_wake_codex_v03.png",
       "runtime": "assets/remodel-v2/backgrounds/s1.webp",
       "width": 768,
       "height": 1536,
-      "center_luma": 15.98,
-      "edge_luma": 32.84,
-      "center_to_edge_ratio": 0.487,
-      "bytes": 123800,
-      "sha256": "5bc35ed7aa812f3baa8ab57c17e5c16d7eb677ae7f3f521517872684dd04597e"
+      "center_luma": 7.58,
+      "edge_luma": 7.39,
+      "center_to_edge_ratio": 1.026,
+      "bytes": 44068,
+      "sha256": "ec38af92b1700cea621968976af531df842896973f20da5f9075afb23a50c93f"
     },
     "S2": {
-      "source": "source/masters/remodel-v2/backgrounds/nf2_sector02_prism_grave_codex_v02.png",
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector02_prism_grave_codex_v03.png",
       "runtime": "assets/remodel-v2/backgrounds/s2.webp",
       "width": 768,
       "height": 1536,
-      "center_luma": 7.48,
-      "edge_luma": 29.11,
-      "center_to_edge_ratio": 0.257,
-      "bytes": 162728,
-      "sha256": "be49e925d42c76a88aa5955e86faf772caa1a3ddef430166ce45ba6ca4334a8e"
+      "center_luma": 8.69,
+      "edge_luma": 6.48,
+      "center_to_edge_ratio": 1.342,
+      "bytes": 55840,
+      "sha256": "887ba702964c590ef7c511644021a89852c33e29f12123ac11000e79abd4cb35"
     },
     "S3": {
-      "source": "source/masters/remodel-v2/backgrounds/nf2_sector03_furnace_line_codex_v02.png",
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector03_furnace_line_codex_v03.png",
       "runtime": "assets/remodel-v2/backgrounds/s3.webp",
       "width": 768,
       "height": 1536,
-      "center_luma": 12.99,
-      "edge_luma": 32.41,
-      "center_to_edge_ratio": 0.401,
-      "bytes": 150728,
-      "sha256": "08fcbd74e0294ce7382e550738150730db1adb4f1add7501fafb175b5bc3dfd6"
+      "center_luma": 17.32,
+      "edge_luma": 12.23,
+      "center_to_edge_ratio": 1.416,
+      "bytes": 59716,
+      "sha256": "b9bc5d4ca9e052726a0af97d12972f895c54bfde818b27488f21c816450029bf"
     },
     "S4": {
-      "source": "source/masters/remodel-v2/backgrounds/nf2_sector04_broken_armada_codex_v02.png",
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector04_broken_armada_codex_v03.png",
       "runtime": "assets/remodel-v2/backgrounds/s4.webp",
       "width": 768,
       "height": 1536,
-      "center_luma": 17.33,
-      "edge_luma": 30.19,
-      "center_to_edge_ratio": 0.574,
-      "bytes": 132244,
-      "sha256": "61a4a45aa1c5d672c1e3ec4b350a342383fb03a530eacbe4308c57bd5e5010f7"
+      "center_luma": 15.02,
+      "edge_luma": 15.92,
+      "center_to_edge_ratio": 0.943,
+      "bytes": 36042,
+      "sha256": "9263f67781baf294e290aa2482dab69e47a66cc3d097c562f8743c1f0a4218c2"
     },
     "S5": {
-      "source": "source/masters/remodel-v2/backgrounds/nf2_sector05_choir_veil_codex_v02.png",
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector05_choir_veil_codex_v03.png",
       "runtime": "assets/remodel-v2/backgrounds/s5.webp",
       "width": 768,
       "height": 1536,
-      "center_luma": 3.37,
-      "edge_luma": 22.11,
-      "center_to_edge_ratio": 0.153,
-      "bytes": 115182,
-      "sha256": "3ad6eae93f26ef28acb1e0249b633c418c247199092c34983b347bb2d086f1d6"
+      "center_luma": 9.31,
+      "edge_luma": 23.75,
+      "center_to_edge_ratio": 0.392,
+      "bytes": 56874,
+      "sha256": "7dec01b8b11ef34731ead9ed947d5c12669b09a9a98e218015f294df2d4457b9"
     },
     "S6": {
-      "source": "source/masters/remodel-v2/backgrounds/nf2_sector06_crown_core_codex_v02.png",
+      "source": "source/masters/remodel-v2/backgrounds/nf2_sector06_crown_core_codex_v03.png",
       "runtime": "assets/remodel-v2/backgrounds/s6.webp",
       "width": 768,
       "height": 1536,
-      "center_luma": 11.67,
-      "edge_luma": 24.19,
-      "center_to_edge_ratio": 0.483,
-      "bytes": 139250,
-      "sha256": "cc13c1360b703a7f561604f7680fc805f5aaaea732250d2fdfd4068308c8234e"
+      "center_luma": 7.77,
+      "edge_luma": 6.99,
+      "center_to_edge_ratio": 1.112,
+      "bytes": 32412,
+      "sha256": "838397324b45963d4f6d46dbd9249e089e2dc5b7e4eb3e2976aa373b53ad8abb"
     }
   },
   "enemies": {
