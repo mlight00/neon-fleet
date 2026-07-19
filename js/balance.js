@@ -487,6 +487,20 @@ export const BAL = {
     pathChoiceSec: [240, 480, 720, 960, 1200],  // ~4분마다 큰 경로 선택(§7.4, 배선 G2-D)
     behaviorInterval: 45,         // 행동 변화 사건 간격(§7.1 지속 성장 체감)
     resultSec: 1500,              // 25분 결과(B7 처치=완결점)
+    // §7.3 함체 T0~T5 기능 변화: 발사 개성은 shipTraits가 담당하고, 여기선 승급마다 '추가로' 얻는 기능(누적).
+    //  index=tier(0=T0 정찰정 … 5=T5 타이탄). move=이동 반응, resonPower=공명 증폭, sideGuns=측면 포대 문수, apex=최종 지배기.
+    hullFn: [
+      { move: 1.00, resonPower: 1.00, sideGuns: 0, apex: false, label: '기본 주포·소형 드론' },   // T0 정찰정
+      { move: 1.28, resonPower: 1.00, sideGuns: 0, apex: false, label: '이동 반응 강화' },         // T1 인터셉터
+      { move: 1.28, resonPower: 1.30, sideGuns: 0, apex: false, label: '공명 회로 증폭' },         // T2 스트라이커
+      { move: 1.40, resonPower: 1.30, sideGuns: 0, apex: false, label: '호위 편대 확장' },         // T3 캐리어(함대 슬롯=G2-C)
+      { move: 1.40, resonPower: 1.45, sideGuns: 2, apex: false, label: '대형 측면 포대' },         // T4 드레드노트
+      { move: 1.50, resonPower: 1.60, sideGuns: 2, apex: true,  label: 'Apex · 화면 지배' },       // T5 타이탄
+    ],
+    apexIntervalSec: 8.5,         // 타이탄 Apex 주기(초): 적탄 소거 + 광역 대미지 펄스
+    apexDamageFrac: 0.06,         // Apex 펄스 피해 = 보스 maxHp의 이 비율(적은 즉사)
+    sideGunIntervalSec: 0.5,      // 측면 포대 발사 주기(초)
+    sideGunDmgFrac: 0.5,          // 측면 포대 1문 피해 = 주무기 기준 이 비율
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.

@@ -672,7 +672,7 @@ export class Squad {
     this.t += dt;
     const target = world.input.targetX;
     this.prevX = this.x;
-    this.x += (target - this.x) * Math.min(1, BAL.squad.followSpeed * this.rushMoveMult * dt);  // RUSH: 이동 반응 ↑
+    this.x += (target - this.x) * Math.min(1, BAL.squad.followSpeed * this.rushMoveMult * (this.moveResponseMult || 1) * dt);  // RUSH·함체 등급(§7.3): 이동 반응 ↑
     const m = BAL.squad.laneMargin + this.width * 0.4;
     this.x = Math.max(m, Math.min(world.logicalW - m, this.x));
 

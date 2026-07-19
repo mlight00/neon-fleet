@@ -566,7 +566,7 @@ function coreLoopAutopilot(sq, w) {
 
 /** 공명 발사체 스폰(§5.4). fromResonance·resonanceId 태그로 재귀 방지·피해 별도 집계. */
 function spawnResonance(spec, sq, w) {
-  const shotBase = Math.max(4, sq.flagPower * (w.stats?.damage ?? 1) * 0.06);   // 한 발 기준 피해 근사
+  const shotBase = Math.max(4, sq.flagPower * (w.stats?.damage ?? 1) * 0.06) * (sq.resonPowerMult || 1);   // 한 발 기준 피해 근사(§7.3 T2+ 공명 증폭)
   if (spec.kind === 'rail') {
     const hx = BAL.gate1.loadout.hardpointX.wing;
     const b = new Bullet(sq.x + hx, sq.y - 10, shotBase * spec.dmgFrac, {
@@ -794,6 +794,7 @@ function startCampaign25(opts = {}) {
     sq.count = w.stats?.startCount ?? BAL.squad.start;
   }
   resonSetLoadout(reson, [startMain, null]);
+  applyCampaignHullFn(sq, r.campaign25);   // T0 기본 기능 적용(§7.3)
   r.maxPower = sq.power;
   window.__nfRunMetrics = null;
   enterNode(r.map.cols[0][0]);   // 첫 전투 진입
@@ -840,14 +841,25 @@ function spawnCampaignBoss(i, bossId, t) {
   r.effects.flash(0.4);
 }
 
-/** 함체 승급(외형+내구도 최대치, 기능 변화는 G2-B). */
+/** 함체 승급: 내구도 최대치 + 발사 개성(shipTraits) + §7.3 등급별 기능(이동·공명·측면포대·Apex)을 함께 바꾼다(G2-B). */
 function campaignHullTier(tier, t) {
   const r = run, sq = r.squad, w = r.world, cl = r.campaign25;
   survTierUp(sq.surv, BAL.gate1.survivability);
   sq.tier = Math.min(BAL.evolution.names.length - 1, sq.tier + 1);
+  applyCampaignHullFn(sq, cl);   // 등급별 기능 갱신
   cl.metrics.hullTier(t);
   w.effects.halo(sq.x, sq.y, COLORS.reward);
-  w.effects.text(sq.x, sq.y - 74, `기함 승급 ${BAL.evolution.names[sq.tier]}`, COLORS.reward, 15);
+  const fn = BAL.gate2.hullFn[Math.min(sq.tier, BAL.gate2.hullFn.length - 1)];
+  w.effects.text(sq.x, sq.y - 74, `기함 승급 ${BAL.evolution.names[sq.tier]} · ${fn.label}`, COLORS.reward, 15);
+}
+
+/** 현재 tier의 §7.3 기능을 편대에 반영(누적형). campaignHullTier·startCampaign25에서 호출. */
+function applyCampaignHullFn(sq, cl) {
+  const fn = BAL.gate2.hullFn[Math.min(sq.tier, BAL.gate2.hullFn.length - 1)];
+  sq.moveResponseMult = fn.move;       // 이동 반응(entities.js 팔로우에서 읽음)
+  sq.resonPowerMult = fn.resonPower;   // 공명 증폭(spawnResonance에서 읽음)
+  sq.sideGuns = fn.sideGuns;           // 측면 포대 문수(campaign25Update에서 발사)
+  if (fn.apex) cl.apexUnlocked = true; // T5 Apex 해금
 }
 
 /** 두 번째 무기 장착(측정=빌드 wing 자동, play=향후 선택 UI G2-B). */
@@ -888,6 +900,38 @@ function campaignBehavior(t) {
   if (cl.auto) { steps[0].apply(); cl.metrics.choice(t, { behavior: true }); }
 }
 
+/** §7.3 등급 기능 per-frame: 측면 포대(T4+) 발사 + Apex(T5) 주기 발동. */
+function campaignHullFnTick(dt) {
+  const r = run, cl = r.campaign25, sq = r.squad, w = r.world, G2 = BAL.gate2;
+  if (sq.sideGuns > 0) {   // 대형 측면 포대: 좌우로 비스듬히 추가 사격
+    cl._sideT = (cl._sideT || 0) - dt;
+    if (cl._sideT <= 0) {
+      cl._sideT = G2.sideGunIntervalSec;
+      const dmg = Math.max(6, sq.flagPower * (w.stats?.damage ?? 1) * 0.06) * G2.sideGunDmgFrac;
+      for (let k = 0; k < sq.sideGuns; k++) {
+        const dir = k % 2 === 0 ? -1 : 1;
+        const b = new Bullet(sq.x + dir * 15, sq.y - 6, dmg, { vy: -BAL.weapons.vulcan.speed * 0.9, vx: dir * 130, kind: 'vulcan', lv: 2, color: '#ffd36b' });
+        b.sourceWeaponId = 'vulcan'; w.bullets.push(b);
+      }
+    }
+  }
+  if (cl.apexUnlocked) {   // 타이탄 Apex: 주기적 화면 지배(적탄 소거 + 광역 펄스)
+    cl._apexT = (cl._apexT ?? G2.apexIntervalSec) - dt;
+    if (cl._apexT <= 0) { cl._apexT = G2.apexIntervalSec; triggerApex(); }
+  }
+}
+
+/** Apex 발동: 적탄 전소 + 잡몹 즉사 + 보스 광역 펄스(보스는 클램프가 상한 → TTK 유지). */
+function triggerApex() {
+  const r = run, w = r.world, sq = r.squad, G2 = BAL.gate2;
+  for (const b of w.enemyBullets) b.dead = true;
+  for (const e of w.entities) { if (e.isEnemy && !e.dead && e.hitByBullet && !e.indestructible) e.hitByBullet(99999, w); }
+  for (const bo of (r.bosses || [])) { if (!bo.dead) bo.hitByBullet((bo.maxHp || 3000) * G2.apexDamageFrac, w); }
+  w.effects.flash(0.5); w.effects.halo(sq.x, sq.y, '#ffe17a'); w.effects.ring(LOGICAL_W / 2, logicalH * 0.4, '#ffe17a');
+  w.effects.text(sq.x, sq.y - 92, 'APEX', '#ffe17a', 24);
+  sfx('evolve');
+}
+
 /** 25분 캠페인 per-frame 진행. */
 function campaign25Update(dt) {
   const r = run, cl = r.campaign25, w = r.world, sq = r.squad;
@@ -903,6 +947,7 @@ function campaign25Update(dt) {
   if (cl.resonActivated) { const spec = resonTryProc(sq.reson, BAL.gate1.resonance, t); if (spec) spawnResonance(spec, sq, w); }
   const bo0 = r.bosses && r.bosses[0];
   if (bo0) updateBossClamp(bo0, dt);
+  campaignHullFnTick(dt);   // §7.3 등급 기능(측면 포대·Apex)
   // 지역 전투 스트림 재보충(보스 없을 때 25분 내내 전투 유지). intro(첫 1분)엔 사격 적 스폰 금지(§7.1).
   if (t >= cl.cfg.introSec && r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < 6 && !cl.bossActive) refillCoreLoopTrack();
   // 디렉터 사건 처리
@@ -918,6 +963,7 @@ function campaign25Update(dt) {
       case 'resonanceReady': activateCampaignResonance(t); break;
       case 'framePick': pickCampaignFrame(t); break;
       case 'behavior': campaignBehavior(t); break;   // 무기 레벨업 → 25분 힘 성장(§1.3)
+      case 'apex': cl.apexUnlocked = true; cl._apexT = 0.1; break;   // §7.3 T5 Apex 해금(즉시 첫 발동)
       case 'result': cl.resultPending = true; break;
       default: cl.deferredEvents.push({ kind: act.kind, t: Math.round(t) }); break;   // fleet/path/apex 등 = G2-B~D 실배선
     }
