@@ -1143,7 +1143,10 @@ function campaign25Update(dt) {
   fleetTick(dt);            // §7.2 세 번째 슬롯 전투기 편대(자율 조준 사격)
   // 지역 전투 스트림 재보충(보스 없을 때 25분 내내 전투 유지). intro(첫 1분)엔 사격 적 스폰 금지(§7.1).
   const densityCap = Math.round(6 * (cl.pathMods?.enemyRateMult || 1));   // §7.4 경로 선택 = 다음 구간 적 밀도(위험/보상)
-  if (t >= cl.cfg.introSec && r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < densityCap && !cl.bossActive) refillCoreLoopTrack();
+  // intro(첫 60초): play는 사격 적 없이 크리스탈 수집 스트림(빈 화면 방지·조작 학습, refill이 skipShooters로 크리스탈만 스폰).
+  //  측정은 헤드리스라 도입부 공백 유지(검증된 TTK 보존). intro 후엔 두 모드 정상 전투 재보충.
+  const introSpawnOK = t >= cl.cfg.introSec || !cl.auto;
+  if (introSpawnOK && r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < densityCap && !cl.bossActive) refillCoreLoopTrack();
   // §7.5 지역 정예 웨이브(주기): 현재 지역 elite 타입을 정예 변이(★)로 스폰 → 4~8초 처치 역할(intro 후·track·비보스 한정).
   cl._eliteWaveT = (cl._eliteWaveT ?? cl.cfg.eliteWaveSec) - dt;
   if (cl._eliteWaveT <= 0) {
@@ -1265,7 +1268,8 @@ function refillCoreLoopTrack(elite = false) {
   const P = BAL.gate1.play, t = cl ? elapsed(cl.director) : 0;
   const playPer = t < P.rampMidSec ? 1 : t < P.rampLateSec ? 2 : 3;   // 사람 플레이: 초반 1기 → 중반 2기 → 후반 3기
   const rows = elite ? 2 : (dense ? 2 : 1), per = elite ? 4 : (dense ? 5 : playPer);
-  const skipShooters = !dense && t < P.introSec;   // 사람 플레이 첫 구간: 사격 적 없이 이동·수집만
+  const introGate = r.campaign25 ? cl.cfg.introSec : P.introSec;   // 캠페인은 gate2.introSec(60s) 기준
+  const skipShooters = !dense && t < introGate;   // 사람 플레이 첫 구간: 사격 적 없이 이동·크리스탈 수집만(사격 적 X, 크리스탈은 스폰)
   // 사람 플레이 스트림은 튜토리얼 미러 복제를 끄고(noDup) per가 정확한 적 수가 되게 한다(Codex P2).
   //  측정 스트림은 weaver 고정(Codex 승인 TTK·밀도 보존). 사람 플레이는 램밍 제외 슈터를 시간 따라 다양화(테스터: 단조로움).
   // §7.5 지역별 적 구성: 캠페인이면 현재 지역 조합(역할=빌드 시험), Gate 1은 기존 그대로(측정=weaver 고정, play=기본 6종).
