@@ -853,13 +853,13 @@ function campaignHullTier(tier, t) {
   w.effects.text(sq.x, sq.y - 74, `기함 승급 ${BAL.evolution.names[sq.tier]} · ${fn.label}`, COLORS.reward, 15);
 }
 
-/** 현재 tier의 §7.3 기능을 편대에 반영(누적형). campaignHullTier·startCampaign25에서 호출. */
+/** 현재 tier의 §7.3 기능을 편대에 반영(누적형). campaignHullTier·startCampaign25에서 호출.
+ *  ※ Apex(T5)는 여기서 켜지 않는다 — 디렉터의 apex 사건(1290s)이 발동을 게이트한다(Codex P2). fn.apex는 라벨용. */
 function applyCampaignHullFn(sq, cl) {
   const fn = BAL.gate2.hullFn[Math.min(sq.tier, BAL.gate2.hullFn.length - 1)];
   sq.moveResponseMult = fn.move;       // 이동 반응(entities.js 팔로우에서 읽음)
-  sq.resonPowerMult = fn.resonPower;   // 공명 증폭(spawnResonance에서 읽음)
+  sq.resonPowerMult = fn.resonPower;   // 공명 증폭(spawnResonance·시커 충돌에서 읽음)
   sq.sideGuns = fn.sideGuns;           // 측면 포대 문수(campaign25Update에서 발사)
-  if (fn.apex) cl.apexUnlocked = true; // T5 Apex 해금
 }
 
 /** 두 번째 무기 장착(측정=빌드 wing 자동, play=향후 선택 UI G2-B). */
@@ -925,7 +925,11 @@ function campaignHullFnTick(dt) {
 function triggerApex() {
   const r = run, w = r.world, sq = r.squad, G2 = BAL.gate2;
   for (const b of w.enemyBullets) b.dead = true;
-  for (const e of w.entities) { if (e.isEnemy && !e.dead && e.hitByBullet && !e.indestructible) e.hitByBullet(99999, w); }
+  for (const e of w.entities) {
+    if (!e.isEnemy || e.dead || !e.hitByBullet || e.indestructible) continue;
+    e.hitByBullet(99999, w);
+    if (e.dead) w.notifyEnemyKilled?.(e);   // 중앙 킬 처리(FLOW·프레임·키스톤·시커 표식 해제) — 다른 광역 킬과 동일(Codex P2)
+  }
   for (const bo of (r.bosses || [])) { if (!bo.dead) bo.hitByBullet((bo.maxHp || 3000) * G2.apexDamageFrac, w); }
   w.effects.flash(0.5); w.effects.halo(sq.x, sq.y, '#ffe17a'); w.effects.ring(LOGICAL_W / 2, logicalH * 0.4, '#ffe17a');
   w.effects.text(sq.x, sq.y - 92, 'APEX', '#ffe17a', 24);
@@ -1345,7 +1349,7 @@ function update(dt) {
         if (dx * dx + dy * dy <= (bo.r * 1.4) ** 2) {
           const siegeBonus = b.blast ? (1 + b.blast.bossBonus) : 1;  // 시즈 토피도 보스 직격 +15%
           let bossDmg = b.damage * (w.mfx?.bossDmgMult ?? 1) * siegeBonus;
-          if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, bo)) bossDmg *= BAL.gate1.resonance.seekerBeam.missileBonus;  // 시커 증폭
+          if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, bo)) bossDmg *= BAL.gate1.resonance.seekerBeam.missileBonus * (w.squad?.resonPowerMult || 1);  // 시커 증폭(+§7.3 공명 증폭)
           // 코어루프 B22 양측 클램프(dpsCap 하한·enrage 상한)는 보스 hitByBullet 래퍼가 '모든' 경로에 적용한다(§5.8, Codex P1).
           const hpBefore = bo.hp;
           bo.hitByBullet(bossDmg, w, b);
@@ -1366,7 +1370,7 @@ function update(dt) {
         const wasAlive = !e.dead;
         let dealt = e.def ? b.damage * (w.mfx?.bossDmgMult ?? 1) : b.damage;
         // 시커 빔(G1-06): 표식 대상을 맞힌 유도 미사일은 실제 피해가 증폭된다(우선추적 + 증폭).
-        if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, e)) dealt *= BAL.gate1.resonance.seekerBeam.missileBonus;
+        if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, e)) dealt *= BAL.gate1.resonance.seekerBeam.missileBonus * (w.squad?.resonPowerMult || 1);   // 시커 증폭(+§7.3 공명 증폭)
         const hpBefore = e.hp ?? 0;
         e.hitByBullet(dealt, w, b); // 탄환 문맥 전달(프리즘 코어 등)
         if (w.metrics) tallyBulletDamage(w, b, Math.max(0, hpBefore - (e.hp ?? 0)), e);   // 실제 적용 피해(HP 감소) 집계(G1-07)
