@@ -1232,7 +1232,7 @@ export class Squad {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    if (this.shield) {
+    if (this.shield || (this.surv && this.surv.shield > 0)) {   // 레거시 shield + surv.shield(경로 보호막 등) 둘 다 시각 표시(Codex G2-D P2)
       ctx.strokeStyle = COLORS.gateGood;
       ctx.globalAlpha = 0.45 + 0.2 * Math.sin(this.t * 5);
       ctx.lineWidth = 2;

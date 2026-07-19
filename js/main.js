@@ -1791,7 +1791,7 @@ function draw() {
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,
       weaponEvo: weaponEvoLabel(r.squad),
-      shield: r.squad.shield,
+      shield: r.squad.shield || (r.squad.surv && r.squad.surv.shield > 0),   // ⛨ 표시: surv.shield(경로 보호막)도 반영(Codex G2-D P2)
       modules: moduleSummary(r.modules),
       logicalH,
       flow: r.squad.flow || 0,

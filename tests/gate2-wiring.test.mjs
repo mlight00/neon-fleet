@@ -167,4 +167,7 @@ test('G2-12: ~4분마다 경로 선택(§7.4, G2-D)', () => {
   assert.ok(/def\.trigger === 'mark'[\s\S]{0,240}e\.x - sq\.x/.test(mainSrc), '2차 P2: mark 표적 = 기함 최근접(거리)');
   // Codex G2-D 3차 P2: mark 표적 탐색에 살아있는 보스 포함(보스전 중 잡몹 없음).
   assert.ok(/function applyResonBoost[\s\S]{0,1100}w\.bosses/.test(mainSrc), '3차 P2: mark 표적에 보스 포함');
+  // Codex G2-D 5차 P2: 경로 보호막(surv.shield)이 함선 링·HUD ⛨에 시각 표시(소비는 단일 소스 유지).
+  assert.ok(entSrc.includes('this.surv && this.surv.shield > 0'), '5차 P2: 함선 보호막 링이 surv.shield 반영');
+  assert.ok(mainSrc.includes('r.squad.surv && r.squad.surv.shield > 0'), '5차 P2: HUD ⛨가 surv.shield 반영');
 });
