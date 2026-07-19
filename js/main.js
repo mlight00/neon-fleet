@@ -503,7 +503,7 @@ function openCoreLoopBehaviorPick(t) {
   if (!steps.length) return false;                       // 전 무기 최대 → 행동 변화 없음, 기록 안 함
   const options = steps.slice(0, 3);
   openCoreLoopPick({
-    title: '행동 변화 강화', subtitle: '발사 형태가 눈에 띄게 달라집니다.',
+    title: '무기 강화', subtitle: '발사 형태가 눈에 띄게 달라집니다.',
     options,
     onPick(id, idx) {
       options[idx].apply();
@@ -1958,7 +1958,7 @@ function draw() {
     if (cl && r.squad.surv) {
       const sq = r.squad;
       const nx = nextEvent(cl.director);
-      const evLabel = { behaviorUpgrade: '행동 변화', secondWeapon: '보조 무기', hullTier: '함체 승급', resonanceTelegraph: '공명 예고', firstResonance: '공명 완성', framePick: '지휘 프레임', eliteWave: '정예 웨이브', bossStart: '지역 보스', result: '결과',
+      const evLabel = { behaviorUpgrade: '무기 강화', secondWeapon: '보조 무기', hullTier: '함체 승급', resonanceTelegraph: '공명 예고', firstResonance: '공명 완성', framePick: '지휘 프레임', eliteWave: '정예 웨이브', bossStart: '지역 보스', result: '결과',
         regionEnter: '지역 진입', fleetTelegraph: '슬롯 예고', fleetSlot: '함대 슬롯', secondResonance: '두번째 공명', finalWeaponEvo: '최종 진화', apex: 'Apex', pathChoice: '경로 선택' };
       const fh = sq.frameId ? frameHud(BAL.gate1.frames, sq.frameId) : null;
       drawCoreLoopHud(ctx, LOGICAL_W, logicalH, {
