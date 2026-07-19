@@ -194,4 +194,8 @@ test('G2-13: 지역별 적 구성(§7.5, G2-E)', () => {
   assert.ok(typeof BAL.gate2.eliteWaveSec === 'number', '정예 웨이브 주기 설정');
   assert.ok(/cl\._eliteWaveT[\s\S]{0,220}refillCoreLoopTrack\(true\)/.test(mainSrc), 'P2: 캠페인 주기적 정예 웨이브(refill true 도달)');
   assert.ok(mainSrc.includes('elite: elite && isCampaign') && mainSrc.includes("applyAffixes(e, ['elite'])"), 'P2: 캠페인 정예는 정예 변이 강제');
+  // Codex G2-E 2차 P2: 정예 타입은 스케일 렌더 지원 타입(creature/turret/charger)만 — 히트박스/스프라이트 정합.
+  const ELITE_OK = new Set(['creature', 'turret', 'charger']);
+  for (const r of rt) assert.ok(ELITE_OK.has(r.elite), `2차 P2: 정예 타입 스케일 지원(${r.elite})`);
+  assert.ok(mainSrc.includes('ELITE_KINDS.has(kind)'), '2차 P2: 정예 강제는 지원 타입만(방어 가드)');
 });
