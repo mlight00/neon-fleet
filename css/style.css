@@ -93,48 +93,35 @@ html, body {
 #overlay .panel.title-screen .btn-row { margin-top: 12px; }
 #overlay .panel.title-screen .btn-row button { padding: 10px 6px; font-size: 13.5px; max-width: 168px; }
 
-/* 주 액션 버튼 = '홀로그램 전술 콘솔': 좌측 네온 액센트 바 + 다층 유리 배경 + 호버 빛 스윕.
-   밋밋한 단일 그라디언트 pill(전형적 AI 느낌)을 우주선 HUD 콘솔 스위치 톤으로 교체. */
+/* 주 액션 버튼 = 미니멀 각진 콘솔: 다크 건메탈 + 얇은 화이트 라인 + 좌측 시안 미세 포인트.
+   다층 그라디언트·빛 스윕 등 장식 제거, 각진 모서리·넓은 자간으로 절제된 무채색 테크 톤
+   (이사 피드백: 더 각지고 미니멀하게·색 변경 → 아이스 화이트/건메탈). */
 #overlay button {
   position: relative;
   margin-top: 14px;
-  padding: 12px 22px 12px 26px;   /* 좌측 액센트 바 자리 확보 */
-  font-size: 15px;
+  padding: 12px 22px 12px 24px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.6px;
-  color: #041018;
-  border: 1px solid rgba(150, 250, 255, 0.7);
-  border-radius: 6px;   /* pill 탈피 — 각진 테크 */
+  letter-spacing: 1.4px;
+  color: #eef4f8;
+  background: #161b22;
+  border: 1px solid rgba(238, 244, 248, 0.42);
+  border-radius: 3px;   /* 각진 테크 */
   cursor: pointer;
-  overflow: hidden;
-  isolation: isolate;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 44%),
-    linear-gradient(150deg, #5ff0e0 0%, #37c9e8 48%, #2f8dff 100%);
-  box-shadow:
-    0 6px 20px rgba(52, 190, 220, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -9px 16px rgba(18, 66, 116, 0.34);
-  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.16s ease, filter 0.16s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
-#overlay button::before {   /* 좌측 네온 액센트 바 */
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
-  background: linear-gradient(180deg, #eafffb, #2f8dff);
-  box-shadow: 0 0 10px rgba(120, 240, 255, 0.9);
+#overlay button::before {   /* 좌측 시안 미세 액센트 — 유일한 색 포인트 */
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: #6fe3ff;
 }
-#overlay button::after {   /* 호버 시 좌→우로 지나가는 빛 스윕 */
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  transform: translateX(-130%);
-  background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.42) 50%, transparent 68%);
-  transition: transform 0.55s ease;
-}
+#overlay button::after { content: none; }   /* 빛 스윕 제거(미니멀) */
 #overlay button:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.05) saturate(1.05);
-  box-shadow: 0 11px 28px rgba(60, 210, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -9px 16px rgba(18, 66, 116, 0.34);
+  background: #1d242e;
+  border-color: rgba(238, 244, 248, 0.82);
+  box-shadow: 0 0 16px rgba(111, 227, 255, 0.16);
+  transform: translateY(-1px);
 }
-#overlay button:hover::after { transform: translateX(130%); }
-#overlay button:active { transform: translateY(0); filter: brightness(0.98); }
+#overlay button:active { transform: translateY(0); }
 
 /* 텍스트 링크형·상점·스타일 버튼은 콘솔 장식(좌측 바·스윕)을 쓰지 않는다 */
 #overlay .link-btn::before, #overlay .link-btn::after,
@@ -152,48 +139,42 @@ html, body {
   min-height: 104px;
   padding: 14px 9px 12px;
   color: #eaf4ff;
-  background: linear-gradient(180deg, rgba(24, 36, 66, 0.96), rgba(11, 17, 38, 0.97));
-  border: 1.5px solid rgba(120, 220, 255, 0.4);   /* 무기색 인라인 border-color가 이 위를 덮어 카드별로 구분 */
-  border-radius: 11px;
-  box-shadow: inset 0 0 24px rgba(63, 245, 224, 0.05), 0 6px 18px rgba(0, 0, 0, 0.36);
+  background: #12161c;   /* 건메탈 평면 */
+  border: 1.5px solid rgba(238, 244, 248, 0.28);   /* 무기색 인라인 border-color가 이 위를 덮어 카드별로 구분 */
+  border-radius: 3px;   /* 각진 */
+  box-shadow: none;
   display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
   letter-spacing: 0; font-weight: 500; white-space: normal;
   overflow: hidden;
-  transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease, border-color 0.14s ease;
 }
-#overlay .draft-card::before {   /* 상단 네온 라인 (주 버튼의 좌측 바를 카드에선 상단 라인으로 재정의) */
-  content: ''; position: absolute; left: 12px; right: 12px; top: 0; width: auto; height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(150, 240, 255, 0.85), transparent);
-  box-shadow: 0 0 8px rgba(120, 230, 255, 0.5);
-}
-#overlay .draft-card::after { display: none; }   /* 카드는 빛 스윕 미사용 */
+#overlay .draft-card::before, #overlay .draft-card::after { display: none; }   /* 미니멀 — 라인·스윕 미사용, 무기색 테두리로만 구분 */
 #overlay .draft-card:hover {
-  transform: translateY(-4px);
-  background: linear-gradient(180deg, rgba(30, 46, 82, 0.97), rgba(16, 24, 50, 0.98));
-  box-shadow: 0 0 26px rgba(63, 245, 224, 0.4), inset 0 0 24px rgba(63, 245, 224, 0.09);
+  transform: translateY(-3px);
+  background: #171d25;
+  border-color: rgba(238, 244, 248, 0.7);
+  box-shadow: 0 0 16px rgba(111, 227, 255, 0.14);
 }
-#overlay .draft-card .card-icon { font-size: 23px; line-height: 1; filter: drop-shadow(0 0 6px rgba(120, 230, 255, 0.4)); }
+#overlay .draft-card .card-icon { font-size: 23px; line-height: 1; }
 #overlay .draft-card .card-label { font-weight: 700; font-size: 14px; margin: 6px 0 4px; }
 #overlay .draft-card .card-desc { font-size: 11px; color: #cdddf2; line-height: 1.4; }
 
 /* 주 액션 버튼(출격/도전) + 격납고를 같은 크기로 나란히 */
 #overlay .btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
 #overlay .btn-row button { flex: 1 1 0; margin-top: 0; padding: 14px 6px; max-width: 200px; font-size: 16px; white-space: nowrap; }
-/* 보조 버튼 = 다크 홀로그램 아웃라인 (주 버튼과 위계 구분). 좌측 액센트 바는 톤다운. */
+/* 보조 버튼 = 더 어두운 미니멀 아웃라인 (주 버튼과 위계 구분, 시안 포인트 없음). */
 #overlay .btn-row .sub-btn, #overlay button.sub-btn {
-  color: #d7f2ff;
-  border: 1px solid rgba(95, 220, 235, 0.42);
-  background:
-    linear-gradient(180deg, rgba(120, 200, 255, 0.06), rgba(10, 20, 40, 0) 46%),
-    rgba(12, 22, 44, 0.55);
-  box-shadow: inset 0 1px 0 rgba(150, 230, 255, 0.12), 0 4px 14px rgba(0, 0, 0, 0.3);
+  color: #c4cdd6;
+  background: #0f1318;
+  border: 1px solid rgba(238, 244, 248, 0.18);
+  box-shadow: none;
 }
-#overlay button.sub-btn::before { background: linear-gradient(180deg, #5fe0e0, #2f7db0); box-shadow: 0 0 8px rgba(95, 220, 235, 0.55); opacity: 0.85; }
+#overlay button.sub-btn::before { background: rgba(238, 244, 248, 0.28); }   /* 시안 대신 무채색 미세 라인 */
 #overlay .btn-row .sub-btn:hover, #overlay button.sub-btn:hover {
-  filter: none;
-  border-color: rgba(130, 245, 255, 0.8);
-  background: linear-gradient(180deg, rgba(120, 210, 255, 0.11), rgba(20, 40, 70, 0.55));
-  box-shadow: 0 0 22px rgba(63, 245, 224, 0.3), inset 0 1px 0 rgba(150, 230, 255, 0.18);
+  color: #eef4f8;
+  border-color: rgba(238, 244, 248, 0.5);
+  background: #161b22;
+  box-shadow: none;
 }
 
 .hidden { display: none !important; }
