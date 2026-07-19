@@ -458,10 +458,10 @@ export const BAL = {
   //  각 지역은 startSec에 진입, bossSec에 지역 보스 등장(끝은 다음 지역 진입 또는 totalSec). 노드형 맵은 폴백 보존.
   gate2: {
     totalSec: 1500,               // 25분
-    introSec: 20,                 // 0~20초 출격(크리스탈 수집·조작 학습) → 20초에 첫 지역 전투 시작(이사 요청: 도입부 단축)
+    introSec: 10,                 // 0~10초 출격(크리스탈 수집·조작 학습) → 10초에 첫 지역 전투 시작(이사 요청: 도입부 단축)
     // §7.1 6개 지역. boss는 §7.5 처치시간 목표. backdrop=섹터 배경 인덱스(1~6, Gate 0 R2 매핑).
     regions: [
-      { i: 1, id: 'coldWake',     name: 'COLD WAKE',     startSec: 20,   bossSec: 200,  boss: 'B8',  backdrop: 1, bossTtk: [30, 45] },
+      { i: 1, id: 'coldWake',     name: 'COLD WAKE',     startSec: 10,   bossSec: 200,  boss: 'B8',  backdrop: 1, bossTtk: [30, 45] },
       { i: 2, id: 'prismGrave',   name: 'PRISM GRAVE',   startSec: 240,  bossSec: 440,  boss: 'B9',  backdrop: 2, bossTtk: [30, 45] },
       { i: 3, id: 'furnaceLine',  name: 'FURNACE LINE',  startSec: 480,  bossSec: 680,  boss: 'B10', backdrop: 3, bossTtk: [30, 45] },
       { i: 4, id: 'brokenArmada', name: 'BROKEN ARMADA', startSec: 720,  bossSec: 920,  boss: 'B11', backdrop: 4, bossTtk: [30, 45] },
