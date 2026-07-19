@@ -544,6 +544,7 @@ export const BAL = {
       { label: '총력 혼성 · 모든 시험',    pool: ['weaver', 'turret', 'shielder', 'orbiter', 'blinker'], elite: 'turret' },   // 6 CROWN CORE — 종합
     ],
     eliteWaveSec: 100,   // §7.5 지역 정예 웨이브 주기(초): 현재 지역 elite 타입을 정예 변이(★ 3.2×HP)로 스폰 → 4~8초 처치 역할
+    behaviorOverflowPower: 55,   // 무기 유한 스텝 소진 후(후반) 행동 변화 사건마다 소폭 화력(banked) 성장 — 25분 내내 성장 유지(Codex 홀리스틱)
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.

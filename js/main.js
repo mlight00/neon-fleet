@@ -816,6 +816,11 @@ function enterCampaignRegion(i, t) {
   cl.region = i;
   r.sector = region.backdrop;                 // 배경 전환(Gate 0 R2 섹터 1:1 매핑)
   r.stage = region.i;                          // 난이도·기록용 진행 카운터(임시: 지역 인덱스)
+  // 지역별 난이도 갱신(Codex 홀리스틱 P1): 진행도·스테이지 모드를 지역 기준으로 재계산 →
+  //  적 HP·발사 주기·변이 확률·보스 공격률이 지역마다 상승(안 하면 전 지역이 1지역 난이도로 고정).
+  r.progression = progressionFor(region.i, 0, BAL.sector.depth);
+  const mods = stageMods(r.progression.difficultyLevel);
+  r.mods = mods; r.world.stageMods = mods;
   r.effects.text(LOGICAL_W / 2, logicalH * 0.28, `${region.i}. ${region.name}`, COLORS.reward, 20);
   const rt = BAL.gate2.regionThreat[region.i - 1];   // §7.5 지역별 위협 테마 안내(무엇을 시험하는지 한 줄)
   if (rt) { cl.regionThreatLabel = rt.label; r.effects.text(LOGICAL_W / 2, logicalH * 0.28 + 26, rt.label, '#8fb4d8', 13); }
@@ -917,9 +922,10 @@ function pickCampaignFrame(t) {
 function campaignBehavior(t) {
   const sq = run.squad, cl = run.campaign25;
   const steps = coreLoopWeaponSteps(sq);
-  if (!steps.length) return;
-  // 측정·플레이 모두 자동 적용(45초마다) — 사람 플레이가 측정 대비 과소 파워가 되지 않게(Codex 홀리스틱). 25분에 무기 성장.
-  steps[0].apply(); cl.metrics.choice(t, { behavior: true });
+  // 측정·플레이 모두 자동 적용(45초마다) — 사람 플레이가 측정 대비 과소 파워가 되지 않게(Codex 홀리스틱).
+  if (steps.length) steps[0].apply();                                    // 유한 무기 스텝(레벨/진화) 우선
+  else sq.banked = (sq.banked || 0) + BAL.gate2.behaviorOverflowPower;   // 스텝 소진(후반)엔 소폭 화력 성장 → 25분 내내 성장 유지(Codex 홀리스틱 2차)
+  cl.metrics.choice(t, { behavior: true });
 }
 
 /** §7.1 최종 무기 진화(1050s): 주무기 최종 레벨 + 미진화면 진화 1단계 부여(Codex 홀리스틱 — 미배선 사건 실동작). */
@@ -1200,7 +1206,15 @@ function finishCampaign25(reason = 'clear') {
   window.__nfRunMetrics = snap;
   state = 'done';
   // play 결과: 25분 6지역 전용 결과 패널(지역별 TTK 6종 + Gate 2 시스템 요약). 재시작은 25분 캠페인으로(Gate 1 이탈 방지).
-  if (cl.mode === 'play') showCampaign25Result(snap, r.squad, cl, (mode) => { ui.hide(); startCampaign25({ mode, buildId: cl.buildId }); });
+  //  '새 조합'(which==='new')은 다른 빌드로 회전 → '같은 조합'과 실제로 구분(Codex 홀리스틱).
+  if (cl.mode === 'play') showCampaign25Result(snap, r.squad, cl, (mode, which) => { ui.hide(); startCampaign25({ mode, buildId: which === 'new' ? nextCampaignBuild(cl.buildId) : cl.buildId }); });
+}
+
+/** '새 조합' 버튼용: 현재 빌드에서 다음 로드아웃 빌드로 회전(스트레스 빌드 제외) — 같은 조합 재시작과 구분(Codex 홀리스틱). */
+function nextCampaignBuild(current) {
+  const ids = Object.keys(CORE_LOOP_BUILDS).filter((k) => !CORE_LOOP_BUILDS[k].stress);
+  const i = ids.indexOf(current);
+  return ids.length ? ids[(i + 1) % ids.length] : current;
 }
 
 /** 25분 캠페인 전용 결과: 6지역 보스 TTK 표 + Gate 2 시스템(함체 T5·함대·경로·정예·공명) 요약(§7.1 §7.6). */
@@ -1219,8 +1233,8 @@ function showCampaign25Result(snap, sq, cl, restartFn) {
     hull: sq.surv.hull, hullMax: sq.surv.hullMax,
     damageByWeapon: snap.damageByWeapon, damageByResonance: snap.damageByResonance,
     weaponLabels: WEAPON_LABELS,
-    onSame: () => restartFn(cl.mode),
-    onNew: () => restartFn('play'),
+    onSame: () => restartFn(cl.mode, 'same'),
+    onNew: () => restartFn('play', 'new'),   // 다른 조합(빌드 회전)으로 재시작
   });
 }
 
