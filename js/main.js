@@ -35,6 +35,7 @@ const _clParams = new URLSearchParams(location.search);
 const CORE_LOOP = _clParams.has('coreLoopTest');        // 사람 플레이(H0·내구도100·무기1·조작 가능)
 const CORE_MEASURE = _clParams.has('coreLoopMeasure');  // 자동 측정 재생(autopilot+auto-select, 헤드리스 시뮬)
 const CAMPAIGN25 = _clParams.has('campaign25');         // Gate 2: 25분 6지역 시간 캠페인(측정·개발용 진입)
+const BOSSLAB = _clParams.has('bosslab');               // 보스 패턴 프리뷰: ?bosslab=1&boss=B14 (개발/테스트용)
 
 const LOGICAL_W = BAL.logicalW;
 const canvas = document.getElementById('game');
@@ -356,10 +357,37 @@ function startPlay() {
   drafting = false;
   betweenStages = false;
   sfx('start');
+  if (BOSSLAB) { startBossLab(_clParams.get('boss') || 'B14'); return; }   // ?bosslab=1&boss=B14: 보스 패턴 프리뷰
   if (CAMPAIGN25) { startCampaign25({ mode: _clParams.has('play') ? 'play' : 'measure', buildId: 'railStorm' }); return; }  // ?campaign25=1 자동시연 / &play=1 사람 조작
   if (CORE_MEASURE) { startCoreLoop({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?coreLoopMeasure=1: 자동 측정
   if (CORE_LOOP) { startCoreLoop({ mode: 'play' }); return; }   // ?coreLoopTest=1: 사람 플레이 8분 슬라이스
   newExpedition();   // → startSector(1) → enterSectorMap(): 섹터 맵 화면(state='map'). 노드 선택 시 전투 시작.
+}
+
+/** 보스 패턴 프리뷰(개발/테스트): 지정 보스를 즉시 등장시켜 패턴만 관찰·연습. 처치 시 재소환. */
+function startBossLab(bossId = 'B14') {
+  drafting = false; betweenStages = false;
+  newExpedition('campaign');
+  const r = run, sq = r.squad;
+  sq.tier = 3; sq.count = 60; sq.banked = 200;   // 관찰용 중간 화력
+  sq.weapon = 'vulcan'; sq.weaponLv = 3;
+  r.maxPower = sq.power;
+  enterNode(r.map.cols[0][0]);
+  r.totalTrack = 1e12; r.pending = [];
+  r.bossLab = bossId;
+  spawnBossLabBoss(bossId);
+}
+
+/** 보스랩용 보스 즉시 등장(정상 HP — 패턴을 충분히 관찰하도록 클램프 없음). */
+function spawnBossLabBoss(bossId) {
+  const r = run, w = r.world;
+  r.phase = 'boss'; w.phase = 'boss'; r.pending = [];
+  const boss = makeBoss(LOGICAL_W, r.mods.enemyRate / BAL.difficulty.bossRateMult, 6, 1, bossId);
+  boss.homeX = LOGICAL_W / 2; boss.x = boss.homeX;
+  r.bosses = [boss]; w.bosses = [boss]; r.boss = boss; w.boss = boss;
+  preloadBossArt(bossId);
+  playBgm('boss'); setBgmIntensity(0.86); sfx('boss_in');
+  r.effects.text(LOGICAL_W / 2, logicalH * 0.35, boss.korName || bossId, COLORS.danger, 20);
 }
 
 // ═══════════ Gate 1: 8분 핵심 재미 하네스 (전면개편 §5, ?coreLoopTest=1) ═══════════
@@ -1195,7 +1223,11 @@ function update(dt) {
     r.scrollY += 30 * dt;
     for (const b of r.bosses) { if (b.dead) b.deathT += dt; else b.update(dt, w); }  // 죽은 보스는 페이드, 산 보스는 교전 지속
     w.boss = r.bosses.find((b) => !b.dead) || r.bosses[0];   // 호밍 표적 = 살아있는 선두
-    if (r.bosses.every((b) => b.dead) && !r.coreLoop && !r.campaign25) {   // 코어루프·25분캠페인은 자체 종료/재개 처리(캠페인 연출 미진입)
+    if (r.bossLab && r.bosses.every((b) => b.dead)) {   // 보스랩: 처치하면 잠시 뒤 재소환(패턴 반복 관찰)
+      r._labRespawnT = (r._labRespawnT || 0) + dt;
+      if (r._labRespawnT > 1.2) { r._labRespawnT = 0; spawnBossLabBoss(r.bossLab); }
+    }
+    if (r.bosses.every((b) => b.dead) && !r.coreLoop && !r.campaign25 && !r.bossLab) {   // 코어루프·25분캠페인·보스랩은 자체 종료/재개 처리(캠페인 연출 미진입)
       // 전원 격파 → 파괴 연출 시작
       r.phase = 'bossDeath';
       r.seqT = 0;
