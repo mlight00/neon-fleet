@@ -1369,9 +1369,9 @@ function update(dt) {
       const gMul = BAL.difficulty.globalMult;   // 전체 난이도 배수(사용자 조정): 체력 ×gMul, 발사 주기 ÷gMul(더 빠름)
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1) * gMul); if (e.fireInterval) e.fireInterval *= mods.enemyRate / gMul; return e; };
       // 적 스폰 헬퍼: 난이도 스케일 + 변이(어픽스=섹터 확률) 롤 + 등록
-      // §7.5 정예 웨이브=정예 변이 강제(★ 3.2×HP). 단, 정예 스케일을 렌더하는 타입만(AFFIX_KINDS.elite=creature·turret·charger)
-      //  — 그 외는 spriteScale 무시로 히트박스/스프라이트 불일치라 일반 변이로 폴백(Codex G2-E 2차 P2).
-      const ELITE_KINDS = new Set(['creature', 'turret', 'charger']);
+      // §7.5 정예 웨이브=정예 변이 강제(★ 3.2×HP). 단, 정예 스케일을 '1회만' 렌더하는 타입만(creature·turret)
+      //  — sniper 등은 spriteScale 무시(2차), charger는 this.r+캔버스 이중 스케일(3차)이라 제외 → 그 외는 일반 변이로 폴백.
+      const ELITE_KINDS = new Set(['creature', 'turret']);
       const spawnEnemy = (e, kind) => { scaleEnemy(e); if (it.elite && ELITE_KINDS.has(kind)) applyAffixes(e, ['elite']); else maybeAffix(e, kind, contentTier, r.rng); w.entities.push(e); };
       // 적 항목은 난이도 비례 복제 스폰(§4.5): 복제본은 좌우 미러 + 세로로 살짝 시차.
       const dup = it.noDup ? 1 : copyCount(difficultyLevel, r.tutorial);   // 첫 노드는 최대 2로 제한. 코어루프 정밀 스트림은 noDup(정확한 수).

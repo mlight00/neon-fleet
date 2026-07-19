@@ -533,14 +533,14 @@ export const BAL = {
     pathFallbackDrones: 6,   // 상한(만피·최대레벨 등)으로 무효화된 경로 mod 1건당 대체 혜택(호위 편대) — 2축 계약 보존
     // §7.5 지역별 적 구성: "적은 HP 벽이 아니라 빌드 시험지". 지역마다 다른 역할 조합으로 다른 빌드 측면을 시험한다.
     //  index = region.i-1 (지역 1~6). pool = 전투 스트림 적 종류(순환), elite = 정예 웨이브 종류. 전부 pending 스폰 가능 타입.
-    // pool = 전투 스트림 종류(자유), elite = 정예 웨이브 종류. elite는 정예 변이 스케일을 렌더하는 타입만 허용
-    //  (AFFIX_KINDS.elite = creature·turret·charger). 그 외 타입은 spriteScale을 무시해 히트박스/스프라이트 불일치(Codex G2-E 2차 P2).
+    // pool = 전투 스트림 종류(자유), elite = 정예 웨이브 종류. elite는 정예 변이 스케일을 '1회만' 렌더하는 타입만 허용(creature·turret).
+    //  charger는 draw가 확대된 this.r + 캔버스 spriteScale로 이중 스케일(Codex G2-E 3차), 그 외(sniper 등)는 spriteScale 무시(2차) → 제외.
     regionThreat: [
       { label: '경량 군집 · 이동/광역',   pool: ['creature', 'weaver'],                            elite: 'creature' }, // 1 COLD WAKE — 기초
       { label: '저격·포탑 · 우선 표적',    pool: ['sniper', 'turret', 'weaver'],                    elite: 'turret' },   // 2 — 표적 선택
-      { label: '장갑·방패 · 표적 순서',    pool: ['shielder', 'charger', 'turret'],                 elite: 'charger' },  // 3 FURNACE LINE — 관통/순서
+      { label: '장갑·방패 · 표적 순서',    pool: ['shielder', 'charger', 'turret'],                 elite: 'turret' },   // 3 FURNACE LINE — 관통/순서
       { label: '모선·궤도 · 광역/전개',    pool: ['carrier', 'orbiter', 'weaver'],                  elite: 'creature' }, // 4 BROKEN ARMADA — 광역
-      { label: '전격·점멸 · 위치 선정',    pool: ['zapper', 'blinker', 'bomber'],                   elite: 'charger' },  // 5 CHOIR VEIL — 기동
+      { label: '전격·점멸 · 위치 선정',    pool: ['zapper', 'blinker', 'bomber'],                   elite: 'creature' }, // 5 CHOIR VEIL — 기동
       { label: '총력 혼성 · 모든 시험',    pool: ['weaver', 'turret', 'shielder', 'orbiter', 'blinker'], elite: 'turret' },   // 6 CROWN CORE — 종합
     ],
     eliteWaveSec: 100,   // §7.5 지역 정예 웨이브 주기(초): 현재 지역 elite 타입을 정예 변이(★ 3.2×HP)로 스폰 → 4~8초 처치 역할
