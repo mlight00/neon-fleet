@@ -10,6 +10,7 @@ export function createRunMetrics({ runId = 'run', seed = 0 } = {}) {
     choiceTimes: [],            // 모든 강화/카드 선택 시각
     behaviorUpgradeTimes: [],   // 행동 변화(모양/수/속도/범위) 강화만
     secondWeaponSec: null,      // 두 번째 무기 장착 시각(최초 1회)
+    fleetSlotSec: null,         // 세 번째 슬롯(함대 시스템) 해금 시각(최초 1회, §7.2)
     firstResonanceSec: null,    // 첫 공명 완성 시각(최초 1회)
     hullTierTimes: [],          // 함체 승급 시각(H1..H5)
     framePickSec: null,         // 지휘 프레임 선택 시각(최초 1회)
@@ -37,6 +38,7 @@ export function createRunMetrics({ runId = 'run', seed = 0 } = {}) {
       if (behavior) m.behaviorUpgradeTimes.push(round1(t));
     },
     secondWeapon(t) { once('secondWeaponSec', t); },
+    fleetSlot(t) { once('fleetSlotSec', t); },
     firstResonance(t) { once('firstResonanceSec', t); },
     hullTier(t) { m.hullTierTimes.push(round1(t)); },
     framePick(t) { once('framePickSec', t); },

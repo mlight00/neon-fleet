@@ -772,6 +772,7 @@ function startCampaign25(opts = {}) {
   const startMain = auto ? build.main : (opts.startWeapon || build.main);
   sq.installGate1({ surv, reson, frameState, frameId: null, mainWeapon: startMain });
   sq.weapon = startMain; sq.weaponLv = 1;
+  sq.fleet = { active: false, systemId: null, ships: [] };   // §7.2 세 번째 슬롯(함대) — fleetSlot 사건에서 해금
   const G2 = BAL.gate2;
   const metrics = createRunMetrics({ runId: `campaign25-${mode}-${build.id}`, seed: (Math.random() * 2 ** 31) | 0 });
   const director = createRunDirector(G2, buildCampaign25Schedule(G2));
@@ -871,6 +872,21 @@ function equipCampaignWing(t) {
   r.world.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[cl.build.wing]}`, WEAPON_COLORS[cl.build.wing], 15);
 }
 
+/** §7.2 세 번째 슬롯 = 함대 시스템(전투기 편대) 해금. 기함 앞 편대 대형·자율 조준 독립 사격(주포 복제 아님). */
+function equipCampaignFleet(t) {
+  const r = run, sq = r.squad, cl = r.campaign25, F = BAL.gate2.fleet;
+  if (sq.fleet && sq.fleet.active) return;   // 멱등(중복 해금 방지)
+  const ships = [];
+  for (let i = 0; i < F.count; i++) {
+    const [ox, oy] = F.formation[Math.min(i, F.formation.length - 1)];
+    ships.push({ ox, oy, x: sq.x + ox, y: sq.y + oy, fireT: F.fireInterval * (i / Math.max(1, F.count)), phase: i * 1.7 });
+  }
+  sq.fleet = { active: true, systemId: F.systemId, ships };
+  cl.metrics.fleetSlot(t);   // 세 번째 슬롯 마일스톤(§7.2)
+  r.world.effects.text(sq.x, sq.y - 88, `함대 시스템 전개: ${F.label} ×${F.count}`, F.color, 16);
+  r.world.effects.halo(sq.x, sq.y, F.color);
+}
+
 /** 공명 회로 활성(두 무기 장착 후). */
 function activateCampaignResonance(t) {
   const r = run, sq = r.squad, cl = r.campaign25;
@@ -951,6 +967,66 @@ function triggerApex() {
   sfx('evolve');
 }
 
+/** §7.2 전투기 편대: 편대 대형 추종(+상하 부유) + 사거리 내 적 자율 조준 사격. 볼트=sourceWeaponId 'fleet'(별도 집계·공명 미충전). */
+function fleetTick(dt) {
+  const r = run, sq = r.squad, w = r.world, F = BAL.gate2.fleet;
+  const fl = sq.fleet;
+  if (!fl || !fl.active) return;
+  const dmg = Math.max(4, sq.flagPower * (w.stats?.damage ?? 1) * F.dmgFrac);
+  for (const s of fl.ships) {
+    s.phase += dt * 2.2;
+    const tx = sq.x + s.ox, ty = sq.y + s.oy + Math.sin(s.phase) * F.bob;
+    const k = Math.min(1, F.followLerp * dt);
+    s.x += (tx - s.x) * k; s.y += (ty - s.y) * k;
+    s.fireT -= dt;
+    if (s.fireT <= 0) {
+      const target = nearestEnemyForFleet(w, s.x, s.y, F.range);
+      if (target) {
+        s.fireT = F.fireInterval;
+        const dx = target.x - s.x, dy = target.y - s.y, d = Math.hypot(dx, dy) || 1;
+        const b = new Bullet(s.x, s.y - 4, dmg, { vx: (dx / d) * F.boltSpeed, vy: (dy / d) * F.boltSpeed, kind: 'vulcan', lv: 1, color: F.color });
+        b.sourceWeaponId = 'fleet'; w.bullets.push(b);   // 세 번째 슬롯 구분 소스(§7.2): 통계 'fleet' 버킷·공명 미충전
+      } else {
+        s.fireT = 0.15;   // 표적 없음: 짧게 재확인(볼트 낭비 방지)
+      }
+    }
+  }
+}
+
+/** 전투기 자율 조준: 사거리 내 앞쪽 잡몹 최근접 우선, 없으면 보스. */
+function nearestEnemyForFleet(w, x, y, range) {
+  let best = null, bestD = range * range;
+  for (const e of w.entities) {
+    if (!e.isEnemy || e.dead || e.indestructible || !e.hitByBullet) continue;
+    if (e.y > y + 20) continue;   // 뒤(아래)로는 안 쏨
+    const dx = e.x - x, dy = e.y - y, d2 = dx * dx + dy * dy;
+    if (d2 < bestD) { bestD = d2; best = e; }
+  }
+  for (const b of (w.bosses || [])) {   // 보스도 표적(클램프 경유라 TTK 유지)
+    if (b.dead) continue;
+    const dx = b.x - x, dy = b.y - y, d2 = dx * dx + dy * dy;
+    if (d2 < bestD) { bestD = d2; best = b; }
+  }
+  return best;
+}
+
+/** 전투기 편대 렌더(작은 삼각 아군기 + 코어 글로우). */
+function drawCampaignFleet(ctx) {
+  const sq = run.squad, fl = sq && sq.fleet;
+  if (!fl || !fl.active) return;
+  const F = BAL.gate2.fleet;
+  ctx.save();
+  for (const s of fl.ships) {
+    ctx.save(); ctx.translate(s.x, s.y);
+    ctx.fillStyle = F.color; ctx.globalAlpha = 0.92;
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 6); ctx.lineTo(0, 3); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 0.55; ctx.fillStyle = '#eafff6';
+    ctx.beginPath(); ctx.arc(0, -1, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 /** 25분 캠페인 per-frame 진행. */
 function campaign25Update(dt) {
   const r = run, cl = r.campaign25, w = r.world, sq = r.squad;
@@ -967,6 +1043,7 @@ function campaign25Update(dt) {
   const bo0 = r.bosses && r.bosses[0];
   if (bo0) updateBossClamp(bo0, dt);
   campaignHullFnTick(dt);   // §7.3 등급 기능(측면 포대·Apex)
+  fleetTick(dt);            // §7.2 세 번째 슬롯 전투기 편대(자율 조준 사격)
   // 지역 전투 스트림 재보충(보스 없을 때 25분 내내 전투 유지). intro(첫 1분)엔 사격 적 스폰 금지(§7.1).
   if (t >= cl.cfg.introSec && r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < 6 && !cl.bossActive) refillCoreLoopTrack();
   // 디렉터 사건 처리
@@ -979,6 +1056,8 @@ function campaign25Update(dt) {
       case 'bossStart': if (cl.bossActive) cl.bossQueue.push({ region: ev.region, boss: ev.boss }); else spawnCampaignBoss(ev.region, ev.boss, t); break;
       case 'hullTier': campaignHullTier(ev.tier, t); break;
       case 'equipWing': equipCampaignWing(t); break;
+      case 'fleetTelegraph': cl.fleetTelegraph = true; r.world.effects.text(sq.x, sq.y - 70, `함대 시스템 준비 — ${BAL.gate2.fleet.label} 곧 전개`, BAL.gate2.fleet.color, 14); break;   // §7.2 슬롯 예고
+      case 'fleetSlot': equipCampaignFleet(t); break;   // §7.2 세 번째 슬롯 해금
       case 'resonanceReady': activateCampaignResonance(t); break;
       case 'framePick': pickCampaignFrame(t); break;
       case 'behavior': campaignBehavior(t); break;   // 무기 레벨업 → 25분 힘 성장(§1.3)
@@ -1611,6 +1690,7 @@ function draw() {
     for (const b of r.world.bullets) b.draw(ctx);
     for (const b of r.world.enemyBullets) b.draw(ctx);
     if (!r.squad.dead) r.squad.draw(ctx);
+    if (r.campaign25) drawCampaignFleet(ctx);   // §7.2 전투기 편대(기함 위에 렌더)
     r.effects.draw(ctx, LOGICAL_W, logicalH);
 
     const evc = r.world.mfx?.evolveCostMult ?? 1;
@@ -1650,6 +1730,8 @@ function draw() {
       drawCoreLoopHud(ctx, LOGICAL_W, logicalH, {
         hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
         mainWeapon: sq.weapon, mainLv: sq.weaponLv, wingWeapon: sq.wing.weaponId, wingLv: sq.wing.level,
+        fleetActive: !!(sq.fleet && sq.fleet.active), fleetLabel: BAL.gate2.fleet.label, fleetCount: sq.fleet?.ships?.length || 0,
+        fleetColor: BAL.gate2.fleet.color, fleetTelegraph: !!cl.fleetTelegraph,   // §7.2 세 번째 슬롯 HUD 구분
         resonanceName: sq.reson.activeId ? RESONANCES[sq.reson.activeId].name : (cl.telegraph ? RESONANCES[cl.build.resonance]?.name : ''),
         resonanceFrac: resonChargeFrac(sq.reson, BAL.gate1.resonance),
         telegraph: resonShouldTelegraph(sq.reson, BAL.gate1.resonance) || (cl.telegraph && !sq.reson.activeId),

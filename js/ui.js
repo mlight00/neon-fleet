@@ -265,6 +265,7 @@ export const ui = {
       dmgW.homing ? bar('유도 미사일', dmgW.homing, '#c8ff6b') : '',
       dmgW.sideGun ? bar('측면 포대', dmgW.sideGun, '#ffb84d') : '',   // 함체 T4+ 기능(총합에 포함되므로 행도 렌더 → 100% 정합, Codex 3차 P2)
       dmgW.apex ? bar('에이펙스 펄스', dmgW.apex, '#ffe17a') : '',      // 함체 T5 Apex(총합 정합)
+      dmgW.fleet ? bar('함대·전투기', dmgW.fleet, '#7dffb0') : '',      // §7.2 세 번째 슬롯 함대 시스템(결과 통계 구분)
       dmgR.railStorm ? bar('공명·레일 스톰', dmgR.railStorm, '#9fe8ff') : '',
       dmgR.microMissile ? bar('공명·미사일 포화', dmgR.microMissile, '#ffb0e0') : '',
       dmgR.seekerBeam ? bar('공명·시커 빔', dmgR.seekerBeam, '#b0ffd0') : '',
