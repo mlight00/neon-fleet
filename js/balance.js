@@ -516,6 +516,20 @@ export const BAL = {
       color: '#7dffb0',          // 전투기·볼트 색(아군 청록그린 — 발칸/레이저/호밍과 구분)
       formation: [[-52, -26], [52, -26], [0, -58]],  // 기함 기준 편대 오프셋 [dx,dy] (count까지 사용)
     },
+    // §7.4 ~4분마다 큰 경로 선택(pathChoiceSec 5회). 각 선택은 2택, 각 옵션이 최소 2개 축을 바꾼다(가짜 분기 금지).
+    //  축: enemyRateMult(다음 구간 밀도=위험/보상)·hullHeal(수리)·weaponLv(무기 강화)·resonCharge(공명 가속)·droneGain(호위=보상)·shield(방어).
+    pathChoices: [
+      { a: { id: 'siege',      label: '강습 항로',      desc: '다음 구간 적 밀도 ↑ · 호위 편대 +8',   mods: { enemyRateMult: 1.40, droneGain: 8 } },
+        b: { id: 'refit',      label: '정비 항로',      desc: '기함 내구도 +30% · 다음 구간 적 밀도 ↓', mods: { hullHeal: 0.30, enemyRateMult: 0.82 } } },
+      { a: { id: 'overcharge', label: '과충전 항로',    desc: '주무기 강화 · 공명 충전 가속',           mods: { weaponLv: 1, resonCharge: 0.5 } },
+        b: { id: 'bulwark',    label: '방벽 항로',      desc: '기함 내구도 +25% · 보호막 전개',         mods: { hullHeal: 0.25, shield: true } } },
+      { a: { id: 'supply',     label: '보급 항로',      desc: '호위 편대 +12 · 내구도 +20%',           mods: { droneGain: 12, hullHeal: 0.20 } },
+        b: { id: 'elitehunt',  label: '정예 사냥 항로', desc: '적 밀도 ↑ · 주무기 강화',               mods: { enemyRateMult: 1.35, weaponLv: 1 } } },
+      { a: { id: 'blitz',      label: '속공 항로',      desc: '적 밀도 ↑ · 공명 충전 가속',            mods: { enemyRateMult: 1.45, resonCharge: 0.6 } },
+        b: { id: 'steady',     label: '안정 항로',      desc: '기함 내구도 +30% · 호위 편대 +8',       mods: { hullHeal: 0.30, droneGain: 8 } } },
+      { a: { id: 'allout',     label: '총력 항로',      desc: '주무기 강화 · 호위 편대 +10',           mods: { weaponLv: 1, droneGain: 10 } },
+        b: { id: 'fortress',   label: '요새 항로',      desc: '기함 내구도 +40% · 보호막 전개',         mods: { hullHeal: 0.40, shield: true } } },
+    ],
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   regionAt, regionByIndex, regionBossId, regionEndSec,
-  buildCampaign25Schedule, eventAction25, expectedPowerMult,
+  buildCampaign25Schedule, eventAction25, expectedPowerMult, pathChoicePair,
 } from '../js/campaign25.js';
 import { BAL } from '../js/balance.js';
 
@@ -107,4 +107,17 @@ test('expectedPowerMult: 25분 힘 성장이 단조 증가(1분 1배 → 25분 2
     assert.ok(m >= prev, '힘 성장 단조 비감소');
     prev = m;
   }
+});
+
+test('pathChoicePair: index → 2택 반환, 범위 밖 클램프, 각 옵션 ≥2축·상이(§7.4)', () => {
+  const n = G2.pathChoiceSec.length;
+  for (let i = 0; i < n; i++) {
+    const p = pathChoicePair(G2, i);
+    assert.ok(p && p.a && p.b, `index ${i} 2택 존재`);
+    assert.ok(Object.keys(p.a.mods).length >= 2 && Object.keys(p.b.mods).length >= 2, '각 옵션 ≥2축');
+    assert.notDeepEqual(p.a.mods, p.b.mods, '두 옵션 효과 상이(가짜 분기 아님)');
+  }
+  assert.deepEqual(pathChoicePair(G2, 99), pathChoicePair(G2, n - 1), '범위 밖은 마지막으로 클램프');
+  assert.deepEqual(pathChoicePair(G2, -5), pathChoicePair(G2, 0), '음수는 0으로 클램프');
+  assert.equal(pathChoicePair({ pathChoices: [] }, 0), null, '빈 목록은 null');
 });

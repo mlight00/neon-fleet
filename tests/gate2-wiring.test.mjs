@@ -141,3 +141,20 @@ test('G2-11: 세 번째 슬롯 fleet 시스템(§7.2, G2-C)', () => {
   // Codex G2-C P3: 함대 HUD 행은 캠페인(Gate 2) 전용 게이트 — Gate 1 공유 HUD엔 미표시.
   assert.ok(mainSrc.includes('fleetSupported: !!r.campaign25') && rd.includes('if (d.fleetSupported)'), 'P3: 함대 HUD 캠페인 게이트');
 });
+
+test('G2-12: ~4분마다 경로 선택(§7.4, G2-D)', () => {
+  // balance.gate2.pathChoices: 스케줄 횟수만큼 2택, 각 옵션 ≥2축(mods), a≠b(가짜 분기 금지).
+  const pcs = BAL.gate2.pathChoices;
+  assert.equal(pcs.length, BAL.gate2.pathChoiceSec.length, '경로 선택 데이터 = 스케줄 횟수');
+  for (const p of pcs) {
+    assert.ok(Object.keys(p.a.mods).length >= 2 && Object.keys(p.b.mods).length >= 2, '각 옵션 ≥2축 변경');
+    assert.notEqual(p.a.id, p.b.id, '두 옵션 식별자 구분');
+    assert.notDeepEqual(p.a.mods, p.b.mods, '두 옵션 실효과 상이(가짜 분기 아님)');
+  }
+  // pathChoice 사건 실배선(default 로그 아님) + play/measure 분기 + 효과 적용.
+  assert.ok(mainSrc.includes("case 'pathChoice': presentPathChoice(ev.choice, t)"), 'pathChoice → 경로 선택 배선');
+  assert.ok(mainSrc.includes('function presentPathChoice') && mainSrc.includes('function applyPathChoice'), '경로 선택 제시·적용 함수');
+  assert.ok(/function presentPathChoice[\s\S]{0,400}cl\.auto/.test(mainSrc) && mainSrc.includes('ui.showCoreLoopPick'), 'measure=자동선택 / play=카드 정지');
+  // 밀도 배수(위험/보상 축)가 실제 스폰 임계에 반영.
+  assert.ok(mainSrc.includes('cl.pathMods') && mainSrc.includes('densityCap'), '경로 밀도 배수 → refill 임계 반영');
+});

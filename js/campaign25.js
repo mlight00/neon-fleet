@@ -84,6 +84,13 @@ export function eventAction25(evtType) {
   }
 }
 
+/** §7.4 경로 선택 쌍(순수): index → { a, b } 2택. 범위 밖 index는 클램프. */
+export function pathChoicePair(cfg, index) {
+  const list = (cfg && cfg.pathChoices) || [];
+  if (!list.length) return null;
+  return list[Math.max(0, Math.min(index, list.length - 1))] || null;
+}
+
 /** 25분 힘 성장 목표(§1.3): t분에서 기대 배율(대략). 측정 검증용 곡선. */
 export function expectedPowerMult(cfg, t) {
   const min = t / 60;

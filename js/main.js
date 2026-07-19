@@ -29,7 +29,7 @@ import { createSurvivability, onTierUp as survTierUp, hullFrac, addShield } from
 import { createFrameState, setFrame as frameSet, frameOnKill, tickFrame, frameHud } from './command-frames.js';
 import { createLoadout, equip as loadoutEquip } from './weapon-loadout.js';
 import { CORE_LOOP_BUILDS, coreLoopBuild, eventAction, frameForBuild } from './core-loop.js';
-import { regionAt as c25RegionAt, regionByIndex as c25Region, buildCampaign25Schedule, eventAction25 } from './campaign25.js';
+import { regionAt as c25RegionAt, regionByIndex as c25Region, buildCampaign25Schedule, eventAction25, pathChoicePair } from './campaign25.js';
 
 const _clParams = new URLSearchParams(location.search);
 const CORE_LOOP = _clParams.has('coreLoopTest');        // 사람 플레이(H0·내구도100·무기1·조작 가능)
@@ -783,6 +783,7 @@ function startCampaign25(opts = {}) {
     region: 0, bossActive: false, bossSpawnT: 0, bossQueue: [], resonActivated: false, resultShown: false, resultPending: false,
     regionResults: [],        // [{ region, boss, ttk, killed }]
     bossesKilled: 0, deferredEvents: [],
+    pathMods: { enemyRateMult: 1 }, pathChoicesMade: 0,   // §7.4 경로 선택 효과(밀도는 다음 선택까지 지속)
     startHull: surv.hull, startTier: 0,   // 결과 화면용 실제 시작 스냅샷
   };
   // H0에서 시작 → H1~H5 승급 5회가 정확히 T1~T5를 만든다(측정도 동일, Codex P2). 측정은 생존/화력만 보정.
@@ -916,6 +917,37 @@ function campaignBehavior(t) {
   if (cl.auto) { steps[0].apply(); cl.metrics.choice(t, { behavior: true }); }
 }
 
+/** §7.4 큰 경로 선택(~4분마다). 측정=결정론적 자동선택, play=게임 정지 + 2택 카드(showCoreLoopPick 재사용). */
+function presentPathChoice(index, t) {
+  const cl = run.campaign25;
+  const pair = pathChoicePair(cl.cfg, index);
+  if (!pair) return;
+  if (cl.auto) { applyPathChoice(index % 2 === 0 ? pair.a : pair.b, t); return; }   // 측정: 교대 선택(양 옵션 다 검증)
+  drafting = true; cl.picking = true; state = 'play';   // play: 게임 정지 + 카드
+  ui.showCoreLoopPick({
+    title: '경로 선택', subtitle: '4분마다의 큰 갈림길 — 항로를 정하세요.',
+    options: [
+      { id: 'a', label: pair.a.label, desc: pair.a.desc, color: '#c9b8ff', icon: '🜂' },
+      { id: 'b', label: pair.b.label, desc: pair.b.desc, color: '#8fd4ff', icon: '🜄' },
+    ],
+    onPick: (id) => { ui.hide(); drafting = false; cl.picking = false; sfx('buy'); applyPathChoice(id === 'a' ? pair.a : pair.b, t); },
+  });
+}
+
+/** 선택 항로 효과 적용(각 옵션 ≥2축 실효과 — 가짜 분기 없음). 밀도 배수는 다음 선택까지 지속. */
+function applyPathChoice(opt, t) {
+  const r = run, cl = r.campaign25, sq = r.squad, w = r.world, m = opt.mods || {};
+  cl.pathMods = { enemyRateMult: m.enemyRateMult || 1 };   // 다음 구간(다음 선택까지) 적 밀도 — 위험/보상 축
+  if (m.hullHeal) sq.surv.hull = Math.min(sq.surv.hullMax, sq.surv.hull + m.hullHeal * sq.surv.hullMax);   // 수리 축
+  if (m.weaponLv) sq.weaponLv = Math.min(BAL.weapons.lvCoef.length, sq.weaponLv + m.weaponLv);            // 무기 강화 축
+  if (m.resonCharge && sq.reson.activeId) sq.reson.charge = (sq.reson.charge || 0) + (BAL.gate1.resonance[sq.reson.activeId]?.threshold || 100) * m.resonCharge;  // 공명 가속
+  if (m.droneGain) sq.applyDelta(m.droneGain, w);          // 호위 편대 — 보상 축
+  if (m.shield) sq.shield = true;                          // 방어 축
+  cl.pathChoicesMade = (cl.pathChoicesMade || 0) + 1;
+  cl.metrics.choice(t);
+  w.effects.text(sq.x, sq.y - 80, `경로: ${opt.label}`, '#c9b8ff', 16);
+}
+
 /** §7.3 등급 기능 per-frame: 등급 기능 동기화 + 측면 포대(T4+) 발사 + Apex(T5) 주기 발동. */
 function campaignHullFnTick(dt) {
   const r = run, cl = r.campaign25, sq = r.squad, w = r.world, G2 = BAL.gate2;
@@ -1047,7 +1079,8 @@ function campaign25Update(dt) {
   campaignHullFnTick(dt);   // §7.3 등급 기능(측면 포대·Apex)
   fleetTick(dt);            // §7.2 세 번째 슬롯 전투기 편대(자율 조준 사격)
   // 지역 전투 스트림 재보충(보스 없을 때 25분 내내 전투 유지). intro(첫 1분)엔 사격 적 스폰 금지(§7.1).
-  if (t >= cl.cfg.introSec && r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < 6 && !cl.bossActive) refillCoreLoopTrack();
+  const densityCap = Math.round(6 * (cl.pathMods?.enemyRateMult || 1));   // §7.4 경로 선택 = 다음 구간 적 밀도(위험/보상)
+  if (t >= cl.cfg.introSec && r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < densityCap && !cl.bossActive) refillCoreLoopTrack();
   // 디렉터 사건 처리
   for (const ev of events) {
     const act = eventAction25(ev.type);
@@ -1064,6 +1097,7 @@ function campaign25Update(dt) {
       case 'framePick': pickCampaignFrame(t); break;
       case 'behavior': campaignBehavior(t); break;   // 무기 레벨업 → 25분 힘 성장(§1.3)
       case 'apex': cl.apexUnlocked = true; cl._apexT = 0.1; break;   // §7.3 T5 Apex 해금(즉시 첫 발동)
+      case 'pathChoice': presentPathChoice(ev.choice, t); break;   // §7.4 ~4분마다 큰 경로 선택
       case 'result': cl.resultPending = true; break;
       default: cl.deferredEvents.push({ kind: act.kind, t: Math.round(t) }); break;   // fleet/path/apex 등 = G2-B~D 실배선
     }
