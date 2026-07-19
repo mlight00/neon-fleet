@@ -783,7 +783,7 @@ function startCampaign25(opts = {}) {
     region: 0, bossActive: false, bossSpawnT: 0, bossQueue: [], resonActivated: false, resultShown: false, resultPending: false,
     regionResults: [],        // [{ region, boss, ttk, killed }]
     bossesKilled: 0, deferredEvents: [],
-    pathMods: { enemyRateMult: 1 }, pathChoicesMade: 0,   // §7.4 경로 선택 효과(밀도는 다음 선택까지 지속)
+    pathMods: { enemyRateMult: 1 }, pathChoicesMade: 0, eliteWavesFired: 0,   // §7.4 경로 선택·§7.5 정예 웨이브 집계(G2-F 통합 검증용)
     startHull: surv.hull, startTier: 0,   // 결과 화면용 실제 시작 스냅샷
   };
   // H0에서 시작 → H1~H5 승급 5회가 정확히 T1~T5를 만든다(측정도 동일, Codex P2). 측정은 생존/화력만 보정.
@@ -1131,7 +1131,7 @@ function campaign25Update(dt) {
   cl._eliteWaveT = (cl._eliteWaveT ?? cl.cfg.eliteWaveSec) - dt;
   if (cl._eliteWaveT <= 0) {
     cl._eliteWaveT = cl.cfg.eliteWaveSec;
-    if (t >= cl.cfg.introSec && r.phase === 'track' && !cl.bossActive) refillCoreLoopTrack(true);
+    if (t >= cl.cfg.introSec && r.phase === 'track' && !cl.bossActive) { refillCoreLoopTrack(true); cl.eliteWavesFired += 1; }
   }
   // 디렉터 사건 처리
   for (const ev of events) {
@@ -1180,10 +1180,35 @@ function finishCampaign25(reason = 'clear') {
   snap.regionResults = cl.regionResults;
   snap.bossesKilled = cl.bossesKilled;
   snap.campaignReason = reason;
+  snap.pathChoicesMade = cl.pathChoicesMade;      // §7.4 경로 선택 횟수(G2-F 통합 검증)
+  snap.eliteWavesFired = cl.eliteWavesFired;       // §7.5 정예 웨이브 횟수
+  snap.fleetActive = !!(r.squad.fleet && r.squad.fleet.active);  // §7.2 세 번째 슬롯 해금 여부
+  snap.finalTier = r.squad.tier;                   // §7.3 최종 함체 등급(T5 도달 확인)
   window.__nfRunMetrics = snap;
   state = 'done';
-  // play 결과: 재시작은 25분 캠페인으로(Gate 1로 벗어나지 않게, Codex P2). 지역별 TTK 6종 패널은 G2-F에서 전용 화면.
-  if (cl.mode === 'play') showCoreLoopResult(snap, r.squad, cl, (mode) => { ui.hide(); startCampaign25({ mode, buildId: cl.buildId }); });
+  // play 결과: 25분 6지역 전용 결과 패널(지역별 TTK 6종 + Gate 2 시스템 요약). 재시작은 25분 캠페인으로(Gate 1 이탈 방지).
+  if (cl.mode === 'play') showCampaign25Result(snap, r.squad, cl, (mode) => { ui.hide(); startCampaign25({ mode, buildId: cl.buildId }); });
+}
+
+/** 25분 캠페인 전용 결과: 6지역 보스 TTK 표 + Gate 2 시스템(함체 T5·함대·경로·정예·공명) 요약(§7.1 §7.6). */
+function showCampaign25Result(snap, sq, cl, restartFn) {
+  const build = cl.build;
+  const activeResonName = sq.reson.activeId ? RESONANCES[sq.reson.activeId]?.name : (RESONANCES[build.resonance]?.name || '');
+  ui.showCampaign25Result({
+    reason: snap.campaignReason,
+    regionResults: snap.regionResults || [],
+    regions: BAL.gate2.regions,
+    build,
+    finalTier: snap.finalTier, tierNames: BAL.evolution.names,
+    fleetActive: snap.fleetActive, fleetLabel: BAL.gate2.fleet.label,
+    pathChoicesMade: snap.pathChoicesMade, eliteWavesFired: snap.eliteWavesFired,
+    resonanceName: activeResonName,
+    hull: sq.surv.hull, hullMax: sq.surv.hullMax,
+    damageByWeapon: snap.damageByWeapon, damageByResonance: snap.damageByResonance,
+    weaponLabels: WEAPON_LABELS,
+    onSame: () => restartFn(cl.mode),
+    onNew: () => restartFn('play'),
+  });
 }
 
 /** 지휘 프레임 자동 스킬을 실제 전투 행동으로 발동(RW-C, G1-05). */
@@ -2026,6 +2051,14 @@ window.__nfCampaign25 = {
       const [lo, hi] = region ? region.bossTtk : [0, 999];
       add(`${x.boss} TTK ${lo}~${hi} 근사`, x.ttk != null && x.ttk >= lo - 5 && x.ttk <= hi + 8, x.ttk);
     }
+    // G2-F 전체 파이프라인 통합: B(함체 T5)·C(함대)·D(경로)·E(정예/지역) 전부 25분 안에 실동작.
+    const dw = s.damageByWeapon || {};
+    add('§7.3 함체 T5 도달(H1~H5 5회 승급)', (s.hullTierTimes || []).length === 5 && s.finalTier >= 5, `tier ${s.finalTier}, 승급 ${(s.hullTierTimes || []).length}`);
+    add('§7.3 T4 측면 포대 실피해', dw.sideGun > 0, Math.round(dw.sideGun || 0));
+    add('§7.3 T5 Apex 실피해', dw.apex > 0, Math.round(dw.apex || 0));
+    add('§7.2 세 번째 슬롯 해금 + 함대 실피해', s.fleetSlotSec != null && dw.fleet > 0, `@${s.fleetSlotSec}s · ${Math.round(dw.fleet || 0)}`);
+    add('§7.4 경로 선택 5회 적용', s.pathChoicesMade === 5, s.pathChoicesMade);
+    add('§7.5 정예 웨이브 발동', s.eliteWavesFired >= 1, s.eliteWavesFired);
     const pass = checks.every((c) => c.ok);
     return { pass, failed: checks.filter((c) => !c.ok).map((c) => c.name), checks };
   },

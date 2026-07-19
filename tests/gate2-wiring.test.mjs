@@ -200,3 +200,15 @@ test('G2-13: 지역별 적 구성(§7.5, G2-E)', () => {
   for (const r of rt) assert.ok(ELITE_OK.has(r.elite), `2·3차 P2: 정예 타입 스케일 정합(${r.elite})`);
   assert.ok(mainSrc.includes("new Set(['creature', 'turret'])") && mainSrc.includes('ELITE_KINDS.has(kind)'), '2·3차 P2: 정예 강제는 지원 타입만(방어 가드)');
 });
+
+test('G2-14: 25분 완주 통합 검증 + 전용 결과 패널(G2-F)', () => {
+  // integrationCheck가 전체 Gate 2 파이프라인(B 함체T5·C 함대·D 경로·E 정예)을 25분 안에 확인.
+  assert.ok(mainSrc.includes('§7.3 함체 T5 도달') && mainSrc.includes('§7.2 세 번째 슬롯 해금 + 함대 실피해'), '통합 검증: 함체 T5·함대 실동작');
+  assert.ok(mainSrc.includes('§7.4 경로 선택 5회 적용') && mainSrc.includes('§7.5 정예 웨이브 발동'), '통합 검증: 경로·정예 실동작');
+  // 스냅샷에 Gate 2 요약 필드 부착(결과·통합 검증용).
+  assert.ok(mainSrc.includes('snap.pathChoicesMade') && mainSrc.includes('snap.eliteWavesFired') && mainSrc.includes('snap.fleetActive') && mainSrc.includes('snap.finalTier'), '스냅샷 Gate 2 요약 필드');
+  assert.ok(mainSrc.includes('cl.eliteWavesFired += 1'), '정예 웨이브 카운터 증가');
+  // 25분 전용 결과 패널(6지역 TTK + Gate 2 시스템 요약).
+  assert.ok(mainSrc.includes('showCampaign25Result(snap, r.squad, cl') && mainSrc.includes('function showCampaign25Result'), '캠페인 전용 결과 패널 연결');
+  assert.ok(uiSrc.includes('showCampaign25Result(') && uiSrc.includes('지역 보스 TTK'), 'ui 결과 패널: 6지역 보스 TTK 표');
+});

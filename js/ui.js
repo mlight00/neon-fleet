@@ -296,6 +296,49 @@ export const ui = {
     document.getElementById('btn-cl-new').addEventListener('click', onNew);
   },
 
+  /** 25분 캠페인 전용 결과(§7.6): 6지역 보스 TTK 표 + Gate 2 시스템(함체 T5·함대·경로·정예·공명) 요약 + 피해 비율. */
+  showCampaign25Result({ reason, regionResults, regions, build, finalTier, tierNames, fleetActive, fleetLabel, pathChoicesMade, eliteWavesFired, resonanceName, hull, hullMax, damageByWeapon, damageByResonance, weaponLabels, onSame, onNew }) {
+    const cleared = reason === 'clear';
+    const dmgW = damageByWeapon || {}, dmgR = damageByResonance || {};
+    const total = Object.values(dmgW).reduce((a, b) => a + b, 0) + Object.values(dmgR).reduce((a, b) => a + b, 0) || 1;
+    const pct = (v) => Math.round((v / total) * 100);
+    const bar = (label, v, color) => (v ? `
+      <div style="display:flex;align-items:center;gap:8px;margin:2px 0;font-size:12px">
+        <span style="min-width:104px;text-align:right;color:#bcd">${label}</span>
+        <span style="flex:1;height:10px;background:#0d1424;border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:${pct(v)}%;background:${color}"></span></span>
+        <b style="min-width:34px;color:${color}">${pct(v)}%</b></div>` : '');
+    const dmgRows = [
+      bar('발칸', dmgW.vulcan, '#ffd36b'), bar('레이저', dmgW.laser, '#5cc8ff'), bar('유도 미사일', dmgW.homing, '#c8ff6b'),
+      bar('측면 포대', dmgW.sideGun, '#ffb84d'), bar('에이펙스', dmgW.apex, '#ffe17a'), bar('함대·전투기', dmgW.fleet, '#7dffb0'),
+      bar('공명·레일 스톰', dmgR.railStorm, '#9fe8ff'), bar('공명·미사일 포화', dmgR.microMissile, '#ffb0e0'), bar('공명·시커 빔', dmgR.seekerBeam, '#b0ffd0'),
+    ].join('');
+    const rows = regions.map((rg) => {
+      const res = (regionResults || []).find((x) => x.region === rg.i);
+      const ttk = res && res.ttk != null ? `${res.ttk}초` : '—';
+      const killed = res && res.killed;
+      return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:${killed ? '#dff0ff' : '#7f93b0'}">
+        <span>${rg.i}. ${rg.name} <b style="color:#9fb8d8">${rg.boss}</b></span><b style="color:${killed ? '#7dffb0' : '#ff8a8a'}">${ttk}</b></div>`;
+    }).join('');
+    panel(`
+      <h2 style="color:${cleared ? '#7dffb0' : '#ff8a8a'}">${cleared ? '은하 해방 · 25분 완주' : '작전 종료'}</h2>
+      <p class="big" style="font-size:15px">${build.label}</p>
+      <div style="text-align:left;max-width:440px;margin:8px auto;line-height:1.6;font-size:13px">
+        <div>함체 <b style="color:#ffd93d">${tierNames[Math.min(finalTier, tierNames.length - 1)]}</b> · 함대 <b style="color:#7dffb0">${fleetActive ? fleetLabel : '미전개'}</b> · 공명 <b style="color:#9fe8ff">${resonanceName}</b></div>
+        <div>경로 선택 <b>${pathChoicesMade || 0}</b>회 · 정예 웨이브 <b>${eliteWavesFired || 0}</b>회 · 기함 내구도 <b>${Math.round(hull)}</b>/${hullMax}</div>
+      </div>
+      <div style="margin:8px 0 3px;color:#8fb4d8;font-size:12px">지역 보스 TTK</div>
+      <div style="max-width:440px;margin:0 auto 8px">${rows}</div>
+      <div style="margin:8px 0 3px;color:#8fb4d8;font-size:12px">피해 비율</div>
+      <div style="max-width:440px;margin:0 auto 10px">${dmgRows}</div>
+      <div class="btn-row">
+        <button id="btn-c25-same">같은 조합 다시</button>
+        <button id="btn-c25-new" class="sub-btn">새 조합 시도</button>
+      </div>
+    `);
+    document.getElementById('btn-c25-same').addEventListener('click', onSame);
+    document.getElementById('btn-c25-new').addEventListener('click', onNew);
+  },
+
   /** 진화 모듈 드래프트: 3장 중 택1 (게임 일시 정지 중) */
   showDraft({ options, owned = [], onPick }) {
     const RARE = { common: '#3ff5e0', rare: '#ffd93d' };
