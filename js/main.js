@@ -887,11 +887,16 @@ function buildForPair(a, b) {
  *  주무기만 선택된 상태(90s 전 사망 대비)에서도 cl.build.main을 갱신해 결과·재시작이 실제 선택을 반영한다. */
 function deriveCampaignBuild() {
   const cl = run.campaign25, main = cl.pickedMain || cl.build.main, wing = cl.pickedWing;
-  const base = wing ? buildForPair(main, wing) : coreLoopBuild(cl.buildId);
-  const label = wing ? `${WEAPON_LABELS[main]}+${WEAPON_LABELS[wing]} / ${RESONANCES[base.resonance]?.name || ''}` : `${WEAPON_LABELS[main]} + ?`;
-  cl.build = { ...base, main, wing, label };   // 슬롯 순서 = 선택 그대로. wing 미선택(90s 전 사망)이면 null 유지 → 정규 wing 오저장 방지(Codex G2-G 2차)
+  if (!wing) {   // 주무기만 선택(보조 선택 전) — 완성 빌드/공명/메트릭에 귀속하지 않고 '미완성' 정체성 유지(Codex G2-G 3차)
+    cl.build = { id: `main-${main}`, main, wing: null, resonance: null, label: `${WEAPON_LABELS[main]} + ?` };
+    cl.buildId = `main-${main}`;
+    cl.metrics.relabel(`campaign25-${cl.mode}-${main}`);   // 주무기만 = 미완성 표기(레일스톰 오귀속 방지)
+    return;
+  }
+  const base = buildForPair(main, wing);   // 조합 확정 → 공명·프레임 빌드 파생. 슬롯 순서는 선택 그대로.
+  cl.build = { ...base, main, wing, label: `${WEAPON_LABELS[main]}+${WEAPON_LABELS[wing]} / ${RESONANCES[base.resonance]?.name || ''}` };
   cl.buildId = base.id;
-  cl.metrics.relabel(`campaign25-${cl.mode}-${base.id}`);   // 메트릭 귀속 갱신(Codex G2-G #3)
+  cl.metrics.relabel(`campaign25-${cl.mode}-${base.id}`);
 }
 
 /** 캠페인 선택창(게임 정지). 측정=자동(autoId) 선택. play=drafting 정지 + showCoreLoopPick 카드. */
@@ -995,10 +1000,15 @@ function campaignBehavior(t) {
 
 /** §7.1 최종 무기 진화(1050s): 주무기 최종 레벨 + 미진화면 진화 1단계 부여(Codex 홀리스틱 — 미배선 사건 실동작). */
 function campaignFinalWeaponEvo(t) {
-  const sq = run.squad, w = run.world, wp = sq.weapon, max = BAL.weapons.lvCoef.length;
-  sq.weaponLv = max;
-  if (!sq.weaponEvolutions[wp]) { const opts = evolutionOptions(wp); if (opts && opts[0]) { sq.weaponEvolutions[wp] = opts[0].id; sq.evoLevels[wp] = 1; } }
-  w.effects.text(sq.x, sq.y - 78, `최종 무기 진화: ${WEAPON_LABELS[wp] || wp}`, COLORS.reward, 16);
+  const sq = run.squad, cl = run.campaign25, w = run.world, wp = sq.weapon, max = BAL.weapons.lvCoef.length;
+  sq.weaponLv = max;   // 최종 레벨(측정·play 공통)
+  const opts = sq.weaponEvolutions[wp] ? [] : (evolutionOptions(wp) || []);   // 이미 진화했으면 레벨만
+  if (!opts.length) { w.effects.text(sq.x, sq.y - 78, `최종 강화: ${WEAPON_LABELS[wp] || wp}`, COLORS.reward, 16); return; }
+  const applyEvo = (id) => { sq.weaponEvolutions[wp] = id; sq.evoLevels[wp] = 1; w.effects.text(sq.x, sq.y - 78, `최종 무기 진화: ${WEAPON_LABELS[wp] || wp}`, COLORS.reward, 16); };
+  if (!cl.pickWeapons) { applyEvo(opts[0].id); return; }   // 측정/자동: 첫 진화
+  // play 완전 선택제: 최종 진화도 선택 카드(Codex G2-G 3차)
+  campaignPick({ title: '최종 무기 진화 선택', subtitle: `${WEAPON_LABELS[wp] || wp}의 진화 경로를 고르세요.`, autoId: opts[0].id,
+    options: opts.map((e) => ({ id: e.id, label: e.short, desc: e.shape, color: '#ffd93d', icon: '✴️' })), onPick: applyEvo });
 }
 
 /** §7.4 큰 경로 선택(~4분마다). 측정=결정론적 자동선택, play=게임 정지 + 2택 카드(showCoreLoopPick 재사용). */

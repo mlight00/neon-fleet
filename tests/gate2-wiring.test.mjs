@@ -262,7 +262,10 @@ test('G2-18: 캠페인 play 완전 무기 선택제(이사 요청, G2-G)', () =>
   assert.ok(mainSrc.includes('startWeapon: cl.pickedMain, wing: cl.pickedWing, pick: false'), '#1: 재시작 선택 슬롯 순서 보존(완성 조합)');
   assert.ok(mainSrc.includes("build: { ...build, main: startMain, wing: startWing }"), '#1: cl.build이 실제 슬롯 반영');
   // Codex G2-G 2차: 보조 미선택(조기 사망) wing null 유지 / 미완성 조합 재시작=재선택 / 선택창 재개 무적.
-  assert.ok(mainSrc.includes('cl.build = { ...base, main, wing, label }'), '2차: wing 미선택이면 null 유지(정규 wing 오저장 방지)');
+  assert.ok(mainSrc.includes('cl.build = { ...base, main, wing, label:') && mainSrc.includes('const base = buildForPair(main, wing);'), '2차: 보조 선택 시 슬롯 순서 보존(조합 파생)');
   assert.ok(mainSrc.includes('else if (cl.pickedMain && cl.pickedWing)'), '2차: 완성 조합만 슬롯 복원(미완성은 재선택)');
   assert.ok(mainSrc.includes('run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln)'), '2차: 선택창 재개 무적');
+  // Codex G2-G 3차: 주무기만이면 미완성 정체성(레일스톰 오귀속 방지), 최종 진화도 play 선택 카드.
+  assert.ok(mainSrc.includes('id: `main-${main}`') && mainSrc.includes('resonance: null'), '3차: 주무기만=미완성 정체성(공명 없음)');
+  assert.ok(mainSrc.includes("campaignPick({ title: '최종 무기 진화 선택'") && mainSrc.includes('if (!cl.pickWeapons) { applyEvo(opts[0].id)'), '3차: 최종 진화도 play 선택 카드(측정은 자동)');
 });
