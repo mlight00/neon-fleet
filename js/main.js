@@ -358,7 +358,7 @@ function startPlay() {
   betweenStages = false;
   sfx('start');
   if (BOSSLAB) { startBossLab(_clParams.get('boss') || 'B14'); return; }   // ?bosslab=1&boss=B14: 보스 패턴 프리뷰
-  if (CAMPAIGN25) { startCampaign25({ mode: _clParams.has('play') ? 'play' : 'measure', buildId: 'railStorm' }); return; }  // ?campaign25=1 자동시연 / &play=1 사람 조작
+  if (CAMPAIGN25) { const play = _clParams.has('play'); startCampaign25({ mode: play ? 'play' : 'measure', buildId: 'railStorm', pick: play }); return; }  // ?campaign25=1 자동시연 / &play=1 사람 조작(무기 완전 선택제)
   if (CORE_MEASURE) { startCoreLoop({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?coreLoopMeasure=1: 자동 측정
   if (CORE_LOOP) { startCoreLoop({ mode: 'play' }); return; }   // ?coreLoopTest=1: 사람 플레이 8분 슬라이스
   newExpedition();   // → startSector(1) → enterSectorMap(): 섹터 맵 화면(state='map'). 노드 선택 시 전투 시작.
@@ -786,6 +786,7 @@ function startCampaign25(opts = {}) {
     bossesKilled: 0, deferredEvents: [],
     pathMods: { enemyRateMult: 1 }, pathChoicesMade: 0, eliteWavesFired: 0,   // §7.4 경로 선택·§7.5 정예 웨이브 집계(G2-F 통합 검증용)
     resonBonus: 1,   // §7.1 두 번째 공명(840s) 증폭 배수(spawnResonance·시커에서 읽음)
+    pickWeapons: !auto && !!opts.pick,   // play 완전 선택제(이사 요청): 시작 무기·보조·강화를 플레이어가 선택. 측정은 자동.
     startHull: surv.hull, startTier: 0,   // 결과 화면용 실제 시작 스냅샷
   };
   // H0에서 시작 → H1~H5 승급 5회가 정확히 T1~T5를 만든다(측정도 동일, Codex P2). 측정은 생존/화력만 보정.
@@ -805,6 +806,7 @@ function startCampaign25(opts = {}) {
   r.totalTrack = 1e12;           // 디렉터가 25분 관리(트랙 종료 조기 클리어 방지)
   r.pending = [];
   // 첫 1분(introSec)은 사격 적 없이 조작 학습(§7.1) → 여기서 스트림을 미리 채우지 않는다. campaign25Update가 intro 후 채운다.
+  if (r.campaign25.pickWeapons) campaignStartWeaponPick();   // play 완전 선택제: 출격 시 시작 무기 선택(게임 정지, 이사 요청)
   return r.campaign25;
 }
 
@@ -873,13 +875,56 @@ function applyCampaignHullFn(sq, cl) {
   sq.sideGuns = fn.sideGuns;           // 측면 포대 문수(campaign25Update에서 발사)
 }
 
-/** 두 번째 무기 장착(측정=빌드 wing 자동, play=향후 선택 UI G2-B). */
+/** 무기 2개 조합 → 매칭 빌드(공명·프레임 파생). 스트레스 빌드 제외, 못 찾으면 railStorm. */
+function buildForPair(a, b) {
+  const match = (bd) => bd.main !== bd.wing && ((bd.main === a && bd.wing === b) || (bd.main === b && bd.wing === a));
+  return Object.values(CORE_LOOP_BUILDS).find((bd) => !bd.stress && match(bd)) || CORE_LOOP_BUILDS.railStorm;
+}
+
+/** 캠페인 선택창(게임 정지). 측정=자동(autoId) 선택. play=drafting 정지 + showCoreLoopPick 카드. */
+function campaignPick({ title, subtitle, options, autoId, onPick }) {
+  const cl = run.campaign25;
+  if (!cl || cl.auto) { onPick(autoId != null ? autoId : (options[0] && options[0].id)); return; }   // 측정: 자동 선택(정지 없음)
+  drafting = true; cl.picking = true; state = 'play';
+  ui.showCoreLoopPick({ title, subtitle, options, onPick: (id) => { ui.hide(); drafting = false; cl.picking = false; sfx('buy'); onPick(id); } });
+}
+
+const WEAPON_ICON = { vulcan: '💥', laser: '⚡', homing: '🚀' };
+
+/** 출격 시 시작 무기 선택(발칸/레이저/유도). play 완전 선택제. */
+function campaignStartWeaponPick() {
+  const r = run, sq = r.squad, cl = r.campaign25;
+  campaignPick({
+    title: '시작 무기 선택', subtitle: '이번 25분 출격의 주무기를 고르세요.',
+    autoId: cl.build.main,
+    options: [
+      { id: 'vulcan', label: WEAPON_LABELS.vulcan, desc: '넓게 퍼지는 연사', color: WEAPON_COLORS.vulcan, icon: WEAPON_ICON.vulcan },
+      { id: 'laser', label: WEAPON_LABELS.laser, desc: '적을 관통하는 빔', color: WEAPON_COLORS.laser, icon: WEAPON_ICON.laser },
+      { id: 'homing', label: WEAPON_LABELS.homing, desc: '흩어진 적 자동 추적', color: WEAPON_COLORS.homing, icon: WEAPON_ICON.homing },
+    ],
+    onPick: (id) => {
+      sq.weapon = id; sq.weaponLv = 1;
+      resonSetLoadout(sq.reson, [id, null]);
+      r.effects.text(sq.x, sq.y - 60, `시작 무기: ${WEAPON_LABELS[id]}`, WEAPON_COLORS[id], 15);
+    },
+  });
+}
+
+/** 두 번째 무기: 측정=빌드 wing 자동, play 완전 선택제=주무기 아닌 2종 중 선택(조합→공명 빌드 파생). */
 function equipCampaignWing(t) {
   const r = run, sq = r.squad, cl = r.campaign25;
   if (sq.wing.weaponId) return;
-  sq.wing.weaponId = cl.build.wing; sq.wing.level = 1; sq._wingAcc = 0;
-  cl.metrics.secondWeapon(t);   // 마일스톤 기록(Codex P2)
-  r.world.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[cl.build.wing]}`, WEAPON_COLORS[cl.build.wing], 15);
+  const setWing = (id) => {
+    sq.wing.weaponId = id; sq.wing.level = 1; sq._wingAcc = 0;
+    if (cl.pickWeapons) { cl.build = buildForPair(sq.weapon, id); cl.buildId = cl.build.id; }   // 선택 조합 → 공명·프레임 빌드 파생
+    cl.metrics.secondWeapon(t);   // 마일스톤 기록(Codex P2)
+    r.world.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[id]}`, WEAPON_COLORS[id], 15);
+  };
+  if (!cl.pickWeapons) { setWing(cl.build.wing); return; }   // 측정/자동
+  const opts = ['vulcan', 'laser', 'homing'].filter((w) => w !== sq.weapon).map((w) => ({
+    id: w, label: WEAPON_LABELS[w], desc: `공명: ${RESONANCES[buildForPair(sq.weapon, w).resonance]?.name || ''}`, color: WEAPON_COLORS[w], icon: WEAPON_ICON[w],
+  }));
+  campaignPick({ title: '보조 무기 선택', subtitle: '주무기와 짝지어 공명이 결정됩니다.', autoId: cl.build.wing, options: opts, onPick: setWing });
 }
 
 /** §7.2 세 번째 슬롯 = 함대 시스템(전투기 편대) 해금. 기함 앞 편대 대형·자율 조준 독립 사격(주포 복제 아님). */
@@ -922,10 +967,12 @@ function pickCampaignFrame(t) {
 function campaignBehavior(t) {
   const sq = run.squad, cl = run.campaign25;
   const steps = coreLoopWeaponSteps(sq);
-  // 측정·플레이 모두 자동 적용(45초마다) — 사람 플레이가 측정 대비 과소 파워가 되지 않게(Codex 홀리스틱).
-  if (steps.length) steps[0].apply();                                    // 유한 무기 스텝(레벨/진화) 우선
-  else sq.banked = (sq.banked || 0) + BAL.gate2.behaviorOverflowPower;   // 스텝 소진(후반)엔 소폭 화력 성장 → 25분 내내 성장 유지(Codex 홀리스틱 2차)
-  cl.metrics.choice(t, { behavior: true });
+  // 스텝 소진(후반) → 자동 소폭 화력 성장(측정·play 공통, 25분 내내 성장 유지, Codex 홀리스틱 2차).
+  if (!steps.length) { sq.banked = (sq.banked || 0) + BAL.gate2.behaviorOverflowPower; cl.metrics.choice(t, { behavior: true }); return; }
+  // 측정/자동: 첫 스텝 자동 적용(과소 파워 방지). play 완전 선택제: 강화 카드로 선택.
+  if (!cl.pickWeapons) { steps[0].apply(); cl.metrics.choice(t, { behavior: true }); return; }
+  const opts = steps.slice(0, 3).map((s) => ({ id: s.id, label: s.label, desc: s.desc, color: s.color || '#ffd93d', icon: '🔧' }));
+  campaignPick({ title: '무기 강화 선택', subtitle: '', autoId: steps[0].id, options: opts, onPick: (id) => { const s = steps.find((x) => x.id === id); if (s) s.apply(); cl.metrics.choice(t, { behavior: true }); } });
 }
 
 /** §7.1 최종 무기 진화(1050s): 주무기 최종 레벨 + 미진화면 진화 1단계 부여(Codex 홀리스틱 — 미배선 사건 실동작). */
@@ -1208,16 +1255,13 @@ function finishCampaign25(reason = 'clear') {
   snap.finalTier = r.squad.tier;                   // §7.3 최종 함체 등급(T5 도달 확인)
   window.__nfRunMetrics = snap;
   state = 'done';
-  // play 결과: 25분 6지역 전용 결과 패널(지역별 TTK 6종 + Gate 2 시스템 요약). 재시작은 25분 캠페인으로(Gate 1 이탈 방지).
-  //  '새 조합'(which==='new')은 다른 빌드로 회전 → '같은 조합'과 실제로 구분(Codex 홀리스틱).
-  if (cl.mode === 'play') showCampaign25Result(snap, r.squad, cl, (mode, which) => { ui.hide(); startCampaign25({ mode, buildId: which === 'new' ? nextCampaignBuild(cl.buildId) : cl.buildId }); });
-}
-
-/** '새 조합' 버튼용: 현재 빌드에서 다음 로드아웃 빌드로 회전(스트레스 빌드 제외) — 같은 조합 재시작과 구분(Codex 홀리스틱). */
-function nextCampaignBuild(current) {
-  const ids = Object.keys(CORE_LOOP_BUILDS).filter((k) => !CORE_LOOP_BUILDS[k].stress);
-  const i = ids.indexOf(current);
-  return ids.length ? ids[(i + 1) % ids.length] : current;
+  // play 결과: 25분 6지역 전용 결과 패널. 재시작은 25분 캠페인으로(Gate 1 이탈 방지).
+  //  '같은 조합 다시'=같은 빌드 자동, '새 조합 시도'=무기 재선택(완전 선택제) → 실제로 구분(Codex 홀리스틱 + 이사 선택제).
+  if (cl.mode === 'play') showCampaign25Result(snap, r.squad, cl, (mode, which) => {
+    ui.hide();
+    if (which === 'new') startCampaign25({ mode: 'play', pick: true });
+    else startCampaign25({ mode, buildId: cl.buildId, pick: false });
+  });
 }
 
 /** 25분 캠페인 전용 결과: 6지역 보스 TTK 표 + Gate 2 시스템(함체 T5·함대·경로·정예·공명) 요약(§7.1 §7.6). */
