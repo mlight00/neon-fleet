@@ -862,11 +862,12 @@ function campaignHullTier(tier, t) {
   const r = run, sq = r.squad, w = r.world, cl = r.campaign25;
   survTierUp(sq.surv, BAL.gate1.survivability);
   sq.tier = Math.min(BAL.evolution.names.length - 1, tier);   // 스케줄된 tier를 '설정'(유기 진화 비활성이므로 스케줄이 유일 권한, Codex 홀리스틱)
+  sq.surv.hull = sq.surv.hullMax;   // 상위 등급으로 강화 = 새 함체 → 내구도 완전 재충전(이사 피드백: 승급 동기부여·직관성). 승급은 25분에 T1~T5 5회로 드물어 밸런스 안전.
   applyCampaignHullFn(sq, cl);   // 등급별 기능 갱신(파워는 tier의 shipPower + 행동변화 무기성장 + 드론/순양함에서 — 별도 은행 없음)
   cl.metrics.hullTier(t);
   w.effects.halo(sq.x, sq.y, COLORS.reward);
   const fn = BAL.gate2.hullFn[Math.min(sq.tier, BAL.gate2.hullFn.length - 1)];
-  w.effects.text(sq.x, sq.y - 74, `기함 승급 ${BAL.evolution.names[sq.tier]} · ${fn.label}`, COLORS.reward, 15);
+  w.effects.text(sq.x, sq.y - 74, `기함 승급 ${BAL.evolution.names[sq.tier]} · 내구도 완충 · ${fn.label}`, COLORS.reward, 15);
 }
 
 /** 현재 tier의 §7.3 기능을 편대에 반영(누적형). campaignHullTier·startCampaign25에서 호출.
