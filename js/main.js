@@ -900,9 +900,10 @@ function campaignBehavior(t) {
   if (cl.auto) { steps[0].apply(); cl.metrics.choice(t, { behavior: true }); }
 }
 
-/** §7.3 등급 기능 per-frame: 측면 포대(T4+) 발사 + Apex(T5) 주기 발동. */
+/** §7.3 등급 기능 per-frame: 등급 기능 동기화 + 측면 포대(T4+) 발사 + Apex(T5) 주기 발동. */
 function campaignHullFnTick(dt) {
   const r = run, cl = r.campaign25, sq = r.squad, w = r.world, G2 = BAL.gate2;
+  applyCampaignHullFn(sq, cl);   // 매 프레임 현재 sq.tier에서 재적용 → 진화/강등 등 유기적 tier 변화와 항상 동기(Codex 2차 P2)
   if (sq.sideGuns > 0) {   // 대형 측면 포대: 좌우로 비스듬히 추가 사격
     cl._sideT = (cl._sideT || 0) - dt;
     if (cl._sideT <= 0) {
@@ -911,7 +912,7 @@ function campaignHullFnTick(dt) {
       for (let k = 0; k < sq.sideGuns; k++) {
         const dir = k % 2 === 0 ? -1 : 1;
         const b = new Bullet(sq.x + dir * 15, sq.y - 6, dmg, { vy: -BAL.weapons.vulcan.speed * 0.9, vx: dir * 130, kind: 'vulcan', lv: 2, color: '#ffd36b' });
-        b.sourceWeaponId = 'vulcan'; w.bullets.push(b);
+        b.sourceWeaponId = 'sideGun'; w.bullets.push(b);   // 별도 소스: 공명 충전·무기 피해 통계에 섞이지 않게(Codex 2차 P2)
       }
     }
   }
@@ -921,16 +922,22 @@ function campaignHullFnTick(dt) {
   }
 }
 
-/** Apex 발동: 적탄 전소 + 잡몹 즉사 + 보스 광역 펄스(보스는 클램프가 상한 → TTK 유지). */
+/** Apex 발동: 적탄 전소 + 잡몹 즉사(즉시 제거) + 보스 광역 펄스(보스는 클램프가 상한 → TTK 유지). */
 function triggerApex() {
   const r = run, w = r.world, sq = r.squad, G2 = BAL.gate2;
   for (const b of w.enemyBullets) b.dead = true;
-  for (const e of w.entities) {
+  for (let i = w.entities.length - 1; i >= 0; i--) {
+    const e = w.entities[i];
     if (!e.isEnemy || e.dead || !e.hitByBullet || e.indestructible) continue;
     e.hitByBullet(99999, w);
-    if (e.dead) w.notifyEnemyKilled?.(e);   // 중앙 킬 처리(FLOW·프레임·키스톤·시커 표식 해제) — 다른 광역 킬과 동일(Codex P2)
+    if (e.dead) { w.notifyEnemyKilled?.(e); w.entities.splice(i, 1); }   // 중앙 킬 처리 + 즉시 제거(사망 후 접촉·발사 방지, Codex 2차 P2)
   }
-  for (const bo of (r.bosses || [])) { if (!bo.dead) bo.hitByBullet((bo.maxHp || 3000) * G2.apexDamageFrac, w); }
+  for (const bo of (r.bosses || [])) {
+    if (bo.dead) continue;
+    const before = bo.hp;
+    bo.hitByBullet((bo.maxHp || 3000) * G2.apexDamageFrac, w);
+    w.metrics?.weaponDamage('apex', Math.max(0, before - bo.hp));   // 실제 적용 Apex 피해 기록(Codex 2차 P2)
+  }
   w.effects.flash(0.5); w.effects.halo(sq.x, sq.y, '#ffe17a'); w.effects.ring(LOGICAL_W / 2, logicalH * 0.4, '#ffe17a');
   w.effects.text(sq.x, sq.y - 92, 'APEX', '#ffe17a', 24);
   sfx('evolve');
