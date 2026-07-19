@@ -356,10 +356,12 @@ export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
   chip('주무기 ' + (WEAPON_LABELS[d.mainWeapon] || d.mainWeapon), d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff');
   if (d.wingWeapon) chip('보조 ' + (WEAPON_LABELS[d.wingWeapon] || d.wingWeapon), d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff');
   else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText('보조 무기 슬롯 (미해금)', x, y); ctx.globalAlpha = 1; y += 17; }
-  // ── 세 번째 슬롯: 함대 시스템(§7.2) — 세 슬롯을 화면에서 구분 ──
-  if (d.fleetActive) { ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = d.fleetColor || '#7dffb0'; ctx.textAlign = 'left'; ctx.fillText(`함대 ${d.fleetLabel} ×${d.fleetCount}`, x, y); y += 17; }
-  else if (d.fleetTelegraph) { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.65; ctx.fillStyle = '#ffd93d'; ctx.textAlign = 'left'; ctx.fillText('함대 슬롯 예고 (곧 전개)', x, y); ctx.globalAlpha = 1; y += 17; }
-  else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText('함대 슬롯 (미해금)', x, y); ctx.globalAlpha = 1; y += 17; }
+  // ── 세 번째 슬롯: 함대 시스템(§7.2) — 캠페인(Gate 2)에서만. Gate 1 공유 HUD엔 표시 안 함(Codex P3) ──
+  if (d.fleetSupported) {
+    if (d.fleetActive) { ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = d.fleetColor || '#7dffb0'; ctx.textAlign = 'left'; ctx.fillText(`함대 ${d.fleetLabel} ×${d.fleetCount}`, x, y); y += 17; }
+    else if (d.fleetTelegraph) { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.65; ctx.fillStyle = '#ffd93d'; ctx.textAlign = 'left'; ctx.fillText('함대 슬롯 예고 (곧 전개)', x, y); ctx.globalAlpha = 1; y += 17; }
+    else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText('함대 슬롯 (미해금)', x, y); ctx.globalAlpha = 1; y += 17; }
+  }
 
   // ── 공명 진행/예고 ──
   if (d.resonanceName) {

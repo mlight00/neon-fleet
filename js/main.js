@@ -993,17 +993,19 @@ function fleetTick(dt) {
   }
 }
 
-/** 전투기 자율 조준: 사거리 내 앞쪽 잡몹 최근접 우선, 없으면 보스. */
+/** 전투기 자율 조준: 사거리 내 '위쪽'(앞) 잡몹 최근접 우선, 없으면 위쪽 보스.
+ *  표적을 위쪽으로 한정하는 이유: 아래로 쏜 볼트는 Bullet.update가 화면 하단 이탈을 제거하지 않아
+ *  25분 동안 w.bullets에 무한 잔류한다(Codex G2-C P2). 위쪽 표적만 → 볼트는 항상 상향 → 상단서 소멸. */
 function nearestEnemyForFleet(w, x, y, range) {
   let best = null, bestD = range * range;
   for (const e of w.entities) {
     if (!e.isEnemy || e.dead || e.indestructible || !e.hitByBullet) continue;
-    if (e.y > y + 20) continue;   // 뒤(아래)로는 안 쏨
+    if (e.y >= y) continue;   // 위쪽 적만(하향 볼트 잔류 방지)
     const dx = e.x - x, dy = e.y - y, d2 = dx * dx + dy * dy;
     if (d2 < bestD) { bestD = d2; best = e; }
   }
-  for (const b of (w.bosses || [])) {   // 보스도 표적(클램프 경유라 TTK 유지)
-    if (b.dead) continue;
+  for (const b of (w.bosses || [])) {   // 보스도 표적(클램프 경유라 TTK 유지). 위쪽일 때만.
+    if (b.dead || b.y >= y) continue;
     const dx = b.x - x, dy = b.y - y, d2 = dx * dx + dy * dy;
     if (d2 < bestD) { bestD = d2; best = b; }
   }
@@ -1730,6 +1732,7 @@ function draw() {
       drawCoreLoopHud(ctx, LOGICAL_W, logicalH, {
         hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
         mainWeapon: sq.weapon, mainLv: sq.weaponLv, wingWeapon: sq.wing.weaponId, wingLv: sq.wing.level,
+        fleetSupported: !!r.campaign25,   // 함대 슬롯은 Gate 2 캠페인 전용 — Gate 1 공유 HUD엔 표시 안 함(Codex P3)
         fleetActive: !!(sq.fleet && sq.fleet.active), fleetLabel: BAL.gate2.fleet.label, fleetCount: sq.fleet?.ships?.length || 0,
         fleetColor: BAL.gate2.fleet.color, fleetTelegraph: !!cl.fleetTelegraph,   // §7.2 세 번째 슬롯 HUD 구분
         resonanceName: sq.reson.activeId ? RESONANCES[sq.reson.activeId].name : (cl.telegraph ? RESONANCES[cl.build.resonance]?.name : ''),

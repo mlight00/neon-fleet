@@ -136,4 +136,8 @@ test('G2-11: 세 번째 슬롯 fleet 시스템(§7.2, G2-C)', () => {
   assert.ok(uiSrc.includes('dmgW.fleet ? bar('), '결과 화면 함대 피해 행');
   // run-metrics 슬롯 마일스톤.
   assert.ok(rmSrc.includes('fleetSlot(t)') && rmSrc.includes('fleetSlotSec'), 'fleet 슬롯 마일스톤 필드');
+  // Codex G2-C P2: 전투기 표적은 위쪽만(하향 볼트가 화면 하단으로 안 지워져 무한 잔류하는 것 방지).
+  assert.ok(/function nearestEnemyForFleet[\s\S]{0,500}e\.y >= y/.test(mainSrc), 'P2: 전투기 표적 위쪽 한정');
+  // Codex G2-C P3: 함대 HUD 행은 캠페인(Gate 2) 전용 게이트 — Gate 1 공유 HUD엔 미표시.
+  assert.ok(mainSrc.includes('fleetSupported: !!r.campaign25') && rd.includes('if (d.fleetSupported)'), 'P3: 함대 HUD 캠페인 게이트');
 });
