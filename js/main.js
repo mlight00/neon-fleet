@@ -2052,6 +2052,7 @@ function showTitleScreen() {
     endlessUnlocked: d.endlessUnlocked,      // 무한 원정 해금 시에만 버튼 표시(§6.5)
     endlessBest: d.endlessBest,
     onStart: startPlay,
+    onCampaign25: () => startCampaign25({ mode: 'play', pick: true }),   // 타이틀에서 25분 캠페인 직접 선택(이사: 두 모드 선택 가능하게)
     onEndless: d.endlessUnlocked ? startEndless : null,
     onHangar: showHangar,
     onIntro: () => playIntro(showTitleScreen),

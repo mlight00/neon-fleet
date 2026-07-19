@@ -74,7 +74,7 @@ export const ui = {
     overlay.innerHTML = '';
   },
 
-  showTitle({ best, stage, coins = 0, saveOk, onStart, onHangar, onIntro, onReset, onEndless = null, endlessUnlocked = false, endlessBest = 0 }) {
+  showTitle({ best, stage, coins = 0, saveOk, onStart, onCampaign25 = null, onHangar, onIntro, onReset, onEndless = null, endlessUnlocked = false, endlessBest = 0 }) {
     panel(`
       <img class="title-lockup" src="assets/art2-webp/branding/title_lockup.webp" alt="NEON FLEET">
       <p class="title-kor">네온 함대</p>
@@ -84,7 +84,10 @@ export const ui = {
       <p style="font-size:11.5px;color:#7f93b0;margin:0">차지 샷: PC는 Space·마우스 홀드, 모바일은 ⚡ 버튼 홀드.</p>
       ${saveOk ? '' : '<p style="color:#ff3d71;font-size:11px">⚠ 현재 브라우저에서는 기록을 저장할 수 없습니다.</p>'}
       <div class="btn-row">
-        <button id="btn-start">출격하기</button>
+        ${onCampaign25 ? '<button id="btn-campaign25">25분 캠페인</button>' : ''}
+        <button id="btn-start">${onCampaign25 ? '섹터 원정' : '출격하기'}</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
         ${onEndless ? '<button id="btn-endless" class="sub-btn">🌌 무한 원정</button>' : ''}
         ${onHangar ? '<button id="btn-hangar" class="sub-btn">격납고 · 영구 강화</button>' : ''}
       </div>
@@ -94,6 +97,7 @@ export const ui = {
       </div>
     `, 'title-screen');
     document.getElementById('btn-start').addEventListener('click', onStart);
+    if (onCampaign25) document.getElementById('btn-campaign25').addEventListener('click', onCampaign25);
     if (onEndless) document.getElementById('btn-endless').addEventListener('click', onEndless);
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
     if (onIntro) document.getElementById('btn-intro').addEventListener('click', onIntro);
