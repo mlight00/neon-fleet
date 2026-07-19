@@ -33,9 +33,10 @@ test('지역 보스 TTK 목표가 §7.5와 일치(지역30~45·B22 45~60·B7 60~
 });
 
 test('regionAt: intro는 null, 각 지역 시각엔 해당 지역, 끝나면 마지막 지역', () => {
-  assert.equal(regionAt(G2, 0), null);          // 출격(intro)
-  assert.equal(regionAt(G2, 30), null);
-  assert.equal(regionAt(G2, 60).i, 1);          // 섹터1 진입
+  assert.equal(regionAt(G2, 0), null);          // 출격(intro, 0~20초)
+  assert.equal(regionAt(G2, 10), null);         // intro 중
+  assert.equal(regionAt(G2, 20).i, 1);          // 20초 섹터1 진입(도입부 단축)
+  assert.equal(regionAt(G2, 60).i, 1);
   assert.equal(regionAt(G2, 239).i, 1);
   assert.equal(regionAt(G2, 240).i, 2);         // 섹터2 진입
   assert.equal(regionAt(G2, 1140).i, 5);        // B22 지역
