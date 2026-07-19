@@ -541,6 +541,7 @@ export const BAL = {
       { label: '전격·점멸 · 위치 선정',    pool: ['zapper', 'blinker', 'bomber'],                   elite: 'zapper' },   // 5 CHOIR VEIL — 기동
       { label: '총력 혼성 · 모든 시험',    pool: ['weaver', 'turret', 'shielder', 'orbiter', 'blinker'], elite: 'carrier' },  // 6 CROWN CORE — 종합
     ],
+    eliteWaveSec: 100,   // §7.5 지역 정예 웨이브 주기(초): 현재 지역 elite 타입을 정예 변이(★ 3.2×HP)로 스폰 → 4~8초 처치 역할
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.

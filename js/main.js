@@ -4,7 +4,7 @@ import { createInput } from './input.js';
 import { createStarfield, drawHUD, drawCoreLoopHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
 import { bossDefById, preloadBossArt } from './sprites.js';
-import { maybeAffix } from './affixes.js';
+import { maybeAffix, applyAffixes } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, superEvolutionOptions, evolutionDef } from './weapon-evolutions.js';
 import { DOCTRINES, DOCTRINE_BY_ID, doctrineIcon } from './doctrines.js';
@@ -1127,6 +1127,12 @@ function campaign25Update(dt) {
   // 지역 전투 스트림 재보충(보스 없을 때 25분 내내 전투 유지). intro(첫 1분)엔 사격 적 스폰 금지(§7.1).
   const densityCap = Math.round(6 * (cl.pathMods?.enemyRateMult || 1));   // §7.4 경로 선택 = 다음 구간 적 밀도(위험/보상)
   if (t >= cl.cfg.introSec && r.phase === 'track' && r.pending.length < 2 && w.entities.filter((e) => e.isEnemy).length < densityCap && !cl.bossActive) refillCoreLoopTrack();
+  // §7.5 지역 정예 웨이브(주기): 현재 지역 elite 타입을 정예 변이(★)로 스폰 → 4~8초 처치 역할(intro 후·track·비보스 한정).
+  cl._eliteWaveT = (cl._eliteWaveT ?? cl.cfg.eliteWaveSec) - dt;
+  if (cl._eliteWaveT <= 0) {
+    cl._eliteWaveT = cl.cfg.eliteWaveSec;
+    if (t >= cl.cfg.introSec && r.phase === 'track' && !cl.bossActive) refillCoreLoopTrack(true);
+  }
   // 디렉터 사건 처리
   for (const ev of events) {
     const act = eventAction25(ev.type);
@@ -1227,7 +1233,7 @@ function refillCoreLoopTrack(elite = false) {
       const type = elite ? eliteType
         : dense ? (isCampaign ? pool[idx % pool.length] : 'weaver')   // 측정: 캠페인=지역 조합 결정론 순환 / Gate1=weaver 고정(불변)
         : pool[(idx + Math.floor(t / 18)) % poolN];                   // play: 조합 시간 순환·점증(캠페인=지역, Gate1=기본)
-      r.pending.push({ type, size: 'small', noDup: !dense,
+      r.pending.push({ type, size: 'small', noDup: !dense, elite: elite && isCampaign,   // 캠페인 정예 웨이브만 정예 변이 강제(Gate1 정예는 기존 확률 유지)
         x: 0.18 + 0.64 * frac, trackY: base + row * (dense ? 360 : 460) });
     }
   }
@@ -1363,7 +1369,7 @@ function update(dt) {
       const gMul = BAL.difficulty.globalMult;   // 전체 난이도 배수(사용자 조정): 체력 ×gMul, 발사 주기 ÷gMul(더 빠름)
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1) * gMul); if (e.fireInterval) e.fireInterval *= mods.enemyRate / gMul; return e; };
       // 적 스폰 헬퍼: 난이도 스케일 + 변이(어픽스=섹터 확률) 롤 + 등록
-      const spawnEnemy = (e, kind) => { scaleEnemy(e); maybeAffix(e, kind, contentTier, r.rng); w.entities.push(e); };
+      const spawnEnemy = (e, kind) => { scaleEnemy(e); if (it.elite) applyAffixes(e, ['elite']); else maybeAffix(e, kind, contentTier, r.rng); w.entities.push(e); };   // §7.5 정예 웨이브=정예 변이 강제(★ 3.2×HP)
       // 적 항목은 난이도 비례 복제 스폰(§4.5): 복제본은 좌우 미러 + 세로로 살짝 시차.
       const dup = it.noDup ? 1 : copyCount(difficultyLevel, r.tutorial);   // 첫 노드는 최대 2로 제한. 코어루프 정밀 스트림은 noDup(정확한 수).
       if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal), w, supplyMult));

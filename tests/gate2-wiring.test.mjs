@@ -190,4 +190,8 @@ test('G2-13: 지역별 적 구성(§7.5, G2-E)', () => {
   assert.ok(mainSrc.includes("dense ? (isCampaign ? pool[idx % pool.length] : 'weaver')"), 'Gate1 측정 weaver 고정 보존');
   // 지역 진입이 위협 테마를 안내(무엇을 시험하는지 한 줄).
   assert.ok(mainSrc.includes('cl.regionThreatLabel = rt.label'), '지역 진입 위협 테마 표시');
+  // Codex G2-E P2: 지역 정예 웨이브가 캠페인에서 실제로 호출되고(eliteType 도달), 정예 변이를 강제.
+  assert.ok(typeof BAL.gate2.eliteWaveSec === 'number', '정예 웨이브 주기 설정');
+  assert.ok(/cl\._eliteWaveT[\s\S]{0,220}refillCoreLoopTrack\(true\)/.test(mainSrc), 'P2: 캠페인 주기적 정예 웨이브(refill true 도달)');
+  assert.ok(mainSrc.includes('elite: elite && isCampaign') && mainSrc.includes("applyAffixes(e, ['elite'])"), 'P2: 캠페인 정예는 정예 변이 강제');
 });
