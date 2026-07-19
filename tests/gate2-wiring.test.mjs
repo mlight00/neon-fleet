@@ -165,4 +165,6 @@ test('G2-12: ~4분마다 경로 선택(§7.4, G2-D)', () => {
   assert.ok(!/if \(m\.shield\)[^\n]*sq\.shield = true/.test(mainSrc), '2차 P2: 보호막 이중 부여 없음(surv 단일)');
   assert.ok(mainSrc.includes('BAL.gate2.pathFallbackDrones * capped') && typeof BAL.gate2.pathFallbackDrones === 'number', '2차 P2: 상한 무효 mod 폴백(2축 보존)');
   assert.ok(/def\.trigger === 'mark'[\s\S]{0,240}e\.x - sq\.x/.test(mainSrc), '2차 P2: mark 표적 = 기함 최근접(거리)');
+  // Codex G2-D 3차 P2: mark 표적 탐색에 살아있는 보스 포함(보스전 중 잡몹 없음).
+  assert.ok(/function applyResonBoost[\s\S]{0,1100}w\.bosses/.test(mainSrc), '3차 P2: mark 표적에 보스 포함');
 });

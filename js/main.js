@@ -974,6 +974,11 @@ function applyResonBoost(sq, w, frac, t) {
       const dx = e.x - sq.x, dy = e.y - sq.y, d = dx * dx + dy * dy;
       if (d < nd) { nd = d; near = e; }
     }
+    for (const b of (w.bosses || [])) {   // 보스전 중엔 잡몹이 없다(spawnCampaignBoss가 w.entities 비움) → 살아있는 보스도 표적(Codex 3차 P2)
+      if (b.dead) continue;
+      const dx = b.x - sq.x, dy = b.y - sq.y, d = dx * dx + dy * dy;
+      if (d < nd) { nd = d; near = b; }
+    }
     if (near) { resonLaserMark(sq.reson, BAL.gate1.resonance, near, t); return true; }
   }
   return false;
