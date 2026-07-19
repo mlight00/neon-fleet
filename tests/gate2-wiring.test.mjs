@@ -259,6 +259,10 @@ test('G2-18: 캠페인 play 완전 무기 선택제(이사 요청, G2-G)', () =>
   assert.ok(mainSrc.includes('function deriveCampaignBuild'), '조합→빌드·라벨·메트릭 파생 헬퍼');
   assert.ok(mainSrc.includes('cl.pickedMain = id; deriveCampaignBuild()'), '#2: 시작 무기 즉시 빌드 반영');
   assert.ok(rmSrc.includes('relabel(id)') && mainSrc.includes('cl.metrics.relabel('), '#3: 메트릭 runId 재라벨');
-  assert.ok(mainSrc.includes('startWeapon: cl.pickedMain || cl.build.main, wing: cl.pickedWing || cl.build.wing'), '#1: 재시작 선택 슬롯 순서 보존');
+  assert.ok(mainSrc.includes('startWeapon: cl.pickedMain, wing: cl.pickedWing, pick: false'), '#1: 재시작 선택 슬롯 순서 보존(완성 조합)');
   assert.ok(mainSrc.includes("build: { ...build, main: startMain, wing: startWing }"), '#1: cl.build이 실제 슬롯 반영');
+  // Codex G2-G 2차: 보조 미선택(조기 사망) wing null 유지 / 미완성 조합 재시작=재선택 / 선택창 재개 무적.
+  assert.ok(mainSrc.includes('cl.build = { ...base, main, wing, label }'), '2차: wing 미선택이면 null 유지(정규 wing 오저장 방지)');
+  assert.ok(mainSrc.includes('else if (cl.pickedMain && cl.pickedWing)'), '2차: 완성 조합만 슬롯 복원(미완성은 재선택)');
+  assert.ok(mainSrc.includes('run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln)'), '2차: 선택창 재개 무적');
 });

@@ -889,7 +889,7 @@ function deriveCampaignBuild() {
   const cl = run.campaign25, main = cl.pickedMain || cl.build.main, wing = cl.pickedWing;
   const base = wing ? buildForPair(main, wing) : coreLoopBuild(cl.buildId);
   const label = wing ? `${WEAPON_LABELS[main]}+${WEAPON_LABELS[wing]} / ${RESONANCES[base.resonance]?.name || ''}` : `${WEAPON_LABELS[main]} + ?`;
-  cl.build = { ...base, main, wing: wing || base.wing, label };   // 슬롯 순서 = 선택한 main/wing 그대로
+  cl.build = { ...base, main, wing, label };   // 슬롯 순서 = 선택 그대로. wing 미선택(90s 전 사망)이면 null 유지 → 정규 wing 오저장 방지(Codex G2-G 2차)
   cl.buildId = base.id;
   cl.metrics.relabel(`campaign25-${cl.mode}-${base.id}`);   // 메트릭 귀속 갱신(Codex G2-G #3)
 }
@@ -899,7 +899,11 @@ function campaignPick({ title, subtitle, options, autoId, onPick }) {
   const cl = run.campaign25;
   if (!cl || cl.auto) { onPick(autoId != null ? autoId : (options[0] && options[0].id)); return; }   // 측정: 자동 선택(정지 없음)
   drafting = true; cl.picking = true; state = 'play';
-  ui.showCoreLoopPick({ title, subtitle, options, onPick: (id) => { ui.hide(); drafting = false; cl.picking = false; sfx('buy'); onPick(id); } });
+  ui.showCoreLoopPick({ title, subtitle, options, onPick: (id) => {
+    ui.hide(); drafting = false; cl.picking = false;
+    if (run.squad) run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln);   // 전투 재개 시 짧은 무적(겹친 적탄 불가피 피해 방지, Codex G2-G 2차)
+    sfx('buy'); onPick(id);
+  } });
 }
 
 const WEAPON_ICON = { vulcan: '💥', laser: '⚡', homing: '🚀' };
@@ -1010,7 +1014,7 @@ function presentPathChoice(index, t) {
       { id: 'a', label: pair.a.label, desc: pair.a.desc, color: '#c9b8ff', icon: '🜂' },
       { id: 'b', label: pair.b.label, desc: pair.b.desc, color: '#8fd4ff', icon: '🜄' },
     ],
-    onPick: (id) => { ui.hide(); drafting = false; cl.picking = false; sfx('buy'); applyPathChoice(id === 'a' ? pair.a : pair.b, t); },
+    onPick: (id) => { ui.hide(); drafting = false; cl.picking = false; run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln); sfx('buy'); applyPathChoice(id === 'a' ? pair.a : pair.b, t); },   // 재개 무적(Codex G2-G 2차)
   });
 }
 
@@ -1274,7 +1278,8 @@ function finishCampaign25(reason = 'clear') {
   if (cl.mode === 'play') showCampaign25Result(snap, r.squad, cl, (mode, which) => {
     ui.hide();
     if (which === 'new') startCampaign25({ mode: 'play', pick: true });
-    else startCampaign25({ mode, buildId: cl.buildId, startWeapon: cl.pickedMain || cl.build.main, wing: cl.pickedWing || cl.build.wing, pick: false });   // 선택 슬롯 순서 보존(Codex G2-G #1)
+    else if (cl.pickedMain && cl.pickedWing) startCampaign25({ mode, buildId: cl.buildId, startWeapon: cl.pickedMain, wing: cl.pickedWing, pick: false });   // 완성 조합 → 선택 슬롯 순서 그대로 복원(Codex G2-G #1)
+    else startCampaign25({ mode: 'play', pick: true });   // 보조 무기 선택 전 종료(미완성 조합) → 재선택(Codex G2-G 2차)
   });
 }
 
