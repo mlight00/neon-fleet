@@ -157,4 +157,8 @@ test('G2-12: ~4분마다 경로 선택(§7.4, G2-D)', () => {
   assert.ok(/function presentPathChoice[\s\S]{0,400}cl\.auto/.test(mainSrc) && mainSrc.includes('ui.showCoreLoopPick'), 'measure=자동선택 / play=카드 정지');
   // 밀도 배수(위험/보상 축)가 실제 스폰 임계에 반영.
   assert.ok(mainSrc.includes('cl.pathMods') && mainSrc.includes('densityCap'), '경로 밀도 배수 → refill 임계 반영');
+  // Codex G2-D P2: 보호막은 surv.shield(투사체 흡수) 경로로, 공명 가속은 빌드 트리거별, 수리는 metrics 기록.
+  assert.ok(mainSrc.includes('addShield(sq.surv'), 'P2: 경로 보호막 = surv.shield(투사체 흡수)');
+  assert.ok(mainSrc.includes('function applyResonBoost') && mainSrc.includes("def.trigger === 'mark'") && mainSrc.includes('resonLaserMark(sq.reson'), 'P2: 공명 가속 빌드 트리거별(mark=시커 표식)');
+  assert.ok(/m\.hullHeal[\s\S]{0,200}cl\.metrics\.hullRepair\(\)/.test(mainSrc), 'P2: 경로 수리 metrics 기록');
 });

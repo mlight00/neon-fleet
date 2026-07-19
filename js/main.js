@@ -938,14 +938,31 @@ function presentPathChoice(index, t) {
 function applyPathChoice(opt, t) {
   const r = run, cl = r.campaign25, sq = r.squad, w = r.world, m = opt.mods || {};
   cl.pathMods = { enemyRateMult: m.enemyRateMult || 1 };   // 다음 구간(다음 선택까지) 적 밀도 — 위험/보상 축
-  if (m.hullHeal) sq.surv.hull = Math.min(sq.surv.hullMax, sq.surv.hull + m.hullHeal * sq.surv.hullMax);   // 수리 축
+  if (m.hullHeal) {                                         // 수리 축
+    const before = sq.surv.hull;
+    sq.surv.hull = Math.min(sq.surv.hullMax, sq.surv.hull + m.hullHeal * sq.surv.hullMax);
+    if (sq.surv.hull > before) cl.metrics.hullRepair();     // 실제 회복 시에만 수리 기록(Codex P2)
+  }
   if (m.weaponLv) sq.weaponLv = Math.min(BAL.weapons.lvCoef.length, sq.weaponLv + m.weaponLv);            // 무기 강화 축
-  if (m.resonCharge && sq.reson.activeId) sq.reson.charge = (sq.reson.charge || 0) + (BAL.gate1.resonance[sq.reson.activeId]?.threshold || 100) * m.resonCharge;  // 공명 가속
+  if (m.resonCharge && sq.reson.activeId) applyResonBoost(sq, w, m.resonCharge, t);   // 공명 가속(빌드 트리거별 호환, Codex P2)
   if (m.droneGain) sq.applyDelta(m.droneGain, w);          // 호위 편대 — 보상 축
-  if (m.shield) sq.shield = true;                          // 방어 축
+  if (m.shield) { addShield(sq.surv, 1); sq.shield = true; }  // 방어 축: 투사체(surv.shield=resolveHit) + 접촉(레거시) 둘 다 흡수(Codex P2)
   cl.pathChoicesMade = (cl.pathChoicesMade || 0) + 1;
   cl.metrics.choice(t);
   w.effects.text(sq.x, sq.y - 80, `경로: ${opt.label}`, '#c9b8ff', 16);
+}
+
+/** 공명 가속: 빌드 트리거별 호환(Codex P2). 충전형(레일/미사일)=즉시 충전, mark형(시커 빔)=근접 적 즉시 표식. */
+function applyResonBoost(sq, w, frac, t) {
+  const rid = sq.reson.activeId, def = RESONANCES[rid];
+  if (!def) return;
+  if (def.trigger === 'charge') {
+    const thr = BAL.gate1.resonance[rid]?.threshold || 100;
+    sq.reson.charge = (sq.reson.charge || 0) + thr * frac;   // 충전형: charge 적립(tryProc이 읽음)
+  } else if (def.trigger === 'mark') {                       // 시커 빔: mark은 threshold가 없어 charge 무효 → 근접 적 즉시 표식
+    const near = w.entities.filter((e) => e.isEnemy && !e.dead).sort((a, b) => a.y - b.y)[0];
+    if (near) resonLaserMark(sq.reson, BAL.gate1.resonance, near, t);
+  }
 }
 
 /** §7.3 등급 기능 per-frame: 등급 기능 동기화 + 측면 포대(T4+) 발사 + Apex(T5) 주기 발동. */
