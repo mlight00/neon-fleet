@@ -815,6 +815,8 @@ function enterCampaignRegion(i, t) {
   r.sector = region.backdrop;                 // 배경 전환(Gate 0 R2 섹터 1:1 매핑)
   r.stage = region.i;                          // 난이도·기록용 진행 카운터(임시: 지역 인덱스)
   r.effects.text(LOGICAL_W / 2, logicalH * 0.28, `${region.i}. ${region.name}`, COLORS.reward, 20);
+  const rt = BAL.gate2.regionThreat[region.i - 1];   // §7.5 지역별 위협 테마 안내(무엇을 시험하는지 한 줄)
+  if (rt) { cl.regionThreatLabel = rt.label; r.effects.text(LOGICAL_W / 2, logicalH * 0.28 + 26, rt.label, '#8fb4d8', 13); }
 }
 
 /** 지역 보스 등장: 잔여 정리 + 지역 TTK 목표로 양측 클램프 설치(공용 헬퍼). */
@@ -1208,12 +1210,23 @@ function refillCoreLoopTrack(elite = false) {
   const skipShooters = !dense && t < P.introSec;   // 사람 플레이 첫 구간: 사격 적 없이 이동·수집만
   // 사람 플레이 스트림은 튜토리얼 미러 복제를 끄고(noDup) per가 정확한 적 수가 되게 한다(Codex P2).
   //  측정 스트림은 weaver 고정(Codex 승인 TTK·밀도 보존). 사람 플레이는 램밍 제외 슈터를 시간 따라 다양화(테스터: 단조로움).
-  const SHOOTERS = ['weaver', 'turret', 'sniper', 'zapper', 'orbiter', 'blinker'];
-  const poolN = Math.min(SHOOTERS.length, 2 + Math.floor(t / 80));   // 시간 지날수록 등장 종류 확대
+  // §7.5 지역별 적 구성: 캠페인이면 현재 지역 조합(역할=빌드 시험), Gate 1은 기존 그대로(측정=weaver 고정, play=기본 6종).
+  const DEFAULT_POOL = ['weaver', 'turret', 'sniper', 'zapper', 'orbiter', 'blinker'];
+  const isCampaign = !!r.campaign25;
+  let pool = DEFAULT_POOL, eliteType = 'turret';
+  if (isCampaign) {
+    const reg = c25RegionAt(cl.cfg, t);
+    const rt = reg ? BAL.gate2.regionThreat[reg.i - 1] : null;
+    if (rt) { pool = rt.pool; eliteType = rt.elite || 'turret'; }
+  }
+  const poolN = Math.min(pool.length, 2 + Math.floor(t / 80));   // 시간 지날수록 등장 종류 확대
   if (!skipShooters) for (let row = 0; row < rows; row++) {
     for (let i = 0; i < per; i++) {
       const frac = per > 1 ? i / (per - 1) : 0.5;   // 1기일 때 0/0(NaN) 방지 — 중앙 배치
-      const type = elite ? 'turret' : (dense ? 'weaver' : SHOOTERS[(row * per + i + Math.floor(t / 18)) % poolN]);
+      const idx = row * per + i;
+      const type = elite ? eliteType
+        : dense ? (isCampaign ? pool[idx % pool.length] : 'weaver')   // 측정: 캠페인=지역 조합 결정론 순환 / Gate1=weaver 고정(불변)
+        : pool[(idx + Math.floor(t / 18)) % poolN];                   // play: 조합 시간 순환·점증(캠페인=지역, Gate1=기본)
       r.pending.push({ type, size: 'small', noDup: !dense,
         x: 0.18 + 0.64 * frac, trackY: base + row * (dense ? 360 : 460) });
     }

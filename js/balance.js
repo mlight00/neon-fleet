@@ -531,6 +531,16 @@ export const BAL = {
         b: { id: 'fortress',   label: '요새 항로',      desc: '기함 내구도 +40% · 보호막 전개',         mods: { hullHeal: 0.40, shield: true } } },
     ],
     pathFallbackDrones: 6,   // 상한(만피·최대레벨 등)으로 무효화된 경로 mod 1건당 대체 혜택(호위 편대) — 2축 계약 보존
+    // §7.5 지역별 적 구성: "적은 HP 벽이 아니라 빌드 시험지". 지역마다 다른 역할 조합으로 다른 빌드 측면을 시험한다.
+    //  index = region.i-1 (지역 1~6). pool = 전투 스트림 적 종류(순환), elite = 정예 웨이브 종류. 전부 pending 스폰 가능 타입.
+    regionThreat: [
+      { label: '경량 군집 · 이동/광역',   pool: ['creature', 'weaver'],                            elite: 'turret' },   // 1 COLD WAKE — 기초
+      { label: '저격·포탑 · 우선 표적',    pool: ['sniper', 'turret', 'weaver'],                    elite: 'sniper' },   // 2 — 표적 선택
+      { label: '장갑·방패 · 표적 순서',    pool: ['shielder', 'charger', 'turret'],                 elite: 'shielder' }, // 3 FURNACE LINE — 관통/순서
+      { label: '모선·궤도 · 광역/전개',    pool: ['carrier', 'orbiter', 'weaver'],                  elite: 'carrier' },  // 4 BROKEN ARMADA — 광역
+      { label: '전격·점멸 · 위치 선정',    pool: ['zapper', 'blinker', 'bomber'],                   elite: 'zapper' },   // 5 CHOIR VEIL — 기동
+      { label: '총력 혼성 · 모든 시험',    pool: ['weaver', 'turret', 'shielder', 'orbiter', 'blinker'], elite: 'carrier' },  // 6 CROWN CORE — 종합
+    ],
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.

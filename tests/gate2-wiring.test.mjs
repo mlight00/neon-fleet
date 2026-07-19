@@ -171,3 +171,23 @@ test('G2-12: ~4분마다 경로 선택(§7.4, G2-D)', () => {
   assert.ok(entSrc.includes('this.surv && this.surv.shield > 0'), '5차 P2: 함선 보호막 링이 surv.shield 반영');
   assert.ok(mainSrc.includes('r.squad.surv && r.squad.surv.shield > 0'), '5차 P2: HUD ⛨가 surv.shield 반영');
 });
+
+test('G2-13: 지역별 적 구성(§7.5, G2-E)', () => {
+  const rt = BAL.gate2.regionThreat;
+  assert.equal(rt.length, BAL.gate2.regions.length, '지역 위협 = 지역 수(6)');
+  // pending 스폰 디스패치가 처리하는 타입만 사용(존재하지 않는 적 스폰 금지).
+  const SPAWNABLE = new Set(['creature', 'splitter', 'weaver', 'sniper', 'turret', 'charger', 'mine', 'bomber', 'zapper', 'orbiter', 'shielder', 'carrier', 'blinker']);
+  for (const r of rt) {
+    assert.ok(Array.isArray(r.pool) && r.pool.length >= 1, '지역 pool 비어있지 않음');
+    assert.ok(r.pool.every((tp) => SPAWNABLE.has(tp)), `pool 전부 스폰 가능(${r.pool})`);
+    assert.ok(SPAWNABLE.has(r.elite), `elite 스폰 가능(${r.elite})`);
+    assert.ok(typeof r.label === 'string' && r.label.length > 0, '위협 테마 라벨');
+  }
+  // 지역마다 조합이 서로 다르다 — HP 벽 아닌 역할 시험(단조 금지).
+  assert.ok(new Set(rt.map((r) => r.pool.join(','))).size >= 4, '지역 조합이 충분히 다양(가짜 단조 금지)');
+  // 캠페인 refill이 지역 조합을 쓰되 Gate 1은 불변(측정=weaver 고정).
+  assert.ok(mainSrc.includes('BAL.gate2.regionThreat[reg.i - 1]'), '캠페인 refill이 지역 조합 사용');
+  assert.ok(mainSrc.includes("dense ? (isCampaign ? pool[idx % pool.length] : 'weaver')"), 'Gate1 측정 weaver 고정 보존');
+  // 지역 진입이 위협 테마를 안내(무엇을 시험하는지 한 줄).
+  assert.ok(mainSrc.includes('cl.regionThreatLabel = rt.label'), '지역 진입 위협 테마 표시');
+});
