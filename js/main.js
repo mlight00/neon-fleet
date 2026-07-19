@@ -566,7 +566,7 @@ function coreLoopAutopilot(sq, w) {
 
 /** 공명 발사체 스폰(§5.4). fromResonance·resonanceId 태그로 재귀 방지·피해 별도 집계. */
 function spawnResonance(spec, sq, w) {
-  const shotBase = Math.max(4, sq.flagPower * (w.stats?.damage ?? 1) * 0.06) * (sq.resonPowerMult || 1);   // 한 발 기준 피해 근사(§7.3 T2+ 공명 증폭)
+  const shotBase = Math.max(4, sq.flagPower * (w.stats?.damage ?? 1) * 0.06) * (sq.resonPowerMult || 1) * (run.campaign25?.resonBonus || 1);   // 한 발 기준 피해 근사(§7.3 T2+ 공명 증폭 + §7.1 두 번째 공명)
   if (spec.kind === 'rail') {
     const hx = BAL.gate1.loadout.hardpointX.wing;
     const b = new Bullet(sq.x + hx, sq.y - 10, shotBase * spec.dmgFrac, {
@@ -777,6 +777,7 @@ function startCampaign25(opts = {}) {
   const metrics = createRunMetrics({ runId: `campaign25-${mode}-${build.id}`, seed: (Math.random() * 2 ** 31) | 0 });
   const director = createRunDirector(G2, buildCampaign25Schedule(G2));
   w.metrics = metrics; w.reson = reson;
+  w.noFlagshipEvolve = true;   // 함체 등급은 디렉터 스케줄(H1~H5)만 — 드론 유기 진화 비활성(Codex 홀리스틱)
   w.onHullDepleted = () => finishCampaign25('hull');   // 내구도 소진 → 25분 결과 종료(regionResults 첨부, Codex P2)
   r.campaign25 = {
     mode, auto, build, buildId: build.id, cfg: G2, director, metrics,
@@ -784,6 +785,7 @@ function startCampaign25(opts = {}) {
     regionResults: [],        // [{ region, boss, ttk, killed }]
     bossesKilled: 0, deferredEvents: [],
     pathMods: { enemyRateMult: 1 }, pathChoicesMade: 0, eliteWavesFired: 0,   // §7.4 경로 선택·§7.5 정예 웨이브 집계(G2-F 통합 검증용)
+    resonBonus: 1,   // §7.1 두 번째 공명(840s) 증폭 배수(spawnResonance·시커에서 읽음)
     startHull: surv.hull, startTier: 0,   // 결과 화면용 실제 시작 스냅샷
   };
   // H0에서 시작 → H1~H5 승급 5회가 정확히 T1~T5를 만든다(측정도 동일, Codex P2). 측정은 생존/화력만 보정.
@@ -849,8 +851,8 @@ function spawnCampaignBoss(i, bossId, t) {
 function campaignHullTier(tier, t) {
   const r = run, sq = r.squad, w = r.world, cl = r.campaign25;
   survTierUp(sq.surv, BAL.gate1.survivability);
-  sq.tier = Math.min(BAL.evolution.names.length - 1, sq.tier + 1);
-  applyCampaignHullFn(sq, cl);   // 등급별 기능 갱신
+  sq.tier = Math.min(BAL.evolution.names.length - 1, tier);   // 스케줄된 tier를 '설정'(유기 진화 비활성이므로 스케줄이 유일 권한, Codex 홀리스틱)
+  applyCampaignHullFn(sq, cl);   // 등급별 기능 갱신(파워는 tier의 shipPower + 행동변화 무기성장 + 드론/순양함에서 — 별도 은행 없음)
   cl.metrics.hullTier(t);
   w.effects.halo(sq.x, sq.y, COLORS.reward);
   const fn = BAL.gate2.hullFn[Math.min(sq.tier, BAL.gate2.hullFn.length - 1)];
@@ -916,7 +918,16 @@ function campaignBehavior(t) {
   const sq = run.squad, cl = run.campaign25;
   const steps = coreLoopWeaponSteps(sq);
   if (!steps.length) return;
-  if (cl.auto) { steps[0].apply(); cl.metrics.choice(t, { behavior: true }); }
+  // 측정·플레이 모두 자동 적용(45초마다) — 사람 플레이가 측정 대비 과소 파워가 되지 않게(Codex 홀리스틱). 25분에 무기 성장.
+  steps[0].apply(); cl.metrics.choice(t, { behavior: true });
+}
+
+/** §7.1 최종 무기 진화(1050s): 주무기 최종 레벨 + 미진화면 진화 1단계 부여(Codex 홀리스틱 — 미배선 사건 실동작). */
+function campaignFinalWeaponEvo(t) {
+  const sq = run.squad, w = run.world, wp = sq.weapon, max = BAL.weapons.lvCoef.length;
+  sq.weaponLv = max;
+  if (!sq.weaponEvolutions[wp]) { const opts = evolutionOptions(wp); if (opts && opts[0]) { sq.weaponEvolutions[wp] = opts[0].id; sq.evoLevels[wp] = 1; } }
+  w.effects.text(sq.x, sq.y - 78, `최종 무기 진화: ${WEAPON_LABELS[wp] || wp}`, COLORS.reward, 16);
 }
 
 /** §7.4 큰 경로 선택(~4분마다). 측정=결정론적 자동선택, play=게임 정지 + 2택 카드(showCoreLoopPick 재사용). */
@@ -1150,6 +1161,8 @@ function campaign25Update(dt) {
       case 'behavior': campaignBehavior(t); break;   // 무기 레벨업 → 25분 힘 성장(§1.3)
       case 'apex': cl.apexUnlocked = true; cl._apexT = 0.1; break;   // §7.3 T5 Apex 해금(즉시 첫 발동)
       case 'pathChoice': presentPathChoice(ev.choice, t); break;   // §7.4 ~4분마다 큰 경로 선택
+      case 'secondResonance': cl.resonBonus = (cl.resonBonus || 1) * 1.4; if (sq.reson.activeId) applyResonBoost(sq, w, 1.0, t); w.effects.text(sq.x, sq.y - 74, '공명 증폭 회로', '#9fe8ff', 15); break;   // §7.1 두 번째 공명(840s)
+      case 'finalWeaponEvo': campaignFinalWeaponEvo(t); break;   // §7.1 최종 무기 진화(1050s)
       case 'result': cl.resultPending = true; break;
       default: cl.deferredEvents.push({ kind: act.kind, t: Math.round(t) }); break;   // fleet/path/apex 등 = G2-B~D 실배선
     }
@@ -1570,7 +1583,7 @@ function update(dt) {
         if (dx * dx + dy * dy <= (bo.r * 1.4) ** 2) {
           const siegeBonus = b.blast ? (1 + b.blast.bossBonus) : 1;  // 시즈 토피도 보스 직격 +15%
           let bossDmg = b.damage * (w.mfx?.bossDmgMult ?? 1) * siegeBonus;
-          if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, bo)) bossDmg *= BAL.gate1.resonance.seekerBeam.missileBonus * (w.squad?.resonPowerMult || 1);  // 시커 증폭(+§7.3 공명 증폭)
+          if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, bo)) bossDmg *= BAL.gate1.resonance.seekerBeam.missileBonus * (w.squad?.resonPowerMult || 1) * (run.campaign25?.resonBonus || 1);  // 시커 증폭(+§7.3 공명 증폭 +§7.1 두 번째 공명)
           // 코어루프 B22 양측 클램프(dpsCap 하한·enrage 상한)는 보스 hitByBullet 래퍼가 '모든' 경로에 적용한다(§5.8, Codex P1).
           const hpBefore = bo.hp;
           bo.hitByBullet(bossDmg, w, b);
@@ -1591,7 +1604,7 @@ function update(dt) {
         const wasAlive = !e.dead;
         let dealt = e.def ? b.damage * (w.mfx?.bossDmgMult ?? 1) : b.damage;
         // 시커 빔(G1-06): 표식 대상을 맞힌 유도 미사일은 실제 피해가 증폭된다(우선추적 + 증폭).
-        if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, e)) dealt *= BAL.gate1.resonance.seekerBeam.missileBonus * (w.squad?.resonPowerMult || 1);   // 시커 증폭(+§7.3 공명 증폭)
+        if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, e)) dealt *= BAL.gate1.resonance.seekerBeam.missileBonus * (w.squad?.resonPowerMult || 1) * (run.campaign25?.resonBonus || 1);   // 시커 증폭(+§7.3 공명 증폭 +§7.1 두 번째 공명)
         const hpBefore = e.hp ?? 0;
         e.hitByBullet(dealt, w, b); // 탄환 문맥 전달(프리즘 코어 등)
         if (w.metrics) tallyBulletDamage(w, b, Math.max(0, hpBefore - (e.hp ?? 0)), e);   // 실제 적용 피해(HP 감소) 집계(G1-07)
@@ -1864,7 +1877,7 @@ function draw() {
         resonanceFrac: resonChargeFrac(sq.reson, BAL.gate1.resonance),
         telegraph: resonShouldTelegraph(sq.reson, BAL.gate1.resonance) || (cl.telegraph && !sq.reson.activeId),
         frameIcon: fh?.icon || '', frameGlow: fh?.glow || '', frameName: fh?.name || '',
-        dirT: elapsed(cl.director),
+        dirT: elapsed(cl.director), totalSec: r.campaign25 ? BAL.gate2.totalSec : 480,   // 캠페인=25:00, Gate 1=8:00(Codex 홀리스틱)
         nextEventLabel: nx ? evLabel[nx.type] || '' : '', nextEventIn: nx ? nx.inSec : 0,
       });
     }

@@ -475,7 +475,8 @@ export class Squad {
     }
     // 2) 순양함이 임계치 이상이면 기함 1단계 업그레이드 (여기서만 선택창=모듈 드래프트가 뜬다)
     const need = Math.max(1, Math.round(E.cruisersPerFlagship * (mfx.evolveCostMult ?? 1)));  // 신속 진화 모듈
-    if (canUpgradeFlagship(this.cruisers || 0, this.tier, maxTier, { cruisersPerFlagship: need })) {
+    // 캠페인(Gate 2)에선 함체 등급을 디렉터 스케줄(H1~H5)만 올린다 — 드론 진화가 예정보다 일찍 등급 기능을 해금하지 않게(Codex 홀리스틱).
+    if (!world.noFlagshipEvolve && canUpgradeFlagship(this.cruisers || 0, this.tier, maxTier, { cruisersPerFlagship: need })) {
       // 흡수한 순양함 화력을 기함에 은행(+보너스) → 업그레이드가 항상 순 이득 (화력 손실 버그 해결)
       const gain = Math.round(need * E.cruiserPower * (E.upgradeBonus ?? 1.2));
       this.cruisers -= need;

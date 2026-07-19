@@ -382,7 +382,8 @@ export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
   // ── 8분 타이머 + 다음 사건 (상단 중앙, 좌/우 버튼과 겹치지 않는 안전지대) ──
   ctx.textAlign = 'center'; ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = '#cfe4ff';
   const mm = Math.floor(d.dirT / 60), ss = Math.floor(d.dirT % 60);
-  ctx.fillText(`${mm}:${String(ss).padStart(2, '0')} / 8:00`, logicalW / 2, 20);
+  const tot = d.totalSec || 480, tmm = Math.floor(tot / 60), tss = Math.floor(tot % 60);   // 총 시간(Gate 1=8:00, Gate 2 캠페인=25:00, Codex 홀리스틱)
+  ctx.fillText(`${mm}:${String(ss).padStart(2, '0')} / ${tmm}:${String(tss).padStart(2, '0')}`, logicalW / 2, 20);
   if (d.nextEventLabel) { ctx.font = '10px Pretendard, sans-serif'; ctx.fillStyle = '#8fb4d8'; ctx.fillText(`다음: ${d.nextEventLabel} (${Math.ceil(d.nextEventIn)}s)`, logicalW / 2, 33); }
   ctx.restore();
 }

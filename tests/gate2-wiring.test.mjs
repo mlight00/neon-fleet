@@ -212,3 +212,20 @@ test('G2-14: 25분 완주 통합 검증 + 전용 결과 패널(G2-F)', () => {
   assert.ok(mainSrc.includes('showCampaign25Result(snap, r.squad, cl') && mainSrc.includes('function showCampaign25Result'), '캠페인 전용 결과 패널 연결');
   assert.ok(uiSrc.includes('showCampaign25Result(') && uiSrc.includes('지역 보스 TTK'), 'ui 결과 패널: 6지역 보스 TTK 표');
 });
+
+test('G2-15: Codex 홀리스틱 4건 — 등급 스케줄 격리·play 행동·미배선 사건·HUD 타이머', () => {
+  // #1 함체 등급은 디렉터 스케줄만(캠페인 유기 기함 진화 비활성 + 스케줄 tier '설정').
+  assert.ok(entSrc.includes('!world.noFlagshipEvolve'), '#1: 캠페인 유기 기함 진화 비활성 가드');
+  assert.ok(mainSrc.includes('w.noFlagshipEvolve = true'), '#1: 캠페인 시작 시 유기 진화 비활성');
+  assert.ok(/function campaignHullTier[\s\S]{0,240}sq\.tier = Math\.min\(BAL\.evolution\.names\.length - 1, tier\)/.test(mainSrc), '#1: 스케줄 tier 설정(증가 아님)');
+  // #2 play 모드도 행동 변화(무기 성장) 적용 — cl.auto 게이트 제거.
+  assert.ok(/function campaignBehavior[\s\S]{0,300}steps\[0\]\.apply\(\); cl\.metrics\.choice/.test(mainSrc), '#2: 행동 변화 두 모드 적용');
+  assert.ok(!/function campaignBehavior[\s\S]{0,240}if \(cl\.auto\) \{ steps\[0\]\.apply/.test(mainSrc), '#2: cl.auto 게이트 제거');
+  // #3 두 번째 공명·최종 무기 진화 사건 실배선(deferred 아님) + 공명 증폭 실반영.
+  assert.ok(mainSrc.includes("case 'secondResonance':") && mainSrc.includes('cl.resonBonus'), '#3: 두 번째 공명 배선');
+  assert.ok(mainSrc.includes("case 'finalWeaponEvo': campaignFinalWeaponEvo") && mainSrc.includes('function campaignFinalWeaponEvo'), '#3: 최종 무기 진화 배선');
+  assert.ok(mainSrc.includes('(run.campaign25?.resonBonus || 1)'), '#3: 공명 증폭이 실피해에 반영');
+  // #4 HUD 타이머가 총 시간을 인자로(/8:00 하드코딩 제거).
+  assert.ok(rd.includes('d.totalSec') && !rd.includes('/ 8:00'), '#4: HUD 타이머 총 시간 인자화');
+  assert.ok(mainSrc.includes('totalSec: r.campaign25 ? BAL.gate2.totalSec : 480'), '#4: 캠페인=25:00 전달');
+});
