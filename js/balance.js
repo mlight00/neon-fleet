@@ -530,6 +530,7 @@ export const BAL = {
       { a: { id: 'allout',     label: '총력 항로',      desc: '주무기 강화 · 호위 편대 +10',           mods: { weaponLv: 1, droneGain: 10 } },
         b: { id: 'fortress',   label: '요새 항로',      desc: '기함 내구도 +40% · 보호막 전개',         mods: { hullHeal: 0.40, shield: true } } },
     ],
+    pathFallbackDrones: 6,   // 상한(만피·최대레벨 등)으로 무효화된 경로 mod 1건당 대체 혜택(호위 편대) — 2축 계약 보존
   },
 
   // 격납고: 코인으로 사는 영구 강화. 벽에 막히면 강화로 미는 게임 루프의 완성 조각.
