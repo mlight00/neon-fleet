@@ -823,29 +823,32 @@ function campaignHullTier(tier, t) {
 }
 
 /** 두 번째 무기 장착(측정=빌드 wing 자동, play=향후 선택 UI G2-B). */
-function equipCampaignWing() {
+function equipCampaignWing(t) {
   const r = run, sq = r.squad, cl = r.campaign25;
   if (sq.wing.weaponId) return;
   sq.wing.weaponId = cl.build.wing; sq.wing.level = 1; sq._wingAcc = 0;
+  cl.metrics.secondWeapon(t);   // 마일스톤 기록(Codex P2)
   r.world.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[cl.build.wing]}`, WEAPON_COLORS[cl.build.wing], 15);
 }
 
 /** 공명 회로 활성(두 무기 장착 후). */
-function activateCampaignResonance() {
+function activateCampaignResonance(t) {
   const r = run, sq = r.squad, cl = r.campaign25;
   if (!sq.wing.weaponId) return;
   resonSetLoadout(sq.reson, [sq.weapon, sq.wing.weaponId]);
   cl.resonActivated = true;
+  cl.metrics.firstResonance(t);   // 첫 공명(활성 시각) 기록(Codex P2)
   if (cl.auto) { const res = RESONANCES[sq.reson.activeId]; if (res?.trigger === 'charge') sq.reson.charge = BAL.gate1.resonance[sq.reson.activeId].threshold; }
   r.world.effects.text(sq.x, sq.y - 74, `공명 회로 활성: ${RESONANCES[sq.reson.activeId]?.name || ''}`, '#9fe8ff', 16);
 }
 
 /** 지휘 프레임 자동 스킬(측정=빌드별 고정). */
-function pickCampaignFrame() {
+function pickCampaignFrame(t) {
   const r = run, sq = r.squad, cl = r.campaign25;
   if (sq.frameId) return;
   const id = frameForBuild(cl.buildId);
   frameSet(sq.frameState, id); sq.frameId = id; sq.doctrine = BAL.gate1.frames[id].doctrine;
+  cl.metrics.framePick(t);   // 마일스톤 기록(Codex P2)
   r.world.effects.text(sq.x, sq.y - 74, `지휘 프레임: ${BAL.gate1.frames[id].name}`, BAL.gate1.frames[id].glow, 16);
 }
 
@@ -883,9 +886,9 @@ function campaign25Update(dt) {
       // 보스 사건이 이미 다른 보스 교전 중에 오면 버리지 않고 FIFO 큐에 담아 순서대로 등장(Codex P1: 겹침 다수여도 보스 누락 없음).
       case 'bossStart': if (cl.bossActive) cl.bossQueue.push({ region: ev.region, boss: ev.boss }); else spawnCampaignBoss(ev.region, ev.boss, t); break;
       case 'hullTier': campaignHullTier(ev.tier, t); break;
-      case 'equipWing': equipCampaignWing(); break;
-      case 'resonanceReady': activateCampaignResonance(); break;
-      case 'framePick': pickCampaignFrame(); break;
+      case 'equipWing': equipCampaignWing(t); break;
+      case 'resonanceReady': activateCampaignResonance(t); break;
+      case 'framePick': pickCampaignFrame(t); break;
       case 'behavior': campaignBehavior(t); break;   // 무기 레벨업 → 25분 힘 성장(§1.3)
       case 'result': cl.resultPending = true; break;
       default: cl.deferredEvents.push({ kind: act.kind, t: Math.round(t) }); break;   // fleet/path/apex 등 = G2-B~D 실배선
@@ -919,7 +922,8 @@ function finishCampaign25(reason = 'clear') {
   snap.campaignReason = reason;
   window.__nfRunMetrics = snap;
   state = 'done';
-  if (cl.mode === 'play') showCoreLoopResult(snap, r.squad, cl);   // 로컬 헬퍼가 ui용 객체를 구성(Codex P2: ui 직접 3인자 호출 금지)
+  // play 결과: 재시작은 25분 캠페인으로(Gate 1로 벗어나지 않게, Codex P2). 지역별 TTK 6종 패널은 G2-F에서 전용 화면.
+  if (cl.mode === 'play') showCoreLoopResult(snap, r.squad, cl, (mode) => { ui.hide(); startCampaign25({ mode, buildId: cl.buildId }); });
 }
 
 /** 지휘 프레임 자동 스킬을 실제 전투 행동으로 발동(RW-C, G1-05). */
@@ -943,7 +947,7 @@ function applyFrameAuto(fr, sq, w) {
 /** 하네스 경량 적 스트림: 자동 회피로 8분 생존 가능하되 피격(내구도 감소)은 받는 밀도.
  *  램밍(크리처/차저)은 접촉 22피해로 헤드리스 회피가 어려워 제외하고, 회피 가능한 슈터만 쓴다. */
 function refillCoreLoopTrack(elite = false) {
-  const r = run, cl = r.coreLoop, base = r.traveled + 340;
+  const r = run, cl = r.coreLoop || r.campaign25, base = r.traveled + 340;   // Gate 2 캠페인도 이 스트림을 쓴다(play=램프·measure=밀집, Codex P2)
   // 측정 모드=밀집 군집(공명이 여러 표적을 맞혀 기여도 산출). 사람 플레이=완만+시간 램프(초반 경량→후반 증가).
   const dense = !cl || cl.auto;
   const P = BAL.gate1.play, t = cl ? elapsed(cl.director) : 0;
@@ -986,10 +990,11 @@ function tallyBulletDamage(w, b, dealt, target) {
 }
 
 /** 8분 결과 화면(§5.9). 실제 시작(startTier/startHull)→최종 상태, 무기 2·공명, 피해 비율, 내구도. */
-function showCoreLoopResult(snap, sq, cl) {
+function showCoreLoopResult(snap, sq, cl, restartFn) {
   const build = cl.build;
   const activeResonName = sq.reson.activeId ? RESONANCES[sq.reson.activeId]?.name : (RESONANCES[build.resonance]?.name || '');
-  const restart = (mode) => { ui.hide(); startCoreLoop({ mode, buildId: cl.buildId }); };
+  // 재시작 콜백은 모드별로 다르다: Gate 1=startCoreLoop, Gate 2 캠페인=startCampaign25(버튼이 캠페인을 벗어나지 않게, Codex P2).
+  const restart = restartFn || ((mode) => { ui.hide(); startCoreLoop({ mode, buildId: cl.buildId }); });
   ui.showCoreLoopResult({
     snap, build,
     startHull: cl.startHull, hull: sq.surv.hull, hullMax: sq.surv.hullMax,

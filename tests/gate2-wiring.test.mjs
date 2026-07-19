@@ -43,6 +43,17 @@ test('G2-07: 미완 런타임 경로 보강(Codex G2-A 리뷰 반영)', () => {
   assert.ok(mainSrc.includes('const cl = r.coreLoop || r.campaign25'), 'P2: 캠페인 내구도 HUD');
 });
 
+test('G2-08: play 경로·측정 정확도 보강(Codex G2-A 3차 반영)', () => {
+  // P2: 스트림 재보충이 캠페인 상태를 읽어야 play가 측정밀도 대신 play 램프를 받는다.
+  assert.ok(mainSrc.includes('cl = r.coreLoop || r.campaign25, base'), 'P2: refill이 캠페인 인식');
+  // P2: 마일스톤 기록(secondWeapon·firstResonance·framePick) — 측정 스냅샷 정확도.
+  assert.ok(mainSrc.includes('cl.metrics.secondWeapon(t)'), 'P2: 두 번째 무기 마일스톤');
+  assert.ok(mainSrc.includes('cl.metrics.firstResonance(t)'), 'P2: 첫 공명 마일스톤');
+  assert.ok(mainSrc.includes('cl.metrics.framePick(t)'), 'P2: 프레임 마일스톤');
+  // P2: play 결과 재시작이 캠페인으로(Gate 1로 벗어나지 않음).
+  assert.ok(mainSrc.includes('startCampaign25({ mode, buildId: cl.buildId })') && mainSrc.includes('showCoreLoopResult(snap, sq, cl, restartFn'), 'P2: 캠페인 재시작 콜백');
+});
+
 test('G2-04: 지역 보스도 Gate 1의 검증된 양측 클램프를 지역 TTK 목표로 재사용', () => {
   assert.ok(mainSrc.includes('installBossTtkClamp(boss, avgDps, region.bossTtk)'), '지역 TTK 목표로 클램프 설치');
   assert.ok(mainSrc.includes('function installBossTtkClamp') && mainSrc.includes('function updateBossClamp'), '공용 클램프 헬퍼');
