@@ -243,8 +243,9 @@ export const ui = {
       <div class="draft-row">${cards}</div>
     `);
     const btns = Array.from(overlay.querySelectorAll('.draft-card'));
-    btns.forEach((b) => b.addEventListener('click', () => onPick(options[+b.dataset.idx].id, +b.dataset.idx)));
-    attachKeyNav(btns, (i) => onPick(options[i].id, i));
+    const pickBtn = (b) => { const idx = +b.dataset.idx; onPick(options[idx].id, idx); };   // attachKeyNav은 '버튼 요소'를 넘김 → data-idx로 인덱스 복원(Codex 홀리스틱: 키보드 확정 예외로 캠페인 정지 방지)
+    btns.forEach((b) => b.addEventListener('click', () => pickBtn(b)));
+    attachKeyNav(btns, pickBtn);
   },
 
   /** 8분 결과 화면 (전면개편 §5.9). 시작→최종 함체, 무기 2·공명, 피해 비율, 내구도, 다음 설계도 실루엣. */

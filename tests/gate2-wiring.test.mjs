@@ -238,3 +238,8 @@ test('G2-16: Codex 홀리스틱 2차 — 지역별 난이도·후반 성장·새
   // P2: 새 조합 버튼이 다른 빌드로 회전(같은 조합 재시작과 구분).
   assert.ok(mainSrc.includes('function nextCampaignBuild') && mainSrc.includes("restartFn('play', 'new')") && mainSrc.includes("which === 'new' ? nextCampaignBuild(cl.buildId)"), 'P2: 새 조합 = 다른 빌드 회전');
 });
+
+test('G2-17: showCoreLoopPick 키보드 확정이 카드 인덱스로(Codex 홀리스틱 3차)', () => {
+  // attachKeyNav은 '버튼 요소'를 넘김 → data-idx로 인덱스 복원(과거엔 options[요소]=undefined 예외 → 캠페인 영구 정지).
+  assert.ok(uiSrc.includes('const idx = +b.dataset.idx; onPick(options[idx].id, idx)') && uiSrc.includes('attachKeyNav(btns, pickBtn)'), '키보드 확정이 data-idx로 인덱스 복원');
+});
