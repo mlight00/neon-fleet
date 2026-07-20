@@ -59,7 +59,7 @@ export const BAL = {
   },
 
   // 돌진병: 예고 후 편대를 향해 급강하 (회피 타이밍 게임)
-  charger: { hp: 30, enterSpeed: 95, dashSpeed: 540, telegraph: 0.7, hoverY: 150, contactPct: 0.14, contactMin: 6, coin: 4, bounty: 2, radius: 15 },
+  charger: { hp: 30, enterSpeed: 95, dashSpeed: 540, telegraph: 0.7, hoverY: 150, contactPct: 0.14, contactMin: 6, coin: 4, bounty: 2, radius: 24 },
   // 기뢰: 천천히 떠다니다 가까우면 폭발 (가만히 못 있게 만듦)
   mine: { hp: 10, descent: 55, sway: 34, swayHz: 0.4, armRadius: 115, fuse: 0.55, blastRadius: 92, dmgPct: 0.12, dmgMin: 8, coin: 3, radius: 13 },
 
@@ -193,9 +193,9 @@ export const BAL = {
   // 사격형 적 (부록 §4): 적탄은 여유 1.2s+, % 피해, 상한 12발
   enemyShots: { cap: 16, telegraphTime: 0.55 },   // 예고 시간 확대 (A1: 회피 여유) · cap↑=초반 긴장(회피 강제)
   // (사격형 적 HP·피해 1.3배 난이도 상향) — 패턴 다양화: 점사/원형탄/조준탄 변주
-  sniper: { hp: 33, enterSpeed: 300, hoverY: 180, stayTime: 5, fireInterval: 1.6, shotSpeed: 260, dmgPct: 0.078, dmgMin: 4, radius: 14,
+  sniper: { hp: 33, enterSpeed: 300, hoverY: 180, stayTime: 5, fireInterval: 1.6, shotSpeed: 260, dmgPct: 0.078, dmgMin: 4, radius: 24,
     burstCount: 3, burstGap: 0.11 },         // 두 번에 한 번 3점사
-  turret: { hp: 52, fireInterval: 2.3, shotSpeed: 190, fanDeg: 25, fanCount: 5, dmgPct: 0.052, dmgMin: 3, coin: 5, radius: 16,
+  turret: { hp: 52, fireInterval: 2.3, shotSpeed: 190, fanDeg: 25, fanCount: 5, dmgPct: 0.052, dmgMin: 3, coin: 5, radius: 26,
     ringCount: 8, ringSpeed: 150 },          // 부채꼴 ↔ 8방향 원형탄 번갈아
   weaver: { hp: 13, y: 160, speed: 150, fireInterval: 0.55, shotSpeed: 260, dmgPct: 0.039, dmgMin: 3, radius: 18,
     aimedEvery: 3 },                         // 3발마다 1발은 편대 조준탄
@@ -203,12 +203,12 @@ export const BAL = {
 
   // 신규 일반 적 6종 (스프라이트 B16~B21, PNG 없으면 코드 도형 폴백). 거동이 서로 확연히 다르게.
   newEnemies: {
-    bomber:   { hp: 30, r: 20, hoverY: 150, enterSpeed: 150, stay: 4.5, fireInterval: 2.2, count: 7, spreadDeg: 62, speed: 120, dmgPct: 0.05, dmgMin: 4, coin: 4 }, // 광역 융단(넓은 하강 산탄)
-    zapper:   { hp: 26, r: 16, hoverY: 140, enterSpeed: 200, stay: 4.5, cycle: 2.2, charge: 0.9, beamShots: 9, beamGap: 0.045, speed: 320, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 세로 번개 기둥
-    orbiter:  { hp: 22, r: 15, orbitR: 66, hz: 0.5, descend: 52, fireInterval: 1.1, speed: 235, dmgPct: 0.04, dmgMin: 3, coin: 3 }, // 원 그리며 조준탄
-    shielder: { hp: 46, r: 20, hoverY: 162, enterSpeed: 170, stay: 6, shieldUp: 0.6, shieldDown: 2.6, fireInterval: 1.3, speed: 195, dmgPct: 0.05, dmgMin: 4, coin: 6, shieldReduce: 0.25, hpScaleMul: 0.045 }, // 방패 약화 2차: HP스케일 0.14→0.045(현행 1/3, 여전히 너무 강함 피드백). 감소 25%·켜짐0.6/꺼짐2.6 유지
+    bomber:   { hp: 30, r: 28, hoverY: 150, enterSpeed: 150, stay: 4.5, fireInterval: 2.2, count: 7, spreadDeg: 62, speed: 120, dmgPct: 0.05, dmgMin: 4, coin: 4 }, // 광역 융단(넓은 하강 산탄)
+    zapper:   { hp: 26, r: 26, hoverY: 140, enterSpeed: 200, stay: 4.5, cycle: 2.2, charge: 0.9, beamShots: 9, beamGap: 0.045, speed: 320, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 세로 번개 기둥
+    orbiter:  { hp: 22, r: 24, orbitR: 66, hz: 0.5, descend: 52, fireInterval: 1.1, speed: 235, dmgPct: 0.04, dmgMin: 3, coin: 3 }, // 원 그리며 조준탄
+    shielder: { hp: 46, r: 28, hoverY: 162, enterSpeed: 170, stay: 6, shieldUp: 0.6, shieldDown: 2.6, fireInterval: 1.3, speed: 195, dmgPct: 0.05, dmgMin: 4, coin: 6, shieldReduce: 0.25, hpScaleMul: 0.045 }, // 방패 약화 2차: HP스케일 0.14→0.045(현행 1/3, 여전히 너무 강함 피드백). 감소 25%·켜짐0.6/꺼짐2.6 유지
     carrier:  { hp: 42, r: 24, hoverY: 128, enterSpeed: 140, stay: 6, spawnInterval: 2.6, spawnCount: 2, coin: 6 }, // 소형 드론 사출
-    blinker:  { hp: 20, r: 15, blink: 1.25, fireInterval: 1.25, speed: 265, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 순간이동+조준탄
+    blinker:  { hp: 20, r: 24, blink: 1.25, fireInterval: 1.25, speed: 265, dmgPct: 0.045, dmgMin: 4, coin: 4 }, // 순간이동+조준탄
   },
 
   powerModule: { duration: 10, multiplier: 2, radius: 14 },
