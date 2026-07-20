@@ -163,7 +163,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '' }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '' }) {
   ctx.save();
   // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
@@ -236,7 +236,12 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
     ctx.fillText((tierPower > 0 ? `기함 ${tierName} · 함대 화력 ${tierPower}` : `기함 ${tierName}`) + dTag, 12, 42);
     }
     // 기함 업그레이드 게이지: 순양함을 모아 임계치를 채우면 기함 1단계 업그레이드
-    if (upgradeMax > 0) {
+    // ※ 25분 캠페인은 승급이 '시간 스케줄'로만 일어난다(유기 진화 비활성 → 순양함을 채워도 승급 안 함).
+    //    그래서 순양함 게이지·MAX 문구를 숨기고 상단 '다음: 함체 승급 (Ns)' 예고에 맡긴다.
+    //    (이사 피드백: 순양함을 모았는데 기함 이름이 안 바뀐다 — 게이지가 잘못된 기대를 만들고 있었음)
+    if (scheduledTier) {
+      // 스케줄 승급 모드 — 순양함 게이지 미표시
+    } else if (upgradeMax > 0) {
       const gw = 86;
       ctx.fillStyle = 'rgba(255,217,61,0.18)';
       ctx.fillRect(12, 48, gw, 5);

@@ -106,9 +106,9 @@ export const BAL = {
   //  체력벽이 아니지만 후반에 무력화되지 않도록 완만한 전용 HP 스케일(상한 있음)을 적용한다.
   adaptiveEnemies: {
     hpPerStage: 0.18, hpScaleMax: 2.6,   // HP = 기본 × min(2.6, 1+0.18×(stage-1))
-    prismWarden:  { minStage: 2, hp: 70, r: 22, frontReduce: 0.55, coreHp: 16, coreOffset: 18, coin: 7 },  // 정면 55%감소(일반공격도 통하게), 코어 더 빨리 깨짐
-    scavenger:    { minStage: 2, hp: 35, r: 17, approach: 150, flee: 260, stealR: 28, rewardMult: 1.5, coin: 5, stayTime: 1.2 },
-    gateParasite: { minStage: 3, hp: 45, r: 15, offsetY: 36, cleanseDrones: 10, armorReduce: 0.35 },  // 일반 공격 35% 감소(65%만), 랜스 강습3단+ 무시(전액)
+    prismWarden:  { minStage: 2, hp: 70, r: 42, frontReduce: 0.55, coreHp: 16, coreOffset: 34, coin: 7 },  // 정면 55%감소(일반공격도 통하게), 코어 더 빨리 깨짐
+    scavenger:    { minStage: 2, hp: 35, r: 34, approach: 150, flee: 260, stealR: 28, rewardMult: 1.5, coin: 5, stayTime: 1.2 },
+    gateParasite: { minStage: 3, hp: 45, r: 30, offsetY: 36, cleanseDrones: 10, armorReduce: 0.35 },  // 일반 공격 35% 감소(65%만), 랜스 강습3단+ 무시(전액)
   },
 
   // ── 집중 게이지(FLOW) → 폭주(NEON RUSH). '적 처치 콤보'로 게이지가 차고 100에서 폭주 자동 발동.

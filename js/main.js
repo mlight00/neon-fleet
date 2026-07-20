@@ -1942,6 +1942,7 @@ function draw() {
       tierPower: Math.round(r.squad.banked || 0),
       upgradeCur: r.squad.cruisers || 0,   // 기함 업그레이드까지 모은 순양함
       upgradeMax: needCruisers,            // 필요한 순양함 (0 = 최종 티어)
+      scheduledTier: !!r.campaign25,       // 캠페인=시간 스케줄 승급 → 순양함 게이지 숨김(오해 방지)
       stage: r.sector,
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,
