@@ -74,7 +74,7 @@ const REMODEL_V2_BOSSES = Object.fromEntries(
 export const RASTER_ART = {
   C: {
     ...ART_PATHS,
-    C1: 'assets/styleC/C1.png', C2: 'assets/styleC/C2.png',
+    C1: 'assets/styleC/C1.png', C2: 'assets/styleC/C2.png', C5: 'assets/styleC/C5.png',
     ...REMODEL_V2_ENEMIES,     // B1~B6, B16~B21 (B4/B6 포함 — 벡터 폴백 해제)
     ...REMODEL_V2_BOSSES,      // B8~B11, B22, B7 (구 카툰 PNG·레이어 합본 대체)
     // 운석/파워모듈은 벡터 메탈 아트 유지. B12~B15(엔드리스)는 이번 범위 밖.
@@ -140,7 +140,7 @@ export const SPRITE_SIZES = {
   B12: 150, B13: 150, B14: 150, B15: 150,      // 신규 보스 4종
   B22: 190,
   B16: 46, B17: 50, B18: 46, B19: 48, B20: 52, B21: 48, // 신규 일반 적 6종 — 전격/궤도/점멸 확대(작아서 안 보임, 이사)
-  C1: 56, C2: 30, C3: 34, C4: 46,              // 크리스탈/캡슐/파워/운석
+  C1: 56, C2: 30, C3: 34, C4: 46, C5: 56,      // 크리스탈/캡슐/파워/운석/보급수송선
   H2_BASE_FRAME: 68, H2_ASSAULT: 68, H2_CARRIER: 68,
   MOUNT_VULCAN_BASE: 42, MOUNT_VULCAN_NEEDLE: 42, MOUNT_VULCAN_STORM: 42,
   MOUNT_LASER_BASE: 42, MOUNT_LASER_CUTTER: 42, MOUNT_LASER_PRISM: 42,
@@ -220,7 +220,7 @@ export function preloadSprites(ids, style = artStyle) {
 
 const CORE_PRELOAD = [
   'A1', 'A2', 'A3', 'A4', 'A5', 'A6',
-  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'C1', 'C2', 'C3', 'C4',
+  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'C1', 'C2', 'C3', 'C4', 'C5',
   'B16', 'B17', 'B18', 'B19', 'B20', 'B21',
   'H2_BASE_FRAME', 'H2_ASSAULT', 'H2_CARRIER',
   ...Object.keys(SPRITE_SIZES).filter((id) => id.startsWith('MOUNT_') || id.startsWith('PROJ_') || id.startsWith('VFX_')),

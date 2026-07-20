@@ -1740,21 +1740,27 @@ export class DronePod extends Scrolling {
     }
   }
   draw(ctx) {
-    // 청록 육각 컨테이너 (크리스탈=노랑 육각과 색으로 구분) + 드론 아이콘 + 보상 숫자
     const r = this.r;
-    glow(ctx, COLORS.ally, 12, (c) => {
-      c.fillStyle = 'rgba(63,245,224,0.14)';
-      c.strokeStyle = COLORS.ally;
-      c.lineWidth = 2;
-      c.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (i * Math.PI) / 3;
-        const px = this.x + Math.cos(a) * r;
-        const py = this.y + Math.sin(a) * r * 0.82;
-        i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
-      }
-      c.closePath(); c.fill(); c.stroke();
-    });
+    const pod = getSprite('C5');
+    if (pod) {
+      // 새 보급 수송선 스프라이트(이사 제작 → 크로마키). r 비례 표시. 크리스탈(보석)과 시각 구분.
+      blit(ctx, pod, this.x, this.y, (r * 2.6) / pod.logicalH);
+    } else {
+      // 폴백: 청록 육각 컨테이너
+      glow(ctx, COLORS.ally, 12, (c) => {
+        c.fillStyle = 'rgba(63,245,224,0.14)';
+        c.strokeStyle = COLORS.ally;
+        c.lineWidth = 2;
+        c.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = (i * Math.PI) / 3;
+          const px = this.x + Math.cos(a) * r;
+          const py = this.y + Math.sin(a) * r * 0.82;
+          i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+        }
+        c.closePath(); c.fill(); c.stroke();
+      });
+    }
     // 내용 표기: ▲ + 드론 수
     ctx.font = `bold ${r >= 22 ? 15 : 12}px Pretendard, sans-serif`;
     ctx.textAlign = 'center';
