@@ -1585,13 +1585,11 @@ function update(dt) {
       const dup = it.noDup ? 1 : copyCount(difficultyLevel, r.tutorial);   // 첫 노드는 최대 2로 제한. 코어루프 정밀 스트림은 noDup(정확한 수).
       if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal), w, supplyMult));
       else if (it.type === 'gatePair') {
-        const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
-        let left = it.left, right = it.right;
-        if (r.squad.reson) {   // 섹터 무기 조합: 이득 게이트(+/×)를 감점(−/÷)으로 반전 — 막대바는 마이너스/나누기만, 이득은 정예 POW로(이사)
-          if (GatePair.isGood(left)) left = invertGateOp(left);
-          if (GatePair.isGood(right)) right = invertGateOp(right);
+        // 섹터 무기 조합: 막대 게이트 전면 제거 — ÷2 vs ÷2·-27 vs -32처럼 선택에 의미가 없다(이사). 성장은 크리스탈·수송선·정예 POW로.
+        if (!r.squad.reson) {
+          const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
+          w.entities.push(new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right)));
         }
-        w.entities.push(new GatePair(LOGICAL_W, -60, gs(left), gs(right)));
       }
       else if (it.type === 'creature') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, it.size), 'creature');
       else if (it.type === 'splitter') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, 'mid', { splits: 3 }), 'creature');
@@ -1616,7 +1614,11 @@ function update(dt) {
       else if (it.type === 'carrier') spawnEnemy(new BroodCarrier(x), 'carrier');      // 단일(드론 사출)
       else if (it.type === 'blinker') for (let k = 0; k < dup; k++) spawnEnemy(new Blinker(k ? LOGICAL_W - x : x, LOGICAL_W), 'blinker');
       else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size, w, supplyMult));
-      else if (it.type === 'midboss') w.entities.push(new MidBoss(LOGICAL_W, contentTier, r.maxPower));
+      else if (it.type === 'midboss') {
+        const mb = new MidBoss(LOGICAL_W, contentTier, r.maxPower);
+        preloadBossArt(mb.def.id);   // 중간보스 아트 지연 로드 — 없으면 붉은 타원 폴백+텍스트만 보임(이사 지적)
+        w.entities.push(mb);
+      }
       else if (it.type === 'capsule') {
         if (!r.squad.reson) {   // 섹터 무기 조합이면 무기 캡슐 미스폰(보조무기 충돌 방지 — 이사)
           const weapon = it.weapon === 'random' ? ['vulcan', 'laser', 'homing'][Math.floor(r.rng() * 3)] : it.weapon;
@@ -1641,10 +1643,12 @@ function update(dt) {
       else if (it.type === 'prismWarden') w.entities.push(new PrismWarden(x, difficultyLevel));
       else if (it.type === 'scavenger') w.entities.push(new Scavenger(x, difficultyLevel));
       else if (it.type === 'corruptedGate') {
-        const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
-        const gate = new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right));
-        w.entities.push(gate);
-        w.entities.push(new GateParasite(gate, it.infectedLane ?? 0, difficultyLevel));
+        if (!r.squad.reson) {   // 섹터 무기 조합: 막대 게이트 전면 제거(감염 게이트도 동일 — 이사)
+          const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
+          const gate = new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right));
+          w.entities.push(gate);
+          w.entities.push(new GateParasite(gate, it.infectedLane ?? 0, difficultyLevel));
+        }
       }
     }
 
