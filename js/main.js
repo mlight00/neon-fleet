@@ -12,7 +12,7 @@ import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, progressPatch, bossCountFor } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, progressPatch, bossCountFor, invertGateOp } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -1586,7 +1586,12 @@ function update(dt) {
       if (it.type === 'crystal') w.entities.push(new Crystal(x, -60, Math.round(it.value * mods.crystal), w, supplyMult));
       else if (it.type === 'gatePair') {
         const gs = (g) => scaleGate(g, difficultyLevel, BAL.gate.flatScalePerStage, BAL.gate.flatScaleMax);
-        w.entities.push(new GatePair(LOGICAL_W, -60, gs(it.left), gs(it.right)));
+        let left = it.left, right = it.right;
+        if (r.squad.reson) {   // 섹터 무기 조합: 이득 게이트(+/×)를 감점(−/÷)으로 반전 — 막대바는 마이너스/나누기만, 이득은 정예 POW로(이사)
+          if (GatePair.isGood(left)) left = invertGateOp(left);
+          if (GatePair.isGood(right)) right = invertGateOp(right);
+        }
+        w.entities.push(new GatePair(LOGICAL_W, -60, gs(left), gs(right)));
       }
       else if (it.type === 'creature') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, it.size), 'creature');
       else if (it.type === 'splitter') for (let k = 0; k < dup; k++) spawnEnemy(new Creature(k ? LOGICAL_W - x : x, -60 - 70 * k, 'mid', { splits: 3 }), 'creature');
