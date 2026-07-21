@@ -75,6 +75,8 @@ export const RASTER_ART = {
   C: {
     ...ART_PATHS,
     C1: 'assets/styleC/C1.png', C2: 'assets/styleC/C2.png', C5: 'assets/styleC/C5.png',
+    // 섹터 클리어 컷신 배경(전체화면 일러스트). 파일이 없으면 getSprite가 null → 인게임 연출로 자동 폴백.
+    CUT_SECTOR_CLEAR: 'assets/art2-webp/story/nf2_cut_sector_clear.webp',
     ...REMODEL_V2_ENEMIES,     // B1~B6, B16~B21 (B4/B6 포함 — 벡터 폴백 해제)
     ...REMODEL_V2_BOSSES,      // B8~B11, B22, B7 (구 카툰 PNG·레이어 합본 대체)
     // 운석/파워모듈은 벡터 메탈 아트 유지. B12~B15(엔드리스)는 이번 범위 밖.
@@ -132,6 +134,7 @@ function loadBackground(style) {
 
 // 에셋별 인게임 크기(px, 논리 좌표) — viewBox 100 기준 전체가 이 크기로 스케일된다
 export const SPRITE_SIZES = {
+  CUT_SECTOR_CLEAR: 800,   // 섹터 클리어 컷신 배경 — 전체화면이라 긴 변(세로)을 캔버스 높이 이상으로
   // 기함은 원본 종횡비가 다르므로 폭이 아닌 긴 변 기준이다. 면적과 긴 변이 H0→H5 단조 증가한다.
   A1: 34, A2: 50, A3: 68, A4: 88, A5: 112, A6: 140,
   B1: 150, B2: 165, B3: 185,                   // 샤드/리퍼/브루드(크리처 small/mid/large) — 위→아래 하강 적 너무 작아 안 보임 → small 5배 확대(순서 유지, 이사)

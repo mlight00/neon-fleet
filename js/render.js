@@ -163,7 +163,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '' }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '', loadoutHud = false }) {
   ctx.save();
   // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
@@ -274,8 +274,10 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
     }
   }
 
-  // 우상단: 무기(+진화) + 레벨 점 + 실드
-  if (weapon) {
+  // 우상단: 무기(+진화) + 레벨 점 + 실드.
+  // loadoutHud=true면 좌측 컬럼(무기 2슬롯)이 같은 정보를 이미 보여주므로 무기 표기는 생략하고
+  // 보호막 표시만 남긴다 — 좌/우 중복으로 화면이 지저분했다(이사).
+  if (weapon && !loadoutHud) {
     const color = WEAPON_COLORS[weapon];
     ctx.textAlign = 'right';
     ctx.font = 'bold 12px Pretendard, sans-serif';
@@ -288,6 +290,11 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillRect(logicalW - 12 - (2 - i) * 10 - 6, 40, 6, 3);
     }
     ctx.globalAlpha = 1;
+  } else if (shield) {
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 12px Pretendard, sans-serif';
+    ctx.fillStyle = COLORS.ally;
+    ctx.fillText('⛨', logicalW - 12, 34);
   }
 
   // ── FLOW / NEON RUSH HUD (하단 중앙, 보스·함대·무기와 겹치지 않음) ──
@@ -346,17 +353,19 @@ function hudHullBar(ctx, x, y, d) {
   ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, hw, hh);
   return y + hh + 15;
 }
-/** 두 무기 슬롯(레벨 점 3개). 보조가 비면 '빈 슬롯'을 흐리게 남겨 아직 조합이 안 됐음을 보여준다. */
+/** 두 무기 슬롯(진화명 + 레벨 점 3개). 보조가 비면 '빈 슬롯'을 흐리게 남겨 아직 조합이 안 됐음을 보여준다.
+ *  진화명(커터3 등)은 예전엔 우상단에만 떠서 좌측 슬롯과 정보가 갈렸다 → 여기로 합쳤다(이사). */
 function hudWeaponSlots(ctx, x, y, d, emptyLabel = '보조 무기 슬롯 (미해금)') {
-  const chip = (label, lv, color) => {
+  const chip = (label, evo, lv, color) => {
     ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = color; ctx.textAlign = 'left';
-    ctx.fillText(label, x, y);
-    const tw = ctx.measureText(label).width;
+    const text = label + (evo ? ` · ${evo}` : '');
+    ctx.fillText(text, x, y);
+    const tw = ctx.measureText(text).width;
     for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < lv ? 1 : 0.25; ctx.fillRect(x + tw + 6 + i * 9, y - 8, 6, 3); }
     ctx.globalAlpha = 1; y += 17;
   };
-  chip('주무기 ' + (WEAPON_LABELS[d.mainWeapon] || d.mainWeapon), d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff');
-  if (d.wingWeapon) chip('보조 ' + (WEAPON_LABELS[d.wingWeapon] || d.wingWeapon), d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff');
+  chip('주무기 ' + (WEAPON_LABELS[d.mainWeapon] || d.mainWeapon), d.mainEvo, d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff');
+  if (d.wingWeapon) chip('보조 ' + (WEAPON_LABELS[d.wingWeapon] || d.wingWeapon), d.wingEvo, d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff');
   else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText(emptyLabel, x, y); ctx.globalAlpha = 1; y += 17; }
   return y;
 }

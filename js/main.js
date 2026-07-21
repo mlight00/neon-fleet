@@ -3,7 +3,8 @@ import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, drawCoreLoopHud, drawSectorLoadoutHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
-import { bossDefById, preloadBossArt } from './sprites.js';
+import { bossDefById, preloadBossArt, preloadSprites } from './sprites.js';
+import { createCutscene, tickCutscene, drawCutscene, cutsceneReady, CUT } from './cutscene.js';
 import { maybeAffix, applyAffixes } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, superEvolutionOptions, evolutionDef } from './weapon-evolutions.js';
@@ -261,6 +262,7 @@ function buildEncounter(node) {
   const mods = stageMods(difficultyLevel);
   r.mods = mods; w.stageMods = mods;
   r.isBossNode = node.type === 'boss';
+  if (r.isBossNode) preloadSprites(['CUT_SECTOR_CLEAR']);   // 섹터 클리어 컷신 배경(보스 노드에서만 로드)
   r.cinemaT = 0;                                   // 컷신 시네마 띠 초기화(노드마다)
   r.tutorial = r.sector === 1 && node.col === 0;   // 첫 원정 첫 노드 = 조작 학습 구간(안전 청크·복제 제한)
   w.scrollSpeed = BAL.scrollSpeed;
@@ -1499,12 +1501,16 @@ function showCoreLoopResult(snap, sq, cl, restartFn) {
 }
 
 // HUD용 무기 진화 라벨: 초진화 > 진화 우선, 강화 레벨 병기 (예: "템페스트2", "폭풍3")
-function weaponEvoLabel(sq) {
-  const w = sq.weapon;
-  const superId = sq.weaponEvolutions2[w], evoId = sq.weaponEvolutions[w];
+/** 무기 하나의 진화 표기(예: '커터3'). 슬롯별로 필요해서 무기 id를 받는다(주무기·보조 공용). */
+function weaponEvoLabelFor(sq, w) {
+  if (!w) return '';
+  const superId = sq.weaponEvolutions2?.[w], evoId = sq.weaponEvolutions?.[w];
   if (superId) return `${evolutionDef(superId)?.short || ''}${sq.superLevels[w] || 1}`;
   if (evoId) return `${evolutionDef(evoId)?.short || ''}${sq.evoLevels[w] || 1}`;
-  return undefined;
+  return '';
+}
+function weaponEvoLabel(sq) {
+  return weaponEvoLabelFor(sq, sq.weapon) || undefined;
 }
 
 // 모듈 효과 누적기 재계산 (모듈 획득 시)
@@ -1715,13 +1721,30 @@ function update(dt) {
       if (r._labRespawnT > 1.2) { r._labRespawnT = 0; spawnBossLabBoss(r.bossLab); }
     }
     if (r.bosses.every((b) => b.dead) && !r.coreLoop && !r.campaign25 && !r.bossLab) {   // 코어루프·25분캠페인·보스랩은 자체 종료/재개 처리(캠페인 연출 미진입)
+      sfx('boss_die');
+      setBgmIntensity(0.24); playBgm('title'); // 승리 여운 BGM으로 전환
+      // 섹터 보스 = 전체화면 컷신(배경 일러스트 + 침몰하는 보스 + 이탈하는 기함).
+      // 배경 이미지가 아직 없으면 cutsceneReady()가 false → 기존 인게임 연출로 폴백한다.
+      if (r.isBossNode && cutsceneReady()) {
+        const lead = r.bosses[0];
+        r.cut = createCutscene({ sector: r.sector, bossId: lead?.def?.id || lead?.bossId, bossName: lead?.korName, tier: r.squad.tier, weapon: r.squad.weapon });
+        r.phase = 'cutscene';
+        r.effects.clear?.();
+        return;
+      }
       // 전원 격파 → 파괴 연출 시작
       r.phase = 'bossDeath';
       r.seqT = 0;
       r.chainT = 0;
-      sfx('boss_die');
-      setBgmIntensity(0.24); playBgm('title'); // 승리 여운 BGM으로 전환
     }
+  } else if (r.phase === 'cutscene') {
+    // 전체화면 컷신 — 게임 로직은 전부 멈추고 연출만 진행.
+    // 초반 0.8초는 건너뛰기를 막는다(보스를 잡은 클릭·스페이스가 그대로 이어져 컷신이 즉사하는 것 방지).
+    if (r.cut.t > 0.8 && input.consumeSkip()) r.cut.t = Math.max(r.cut.t, CUT.outStart);
+    r.effects.update(dt);
+    tickCutscene(r.cut, dt, { ...r.effects, logicalH }, sfx);
+    if (r.cut.done) { r.cut = null; onEncounterClear(); }
+    return;
   } else if (r.phase === 'bossDeath') {
     // 보스 위에서 연쇄 폭발이 터지며 파괴 → 함체가 기울며 아래로 침몰(섹터 클리어 컷신)
     r.squad.invulnT = Math.max(r.squad.invulnT, BAL.flythrough.invuln);   // 클리어 연출 중 무적 (잔여 적 충돌 방지)
@@ -2008,6 +2031,12 @@ function draw() {
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
+  // 섹터 클리어 컷신 = 전체화면 일러스트. 게임 화면·HUD를 전부 대체한다(이사).
+  if (run && run.phase === 'cutscene' && run.cut) {
+    if (drawCutscene(ctx, run.cut, LOGICAL_W, logicalH, run.effects)) { ctx.restore(); return; }
+    run.cut = null;   // 배경 이미지가 없으면 컷신 포기 → 아래 인게임 렌더로 폴백
+  }
+
   // 6구역 × 3층 절차적 배경: 해상도·화면비에 무관하고 이미지 타일 이음새가 없다.
   const scroll = run ? run.scrollY : performance.now() * 0.02;
   zoneBackdrop.draw(ctx, logicalH, scroll, run ? run.sector : save.get().stage);
@@ -2082,6 +2111,7 @@ function draw() {
       flowMax: BAL.flow.max,
       rushT: r.squad.rushT || 0,
       keystoneIcon: keystoneIcon(r.squad.keystone),
+      loadoutHud: !!r.squad.surv,   // 좌측 무기 2슬롯이 뜨는 모드 = 우상단 무기 표기 중복 → 생략(이사)
     });
     // 섹터 원정 적재 HUD — 25분과 같은 내구도 바 + 무기 2슬롯(빈 보조 슬롯 표시) + 공명(이사 요청).
     //  섹터엔 디렉터 타이머·함대·프레임이 없으므로 전용 함수로 그 셋만 뺀다.
@@ -2090,6 +2120,7 @@ function draw() {
       drawSectorLoadoutHud(ctx, LOGICAL_W, logicalH, {
         hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
         mainWeapon: sq.weapon, mainLv: sq.weaponLv, wingWeapon: sq.wing.weaponId, wingLv: sq.wing.level,
+        mainEvo: weaponEvoLabelFor(sq, sq.weapon), wingEvo: weaponEvoLabelFor(sq, sq.wing.weaponId),
         resonanceName: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].name : '',
         resonanceHint: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].hint : '',
         markType: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].trigger === 'mark' : false,
@@ -2107,6 +2138,7 @@ function draw() {
       drawCoreLoopHud(ctx, LOGICAL_W, logicalH, {
         hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
         mainWeapon: sq.weapon, mainLv: sq.weaponLv, wingWeapon: sq.wing.weaponId, wingLv: sq.wing.level,
+        mainEvo: weaponEvoLabelFor(sq, sq.weapon), wingEvo: weaponEvoLabelFor(sq, sq.wing.weaponId),
         fleetSupported: !!r.campaign25,   // 함대 슬롯은 Gate 2 캠페인 전용 — Gate 1 공유 HUD엔 표시 안 함(Codex P3)
         fleetActive: !!(sq.fleet && sq.fleet.active), fleetLabel: BAL.gate2.fleet.label, fleetCount: sq.fleet?.ships?.length || 0,
         fleetColor: BAL.gate2.fleet.color, fleetTelegraph: !!cl.fleetTelegraph,   // §7.2 세 번째 슬롯 HUD 구분

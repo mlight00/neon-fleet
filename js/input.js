@@ -1,6 +1,9 @@
 // 입력 통합: 이동(터치 드래그 / 마우스 위치 / ←→ 키) → targetX,  충전(좌클릭·충전버튼) → charging
 export function createInput(canvas, logicalW) {
-  const input = { targetX: logicalW / 2, active: false, charging: false };
+  const input = { targetX: logicalW / 2, active: false, charging: false, skipRequested: false };
+  /** 연출(컷신) 건너뛰기 래치. 읽으면 소진된다 — 시작 시 clearSkip()으로 먼저 비운 뒤 쓴다. */
+  input.consumeSkip = function () { const v = input.skipRequested; input.skipRequested = false; return v; };
+  input.clearSkip = function () { input.skipRequested = false; };
   let keyDir = 0;
   const KEY_SPEED = 420; // 초당 px
 
@@ -11,6 +14,7 @@ export function createInput(canvas, logicalW) {
   }
 
   canvas.addEventListener('pointerdown', (e) => {
+    input.skipRequested = true;   // 연출 건너뛰기(컷신)
     if (e.pointerType === 'mouse') {
       // 데스크톱: 좌클릭 홀드 = 충전. 이동은 마우스 위치로(아래 pointermove) — 클릭이 함선을 점프시키지 않음.
       if (e.button === 0) input.charging = true;
@@ -35,6 +39,7 @@ export function createInput(canvas, logicalW) {
   window.addEventListener('blur', () => { input.charging = false; });
 
   window.addEventListener('keydown', (e) => {
+    input.skipRequested = true;   // 연출 건너뛰기(컷신)
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keyDir = -1;
     else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keyDir = 1;
     else if (e.key === ' ' || e.code === 'Space') { input.charging = true; e.preventDefault(); } // 스페이스바 홀드 = 차지 랜스 (키보드 플레이)
