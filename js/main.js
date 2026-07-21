@@ -195,7 +195,7 @@ function enterSectorMap() {
   // 첫 출격: 루트 노드(단일 선택지)는 자동 진입하되, 그 전에 조작 안내를 1회 표시 (지시서 A-4 §3.5).
   if (r.sector === 1 && r.done.length === 0 && !d.firstGuideSeen) {
     const root = r.map.cols[0][0];
-    ui.showFirstGuide({ onStart: () => { save.set({ firstGuideSeen: true }); enterNode(root); } });
+    ui.showFirstGuide({ combo: !!r.squad.reson, onStart: () => { save.set({ firstGuideSeen: true }); enterNode(root); } });
     return;
   }
   ui.showSectorMap({
@@ -294,7 +294,12 @@ function buildEncounter(node) {
       pending.push({ type: 'dronePod', trackY: totalTrack * Math.min(0.96, prog), x: 0.18 + 0.64 * rng(), size });
     }
   }
-  if (node.type === 'elite') pending.push({ type: 'midboss', trackY: totalTrack * BAL.midboss.progress }); // 정예=미니보스
+  // 정예 노드 = 미니보스(기존). 추가로, 섹터 무기 조합에서 보조 무기가 아직 없으면 전투/보급 노드에도 미니보스를 확정 배치한다.
+  // 미니보스 POW가 보조 무기(=공명 조합)의 입구인데 정예 변이몹은 섹터 1에서 등장 확률 0%라 조합이 영영 안 나왔다(이사 지적).
+  const needWing = !!r.squad.reson && !r.squad.wing?.weaponId;
+  if (node.type === 'elite' || (needWing && (node.type === 'combat' || node.type === 'supply'))) {
+    pending.push({ type: 'midboss', trackY: totalTrack * BAL.midboss.progress });
+  }
   pending.sort((a, b) => a.trackY - b.trackY);
   // 게이트류(전체폭 막대)가 화면에서 겹쳐 보이지 않게 최소 세로 간격 확보
   const GATE_TYPES = new Set(['gatePair', 'bonusGate', 'weaponGate', 'corruptedGate']);
@@ -1503,8 +1508,10 @@ function recomputeMfx() {
 //   멱등: e._killHandled 플래그로 중복/재귀 안전. 폭발 처리 전에 플래그를 먼저 세워 재귀 이중 처리 차단.
 function onEnemyKilled(e, w) {
   if (!claimKill(e)) return;   // 비적대·미사망·중복 차단 (개체당 1회, 폭발 재귀 안전)
-  // 섹터 무기 조합(S4): 정예몹(엘리트 변이) 처치 → POW 배지 드롭 → 수집 시 무기 강화(이사). 25분·coreLoop 제외(자체 강화).
-  if (!run.campaign25 && !run.coreLoop && e.affixes && e.affixes.includes('elite')) w.spawnEntity(new Pow(e.x, e.y));
+  // 섹터 무기 조합(S4): 중간 정예몹 처치 → POW 배지 드롭 → 수집 시 무기 강화(이사). 25분·coreLoop 제외(자체 강화).
+  //  대상 = 미니보스(=이사가 말한 '중간 정예몹', 확정) + 정예 변이몹(★, 보너스).
+  //  미니보스를 빼먹어서 섹터 1(변이 확률 0%)에선 POW가 하나도 안 나왔다 → 무기 조합이 영영 안 열림.
+  if (!run.campaign25 && !run.coreLoop && (e instanceof MidBoss || (e.affixes && e.affixes.includes('elite')))) w.spawnEntity(new Pow(e.x, e.y));
   const mfx = w.mfx; if (!mfx) { w.squad.onEnemyKill(w, e); return; }
   if (mfx.explodeRadius > 0) {
     const dmg = Math.max(2, (e.maxHp || 20) * mfx.explodeDmgFrac);
