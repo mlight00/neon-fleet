@@ -12,7 +12,7 @@ import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, progressPatch, bossCountFor, invertGateOp } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, cruisersNeededForTier, progressPatch, bossCountFor, invertGateOp } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -261,6 +261,7 @@ function buildEncounter(node) {
   const mods = stageMods(difficultyLevel);
   r.mods = mods; w.stageMods = mods;
   r.isBossNode = node.type === 'boss';
+  r.cinemaT = 0;                                   // 컷신 시네마 띠 초기화(노드마다)
   r.tutorial = r.sector === 1 && node.col === 0;   // 첫 원정 첫 노드 = 조작 학습 구간(안전 청크·복제 제한)
   w.scrollSpeed = BAL.scrollSpeed;
   w.entities.length = 0; w.bullets.length = 0; w.enemyBullets.length = 0;
@@ -1722,10 +1723,16 @@ function update(dt) {
       setBgmIntensity(0.24); playBgm('title'); // 승리 여운 BGM으로 전환
     }
   } else if (r.phase === 'bossDeath') {
-    // 보스 위에서 연쇄 폭발이 터지며 파괴
+    // 보스 위에서 연쇄 폭발이 터지며 파괴 → 함체가 기울며 아래로 침몰(섹터 클리어 컷신)
     r.squad.invulnT = Math.max(r.squad.invulnT, BAL.flythrough.invuln);   // 클리어 연출 중 무적 (잔여 적 충돌 방지)
     r.seqT += dt;
-    for (const b of r.bosses) b.deathT = r.seqT;
+    const BD = BAL.bossDeath;
+    for (const b of r.bosses) {
+      b.deathT = r.seqT;
+      b.y += BD.sinkDrift * dt;                                   // 아래로 가라앉는다
+      b.sinkRoll = (b.sinkRoll || 0) + BD.sinkRoll * dt * (b._rollDir || (b._rollDir = Math.random() < 0.5 ? -1 : 1));
+    }
+    r.cinemaT = Math.min(1, (r.cinemaT || 0) + dt * 3);            // 시네마 띠 등장
     r.scrollY += 30 * dt;
     r.chainT -= dt;
     if (r.chainT <= 0) {
@@ -1740,7 +1747,7 @@ function update(dt) {
       sfx(Math.random() < 0.5 ? 'explode_s' : 'explode_l');
     }
     r.squad.update(dt, w); // 우주선은 사격하며 대기
-    if (r.seqT >= BAL.bossDeath.duration) {
+    if (r.seqT >= (r.isBossNode ? BD.sectorDuration : BD.duration)) {
       // 마지막 대폭발 → 통과 시작
       for (const b of r.bosses) { r.effects.burst(b.x, b.y, COLORS.reward, 40, 320); r.effects.burst(b.x, b.y, '#ffffff', 20, 260); r.effects.ring(b.x, b.y, COLORS.reward); }
       r.effects.flash(0.6);
@@ -1755,17 +1762,20 @@ function update(dt) {
     r.flyV += BAL.flythrough.accel * dt;
     r.squad.y -= r.flyV * dt;
     r.scrollY += r.flyV * dt * 0.6; // 별이 빠르게 흐름
-    for (const b of r.bosses) b.deathT += dt;
+    // 침몰은 통과 중에도 계속 — 화면에 남은 보스가 아래로 멀어지며 뒤로 밀린다
+    for (const b of r.bosses) { b.deathT += dt; b.y += BAL.bossDeath.sinkDrift * 0.6 * dt; }
     r.squad.update(dt, w);
-    // 보스 위치를 지나는 순간 "STAGE CLEAR" 배너
+    // 보스 위치를 지나는 순간 배너 (섹터 보스면 섹터 돌파 컷신 문구)
     if (!r.clearShown && r.boss && r.squad.y < r.boss.y + 30) {
       r.clearShown = true;
-      r.effects.text(LOGICAL_W / 2, logicalH * 0.42, '전투 완료!', COLORS.ally);
+      const label = r.isBossNode ? `섹터 ${r.sector} 돌파` : '전투 완료!';
+      r.effects.text(LOGICAL_W / 2, logicalH * 0.42, label, COLORS.ally, r.isBossNode ? 26 : 18);
+      if (r.isBossNode) r.effects.text(LOGICAL_W / 2, logicalH * 0.42 + 30, '적 기함 격침 확인', COLORS.reward, 13);
       r.effects.ring(LOGICAL_W / 2, logicalH * 0.42, COLORS.ally);
       r.effects.flash(0.4);
       sfx('evolve');
     }
-    if (r.squad.y < BAL.flythrough.exitY) { onEncounterClear(); return; }
+    if (r.squad.y < BAL.flythrough.exitY) { r.cinemaT = 0; onEncounterClear(); return; }
   }
 
   // 개체 업데이트
@@ -2036,9 +2046,19 @@ function draw() {
     if (r.campaign25) drawCampaignFleet(ctx);   // §7.2 전투기 편대(기함 위에 렌더)
     r.effects.draw(ctx, LOGICAL_W, logicalH);
 
+    // 섹터 클리어 컷신: 위아래 시네마 띠. 격침되는 보스를 두고 기함이 빠져나가는 구간을
+    // 전투 화면과 다르게 보이게 한다(이사 요청). HUD보다 먼저 그려 HUD가 띠 위에 남게.
+    if (r.cinemaT > 0) {
+      const bh = logicalH * BAL.bossDeath.letterbox * Math.min(1, r.cinemaT);
+      ctx.save(); ctx.fillStyle = 'rgba(2,4,10,0.92)';
+      ctx.fillRect(0, 0, LOGICAL_W, bh);
+      ctx.fillRect(0, logicalH - bh, LOGICAL_W, bh);
+      ctx.restore();
+    }
+
     const evc = r.world.mfx?.evolveCostMult ?? 1;
     const maxTier = BAL.evolution.names.length - 1;
-    const needCruisers = r.squad.tier < maxTier ? Math.max(1, Math.round(BAL.escort.cruisersPerFlagship * evc)) : 0;
+    const needCruisers = r.squad.tier < maxTier ? Math.max(1, Math.round(cruisersNeededForTier(r.squad.tier, BAL.escort) * evc)) : 0;   // 등급별 필요 순양함(초반 저렴)
     drawHUD(ctx, LOGICAL_W, {
       progress: Math.min(1, r.traveled / r.totalTrack),
       bosses: r.phase === 'boss' ? r.bosses.map((b) => ({ hp: Math.max(0, b.hp), maxHp: b.maxHp, name: b.korName, dead: b.dead, stagger: b.stagger, staggerMax: BAL.neonArbiter.staggerMax, breakT: b.breakT })) : [],
@@ -2071,8 +2091,9 @@ function draw() {
         hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
         mainWeapon: sq.weapon, mainLv: sq.weaponLv, wingWeapon: sq.wing.weaponId, wingLv: sq.wing.level,
         resonanceName: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].name : '',
+        resonanceHint: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].hint : '',
+        markType: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].trigger === 'mark' : false,
         resonanceFrac: sq.reson ? resonChargeFrac(sq.reson, BAL.gate1.resonance) : 0,
-        telegraph: sq.reson ? resonShouldTelegraph(sq.reson, BAL.gate1.resonance) : false,
       });
     }
     // Gate 1 코어루프 / Gate 2 25분 캠페인 HUD (내구도·두 무기·공명·프레임·타이머). 둘 다 surv·director를 가진다.
@@ -2090,8 +2111,10 @@ function draw() {
         fleetActive: !!(sq.fleet && sq.fleet.active), fleetLabel: BAL.gate2.fleet.label, fleetCount: sq.fleet?.ships?.length || 0,
         fleetColor: BAL.gate2.fleet.color, fleetTelegraph: !!cl.fleetTelegraph,   // §7.2 세 번째 슬롯 HUD 구분
         resonanceName: sq.reson.activeId ? RESONANCES[sq.reson.activeId].name : (cl.telegraph ? RESONANCES[cl.build.resonance]?.name : ''),
+        pending: !sq.reson.activeId && !!cl.telegraph,   // 아직 해금 전 예고 — 충전 0%가 아니라 '곧 해금'으로 표기
         resonanceFrac: resonChargeFrac(sq.reson, BAL.gate1.resonance),
-        telegraph: resonShouldTelegraph(sq.reson, BAL.gate1.resonance) || (cl.telegraph && !sq.reson.activeId),
+        resonanceHint: sq.reson.activeId ? RESONANCES[sq.reson.activeId].hint : '',
+        markType: sq.reson.activeId ? RESONANCES[sq.reson.activeId].trigger === 'mark' : false,
         frameIcon: fh?.icon || '', frameGlow: fh?.glow || '', frameName: fh?.name || '',
         dirT: elapsed(cl.director), totalSec: r.campaign25 ? BAL.gate2.totalSec : 480,   // 캠페인=25:00, Gate 1=8:00(Codex 홀리스틱)
         nextEventLabel: nx ? evLabel[nx.type] || '' : '', nextEventIn: nx ? nx.inSec : 0,

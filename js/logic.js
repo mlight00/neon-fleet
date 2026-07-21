@@ -165,6 +165,17 @@ export function canUpgradeFlagship(cruisers, tier, maxTier, cfg) {
   return tier < maxTier && cruisers >= cfg.cruisersPerFlagship;
 }
 
+/**
+ * 현재 등급에서 다음 등급까지 필요한 순양함 수 (순수).
+ * 등급별 표(cruisersPerFlagshipByTier)가 있으면 그 값을, 없거나 범위를 넘으면 기본값을 쓴다.
+ * 초반 승급이 너무 오래 걸린다는 피드백으로 앞 단계만 싸게 만든 장치(이사).
+ */
+export function cruisersNeededForTier(tier, cfg) {
+  const table = cfg.cruisersPerFlagshipByTier;
+  const v = Array.isArray(table) && table[tier] != null ? table[tier] : cfg.cruisersPerFlagship;
+  return Math.max(1, v);
+}
+
 /** 기함 업그레이드 시 흡수 화력을 은행에 적립 + 롤백용 스택에 기록 (순수). */
 export function bankUpgrade(banked, stack, gain) {
   return { banked: banked + gain, stack: [...stack, gain] };

@@ -3,7 +3,7 @@
 // world = { bal, input, squad, bullets, enemyBullets, entities, effects, addCoins,
 //           spawnEntity, spawnEnemyBullet, scrollSpeed, logicalW, logicalH, rng, phase }
 import { BAL } from './balance.js';
-import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, bankUpgrade, bankDemote, invertGateOp } from './logic.js';
+import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, cruisersNeededForTier, bankUpgrade, bankDemote, invertGateOp } from './logic.js';
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFrame, drawHullFrame, drawWeaponRig, drawUpgradeSequence, weaponProjectileSpriteId, SHIP_DEFS, cruiserBlitScale, droneBlitScale } from './ships.js';
@@ -474,7 +474,7 @@ export class Squad {
       sfx('pickup');
     }
     // 2) 순양함이 임계치 이상이면 기함 1단계 업그레이드 (여기서만 선택창=모듈 드래프트가 뜬다)
-    const need = Math.max(1, Math.round(E.cruisersPerFlagship * (mfx.evolveCostMult ?? 1)));  // 신속 진화 모듈
+    const need = Math.max(1, Math.round(cruisersNeededForTier(this.tier, E) * (mfx.evolveCostMult ?? 1)));  // 등급별 비용 + 신속 진화 모듈
     // 캠페인(Gate 2)에선 함체 등급을 디렉터 스케줄(H1~H5)만 올린다 — 드론 진화가 예정보다 일찍 등급 기능을 해금하지 않게(Codex 홀리스틱).
     if (!world.noFlagshipEvolve && canUpgradeFlagship(this.cruisers || 0, this.tier, maxTier, { cruisersPerFlagship: need })) {
       // 흡수한 순양함 화력을 기함에 은행(+보너스) → 업그레이드가 항상 순 이득 (화력 손실 버그 해결)
@@ -1390,9 +1390,29 @@ export class Bullet {
       ctx.translate(this.x, this.y);
       ctx.rotate(a);
       const s = sc * (this.scale || 1);
+      // 레이저는 굵기의 근거가 beamW인데 스프라이트 경로는 이를 무시했다. 그 결과 ①커터 초진화 아트가
+      // 원본부터 얇아(39×320 → 화면 4.9px, 기본 131×320 = 16.4px) 진화하면 빔이 3배 얇아지고
+      // ②5발마다 나오는 '굵은 절단탄'(widthMult 2.3)이 전혀 굵어지지 않았다(이사 지적).
+      // → 렌더 폭이 beamW 기준보다 좁으면 가로만 늘려, 진화해도 안 얇아지고 절단탄은 확실히 굵어진다.
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.9;
-      blit(ctx, art, 0, 0, s);
+      if (this.kind === 'laser') {
+        const wantW = this.beamW * 2;
+        const artW = art.logicalW * s;
+        ctx.save();
+        if (artW > 0 && artW < wantW) ctx.scale(wantW / artW, 1);   // 가로만 늘림(길이는 유지)
+        blit(ctx, art, 0, 0, s);
+        ctx.restore();
+        if (this.cutter) {   // 절단탄: 폭이 넓어진 만큼 백열 심도 굵게 → '굵은 빔'이 한눈에 구분
+          const h = art.logicalH * s, cw = Math.max(2.4, this.beamW * 0.5);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(-cw / 2, -h * 0.48, cw, h * 0.96);
+        }
+      } else {
+        blit(ctx, art, 0, 0, s);
+      }
       // 발칸 발사체 스프라이트는 세로로 길고 폭이 7~9px로 얇은 데다 가산합성이라, 밝은 폭발 위나
       // 오렌지 계열 진화(템페스트)에서는 배경·이펙트에 묻혀 잘 안 보인다. 밝은 백열 코어를 '덮어쓰기'로
       // 항상 덧그려, 어떤 배경·발사체 색에서도 탄의 형태가 또렷하게 남게 한다.

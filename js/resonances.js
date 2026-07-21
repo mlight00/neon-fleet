@@ -4,10 +4,14 @@
 // 공명이 공명을 재귀 발동하지 않도록 발동 소스에 표식(fromResonance)을 두고 충전에서 제외한다.
 
 // 세 공명. 각 쌍은 서로 다른 두 무기. 순서 무관 매칭.
+// hint = 플레이어에게 보여줄 '지금 뭘 하면 되는지'. 내부 용어(예고/충전)만 띄우면 무슨 뜻인지 알 수 없다(이사).
 export const RESONANCES = {
-  railStorm:    { id: 'railStorm',    name: '레일 스톰',       pair: ['vulcan', 'laser'],  trigger: 'charge' },
-  microMissile: { id: 'microMissile', name: '마이크로 미사일 포화', pair: ['vulcan', 'homing'], trigger: 'charge' },
-  seekerBeam:   { id: 'seekerBeam',   name: '시커 빔',         pair: ['laser', 'homing'],  trigger: 'mark' },
+  railStorm:    { id: 'railStorm',    name: '레일 스톰',       pair: ['vulcan', 'laser'],  trigger: 'charge',
+    hint: '적을 맞히면 충전 → 관통 레일포 발사' },
+  microMissile: { id: 'microMissile', name: '마이크로 미사일 포화', pair: ['vulcan', 'homing'], trigger: 'charge',
+    hint: '적을 맞히면 충전 → 유도 미사일 일제 발사' },
+  seekerBeam:   { id: 'seekerBeam',   name: '시커 빔',         pair: ['laser', 'homing'],  trigger: 'mark',
+    hint: '레이저로 적을 찍으면 미사일이 그 적에 집중' },
 };
 
 const PAIR_KEY = (a, b) => [a, b].sort().join('+');

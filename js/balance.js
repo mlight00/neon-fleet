@@ -150,7 +150,10 @@ export const BAL = {
   //  드론→순양함은 자동(게이트·선택 없음). 순양함이 모여 기함을 올릴 때만 선택창(모듈 드래프트)이 뜬다.
   escort: {
     dronesPerCruiser: 130,    // 드론 130기 → 순양함 1척 (자동 합체) — 합체 감속
-    cruisersPerFlagship: 9,   // 순양함 9척 → 기함 1단계 자동 업그레이드 — 진화 감속
+    cruisersPerFlagship: 9,   // 순양함 N척 → 기함 1단계 자동 업그레이드 (아래 표가 없을 때의 기본값)
+    // 등급별 필요 순양함. 초반 승급이 너무 오래 걸린다(이사)는 피드백으로 앞 단계를 싸게 —
+    // index = 현재 등급(0=스카우트 → 1). 뒤 단계는 기존 9척 그대로라 후반 페이스는 유지된다.
+    cruisersPerFlagshipByTier: [4, 6, 8, 9, 9],
     cruiserPower: 130,        // 순양함 1척 화력(드론 환산) — 총화력·적 스케일에 합산
     maxCruisers: 12,          // 순양함 최대 (성능·화면 상한)
     slotGap: 30,              // 순양함 편성 간격(px)
@@ -379,7 +382,9 @@ export const BAL = {
   },
 
   // 보스 격파 연출: 파괴 애니메이션 → 우주선 통과 → 클리어
-  bossDeath: { duration: 1.8, chainInterval: 0.13 }, // 연쇄 폭발 단계
+  // 연쇄 폭발 단계. 섹터 보스는 컷신으로 길게(sectorDuration) 보여준다 — 격침되는 보스를 두고
+  // 기함이 빠져나가는 그림(이사 요청). sink*=침몰 표현, letterbox=시네마 띠 높이 비율.
+  bossDeath: { duration: 1.8, sectorDuration: 3.2, chainInterval: 0.13, sinkDrift: 52, sinkRoll: 0.42, letterbox: 0.1 },
   flythrough: { startV: 140, accel: 1100, exitY: -90, invuln: 0.5 }, // 우주선 상승 통과 (invuln=클리어 통과 중 무적 유지 floor초)
 
   // ── Gate 1: 8분 핵심 재미 수직 슬라이스 (전면개편 §5) ──────────

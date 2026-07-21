@@ -360,14 +360,25 @@ function hudWeaponSlots(ctx, x, y, d, emptyLabel = '보조 무기 슬롯 (미해
   else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText(emptyLabel, x, y); ctx.globalAlpha = 1; y += 17; }
   return y;
 }
+/** 공명 상태 = 이름 + '지금 뭘 하면 되는지' 한 줄 + 진행 바.
+ *  예전엔 '공명 예고: 시커 빔'만 떠서 무슨 뜻인지 알 수 없었다(이사: "공명 예고는 뭐지?").
+ *  표식형(시커 빔)은 충전이 아니라 표적 지정이 조건이라 진행률 대신 상태 문구로 보여준다. */
 function hudResonanceBar(ctx, x, y, d) {
   if (!d.resonanceName) return y;
+  const frac = Math.max(0, Math.min(1, d.resonanceFrac));
+  const ready = frac >= 1;
   ctx.font = 'bold 10px Pretendard, sans-serif'; ctx.textAlign = 'left';
-  ctx.fillStyle = d.telegraph ? '#ffd93d' : '#9fe8ff';
-  ctx.fillText((d.telegraph ? '공명 예고: ' : '공명: ') + d.resonanceName, x, y); y += 4;
+  ctx.fillStyle = ready ? '#ffd93d' : '#9fe8ff';
+  const state = d.pending ? '곧 해금' : d.markType ? (ready ? '표적 지정됨' : '표적 대기') : `${Math.round(frac * 100)}%`;
+  ctx.fillText(`공명 ${d.resonanceName} · ${state}`, x, y); y += 4;
   ctx.fillStyle = 'rgba(159,232,255,0.16)'; ctx.fillRect(x, y, 130, 5);
-  ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x, y, 130 * Math.max(0, Math.min(1, d.resonanceFrac)), 5);
-  return y + 16;
+  ctx.fillStyle = ready ? '#ffd93d' : '#9fe8ff'; ctx.fillRect(x, y, 130 * frac, 5);
+  y += 12;
+  if (d.resonanceHint) {   // 조작 안내 한 줄 — 이게 없으면 공명이 뭘 하는 건지 알 수 없다
+    ctx.font = '9px Pretendard, sans-serif'; ctx.fillStyle = 'rgba(159,232,255,0.62)';
+    ctx.fillText(d.resonanceHint, x, y); y += 11;
+  }
+  return y + 4;
 }
 
 /** 섹터 원정 전용 적재 HUD: 기함 내구도 + 무기 2슬롯 + 공명. 타이머·함대·프레임은 섹터에 없으므로 뺀다. */

@@ -83,7 +83,8 @@ html, body {
    (이사: "배경 박스 촌스럽다") → 엠블럼만 이미지로 쓰고 워드마크는 텍스트로 조판해 박스 자체를 없앰. */
 #overlay .title-mark { display:flex; align-items:center; justify-content:center; gap:14px; margin:0 auto 2px; }
 #overlay .title-emblem { display:block; height:72px; width:auto; filter:drop-shadow(0 0 16px rgba(80,213,255,.34)); }
-#overlay .title-words { display:flex; flex-direction:column; align-items:flex-start; line-height:1; }
+/* 워드마크는 가운데 정렬 — 태그라인이 NEON/FLEET보다 훨씬 넓어서 왼쪽 정렬이면 글자가 줄 가운데를 벗어나 보인다(이사). */
+#overlay .title-words { display:flex; flex-direction:column; align-items:center; text-align:center; line-height:1; }
 #overlay .title-words .tw-neon,
 #overlay .title-words .tw-fleet { font-weight:800; letter-spacing:.14em; font-size:32px; }
 #overlay .title-words .tw-neon { color:#e8f4ff; text-shadow:0 0 14px rgba(120,210,255,.42); }

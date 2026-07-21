@@ -297,14 +297,29 @@ export class Boss {
     }
   }
 
-  /** 파괴 연출: 흔들리며 붉게 과부하 + 파편 흩어짐 + 페이드 */
+  /** 파괴 연출: 함체가 기울며 침몰 + 과부하 발광 + 파편 흩어짐 + 페이드.
+   *  예전엔 스프라이트를 아예 안 그리고 붉은 타원으로 대체해서 "격침되는 적 함선"이 안 보였다
+   *  → 실제 보스 아트를 기울여 남겨야 컷신에서 '침몰하는 보스'로 읽힌다(이사 요청). */
   drawDying(ctx, duration) {
     const p = Math.min(1, this.deathT / duration);
     const shake = (1 - p) * 6;
     const sx = this.x + (Math.random() - 0.5) * shake;
     const sy = this.y + (Math.random() - 0.5) * shake;
+    // ── 침몰하는 함체(실제 보스 아트) ──
+    const gem = this.sprite();
+    if (gem) {
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(this.sinkRoll || 0);                 // 기울어짐(메인 루프가 키움)
+      ctx.globalAlpha = Math.max(0, 1 - p * 0.85);    // 끝에서만 사라짐 — 대부분 구간은 보인다
+      blit(ctx, gem, 0, 0, this.drawScale || 1);
+      ctx.globalCompositeOperation = 'source-atop';   // 함체 실루엣 안쪽만 달군다
+      ctx.fillStyle = `rgba(120,16,20,${(0.25 + p * 0.5).toFixed(2)})`;
+      ctx.fillRect(-this.r * 3, -this.r * 3, this.r * 6, this.r * 6);
+      ctx.restore();
+    }
     ctx.save();
-    ctx.globalAlpha = Math.max(0, 1 - p);
+    ctx.globalAlpha = Math.max(0, 1 - p) * 0.75;
     glow(ctx, COLORS.danger, 30, (c) => {
       c.fillStyle = '#3a0d14';
       c.strokeStyle = COLORS.danger;
