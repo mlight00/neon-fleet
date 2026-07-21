@@ -285,9 +285,9 @@ function buildEncounter(node) {
       pending.push({ ...it, trackY: i * BAL.chunk.heightPx + it.y * BAL.chunk.heightPx });
     }
   }
-  if (r.sector === 1 && node.col === 0) pending.push({ type: 'weaponGate', trackY: 380 }); // 무기 선택 1회(첫 노드)
+  if (r.sector === 1 && node.col === 0 && !r.squad.reson) pending.push({ type: 'weaponGate', trackY: 380 }); // 무기 선택 게이트 — 섹터 무기 조합(reson)이면 제거(시작무기+POW로 충분, 이사: 무기선택 또 나옴)
   if (node.type === 'combat' || node.type === 'elite' || node.type === 'supply') {
-    pending.push({ type: 'bonusGate', trackY: totalTrack * BAL.bonusGate.progress });
+    if (!r.squad.reson) pending.push({ type: 'bonusGate', trackY: totalTrack * BAL.bonusGate.progress }); // 이득 게이트(드론/LvUp/실드) — 섹터 무기 조합이면 제거(이득은 POW로, 이사: 막대바 삭제)
     for (let i = 0; i < BAL.pod.perRun; i++) {
       const prog = (i + 0.6) / BAL.pod.perRun;
       const size = prog < bounds[0] ? 'small' : prog < bounds[1] ? 'mid' : 'large';

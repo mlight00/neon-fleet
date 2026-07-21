@@ -1643,6 +1643,7 @@ export class Crystal extends Scrolling {
     return this.payout;
   }
   hitByBullet(dmg, world) {
+    if (world.squad && world.squad.reson) return;   // 섹터 무기 조합: 크리스탈은 총알로 파괴 안 됨 — 지나가며 편대 접촉 시 자동 수집만(이사)
     const res = hitCrystal(this, dmg);
     this.hp = res.hp;
     if (res.broken) {
@@ -1656,6 +1657,10 @@ export class Crystal extends Scrolling {
     this.scroll(dt, world);
     // 크리스탈 = 편대 접촉 시 자동 수집(안 쏴도 소량 획득). 수송선(DronePod)은 부숴야 대량 → 획득 방식 구분(이사).
     const sq = world.squad;
+    if (sq.reson) {   // 섹터 무기 조합: 파괴 없이 접촉 수집이므로 편대로 유도 흡인(놓치지 않게)
+      const dx = sq.x - this.x, dy = sq.y - this.y, d = Math.hypot(dx, dy) || 1;
+      this.x += (dx / d) * 130 * dt; this.y += (dy / d) * 130 * dt;
+    }
     if (!this.dead && circleHit(this.x, this.y, this.r, sq.x, sq.y, sq.hitRadius)) {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.reward, 16);
