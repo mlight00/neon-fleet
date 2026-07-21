@@ -70,7 +70,9 @@ export const BAL = {
     // 함선을 다시 만들고 왕관을 부수는 이야기라, 등급마다 빛이 커지는 고유명사로 통일(이사 선택).
     // 예전 이름(스카우트·인터셉터·스트라이커)은 함선이 아니라 전투기 등급이었고,
     // 캐리어(항공모함)가 드레드노트(전함)보다 아래라 위계도 어긋나 있었다.
-    names: ['잔광', '섬광', '집광', '극광', '백야', '초신성'],
+    // 한글 '-광' 돌림(잔광·섬광·집광)이 촌스럽다는 피드백으로 영문 함급명으로 교체(이사).
+    // 기존 고유명사(NOVA·PRISM·REAPER·STORM·LANCE·ARBITER·SERAPH…)와 겹치지 않는 이름만 골랐다.
+    names: ['EMBER', 'FLARE', 'ARCLIGHT', 'AURORA', 'ZENITH', 'QUASAR'],
   },
 
   // ── NEON ADAPTATION Phase 1 ──────────────────────────────────
@@ -242,12 +244,12 @@ export const BAL = {
   //  차이를 확실히 느끼도록 극단적으로 벌렸다(연사 1.6↔0.8, 확산 0.4↔2.0, 관통 0↔3).
   // 이름은 evolution.names와 1:1(빛의 단계). 각 등급의 뜻이 그 등급의 사격 특성과 맞물린다.
   shipTraits: [
-    { tag: '잔광 · 균형형',          rate: 1.00, dmg: 1.00, spread: 1.0,  pierce: 0 }, // T0 꺼진 함대에 남은 마지막 빛 — 부서진 정찰함
-    { tag: '섬광 · 고속 연사',        rate: 1.65, dmg: 0.72, spread: 1.25, pierce: 0 }, // T1 번쩍이는 빛 = 탄을 쏟아붓는다
-    { tag: '집광 · 집중 화력',        rate: 0.95, dmg: 1.65, spread: 0.4,  pierce: 0 }, // T2 빛을 한 점에 모음 = 좁고 묵직한 한 방
-    { tag: '극광 · 광역 사격',        rate: 1.45, dmg: 0.90, spread: 2.1,  pierce: 0 }, // T3 오로라 = 부채꼴로 흩뿌림
-    { tag: '백야 · 관통 포격',        rate: 0.85, dmg: 1.55, spread: 0.7,  pierce: 2 }, // T4 밤이 사라진 상태 = 뚫고 나간다
-    { tag: '초신성 · 최대 관통·화력',   rate: 0.78, dmg: 2.05, spread: 0.55, pierce: 3 }, // T5 별의 폭발 = 왕관을 부수는 빛
+    { tag: 'EMBER · 균형형',        rate: 1.00, dmg: 1.00, spread: 1.0,  pierce: 0 }, // T0 잔불 — 꺼진 함대에 남은 마지막 불씨(부서진 정찰함)
+    { tag: 'FLARE · 고속 연사',      rate: 1.65, dmg: 0.72, spread: 1.25, pierce: 0 }, // T1 섬광탄 = 번쩍이며 쏟아붓는다
+    { tag: 'ARCLIGHT · 집중 화력',   rate: 0.95, dmg: 1.65, spread: 0.4,  pierce: 0 }, // T2 아크등 = 한 점에 모인 강렬한 빛
+    { tag: 'AURORA · 광역 사격',     rate: 1.45, dmg: 0.90, spread: 2.1,  pierce: 0 }, // T3 오로라 = 하늘 가득 부채꼴로 퍼진다
+    { tag: 'ZENITH · 관통 포격',     rate: 0.85, dmg: 1.55, spread: 0.7,  pierce: 2 }, // T4 천정(정점의 태양) = 뚫고 내리꽂는다
+    { tag: 'QUASAR · 최대 관통·화력', rate: 0.78, dmg: 2.05, spread: 0.55, pierce: 3 }, // T5 퀘이사 = 우주에서 가장 밝은 광선, 왕관을 부순다
   ],
 
   creature: {
