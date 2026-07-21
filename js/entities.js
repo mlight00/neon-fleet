@@ -1926,6 +1926,33 @@ export class TriGate extends Scrolling {
 }
 
 // ───────────────────────── 색깔 캡슐 (라이덴 오마주): 같은 색 = Lv+1, 다른 색 = 교체
+// 파워업 배지(POW): 정예몹 처치 시 드롭 → 편대로 유도 흡인 → 접촉 시 무기 강화(섹터 무기 조합, 이사 아이디어).
+export class Pow extends Scrolling {
+  constructor(x, y) { super(x, y); this.r = 16; this.t = 0; this.isEnemy = false; }
+  update(dt, world) {
+    this.t += dt;
+    const sq = world.squad;
+    const dx = sq.x - this.x, dy = sq.y - this.y, d = Math.hypot(dx, dy) || 1;
+    this.x += (dx / d) * 165 * dt; this.y += (dy / d) * 165 * dt;   // 편대로 유도(놓치지 않게)
+    if (circleHit(this.x, this.y, this.r + 8, sq.x, sq.y, sq.hitRadius)) {
+      this.dead = true; sfx('buy');
+      if (world.onPowCollect) world.onPowCollect();
+    }
+    if (this.offscreen(world)) this.dead = true;
+  }
+  draw(ctx) {
+    const r = this.r, pulse = 0.72 + 0.28 * Math.sin(this.t * 6);
+    glow(ctx, '#ffd93d', 12, (c) => {
+      c.fillStyle = `rgba(255,217,61,${0.82 * pulse})`; c.strokeStyle = '#fff4c6'; c.lineWidth = 2;
+      c.beginPath();
+      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 - Math.PI / 2; const px = this.x + Math.cos(a) * r, py = this.y + Math.sin(a) * r; i ? c.lineTo(px, py) : c.moveTo(px, py); }
+      c.closePath(); c.fill(); c.stroke();
+    });
+    ctx.fillStyle = '#2a2000'; ctx.font = 'bold 15px Pretendard, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('POW', this.x, this.y + 5);
+  }
+}
+
 export class Capsule extends Scrolling {
   constructor(x, y, weapon) {
     super(x, y);

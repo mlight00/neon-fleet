@@ -2,7 +2,7 @@
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, drawCoreLoopHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
-import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
+import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
 import { bossDefById, preloadBossArt } from './sprites.js';
 import { maybeAffix, applyAffixes } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
@@ -151,6 +151,7 @@ function newExpedition(mode = 'campaign', opts = {}) {
     spawnEntity(e) { this.entities.push(e); },
     spawnEnemyBullet(b) { if (this.enemyBullets.length < this.stageMods.shotCap) this.enemyBullets.push(b); },
     notifyEnemyKilled(e) { onEnemyKilled(e, this); },   // 랜스·메아리·시즈 등 entities.js 킬 경로가 호출하는 중앙 알림
+    onPowCollect() { sectorWeaponUpgrade(); },          // 섹터 POW 수집 → 무기 강화 카드(S4)
   };
   run = {
     world, squad, effects, rng,
@@ -332,6 +333,16 @@ function sectorWingPick(done) {
   });
 }
 
+/** 섹터 정예몹 처치 보상 = pow 수집 → 무기 강화 카드(coreLoopWeaponSteps). 25분의 시간 강화를 섹터답게 정예 격파로(이사). */
+function sectorWeaponUpgrade() {
+  const r = run, sq = r.squad;
+  const steps = coreLoopWeaponSteps(sq);
+  if (!steps.length) { sq.banked = (sq.banked || 0) + 55; r.effects.text(sq.x, sq.y - 60, '화력 강화 +', COLORS.reward, 15); return; }   // 전 무기 최대 → 소폭 화력
+  const opts = steps.slice(0, 3).map((s) => ({ id: s.id, label: s.label, desc: s.desc, color: s.color || '#ffd93d', icon: '🔧' }));
+  pickCard({ title: '무기 강화 선택', subtitle: '정예 격파 보상', autoId: steps[0].id, options: opts,
+    onPick: (id) => { const s = steps.find((x) => x.id === id); if (s) s.apply(); } });
+}
+
 /** 인카운터 클리어(트랙/보스 종료) → 코인 + (섹터: 보조무기 선택 1회) + 노드 완료 */
 function onEncounterClear() {
   const r = run, node = r.node, sq = r.squad;
@@ -362,7 +373,8 @@ function completeNode(node) {
   };
   // 노드 타입별 모듈 지급 계약 (§5.3, logic.nodeModuleGrant): combat·hazard=일반 3택,
   // elite=4택(희귀 보장), supply=없음, repair=자체 UI, boss=다음 섹터/키스톤.
-  const grant = node && nodeModuleGrant(node.type, BAL.nodeReward.eliteDraftCount);
+  // S5: 섹터 무기 조합(reson 설치)이면 진화 모듈 드래프트 대신 무기 강화(정예 POW)로 성장 — 모듈 스킵.
+  const grant = node && !r.squad.reson && nodeModuleGrant(node.type, BAL.nodeReward.eliteDraftCount);
   if (grant) {
     const opts = draftOptions(r.modules, r.rng, grant.count, !!grant.rare);
     if (opts.length) {
@@ -1488,6 +1500,8 @@ function recomputeMfx() {
 //   멱등: e._killHandled 플래그로 중복/재귀 안전. 폭발 처리 전에 플래그를 먼저 세워 재귀 이중 처리 차단.
 function onEnemyKilled(e, w) {
   if (!claimKill(e)) return;   // 비적대·미사망·중복 차단 (개체당 1회, 폭발 재귀 안전)
+  // 섹터 무기 조합(S4): 정예몹(엘리트 변이) 처치 → POW 배지 드롭 → 수집 시 무기 강화(이사). 25분·coreLoop 제외(자체 강화).
+  if (!run.campaign25 && !run.coreLoop && e.affixes && e.affixes.includes('elite')) w.spawnEntity(new Pow(e.x, e.y));
   const mfx = w.mfx; if (!mfx) { w.squad.onEnemyKill(w, e); return; }
   if (mfx.explodeRadius > 0) {
     const dmg = Math.max(2, (e.maxHp || 20) * mfx.explodeDmgFrac);
@@ -1651,7 +1665,8 @@ function update(dt) {
         const variantHp = 1 + BAL.bossVariant.hpPerLoop * b.variantLevel;
         const rawHp = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (b.pattern.tanky ?? 1) * variantHp;
         // 전체 난이도 배수 × 보스 전용 배수 (상한 이후에 곱해 '체력 상한' 자체를 함께 끌어올린다)
-        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap) * BAL.difficulty.globalMult * BAL.difficulty.bossHpMult);
+        const sectorBossScale = 1 + Math.max(0, r.sector - 1) * 0.22;   // 섹터 깊을수록 보스 단단(섹터5≈1.9배·섹터6≈2.1배) — 후반 보스 너무 쉽게 죽는 문제 해결(이사)
+        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap) * BAL.difficulty.globalMult * BAL.difficulty.bossHpMult * sectorBossScale);
         r.bosses.push(b);
       }
       r.boss = r.bosses[0];   // 연출·클리어 배너 앵커용 선두
