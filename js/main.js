@@ -902,16 +902,23 @@ function deriveCampaignBuild() {
 }
 
 /** 캠페인 선택창(게임 정지). 측정=자동(autoId) 선택. play=drafting 정지 + showCoreLoopPick 카드. */
-function campaignPick({ title, subtitle, options, autoId, onPick }) {
+/** 무기/경로 선택 카드(공용 — 섹터·25분 무관). auto=true면 즉시 자동 선택(측정), 아니면 게임 정지 후 카드.
+ *  drafting 플래그로 update()를 멈추고, 여는·재개 프레임에 짧은 무적을 준다. cl(campaign25) 없어도 동작(섹터). */
+function pickCard({ title, subtitle, options, autoId, onPick, auto = false }) {
+  if (auto) { onPick(autoId != null ? autoId : (options[0] && options[0].id)); return; }
   const cl = run.campaign25;
-  if (!cl || cl.auto) { onPick(autoId != null ? autoId : (options[0] && options[0].id)); return; }   // 측정: 자동 선택(정지 없음)
-  drafting = true; cl.picking = true; state = 'play';
-  if (run.squad) run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln);   // 여는 프레임도 보호(현재 update의 남은 적탄 충돌 방지, Codex G2-G 4차)
+  drafting = true; if (cl) cl.picking = true; state = 'play';
+  if (run.squad) run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln);   // 여는 프레임도 보호(남은 적탄 충돌 방지, Codex G2-G 4차)
   ui.showCoreLoopPick({ title, subtitle, options, onPick: (id) => {
-    ui.hide(); drafting = false; cl.picking = false;
+    ui.hide(); drafting = false; if (cl) cl.picking = false;
     if (run.squad) run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln);   // 전투 재개 시 짧은 무적(겹친 적탄 불가피 피해 방지, Codex G2-G 2차)
     sfx('buy'); onPick(id);
   } });
+}
+/** 25분 캠페인 무기 픽 — 측정(cl.auto)·cl 부재면 자동. (pickCard 래퍼: 기존 호출부 시그니처 보존) */
+function campaignPick(opts) {
+  const cl = run.campaign25;
+  pickCard({ ...opts, auto: !cl || cl.auto });
 }
 
 const WEAPON_ICON = { vulcan: '💥', laser: '⚡', homing: '🚀' };
