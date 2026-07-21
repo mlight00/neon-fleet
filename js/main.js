@@ -315,12 +315,32 @@ function buildEncounter(node) {
   if (!r.squad.surv) { r.squad.cruiserHp = []; r.squad.cruiserFlash = []; }
 }
 
-/** 인카운터 클리어(트랙/보스 종료) → 코인 + 노드 완료 */
+/** 섹터 원정 보조 무기 선택(전투 노드 클리어 시 1회) → 주+보조 조합 공명 활성. pickCard 공용. */
+function sectorWingPick(done) {
+  const r = run, sq = r.squad;
+  const opts = ['vulcan', 'laser', 'homing'].filter((w) => w !== sq.weapon).map((w) => ({
+    id: w, label: WEAPON_LABELS[w], desc: `공명: ${RESONANCES[buildForPair(sq.weapon, w).resonance]?.name || ''}`, color: WEAPON_COLORS[w], icon: WEAPON_ICON[w],
+  }));
+  pickCard({
+    title: '보조 무기 선택', subtitle: '주무기와 짝지어 공명이 결정됩니다.', autoId: opts[0].id, options: opts,
+    onPick: (id) => {
+      sq.wing.weaponId = id; sq.wing.level = 1; sq._wingAcc = 0;
+      resonSetLoadout(sq.reson, [sq.weapon, id]);   // 조합 → 공명 활성(update가 tick/발동)
+      r.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[id]} · 공명 ${RESONANCES[sq.reson.activeId]?.name || ''}`, WEAPON_COLORS[id], 15);
+      done && done();
+    },
+  });
+}
+
+/** 인카운터 클리어(트랙/보스 종료) → 코인 + (섹터: 보조무기 선택 1회) + 노드 완료 */
 function onEncounterClear() {
-  const r = run;
+  const r = run, node = r.node, sq = r.squad;
   // 노드 클리어 코인 = baseNodeCoins(sector,col) × 타입 배수 (§5.2)
-  r.world.addCoins(nodeCoinReward(r.sector, r.node.col, r.node.type, BAL.nodeReward.coinMult));
-  completeNode(r.node);
+  r.world.addCoins(nodeCoinReward(r.sector, node.col, node.type, BAL.nodeReward.coinMult));
+  // 섹터 무기 조합(S3): 보조 무기 미선택 + 전투/정예 노드 → 보조 무기 선택 후 노드 완료(원정당 1회).
+  if (!r.campaign25 && sq.reson && !sq.wing.weaponId && node && (node.type === 'combat' || node.type === 'elite')) {
+    sectorWingPick(() => completeNode(node));
+  } else completeNode(node);
 }
 
 /** 노드 완료 → 맵 복귀, 보스 노드면 다음 섹터 */
@@ -1415,13 +1435,14 @@ function refillCoreLoopTrack(elite = false) {
 
 /** Gate 1: 아군 탄이 표적을 맞힌 순간 — 무기/공명 피해 집계 + 공명 충전·표식(§5.4/§6.1). */
 function tallyBulletDamage(w, b, dealt, target) {
-  const m = w.metrics, reson = w.reson;
+  const m = w.metrics, reson = w.reson;   // m 없음=섹터(피해 집계 생략, 공명 충전은 유지)
   const nowT = run.coreLoop ? elapsed(run.coreLoop.director) : 0;
-  if (b.resonanceId) { m.resonanceDamage(b.resonanceId, dealt); return; }   // 공명 발사체 = 공명 피해
-  // 시커 빔: 표식 대상을 맞힌 유도 미사일은 공명 피해로 귀속(우선추적 보상)
-  if (reson && b.sourceWeaponId === 'homing' && isSeekerHit(reson, target)) { m.resonanceDamage('seekerBeam', dealt); }
-  else m.weaponDamage(b.sourceWeaponId, dealt);
-  // 공명 충전: 쌍의 두 무기 명중 모두 전달(모듈의 pair 검사가 필터). 시커 표식: 레이저 명중.
+  if (b.resonanceId) { if (m) m.resonanceDamage(b.resonanceId, dealt); return; }   // 공명 발사체 = 공명 피해(집계만·재충전 안 함)
+  if (m) {   // 피해 집계는 측정/캠페인만(섹터는 metrics 없음)
+    if (reson && b.sourceWeaponId === 'homing' && isSeekerHit(reson, target)) m.resonanceDamage('seekerBeam', dealt);   // 시커 표식 명중=공명 피해 귀속
+    else m.weaponDamage(b.sourceWeaponId, dealt);
+  }
+  // 공명 충전(모드 무관 — 섹터 포함): 쌍의 두 무기 명중 모두 전달(모듈 pair 검사가 필터). 시커 표식=레이저 명중.
   if (reson && reson.activeId) {
     resonOnHit(reson, BAL.gate1.resonance, { sourceWeaponId: b.sourceWeaponId, fromResonance: b.fromResonance });
     if (b.sourceWeaponId === 'laser' && reson.activeId === 'seekerBeam') resonLaserMark(reson, BAL.gate1.resonance, target, nowT);
@@ -1507,6 +1528,11 @@ function update(dt) {
   r.squad.update(dt, w);
   if (r.coreLoop) coreLoopUpdate(dt);   // Gate 1 하네스: 디렉터·공명·프레임·측정 진행
   if (r.campaign25) campaign25Update(dt);   // Gate 2: 25분 6지역 시간 캠페인 진행
+  else if (!r.coreLoop && r.squad.reson?.activeId) {   // 섹터 무기 조합 이식(S3): 공명 tick/발동(coreLoop·campaign25는 자체 update에서 처리)
+    resonTick(r.squad.reson, dt);
+    const spec = resonTryProc(r.squad.reson, BAL.gate1.resonance, 0);
+    if (spec) spawnResonance(spec, r.squad, w);
+  }
   // 트랙 후반·보스·NEON RUSH일수록 BGM의 고역과 속도가 열리는 적응형 강도.
   const travelIntensity = r.totalTrack ? Math.min(1, r.traveled / r.totalTrack) : 0;
   const musicIntensity = r.phase === 'boss' ? 0.86 : r.phase === 'bossDeath' ? 0.35 : 0.3 + travelIntensity * 0.38;
@@ -1714,7 +1740,7 @@ function update(dt) {
           // 코어루프 B22 양측 클램프(dpsCap 하한·enrage 상한)는 보스 hitByBullet 래퍼가 '모든' 경로에 적용한다(§5.8, Codex P1).
           const hpBefore = bo.hp;
           bo.hitByBullet(bossDmg, w, b);
-          if (w.metrics) tallyBulletDamage(w, b, Math.max(0, hpBefore - bo.hp), bo);   // Gate 1: 실제 적용 피해(HP 감소) 집계(G1-07)
+          if (w.metrics || w.reson?.activeId) tallyBulletDamage(w, b, Math.max(0, hpBefore - bo.hp), bo);   // 피해 집계(측정/캠페인) + 공명 충전(섹터 포함)
           b.onHit?.(bo, w);            // 시즈 폭발(도탄/분열은 보스전에서 대상 없음)
           b.dead = true; hitBoss = true; // 보스는 관통 불가 (거대 표적)
           break;
@@ -1734,7 +1760,7 @@ function update(dt) {
         if (w.reson && b.sourceWeaponId === 'homing' && isSeekerHit(w.reson, e)) dealt *= BAL.gate1.resonance.seekerBeam.missileBonus * (w.squad?.resonPowerMult || 1) * (run.campaign25?.resonBonus || 1);   // 시커 증폭(+§7.3 공명 증폭 +§7.1 두 번째 공명)
         const hpBefore = e.hp ?? 0;
         e.hitByBullet(dealt, w, b); // 탄환 문맥 전달(프리즘 코어 등)
-        if (w.metrics) tallyBulletDamage(w, b, Math.max(0, hpBefore - (e.hp ?? 0)), e);   // 실제 적용 피해(HP 감소) 집계(G1-07)
+        if (w.metrics || w.reson?.activeId) tallyBulletDamage(w, b, Math.max(0, hpBefore - (e.hp ?? 0)), e);   // 피해 집계(측정/캠페인) + 공명 충전(섹터 포함)
         b.onHit?.(e, w);   // 진화 온-히트(도탄/분열/폭발) — 각 1회, 비재귀
         if (wasAlive && e.dead) onEnemyKilled(e, w);
         if (b.kind === 'homing') w.effects.burst(b.x, b.y, '#ff9c41', 8, 120); // 미사일 폭발
