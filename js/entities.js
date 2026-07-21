@@ -1654,6 +1654,14 @@ export class Crystal extends Scrolling {
   }
   update(dt, world) {
     this.scroll(dt, world);
+    // 크리스탈 = 편대 접촉 시 자동 수집(안 쏴도 소량 획득). 수송선(DronePod)은 부숴야 대량 → 획득 방식 구분(이사).
+    const sq = world.squad;
+    if (!this.dead && circleHit(this.x, this.y, this.r, sq.x, sq.y, sq.hitRadius)) {
+      this.dead = true;
+      world.effects.burst(this.x, this.y, COLORS.reward, 16);
+      sq.applyDelta(this.payout, world);
+      sfx('crystal');
+    }
     if (this.offscreen(world)) this.dead = true;
   }
   draw(ctx) {
