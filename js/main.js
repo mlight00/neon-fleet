@@ -124,7 +124,7 @@ let drafting = false; // 모듈 드래프트 표시 중(게임 일시 정지)
 let betweenStages = false; // 스테이지 클리어 요약 표시 중(게임 일시 정지)
 
 // 원정(run) = 1스테이지부터 죽을 때까지 연속. 기함·드론·모듈이 누적된다.
-function newExpedition(mode = 'campaign') {
+function newExpedition(mode = 'campaign', opts = {}) {
   const rng = mulberry32((Math.random() * 2 ** 31) | 0);
   const up = save.get().up;
   const H = BAL.hangar.upgrades;
@@ -163,7 +163,13 @@ function newExpedition(mode = 'campaign') {
     mode,                                                            // 'campaign' | 'endless' (§6)
   };
   // 엔드리스는 캠페인 이후 섹터(7)부터 시작 → 보스 순환·변주·다중 보스가 자연히 강해진다.
-  startSector(mode === 'endless' ? BAL.campaign.sectors + 1 : 1);
+  const begin = () => startSector(mode === 'endless' ? BAL.campaign.sectors + 1 : 1);
+  if (opts.pickWeapon) {
+    // 섹터 무기 조합 이식(S2~): 공명 상태 준비 + 출격 시 시작 무기 선택 → 선택 완료 후 섹터 시작.
+    squad.reson = createResonanceState();
+    world.reson = squad.reson;
+    sectorStartWeaponPick(begin);
+  } else begin();
 }
 
 // ── 섹터 분기 맵 ─────────────────────────────────────────────
@@ -361,7 +367,7 @@ function startPlay() {
   if (CAMPAIGN25) { const play = _clParams.has('play'); startCampaign25({ mode: play ? 'play' : 'measure', buildId: 'railStorm', pick: play }); return; }  // ?campaign25=1 자동시연 / &play=1 사람 조작(무기 완전 선택제)
   if (CORE_MEASURE) { startCoreLoop({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?coreLoopMeasure=1: 자동 측정
   if (CORE_LOOP) { startCoreLoop({ mode: 'play' }); return; }   // ?coreLoopTest=1: 사람 플레이 8분 슬라이스
-  newExpedition();   // → startSector(1) → enterSectorMap(): 섹터 맵 화면(state='map'). 노드 선택 시 전투 시작.
+  newExpedition('campaign', { pickWeapon: true });   // 섹터 원정: 출격 시 시작 무기 선택 → 섹터 맵. 노드 선택 시 전투.
 }
 
 /** 보스 패턴 프리뷰(개발/테스트): 지정 보스를 즉시 등장시켜 패턴만 관찰·연습. 처치 시 재소환. */
@@ -914,6 +920,25 @@ function pickCard({ title, subtitle, options, autoId, onPick, auto = false }) {
     if (run.squad) run.squad.invulnT = Math.max(run.squad.invulnT || 0, BAL.squad.evolveInvuln);   // 전투 재개 시 짧은 무적(겹친 적탄 불가피 피해 방지, Codex G2-G 2차)
     sfx('buy'); onPick(id);
   } });
+}
+/** 섹터 원정 출격 시 시작 무기 선택(사람). pickCard 공용 사용 → 완료 후 done()으로 섹터 시작. */
+function sectorStartWeaponPick(done) {
+  const r = run, sq = r.squad;
+  pickCard({
+    title: '시작 무기 선택', subtitle: '이번 원정의 주무기를 고르세요.',
+    autoId: sq.weapon,
+    options: [
+      { id: 'vulcan', label: WEAPON_LABELS.vulcan, desc: '넓게 퍼지는 연사', color: WEAPON_COLORS.vulcan, icon: WEAPON_ICON.vulcan },
+      { id: 'laser', label: WEAPON_LABELS.laser, desc: '적을 관통하는 빔', color: WEAPON_COLORS.laser, icon: WEAPON_ICON.laser },
+      { id: 'homing', label: WEAPON_LABELS.homing, desc: '흩어진 적 자동 추적', color: WEAPON_COLORS.homing, icon: WEAPON_ICON.homing },
+    ],
+    onPick: (id) => {
+      sq.weapon = id; sq.weaponLv = 1;
+      if (sq.reson) resonSetLoadout(sq.reson, [id, null]);
+      r.effects.text(sq.x, sq.y - 60, `시작 무기: ${WEAPON_LABELS[id]}`, WEAPON_COLORS[id], 15);
+      done && done();
+    },
+  });
 }
 /** 25분 캠페인 무기 픽 — 측정(cl.auto)·cl 부재면 자동. (pickCard 래퍼: 기존 호출부 시그니처 보존) */
 function campaignPick(opts) {
