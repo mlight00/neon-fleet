@@ -334,13 +334,9 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
  * Gate 1 코어루프 전용 HUD (전면개편 §5.3/5.4/5.6/5.7). 캠페인 HUD와 별개로 그린다.
  * 기함 내구도 바 + 두 무기 슬롯 + 공명 진행/예고 + 지휘 프레임 + 8분 타이머를 한눈에.
  */
-export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
-  ctx.save();
-  ctx.textBaseline = 'alphabetic';
-  // 모든 코어루프 정보는 좌측 컬럼(x=12)에 세로로 쌓는다 — 우상단 사운드 버튼·좌상단 일시정지 버튼과
-  //  겹치지 않게(G1-09). 캠페인 좌측 HUD(드론/기함 줄)는 y≤83이라 y=92부터 시작한다.
-  const x = 12; let y = 92;
-  // ── 기함 내구도 바 ──
+// ── 공용 조각: 내구도 바 / 무기 슬롯 / 공명 게이지 ──
+// 25분 캠페인(drawCoreLoopHud)과 섹터 원정(drawSectorLoadoutHud)이 같은 표기를 쓰도록 분리(이사: 섹터에도 포함).
+function hudHullBar(ctx, x, y, d) {
   ctx.font = 'bold 11px Pretendard, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#dff0ff';
   ctx.fillText(`기함 내구도 ${Math.round(d.hull)}/${d.hullMax}`, x, y);
   y += 4;
@@ -348,9 +344,10 @@ export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
   ctx.fillStyle = 'rgba(255,80,80,0.16)'; ctx.fillRect(x, y, hw, hh);
   ctx.fillStyle = hf > 0.4 ? '#57e0ff' : hf > 0.18 ? '#ffd93d' : '#ff5a5a'; ctx.fillRect(x, y, hw * hf, hh);
   ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, hw, hh);
-  y += hh + 15;
-
-  // ── 두 무기 슬롯 (좌, 레벨 점) ──
+  return y + hh + 15;
+}
+/** 두 무기 슬롯(레벨 점 3개). 보조가 비면 '빈 슬롯'을 흐리게 남겨 아직 조합이 안 됐음을 보여준다. */
+function hudWeaponSlots(ctx, x, y, d, emptyLabel = '보조 무기 슬롯 (미해금)') {
   const chip = (label, lv, color) => {
     ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = color; ctx.textAlign = 'left';
     ctx.fillText(label, x, y);
@@ -360,7 +357,38 @@ export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
   };
   chip('주무기 ' + (WEAPON_LABELS[d.mainWeapon] || d.mainWeapon), d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff');
   if (d.wingWeapon) chip('보조 ' + (WEAPON_LABELS[d.wingWeapon] || d.wingWeapon), d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff');
-  else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText('보조 무기 슬롯 (미해금)', x, y); ctx.globalAlpha = 1; y += 17; }
+  else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText(emptyLabel, x, y); ctx.globalAlpha = 1; y += 17; }
+  return y;
+}
+function hudResonanceBar(ctx, x, y, d) {
+  if (!d.resonanceName) return y;
+  ctx.font = 'bold 10px Pretendard, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillStyle = d.telegraph ? '#ffd93d' : '#9fe8ff';
+  ctx.fillText((d.telegraph ? '공명 예고: ' : '공명: ') + d.resonanceName, x, y); y += 4;
+  ctx.fillStyle = 'rgba(159,232,255,0.16)'; ctx.fillRect(x, y, 130, 5);
+  ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x, y, 130 * Math.max(0, Math.min(1, d.resonanceFrac)), 5);
+  return y + 16;
+}
+
+/** 섹터 원정 전용 적재 HUD: 기함 내구도 + 무기 2슬롯 + 공명. 타이머·함대·프레임은 섹터에 없으므로 뺀다. */
+export function drawSectorLoadoutHud(ctx, logicalW, logicalH, d) {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  const x = 12; let y = 92;
+  y = hudHullBar(ctx, x, y, d);
+  y = hudWeaponSlots(ctx, x, y, d, '보조 무기 슬롯 (정예 POW로 장착)');
+  hudResonanceBar(ctx, x, y, d);
+  ctx.restore();
+}
+
+export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  // 모든 코어루프 정보는 좌측 컬럼(x=12)에 세로로 쌓는다 — 우상단 사운드 버튼·좌상단 일시정지 버튼과
+  //  겹치지 않게(G1-09). 캠페인 좌측 HUD(드론/기함 줄)는 y≤83이라 y=92부터 시작한다.
+  const x = 12; let y = 92;
+  y = hudHullBar(ctx, x, y, d);
+  y = hudWeaponSlots(ctx, x, y, d);
   // ── 세 번째 슬롯: 함대 시스템(§7.2) — 캠페인(Gate 2)에서만. Gate 1 공유 HUD엔 표시 안 함(Codex P3) ──
   if (d.fleetSupported) {
     if (d.fleetActive) { ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = d.fleetColor || '#7dffb0'; ctx.textAlign = 'left'; ctx.fillText(`함대 ${d.fleetLabel} ×${d.fleetCount}`, x, y); y += 17; }
@@ -369,14 +397,7 @@ export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
   }
 
   // ── 공명 진행/예고 ──
-  if (d.resonanceName) {
-    ctx.font = 'bold 10px Pretendard, sans-serif'; ctx.textAlign = 'left';
-    ctx.fillStyle = d.telegraph ? '#ffd93d' : '#9fe8ff';
-    ctx.fillText((d.telegraph ? '공명 예고: ' : '공명: ') + d.resonanceName, x, y); y += 4;
-    ctx.fillStyle = 'rgba(159,232,255,0.16)'; ctx.fillRect(x, y, 130, 5);
-    ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x, y, 130 * Math.max(0, Math.min(1, d.resonanceFrac)), 5);
-    y += 16;
-  }
+  y = hudResonanceBar(ctx, x, y, d);
 
   // ── 지휘 프레임 아이콘 ──
   if (d.frameIcon) {

@@ -76,7 +76,13 @@ export const ui = {
 
   showTitle({ best, stage, coins = 0, saveOk, onStart, onCampaign25 = null, onHangar, onIntro, onReset, onEndless = null, endlessUnlocked = false, endlessBest = 0 }) {
     panel(`
-      <img class="title-lockup" src="assets/art2-webp/branding/title_lockup.webp" alt="NEON FLEET">
+      <div class="title-mark">
+        <img class="title-emblem" src="assets/art2-webp/branding/emblem.webp" alt="">
+        <div class="title-words">
+          <span class="tw-neon">NEON</span><span class="tw-fleet">FLEET</span>
+          <span class="tw-tag">REBUILD // EVOLVE // BREAK THE CROWN</span>
+        </div>
+      </div>
       <p class="title-kor">네온 함대</p>
       <p class="big">최고 기록: 스테이지 ${stage}</p>
       ${endlessUnlocked ? `<p style="font-size:12px;color:#ffd93d;margin:2px 0">🌌 은하 해방 · 무한 원정 최고 섹터 ${endlessBest}</p>` : ''}

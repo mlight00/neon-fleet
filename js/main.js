@@ -1,7 +1,7 @@
 // 진입점: 캔버스 관리 + 게임 루프 + 상태 머신 + 트랙 생성
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
-import { createStarfield, drawHUD, drawCoreLoopHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
+import { createStarfield, drawHUD, drawCoreLoopHud, drawSectorLoadoutHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
 import { bossDefById, preloadBossArt } from './sprites.js';
 import { maybeAffix, applyAffixes } from './affixes.js';
@@ -152,6 +152,13 @@ function newExpedition(mode = 'campaign', opts = {}) {
     spawnEnemyBullet(b) { if (this.enemyBullets.length < this.stageMods.shotCap) this.enemyBullets.push(b); },
     notifyEnemyKilled(e) { onEnemyKilled(e, this); },   // 랜스·메아리·시즈 등 entities.js 킬 경로가 호출하는 중앙 알림
     onPowCollect() { sectorWeaponUpgrade(); },          // 섹터 POW 수집 → 무기 강화 카드(S4)
+    // 기함 등급 상승 → 함체 내구도 등급업 + 완전 재충전. 25분은 스케줄(campaignHullTier)이 담당하고,
+    // 섹터는 순양함 흡수로 유기적으로 오르므로 여기서 받는다(이사: 25분 체력 시스템을 섹터에도).
+    onFlagshipTierUp(sq) {
+      if (!sq.surv) return;
+      survTierUp(sq.surv, BAL.gate1.survivability);
+      sq.surv.hull = sq.surv.hullMax;
+    },
   };
   run = {
     world, squad, effects, rng,
@@ -166,8 +173,9 @@ function newExpedition(mode = 'campaign', opts = {}) {
   // 엔드리스는 캠페인 이후 섹터(7)부터 시작 → 보스 순환·변주·다중 보스가 자연히 강해진다.
   const begin = () => startSector(mode === 'endless' ? BAL.campaign.sectors + 1 : 1);
   if (opts.pickWeapon) {
-    // 섹터 무기 조합 이식(S2~): 공명 상태 준비 + 출격 시 시작 무기 선택 → 선택 완료 후 섹터 시작.
-    squad.reson = createResonanceState();
+    // 섹터 무기 조합 이식(S2~): 공명 + **기함 내구도**(25분과 동일 모델, 이사 요청) 동시 설치.
+    // installGate1이 wing 슬롯도 비워 초기화하므로, 시작 무기 선택 전에 한 번만 부른다.
+    squad.installGate1({ surv: createSurvivability(BAL.gate1.survivability), reson: createResonanceState(), mainWeapon: squad.weapon });
     world.reson = squad.reson;
     sectorStartWeaponPick(begin);
   } else begin();
@@ -180,6 +188,7 @@ function startSector(sector) {
   r.sector = sector;
   r.map = generateSectorMap(sector, r.rng, BAL.sector.depth);
   r.node = null; r.done = [];
+  r.bgmRestart = true;   // 새 섹터 = 새 장 → 배경음악도 처음부터 다시(이사)
   // 최고 도달 섹터 기록 — 캠페인은 stage, 엔드리스는 endlessBest에만 (기록 완전 분리)
   const p = progressPatch(r.mode, sector, save.get());
   if (Object.keys(p).length) save.set(p);
@@ -190,7 +199,8 @@ function startSector(sector) {
 function enterSectorMap() {
   const r = run;
   state = 'map';
-  setBgmIntensity(0.2); playBgm('title');
+  setBgmIntensity(0.2); playBgm('title', { restart: !!r.bgmRestart });
+  r.bgmRestart = false;   // 섹터 전환 1회만 재시작(노드 사이 복귀는 이어서)
   const d = save.get();
   // 첫 출격: 루트 노드(단일 선택지)는 자동 진입하되, 그 전에 조작 안내를 1회 표시 (지시서 A-4 §3.5).
   if (r.sector === 1 && r.done.length === 0 && !d.firstGuideSeen) {
@@ -1622,7 +1632,10 @@ function update(dt) {
       else if (it.type === 'blinker') for (let k = 0; k < dup; k++) spawnEnemy(new Blinker(k ? LOGICAL_W - x : x, LOGICAL_W), 'blinker');
       else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size, w, supplyMult));
       else if (it.type === 'midboss') {
-        const mb = new MidBoss(LOGICAL_W, contentTier, r.maxPower);
+        // 중간보스 정체 = 캠페인 순서상 '직전 섹터의 보스'(섹터 1은 그 섹터 보스의 축소판).
+        // 이전엔 bossDefFor(sector-1)이라 섹터 1에서 로스터 0번 = B7 하이브 퀸(섹터 6 최종 보스)이 나왔다(이사 지적).
+        const midId = campaignBossId(Math.max(1, r.sector - 1), r.mode, BAL.campaign.bosses, BAL.campaign.endlessBosses);
+        const mb = new MidBoss(LOGICAL_W, contentTier, r.maxPower, midId);
         preloadBossArt(mb.def.id);   // 중간보스 아트 지연 로드 — 없으면 붉은 타원 폴백+텍스트만 보임(이사 지적)
         w.entities.push(mb);
       }
@@ -2050,6 +2063,18 @@ function draw() {
       rushT: r.squad.rushT || 0,
       keystoneIcon: keystoneIcon(r.squad.keystone),
     });
+    // 섹터 원정 적재 HUD — 25분과 같은 내구도 바 + 무기 2슬롯(빈 보조 슬롯 표시) + 공명(이사 요청).
+    //  섹터엔 디렉터 타이머·함대·프레임이 없으므로 전용 함수로 그 셋만 뺀다.
+    if (!r.coreLoop && !r.campaign25 && r.squad.surv) {
+      const sq = r.squad;
+      drawSectorLoadoutHud(ctx, LOGICAL_W, logicalH, {
+        hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
+        mainWeapon: sq.weapon, mainLv: sq.weaponLv, wingWeapon: sq.wing.weaponId, wingLv: sq.wing.level,
+        resonanceName: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].name : '',
+        resonanceFrac: sq.reson ? resonChargeFrac(sq.reson, BAL.gate1.resonance) : 0,
+        telegraph: sq.reson ? resonShouldTelegraph(sq.reson, BAL.gate1.resonance) : false,
+      });
+    }
     // Gate 1 코어루프 / Gate 2 25분 캠페인 HUD (내구도·두 무기·공명·프레임·타이머). 둘 다 surv·director를 가진다.
     const cl = r.coreLoop || r.campaign25;
     if (cl && r.squad.surv) {

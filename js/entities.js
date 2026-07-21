@@ -7,7 +7,7 @@ import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlag
 import { circleHit } from './collision.js';
 import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFrame, drawHullFrame, drawWeaponRig, drawUpgradeSequence, weaponProjectileSpriteId, SHIP_DEFS, cruiserBlitScale, droneBlitScale } from './ships.js';
-import { getSprite, bossDefFor } from './sprites.js';
+import { getSprite, bossDefFor, bossDefById } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
 import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult, weaponProjectileColor } from './weapon-evolutions.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
@@ -482,6 +482,7 @@ export class Squad {
       this.cruisers -= need;
       ({ banked: this.banked, stack: this.bankStack } = bankUpgrade(this.banked || 0, this.bankStack, gain));  // 은행 적립(+롤백 스택)
       this.tier += 1;
+      world.onFlagshipTierUp?.(this);   // 내구도 모델(surv)이 설치된 모드는 함체 등급 상승 + 내구도 완충 (섹터, 이사)
       this.triggerUpgradeFx(world, 'flagship');
       if (this.tier === 1 && !this.doctrine && !this.pendingDoctrine) this.pendingDoctrine = true;  // 첫 업그레이드(0→1) → 교리 선택
       this.shield = true;                        // 업그레이드 직후 사고사 방지
@@ -3007,10 +3008,12 @@ export class Mine extends Scrolling {
 // ───────────────────────── 중간보스: 직전 스테이지 보스가 일반 적처럼 트랙을 지나간다 (스테이지 2+)
 // 화면 상단 고정이 아니라 천천히 하강·통과. 격파 = 드론 대량 회수, 놓치면 그냥 지나감.
 export class MidBoss extends Scrolling {
-  constructor(logicalW, stage, power) {
+  constructor(logicalW, stage, power, bossId = null) {
     super(logicalW / 2, -90);
     const M = BAL.midboss;
-    this.def = bossDefFor(Math.max(1, stage - 1)); // 직전 스테이지의 보스
+    // 직전 스테이지의 보스. bossId를 주면 그걸 우선한다 — bossDefFor(0→1)이 로스터 0번인 **B7 하이브 퀸**
+    // (캠페인 최종 보스)을 돌려줘서, 섹터 1 중간보스로 최종 보스가 나오던 문제(이사 지적) 때문.
+    this.def = bossId ? bossDefById(bossId) : bossDefFor(Math.max(1, stage - 1));
     this.pattern = BAL.bossPatterns[this.def.id] ?? { kind: 'brood' };
     this.stage = stage;
     this.hp = this.maxHp = Math.round(Math.max(M.hpMin, power * M.hpPerPower));

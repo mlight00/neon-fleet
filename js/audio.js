@@ -17,6 +17,9 @@ let saveRef = null;     // save 객체 (설정 영속화)
 // 효과음 전역 감쇠: 베이스 합성음이 커서 슬라이더를 낮춰도 시끄러웠음 → 실제 출력 = 슬라이더값 × 이 배수.
 // (밤시간·저볼륨 환경 대응. 슬라이더는 이 배수 위에서 비례 조절된다.)
 const SFX_MASTER = 0.1;
+// BGM 전역 감쇠: 배경음악이 전반적으로 컸다(이사) → 실제 출력 = 슬라이더값 × 이 배수.
+// 저장된 슬라이더 값과 무관하게 절반이 되므로, 기존 사용자도 다시 맞출 필요가 없다.
+const BGM_MASTER = 0.5;
 
 const bgmBuffers = {};  // name → AudioBuffer | null(로드실패)
 let bgmSlot = null;     // { name, src, gain }
@@ -61,7 +64,7 @@ export function unlockAudio() {
     ctx = new AC();
     masterBgm = ctx.createGain();
     masterSfx = ctx.createGain();
-    masterBgm.gain.value = settings.mute ? 0 : settings.bgm;
+    masterBgm.gain.value = settings.mute ? 0 : settings.bgm * BGM_MASTER;
     masterSfx.gain.value = settings.mute ? 0 : settings.sfx * SFX_MASTER;
     masterBgm.connect(ctx.destination);
     // SFX 버스에 컴프레서 → 타격감(펀치)과 글루. 무기 소리를 묵직하게.
@@ -78,10 +81,18 @@ export function unlockAudio() {
   }
 }
 
+/** 정확히 목표값에 도달하는 램프. setTargetAtTime은 지수 접근이라 0을 **절대** 찍지 못해
+ *  슬라이더를 최소로 내려도 잔음이 남았다(이사: "최소로 줄여도 소리가 나온다"). 선형 램프는 끝값에 정확히 안착한다. */
+function rampTo(param, target) {
+  const now = ctx.currentTime;
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(param.value, now);
+  param.linearRampToValueAtTime(target, now + 0.08);
+}
 function applyVolumes() {
   if (!ctx) return;
-  masterBgm.gain.setTargetAtTime(settings.mute ? 0 : settings.bgm, ctx.currentTime, 0.05);
-  masterSfx.gain.setTargetAtTime(settings.mute ? 0 : settings.sfx * SFX_MASTER, ctx.currentTime, 0.05);
+  rampTo(masterBgm.gain, settings.mute ? 0 : settings.bgm * BGM_MASTER);
+  rampTo(masterSfx.gain, settings.mute ? 0 : settings.sfx * SFX_MASTER);
 }
 
 export function getSettings() { return { ...settings }; }
@@ -123,9 +134,10 @@ async function loadBgm(name) {
   return null;
 }
 
-export async function playBgm(name, { fade = 1.2 } = {}) {
+/** restart=true면 같은 곡이어도 처음부터 다시 튼다(섹터 전환 등 '새 장' 연출, 이사 요청). */
+export async function playBgm(name, { fade = 1.2, restart = false } = {}) {
   if (!unlocked) { pendingBgm = name; return; }
-  if (bgmSlot && bgmSlot.name === name) return; // 이미 재생 중
+  if (!restart && bgmSlot && bgmSlot.name === name) return; // 이미 재생 중
   const buffer = await loadBgm(name);
   const now = ctx.currentTime;
 
