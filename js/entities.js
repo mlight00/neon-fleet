@@ -1287,7 +1287,7 @@ export class ChargeLance {
 function nearestTarget(world, x, y, radius, seen, side = 0) {
   let best = null, bestD = radius;
   for (const e of world.entities) {
-    if (e.dead || !e.hitByBullet || e.indestructible) continue;
+    if (e.dead || !e.hitByBullet || e.indestructible || e.bulletPhantom?.(world)) continue;   // 통과 대상(수집 전용 크리스탈)은 도탄·분열 표적에서 제외
     if (seen && seen.has(e)) continue;
     if (side < 0 && e.x >= x) continue;
     if (side > 0 && e.x <= x) continue;
@@ -1480,7 +1480,8 @@ export class HomingMissile {
     // 우선순위: 크리처/사격형 적 > 크리스탈 > 운석 (최근접). 와스프는 근접 3표적 중 랜덤(분산).
     const cands = [];
     for (const e of world.entities) {
-      if (e.dead || !e.hitByBullet || e.indestructible) continue;
+      // 파괴 불가 대상은 조준하지 않는다 — 잔해(indestructible)·수집 전용 크리스탈(bulletPhantom). 조준하면 미사일이 영원히 못 부수는 걸 쫓느라 적을 안 때린다(이사).
+      if (e.dead || !e.hitByBullet || e.indestructible || e.bulletPhantom?.(world)) continue;
       const d = Math.hypot(e.x - this.x, e.y - this.y);
       cands.push({ e, score: (e.isEnemy ? 2000 : e.reward ? 800 : 400) - d });
     }
@@ -1597,7 +1598,7 @@ export class HomingMissile {
     if (!this.blast) return;
     const { radius, frac } = this.blast;
     for (const o of world.entities) {
-      if (o === hit || o.dead || !o.hitByBullet || o.indestructible) continue;
+      if (o === hit || o.dead || !o.hitByBullet || o.indestructible || o.bulletPhantom?.(world)) continue;   // 통과 대상은 폭발 대상에서도 제외
       if (Math.hypot(o.x - this.x, o.y - this.y) <= radius + (o.r || 0)) {
         o.hitByBullet(this.damage * frac, world);
         if (o.dead) world.notifyEnemyKilled?.(o);   // 시즈 토피도 광역 처치도 킬 이벤트 집계
@@ -1641,6 +1642,12 @@ export class Crystal extends Scrolling {
   /** 실제 지급 드론 수 = 생성 시 확정된 payout. 스캐빈저도 이 값을 저장한다. (world 인자는 하위 호환용) */
   getDroneReward() {
     return this.payout;
+  }
+  /** 섹터 무기 조합 모드: 아군 탄이 그대로 통과한다(파괴 불가 = 표적도 장애물도 아님, 이사).
+   *  이게 없으면 편대 쪽으로 흡인된 크리스탈이 사선 정면에서 발칸·레이저·미사일을 전부 잡아먹어 초반 적을 못 부순다.
+   *  잔해(Debris)의 indestructible과는 다르다 — 잔해는 탄을 '막는' 게 설계 의도라 통과시키지 않는다. */
+  bulletPhantom(world) {
+    return !!(world && world.squad && world.squad.reson);
   }
   hitByBullet(dmg, world) {
     if (world.squad && world.squad.reson) return;   // 섹터 무기 조합: 크리스탈은 총알로 파괴 안 됨 — 지나가며 편대 접촉 시 자동 수집만(이사)

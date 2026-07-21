@@ -1778,7 +1778,8 @@ function update(dt) {
       if (hitBoss) continue;
     }
     for (const e of w.entities) {
-      if (e.dead || !e.hitByBullet) continue;
+      // bulletPhantom = 아군 탄이 그대로 통과(섹터 무기 조합의 수집 전용 크리스탈). 충돌 자체를 안 잡아야 탄이 소멸하지 않는다.
+      if (e.dead || !e.hitByBullet || e.bulletPhantom?.(w)) continue;
       if (b.hitSet && b.hitSet.has(e)) continue;
       const rr = (e.r ?? 20) + b.r;
       const dx = b.x - e.x, dy = b.y - e.y;
