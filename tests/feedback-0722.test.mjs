@@ -58,6 +58,18 @@ test('FB-05: 섹터 클리어 컷신 — 보스가 침몰하고 시네마 띠가
   assert.ok(mainSrc.includes('r.cinemaT = 0;'), '노드마다 초기화');
 });
 
+test('FB-06b: 기함 등급 이름 = 세계관(빛의 단계) 고유명사, 특성 태그와 1:1', () => {
+  const names = BAL.evolution.names, traits = BAL.shipTraits;
+  assert.deepEqual(names, ['잔광', '섬광', '집광', '극광', '백야', '초신성']);
+  assert.equal(traits.length, names.length, '이름과 특성 개수 일치');
+  names.forEach((n, i) => assert.ok(traits[i].tag.startsWith(n + ' ·'), `T${i} 태그가 '${n}'로 시작`));
+  // 전투기 등급·위계 역전(캐리어<드레드노트)이던 옛 이름이 플레이어에게 다시 노출되면 안 된다
+  for (const old of ['스카우트', '인터셉터', '스트라이커', '캐리어', '드레드노트', '타이탄']) {
+    assert.ok(!names.includes(old), `옛 이름 ${old} 잔존`);
+    assert.ok(!traits.some((t) => t.tag.includes(old)), `옛 이름 ${old}가 특성 태그에 잔존`);
+  }
+});
+
 test('FB-06: 초기 기함 승급이 빨라지고 후반은 유지된다', () => {
   const E = BAL.escort;
   assert.ok(Array.isArray(E.cruisersPerFlagshipByTier), '등급별 비용표');
