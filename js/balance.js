@@ -176,7 +176,7 @@ export const BAL = {
   weapons: {
     vulcan: { coef: 1.2, speed: 560, spreadDeg: [16, 20, 24] },       // Lv별 확산각 (파워 상향 1.0→1.2: 발칸 빈약 피드백)
     laser: { coef: 1.15, speed: 900, pierce: [3, 3, 4], decay: 0.65 }, // 관통 수, 관통당 감쇠
-    homing: { coef: 0.84, rate: 12, speedFrom: 300, speedTo: 480, turnRate: 5, cap: 16 }, // 자동조준 보정 완화(0.56→0.8→0.84: 시작 시 초반 적을 못 부순다는 피드백으로 5% 상향, 이사)
+    homing: { coef: 0.88, rate: 12, speedFrom: 300, speedTo: 480, turnRate: 5, cap: 16 }, // 자동조준 보정 완화(0.56→0.8→0.88: 초반 적을 못 부순다는 피드백으로 10% 상향, 이사)
     lvCoef: [1.0, 1.15, 1.3],
     maxLv: 3,
     // 진화·초진화 강화 진행 속도 늦춤(사용자: 섹터 2에 이미 최종 진화). 베이스 Lv는 그대로,
