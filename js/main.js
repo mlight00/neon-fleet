@@ -333,25 +333,28 @@ function sectorWingPick(done) {
   });
 }
 
-/** 섹터 정예몹 처치 보상 = pow 수집 → 무기 강화 카드(coreLoopWeaponSteps). 25분의 시간 강화를 섹터답게 정예 격파로(이사). */
+/** 섹터 정예몹 처치 보상 = POW 수집 → 무기 강화 카드. 보조 무기 미장착이면 '보조 무기 장착'(공명) 옵션도 포함(이사: 5초 선택창 대신 정예 보상으로 통합). */
 function sectorWeaponUpgrade() {
   const r = run, sq = r.squad;
-  const steps = coreLoopWeaponSteps(sq);
-  if (!steps.length) { sq.banked = (sq.banked || 0) + 55; r.effects.text(sq.x, sq.y - 60, '화력 강화 +', COLORS.reward, 15); return; }   // 전 무기 최대 → 소폭 화력
-  const opts = steps.slice(0, 3).map((s) => ({ id: s.id, label: s.label, desc: s.desc, color: s.color || '#ffd93d', icon: '🔧' }));
+  let steps = coreLoopWeaponSteps(sq);
+  if (!sq.wing.weaponId) {   // 보조 무기 없음 → 이번 POW에 보조 무기 장착 선택지(주무기와 조합→공명) 우선 노출
+    const wingOpts = ['vulcan', 'laser', 'homing'].filter((w) => w !== sq.weapon).map((w) => ({
+      id: `wing-${w}`, label: `보조: ${WEAPON_LABELS[w]}`, desc: `공명 ${RESONANCES[buildForPair(sq.weapon, w).resonance]?.name || ''}`, color: WEAPON_COLORS[w], icon: WEAPON_ICON[w],
+      apply: () => { sq.wing.weaponId = w; sq.wing.level = 1; sq._wingAcc = 0; resonSetLoadout(sq.reson, [sq.weapon, w]); r.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[w]} · 공명 ${RESONANCES[sq.reson.activeId]?.name || ''}`, WEAPON_COLORS[w], 15); },
+    }));
+    steps = [...wingOpts, ...steps];
+  }
+  if (!steps.length) { sq.banked = (sq.banked || 0) + 55; r.effects.text(sq.x, sq.y - 60, '화력 강화 +', COLORS.reward, 15); return; }
+  const opts = steps.slice(0, 3).map((s) => ({ id: s.id, label: s.label, desc: s.desc, color: s.color || '#ffd93d', icon: s.icon || '🔧' }));
   pickCard({ title: '무기 강화 선택', subtitle: '정예 격파 보상', autoId: steps[0].id, options: opts,
     onPick: (id) => { const s = steps.find((x) => x.id === id); if (s) s.apply(); } });
 }
 
-/** 인카운터 클리어(트랙/보스 종료) → 코인 + (섹터: 보조무기 선택 1회) + 노드 완료 */
+/** 인카운터 클리어(트랙/보스 종료) → 코인 + 노드 완료. 보조 무기는 정예 POW 강화에 통합(이사: 출격 직후 5초 선택창 삭제). */
 function onEncounterClear() {
-  const r = run, node = r.node, sq = r.squad;
-  // 노드 클리어 코인 = baseNodeCoins(sector,col) × 타입 배수 (§5.2)
-  r.world.addCoins(nodeCoinReward(r.sector, node.col, node.type, BAL.nodeReward.coinMult));
-  // 섹터 무기 조합(S3): 보조 무기 미선택 + 전투/정예 노드 → 보조 무기 선택 후 노드 완료(원정당 1회).
-  if (!r.campaign25 && sq.reson && !sq.wing.weaponId && node && (node.type === 'combat' || node.type === 'elite')) {
-    sectorWingPick(() => completeNode(node));
-  } else completeNode(node);
+  const r = run, node = r.node;
+  r.world.addCoins(nodeCoinReward(r.sector, node.col, node.type, BAL.nodeReward.coinMult));   // 노드 클리어 코인(§5.2)
+  completeNode(node);
 }
 
 /** 노드 완료 → 맵 복귀, 보스 노드면 다음 섹터 */
@@ -608,7 +611,7 @@ function spawnResonance(spec, sq, w) {
   if (spec.kind === 'rail') {
     const hx = BAL.gate1.loadout.hardpointX.wing;
     const b = new Bullet(sq.x + hx, sq.y - 10, shotBase * spec.dmgFrac, {
-      vy: -BAL.weapons.laser.speed * 1.15, kind: 'laser', pierce: spec.pierce, beamW: spec.width, lv: 3, color: '#e9f7ff',
+      vy: -BAL.weapons.laser.speed * 1.15, kind: 'laser', pierce: spec.pierce, beamW: 9, lv: 3, color: '#e9f7ff',   // 시각 폭 9(←spec.width 36은 폭72 흰 네모박스로 보임). 관통 판정은 pierce로 유지
     });
     b.resonanceId = 'railStorm'; b.fromResonance = true; b.sourceWeaponId = null;
     w.bullets.push(b);
@@ -1590,9 +1593,11 @@ function update(dt) {
       else if (it.type === 'meteor') w.entities.push(new Meteor(x, -60, r.rng));
       else if (it.type === 'debris') w.entities.push(new Debris(x, -90, it.size));
       else if (it.type === 'power') {
-        // 절반은 무기 캡슐(무기 선택/강화)로 교체 — 10초 임시 파워업만 반복되지 않게 (사용자 요청)
-        if (r.rng() < 0.5) w.entities.push(new PowerModule(x, -60));
-        else w.entities.push(new Capsule(x, -60, ['vulcan', 'laser', 'homing'][Math.floor(r.rng() * 3)]));
+        // 섹터 무기 조합(reson)이면 무기 캡슐·파워업 미스폰 — 무기는 정예 POW 강화로만(이사: 보조무기 충돌·드론/보호막 획득 정리).
+        if (!r.squad.reson) {
+          if (r.rng() < 0.5) w.entities.push(new PowerModule(x, -60));
+          else w.entities.push(new Capsule(x, -60, ['vulcan', 'laser', 'homing'][Math.floor(r.rng() * 3)]));
+        }
       }
       else if (it.type === 'sniper') for (let k = 0; k < dup; k++) spawnEnemy(new Sniper(k ? LOGICAL_W - x : x), 'sniper');
       else if (it.type === 'turret') for (let k = 0; k < dup; k++) spawnEnemy(new Turret(k ? LOGICAL_W - x : x, -60 - 90 * k), 'turret');
@@ -1608,10 +1613,10 @@ function update(dt) {
       else if (it.type === 'dronePod') w.entities.push(new DronePod(x, -60, it.size, w, supplyMult));
       else if (it.type === 'midboss') w.entities.push(new MidBoss(LOGICAL_W, contentTier, r.maxPower));
       else if (it.type === 'capsule') {
-        const weapon = it.weapon === 'random'
-          ? ['vulcan', 'laser', 'homing'][Math.floor(r.rng() * 3)]
-          : it.weapon;
-        w.entities.push(new Capsule(x, -60, weapon));
+        if (!r.squad.reson) {   // 섹터 무기 조합이면 무기 캡슐 미스폰(보조무기 충돌 방지 — 이사)
+          const weapon = it.weapon === 'random' ? ['vulcan', 'laser', 'homing'][Math.floor(r.rng() * 3)] : it.weapon;
+          w.entities.push(new Capsule(x, -60, weapon));
+        }
       }
       else if (it.type === 'weaponGate') {
         w.entities.push(new TriGate(LOGICAL_W, -70, [
