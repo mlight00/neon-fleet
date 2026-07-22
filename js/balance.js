@@ -29,7 +29,12 @@ export const BAL = {
   // coinBankMult = 원정 종료 시 격납고로 적립되는 코인 배수. 노드 보상·적 처치·드론 초과분 등
   //  모든 코인 경로가 이 한 지점을 지나므로 여기서만 조정하면 전체 수급이 비례한다.
   //  (섹터 5까지 한 번에 전체 강화 항목의 1/4을 살 수 있어 과했다 → 0.5, 이사)
-  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5, coinBankMult: 0.5 },
+  // crystalContactMult = 접촉 수집(무위험) 크리스탈의 보상 배수.
+  //  크리스탈은 원래 '쏴서 부수는' 개체라 보상값(최대 300)이 그 전제로 잡혀 있었는데,
+  //  접촉 자동 수집으로 바꾸면서 무위험이 됐다. 그 결과 공짜 크리스탈(+66)이 HP 110을 깎아야 하는
+  //  대형 수송선(+19)보다 3.5배 더 줬다 — 리스크-보상이 완전히 뒤집혀 있었다(이사 지적).
+  //  → 크리스탈은 '잔돈', 대량 보급은 부숴야 하는 수송선. 아래 배수로 그 순서를 되돌린다.
+  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5, coinBankMult: 0.5, crystalContactMult: 0.25 },
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
