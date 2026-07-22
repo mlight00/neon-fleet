@@ -121,3 +121,46 @@ test('TU-11: 드론 발사 지분이 값으로 분리돼 조정 가능하다', (
   assert.ok(entSrc.includes('BAL.squad.escortShare + dEff.escortShareBonus'), '코드에 박힌 0.3을 값으로 뺐다');
   assert.ok(!/this\.count > 1 \? 0\.3 \+/.test(entSrc), '옛 하드코딩이 남아 있으면 안 된다');
 });
+
+// ── 썸네일 (이사: 이름만으론 어느 적인지 매칭이 안 된다) ──────────
+import { artFor } from '../js/tuner-spec.js';
+
+test('TU-12: 적 관련 밸런스 경로에 썸네일이 매칭된다', () => {
+  const must = [
+    ['creature.small', 'B1'], ['creature.mid', 'B2'], ['creature.large', 'B3'],
+    ['creature.radius.small', 'B1'], ['creature.radius.large', 'B3'],
+    ['sniper.hp', 'B4'], ['turret.hp', 'B5'], ['weaver.hp', 'B6'],
+    ['newEnemies.bomber.hp', 'B16'], ['newEnemies.zapper.hp', 'B17'],
+    ['newEnemies.orbiter.hp', 'B18'], ['newEnemies.shielder.hp', 'B19'],
+    ['newEnemies.carrier.hp', 'B20'], ['newEnemies.blinker.hp', 'B21'],
+    ['boss.hp', 'B8'], ['midboss.hpMin', 'B8'], ['neonArbiter.staggerMax', 'B22'],
+    ['pod.large.reward', 'C5'], ['weapons.homing.coef', 'PROJ_HOMING_BASE'],
+  ];
+  for (const [path, art] of must) {
+    assert.equal(artFor('bal', path), art, `${path} 의 썸네일이 ${art} 여야 한다`);
+  }
+});
+
+test('TU-13: 그림 파일이 없는 적은 코드 렌더로 표시한다', () => {
+  // 돌진병·기뢰·잔해는 스프라이트가 없어 게임의 draw()를 그대로 호출한다
+  for (const p of ['charger.hp', 'mine.hp', 'debris.rBig']) {
+    const a = artFor('bal', p);
+    assert.ok(a && a.startsWith('VEC:'), `${p} 는 코드 렌더 대상이어야 한다 (지금 ${a})`);
+  }
+  const tunerSrc = readFileSync(new URL('../js/tuner.js', import.meta.url), 'utf8');
+  assert.ok(tunerSrc.includes('const VECTOR_THUMB'), '코드 렌더 표');
+  assert.ok(tunerSrc.includes("import { Charger, Mine, Debris } from './entities.js'"), '실제 게임 클래스 사용');
+  assert.ok(tunerSrc.includes('e.draw(g)'), '게임의 draw()를 그대로 호출 — 그림이 바뀌면 썸네일도 따라간다');
+});
+
+test('TU-14: 크기 항목은 그 스프라이트 자신을 보여준다', () => {
+  assert.equal(artFor('sprite', 'B1'), 'B1');
+  assert.equal(artFor('sprite', 'A6'), 'A6');
+});
+
+test('TU-15: 추상 수치에는 억지로 그림을 붙이지 않는다', () => {
+  // 난이도 배수·타임라인 같은 값에 엉뚱한 그림이 붙으면 오히려 헷갈린다
+  for (const p of ['difficulty.globalMult', 'gate1.timeline.bossStart', 'nodeReward.eliteDraftCount']) {
+    assert.equal(artFor('bal', p), null, `${p} 에는 썸네일이 없어야 한다`);
+  }
+});

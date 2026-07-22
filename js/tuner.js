@@ -1,9 +1,10 @@
 // 밸런스 튜너 화면 로직 (tuner.html 전용).
 // 게임과 같은 출처라 저장소를 공유한다 → 저장하면 게임 탭이 storage 이벤트로 즉시 반영.
 import { BAL } from './balance.js';
-import { SPRITE_SIZES } from './sprites.js';
-import { GROUPS, coreKeySet, coreCount } from './tuner-spec.js';
+import { SPRITE_SIZES, preloadSprites, getSprite } from './sprites.js';
+import { GROUPS, coreKeySet, coreCount, artFor } from './tuner-spec.js';
 import { flatten, getPath, loadPatch, savePatch, clearPatch, emptyPatch } from './tuning.js';
+import { Charger, Mine, Debris } from './entities.js';
 
 // 원본 기본값 스냅샷 — 페이지 로드 시 한 번. 이후 편집은 이 사본과 비교해 '변경분'만 저장한다.
 const BASE = { bal: JSON.parse(JSON.stringify(BAL)), sprite: { ...SPRITE_SIZES } };
@@ -11,6 +12,7 @@ const SRC = { bal: BAL, sprite: SPRITE_SIZES };
 
 let patch = loadPatch();                       // { bal:{path:값}, sprite:{path:값} }
 const rowEls = new Map();                      // 'ns:path' → { input, slider, reset, row }
+const thumbs = [];                             // 그려야 할 썸네일 캔버스들
 
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -70,10 +72,22 @@ function makeRow(item) {
 
   const row = el('div', 'row');
   const left = el('div', 'label');
-  left.appendChild(el('div', 'nm', item.name || path));
+  // 썸네일: 이름만으론 어느 적인지 알기 어렵다는 피드백(이사) → 실제 게임 그림을 옆에 붙인다.
+  const artId = item.art || artFor(ns, path);
+  if (artId) {
+    const c = el('canvas', 'thumb');
+    c.width = 40; c.height = 40; c.dataset.art = artId; c.title = artId;
+    left.appendChild(c);
+    thumbs.push(c);
+  } else {
+    left.appendChild(el('div', 'thumb none'));   // 자리를 비워두면 이름 줄이 어긋난다
+  }
+  const txt = el('div', 'ltext');
+  txt.appendChild(el('div', 'nm', item.name || path));
   const sub = el('div', 'sub');
   sub.textContent = item.desc ? `${item.desc} · ${path}` : path;
-  left.appendChild(sub);
+  txt.appendChild(sub);
+  left.appendChild(txt);
 
   const ctrl = el('div', 'ctrl');
   let slider = null;
@@ -215,6 +229,49 @@ function applyFilter(q) {
   }
 }
 
+/** 스프라이트를 실제로 로드해 각 썸네일 캔버스에 비율 유지로 그린다. */
+/** 그림 파일이 없고 코드로 그리는 적 — 게임의 실제 draw()를 그대로 호출해 정확한 모습을 얻는다. */
+const VECTOR_THUMB = {
+  charger: () => new Charger(0),
+  mine: () => new Mine(0),
+  debris: () => new Debris(0, 0, 'big'),
+};
+function drawVector(c, kind) {
+  const make = VECTOR_THUMB[kind];
+  if (!make) return false;
+  const e = make();
+  const g = c.getContext('2d');
+  const s = (c.width * 0.86) / Math.max(2, (e.r || 20) * 2);
+  g.save();
+  g.translate(c.width / 2, c.height / 2);
+  g.scale(s, s);
+  g.translate(-e.x, -e.y);          // draw()가 절대좌표를 쓰므로 개체 위치를 원점으로
+  try { e.draw(g); } catch { g.restore(); return false; }
+  g.restore();
+  return true;
+}
+
+async function drawThumbs() {
+  const ids = [...new Set(thumbs.map((c) => c.dataset.art))].filter((id) => !id.startsWith('VEC:'));
+  await preloadSprites(ids).catch(() => {});
+  let drawn = 0;
+  for (const c of thumbs) {
+    if (c.dataset.art.startsWith('VEC:')) {
+      if (drawVector(c, c.dataset.art.slice(4))) drawn++; else c.classList.add('none');
+      continue;
+    }
+    const sp = getSprite(c.dataset.art);
+    if (!sp) { c.classList.add('none'); continue; }
+    const g = c.getContext('2d');
+    const s = Math.min(c.width / sp.logicalW, c.height / sp.logicalH) * 0.92;
+    const w = sp.logicalW * s, h = sp.logicalH * s;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(sp, (c.width - w) / 2, (c.height - h) / 2, w, h);
+    drawn++;
+  }
+  return drawn;
+}
+
 // ── 시작 ──
 buildCore();
 buildAll();
@@ -226,3 +283,4 @@ $('#btn-export').addEventListener('click', doExport);
 $('#btn-import').addEventListener('click', doImport);
 $('#search').addEventListener('input', (e) => applyFilter(e.target.value));
 $('#btn-open-game').addEventListener('click', () => window.open('index.html', 'neonfleet-game'));
+drawThumbs().then((n) => console.info(`[튜너] 썸네일 ${n}개 렌더`));
