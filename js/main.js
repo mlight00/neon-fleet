@@ -4,7 +4,7 @@ import { createInput } from './input.js';
 import { createStarfield, drawHUD, drawCoreLoopHud, drawSectorLoadoutHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
 import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
 import { bossDefById, preloadBossArt, preloadSprites } from './sprites.js';
-import { createCutscene, tickCutscene, drawCutscene, cutsceneReady, CUT } from './cutscene.js';
+import { createCutscene, tickCutscene, drawCutscene, drawCutsceneBackdrop, cutsceneReady, CUT } from './cutscene.js';
 import { maybeAffix, applyAffixes } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
 import { evolutionOptions, superEvolutionOptions, evolutionDef } from './weapon-evolutions.js';
@@ -262,6 +262,7 @@ function buildEncounter(node) {
   const mods = stageMods(difficultyLevel);
   r.mods = mods; w.stageMods = mods;
   r.isBossNode = node.type === 'boss';
+  r.clearBackdrop = false;   // 새 노드 시작 = 컷신 배경 해제
   if (r.isBossNode) preloadSprites(['CUT_SECTOR_CLEAR']);   // 섹터 클리어 컷신 배경(보스 노드에서만 로드)
   r.cinemaT = 0;                                   // 컷신 시네마 띠 초기화(노드마다)
   r.tutorial = r.sector === 1 && node.col === 0;   // 첫 원정 첫 노드 = 조작 학습 구간(안전 청크·복제 제한)
@@ -1727,8 +1728,14 @@ function update(dt) {
       // 배경 이미지가 아직 없으면 cutsceneReady()가 false → 기존 인게임 연출로 폴백한다.
       if (r.isBossNode && cutsceneReady()) {
         const lead = r.bosses[0];
-        r.cut = createCutscene({ sector: r.sector, bossId: lead?.def?.id || lead?.bossId, bossName: lead?.korName, tier: r.squad.tier, weapon: r.squad.weapon });
+        // 보스 아트 id: Boss 클래스는 spriteId, MidBoss는 def.id를 쓴다.
+        // 예전엔 def.id만 읽어 섹터 보스에서 undefined가 되면서 컷신에 보스가 아예 안 그려졌다(이사 지적).
+        r.cut = createCutscene({
+          sector: r.sector, bossId: lead?.spriteId || lead?.def?.id, bossName: lead?.korName,
+          tier: r.squad.tier, weapon: r.squad.weapon,
+        });
         r.phase = 'cutscene';
+        input.clearSkip();   // 보스전에서 누르고 있던 키가 남아 컷신이 즉시 스킵되던 문제
         r.effects.clear?.();
         return;
       }
@@ -1743,7 +1750,7 @@ function update(dt) {
     if (r.cut.t > 0.8 && input.consumeSkip()) r.cut.t = Math.max(r.cut.t, CUT.outStart);
     r.effects.update(dt);
     tickCutscene(r.cut, dt, { ...r.effects, logicalH }, sfx);
-    if (r.cut.done) { r.cut = null; onEncounterClear(); }
+    if (r.cut.done) { r.cut = null; r.clearBackdrop = true; onEncounterClear(); }
     return;
   } else if (r.phase === 'bossDeath') {
     // 보스 위에서 연쇄 폭발이 터지며 파괴 → 함체가 기울며 아래로 침몰(섹터 클리어 컷신)
@@ -2031,6 +2038,12 @@ function draw() {
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
+  // 섹터 클리어 직후의 선택 화면(키스톤·항로)도 컷신 배경 위에서 진행한다(이사).
+  //  선택창이 전투 화면 위에 뜨면 컷신의 여운이 끊긴다. 살짝 어둡게 눌러 카드 글자 가독성 확보.
+  if (run && run.clearBackdrop && state === 'map') {
+    if (drawCutsceneBackdrop(ctx, LOGICAL_W, logicalH, 0.22)) { ctx.restore(); return; }
+    run.clearBackdrop = false;
+  }
   // 섹터 클리어 컷신 = 전체화면 일러스트. 게임 화면·HUD를 전부 대체한다(이사).
   if (run && run.phase === 'cutscene' && run.cut) {
     if (drawCutscene(ctx, run.cut, LOGICAL_W, logicalH, run.effects)) { ctx.restore(); return; }

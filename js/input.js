@@ -14,7 +14,7 @@ export function createInput(canvas, logicalW) {
   }
 
   canvas.addEventListener('pointerdown', (e) => {
-    input.skipRequested = true;   // 연출 건너뛰기(컷신)
+    if (e.pointerType !== 'mouse') input.skipRequested = true;   // 마우스 좌클릭=차지라 제외, 터치 탭만 건너뛰기
     if (e.pointerType === 'mouse') {
       // 데스크톱: 좌클릭 홀드 = 충전. 이동은 마우스 위치로(아래 pointermove) — 클릭이 함선을 점프시키지 않음.
       if (e.button === 0) input.charging = true;
@@ -38,8 +38,12 @@ export function createInput(canvas, logicalW) {
   window.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') input.charging = false; });
   window.addEventListener('blur', () => { input.charging = false; });
 
+  // 연출 건너뛰기는 '조작에 안 쓰는 키'의 새 입력만 인정한다.
+  // 이동(←→·A·D)·차지(Space)는 전투 중 계속 눌려 있고 키 반복까지 발생해서,
+  // 그대로 두면 보스를 잡자마자 컷신이 즉시 스킵된다(이사: "컷신이 반짝하고 사라졌다").
+  const PLAY_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'a', 'A', 'd', 'D', ' ']);
   window.addEventListener('keydown', (e) => {
-    input.skipRequested = true;   // 연출 건너뛰기(컷신)
+    if (!e.repeat && !PLAY_KEYS.has(e.key) && e.code !== 'Space') input.skipRequested = true;
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keyDir = -1;
     else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keyDir = 1;
     else if (e.key === ' ' || e.code === 'Space') { input.charging = true; e.preventDefault(); } // 스페이스바 홀드 = 차지 랜스 (키보드 플레이)

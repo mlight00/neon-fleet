@@ -64,14 +64,35 @@ test('CS-04: 배경 이미지가 없으면 인게임 연출로 폴백한다 (게
 test('CS-05: 컷신은 보스 아트를 이미지에 굽지 않고 런타임에 얹는다', () => {
   // 보스 정체가 섹터마다 다르므로 배경에 그려 넣으면 안 된다
   assert.ok(cutSrc.includes('getSprite(c.bossId)'), '실제 보스 스프라이트 사용');
-  assert.ok(mainSrc.includes('bossId: lead?.def?.id'), '격파된 보스 id 전달');
+  assert.ok(mainSrc.includes('bossId: lead?.spriteId || lead?.def?.id'), '격파된 보스 id 전달');
 });
 
-test('CS-06: 컷신 건너뛰기 — 래치를 소비하고 초반엔 무시한다', () => {
+test('CS-06: 컷신 건너뛰기 — 조작키는 스킵으로 잡지 않는다', () => {
   assert.ok(inputSrc.includes('input.consumeSkip'), '소비형 래치');
-  assert.ok(inputSrc.includes('skipRequested = true'), '입력이 래치를 세운다');
-  assert.ok(mainSrc.includes('r.cut.t > 0.8 && input.consumeSkip()'),
-    '초반 0.8초는 무시 — 보스를 잡은 클릭이 그대로 이어져 컷신이 즉사하면 안 된다');
+  assert.ok(mainSrc.includes('r.cut.t > 0.8 && input.consumeSkip()'), '초반 0.8초 무시');
+  assert.ok(mainSrc.includes('input.clearSkip();'), '컷신 시작 시 래치를 비운다');
+  // 사건: 이동키 반복·스페이스 홀드가 래치를 세워 컷신이 0.8초 만에 스킵됐다("반짝하고 사라짐")
+  assert.ok(/const PLAY_KEYS = new Set\(\['ArrowLeft', 'ArrowRight', 'a', 'A', 'd', 'D', ' '\]\)/.test(inputSrc),
+    '이동·차지 키 목록');
+  assert.ok(inputSrc.includes("if (!e.repeat && !PLAY_KEYS.has(e.key) && e.code !== 'Space') input.skipRequested = true"),
+    '키 반복·조작키는 스킵 아님');
+  assert.ok(inputSrc.includes("if (e.pointerType !== 'mouse') input.skipRequested = true"),
+    '마우스 좌클릭=차지라 스킵에서 제외');
+});
+
+test('CS-09: 컷신 배경이 선택 화면(키스톤·항로)까지 이어진다', () => {
+  assert.ok(cutSrc.includes('export function drawCutsceneBackdrop'), '배경만 그리는 함수');
+  assert.ok(mainSrc.includes('r.clearBackdrop = true'), '컷신 종료 시 배경 유지 플래그');
+  assert.ok(mainSrc.includes("run.clearBackdrop && state === 'map'"), '맵·드래프트 화면에서 배경 사용');
+  assert.ok(mainSrc.includes('drawCutsceneBackdrop(ctx, LOGICAL_W, logicalH, 0.22)'), '카드 가독성용 감광');
+  assert.ok(mainSrc.includes('r.clearBackdrop = false;'), '다음 노드 시작 시 해제');
+});
+
+test('CS-10: 보스 아트 id를 Boss(spriteId)·MidBoss(def.id) 양쪽에서 읽는다', () => {
+  // 사건: def.id만 읽어 섹터 보스에서 undefined → 컷신에 보스가 아예 안 그려졌다
+  assert.ok(mainSrc.includes('bossId: lead?.spriteId || lead?.def?.id'), 'spriteId 우선');
+  const bossSrc = readFileSync(new URL('../js/bosses.js', import.meta.url), 'utf8');
+  assert.ok(bossSrc.includes('this.spriteId = def.id;'), 'Boss는 spriteId 필드를 쓴다(전제)');
 });
 
 test('CS-07: 무기 표기 중복 제거 — 좌측 슬롯이 뜨면 우상단은 생략', () => {

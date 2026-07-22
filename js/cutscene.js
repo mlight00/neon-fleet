@@ -72,24 +72,31 @@ export function shipPose(c, logicalW, logicalH) {
 }
 
 /** 전체화면 컷신 렌더. 배경 이미지가 없으면 false(호출부가 폴백). */
-export function drawCutscene(ctx, c, logicalW, logicalH, effects) {
+/** 컷신 배경만 그린다(보스·기함·타이틀 제외). 컷신이 끝난 뒤 키스톤·항로 선택 화면의
+ *  배경으로 계속 쓰기 위한 것 — 선택창이 전투 화면 위에 뜨면 컷신의 여운이 끊긴다(이사).
+ *  dim>0이면 더 어둡게 눌러 선택 카드의 글자가 잘 읽히게 한다. */
+export function drawCutsceneBackdrop(ctx, logicalW, logicalH, dim = 0) {
   const bg = getSprite('CUT_SECTOR_CLEAR');
   if (!bg) return false;
-
   ctx.save();
-  // ── 배경: 화면을 덮도록 cover-fit (비율 유지, 넘치는 쪽은 잘라냄) ──
   const scale = Math.max(logicalW / bg.logicalW, logicalH / bg.logicalH);
-  const bw = bg.logicalW * scale, bh = bg.logicalH * scale;
   ctx.fillStyle = '#02040a';
   ctx.fillRect(0, 0, logicalW, logicalH);
   blit(ctx, bg, logicalW / 2, logicalH / 2, scale);
-  // 위아래를 살짝 눌러 글자·함선이 잘 읽히게
   const grad = ctx.createLinearGradient(0, 0, 0, logicalH);
   grad.addColorStop(0, 'rgba(2,4,10,0.55)');
   grad.addColorStop(0.45, 'rgba(2,4,10,0.05)');
   grad.addColorStop(1, 'rgba(2,4,10,0.62)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, logicalW, logicalH);
+  if (dim > 0) { ctx.fillStyle = `rgba(2,4,10,${dim})`; ctx.fillRect(0, 0, logicalW, logicalH); }
+  ctx.restore();
+  return true;
+}
+
+export function drawCutscene(ctx, c, logicalW, logicalH, effects) {
+  if (!drawCutsceneBackdrop(ctx, logicalW, logicalH)) return false;
+  ctx.save();
 
   // ── 침몰하는 보스 (실제 보스 아트) ──
   const bp = bossPose(c, logicalW, logicalH);
@@ -157,7 +164,8 @@ export function drawCutscene(ctx, c, logicalW, logicalH, effects) {
   if (c.t > 1.2 && c.t < CUT.outStart) {
     ctx.textAlign = 'center'; ctx.font = '11px Pretendard, sans-serif';
     ctx.fillStyle = 'rgba(220,235,255,0.5)';
-    ctx.fillText('아무 키나 눌러 건너뛰기', logicalW / 2, logicalH - 22);
+    // 이동키·스페이스는 건너뛰기로 안 잡는다(전투 중 눌린 채 넘어와 즉시 스킵되므로) → 안내도 정확히.
+    ctx.fillText('Enter 키로 건너뛰기', logicalW / 2, logicalH - 22);
   }
   ctx.restore();
   return true;
