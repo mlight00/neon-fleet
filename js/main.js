@@ -13,7 +13,7 @@ import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, cruisersNeededForTier, progressPatch, bossCountFor, invertGateOp } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, cruisersNeededForTier, effectiveFirepower, progressPatch, bossCountFor, invertGateOp } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES } from './sprites.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
@@ -1702,7 +1702,9 @@ function update(dt) {
       const resolvedBossId = bossDefById(bossId).id;
       preloadBossArt(resolvedBossId); // 등장 이동 시간 동안 전용 레이어를 지연 로드
       const bossN = bossCountFor(resolvedBossId, bossTier, BAL.boss);
-      const hpCap = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
+      // 보스 HP 기준 화력 = 함대 화력 × 격납고 강화 배수. 격납고를 빼면 강화할수록 보스가 물러진다(이사).
+      const bossPower = effectiveFirepower(r.maxPower, r.world.stats, BAL.squad, BAL.boss.hangarWeight);
+      const hpCap = Math.max(BAL.boss.hp, bossPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
       const totalMult = bossN > 1 ? BAL.boss.multiTotalMult : 1;                 // 다중 총 HP 배수(각=이/보스수)
       r.bosses = [];
       // 보스 발사 주기: 보스는 scaleEnemy를 안 거쳐 globalMult 버프를 못 받으므로 여기서 bossRateMult로 보정(나눌수록 빠름)
@@ -1713,7 +1715,7 @@ function update(dt) {
         b.x = b.homeX;
         b.swayScale = 1 / bossN;                        // 좌우 폭 축소 → 겹침 방지
         const variantHp = 1 + BAL.bossVariant.hpPerLoop * b.variantLevel;
-        const rawHp = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (b.pattern.tanky ?? 1) * variantHp;
+        const rawHp = Math.max(BAL.boss.hp, bossPower * BAL.boss.hpPerPower) * r.mods.boss * (b.pattern.tanky ?? 1) * variantHp;
         // 전체 난이도 배수 × 보스 전용 배수 (상한 이후에 곱해 '체력 상한' 자체를 함께 끌어올린다)
         const sectorBossScale = 1 + Math.max(0, r.sector - 1) * 0.22;   // 섹터 깊을수록 보스 단단(섹터5≈1.9배·섹터6≈2.1배) — 후반 보스 너무 쉽게 죽는 문제 해결(이사)
         const sectorHpMult = BAL.boss.sectorHpMult?.[r.sector] ?? 1;    // 특정 섹터만 따로 조정(섹터 1=2배, 이사)

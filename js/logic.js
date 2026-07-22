@@ -161,6 +161,21 @@ export function dronesToCruisers(count, cruisers, cfg) {
  * 기함 업그레이드 가능 여부 (순수). 순양함이 임계치 이상이고 최고 티어 미만이면 true.
  * cfg: { cruisersPerFlagship }
  */
+/**
+ * 보스 HP 산정용 '실효 화력' (순수).
+ * 함대 화력(=드론+기함)만 쓰면 **격납고 영구 강화가 전혀 반영되지 않는다**. 공격력·연사력을
+ * 올릴수록 실제 DPS는 몇 배가 되는데 보스 HP는 그대로라, 강화가 쌓일수록 보스가 일방적으로
+ * 물러진다(이사: 섹터 1 보스가 10초 만에 죽음 — HP를 2배로 올려도 같은 이유로 무의미).
+ *  → 격납고 배수를 화력에 곱해 보스가 '지금 이 플레이어'에 맞춰 단단해지게 한다.
+ *  weight 0 = 옛 동작(무시), 1 = 완전 반영.
+ */
+export function effectiveFirepower(maxPower, stats, base, weight = 1) {
+  const d = (stats?.damage ?? base.damage) / base.damage;
+  const r = (stats?.fireRate ?? base.fireRate) / base.fireRate;
+  const gain = Math.max(1, d * r);
+  return maxPower * (1 + weight * (gain - 1));
+}
+
 export function canUpgradeFlagship(cruisers, tier, maxTier, cfg) {
   return tier < maxTier && cruisers >= cfg.cruisersPerFlagship;
 }

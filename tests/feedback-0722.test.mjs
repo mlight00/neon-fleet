@@ -175,3 +175,21 @@ test('FB-14: 섹터별 보스 HP 배수표 — 지정한 섹터에만 걸린다'
   assert.ok(mainSrc.includes('BAL.boss.sectorHpMult?.[r.sector] ?? 1'), '없으면 1로 폴백');
   assert.ok(/sectorBossScale \* sectorHpMult\)/.test(mainSrc), 'HP 계산에 곱해진다');
 });
+
+import { effectiveFirepower } from '../js/logic.js';
+
+test('FB-15: 보스 HP가 격납고 영구 강화를 반영한다', () => {
+  const base = BAL.squad;
+  const plain = { damage: base.damage, fireRate: base.fireRate };
+  const upgraded = { damage: base.damage + 6 * BAL.hangar.upgrades.dmg.step,
+                     fireRate: base.fireRate + 6 * BAL.hangar.upgrades.rate.step };
+  assert.equal(effectiveFirepower(200, plain, base, 1), 200, '강화 0이면 화력 그대로');
+  assert.ok(effectiveFirepower(200, upgraded, base, 1) > 200 * 2, '강화 6렙이면 2배 이상');
+  assert.equal(effectiveFirepower(200, upgraded, base, 0), 200, 'weight 0 = 옛 동작');
+  // 강화는 DPS를 곱으로 올리므로 HP도 같은 비율로 따라와야 처치 시간이 유지된다
+  const gain = (upgraded.damage / base.damage) * (upgraded.fireRate / base.fireRate);
+  assert.ok(Math.abs(effectiveFirepower(200, upgraded, base, 1) - 200 * gain) < 0.001, '배수가 정확히 곱해진다');
+  assert.equal(BAL.boss.hangarWeight, 1, '현재 완전 반영');
+  assert.ok(mainSrc.includes('effectiveFirepower(r.maxPower, r.world.stats, BAL.squad, BAL.boss.hangarWeight)'), '보스 스폰 배선');
+  assert.ok(!/r\.maxPower \* BAL\.boss\.hpPer/.test(mainSrc), '옛 계산(원시 화력)이 남아 있으면 안 된다');
+});
