@@ -38,6 +38,12 @@ const CORE_MEASURE = _clParams.has('coreLoopMeasure');  // 자동 측정 재생(
 const CAMPAIGN25 = _clParams.has('campaign25');         // Gate 2: 25분 6지역 시간 캠페인(측정·개발용 진입)
 const BOSSLAB = _clParams.has('bosslab');               // 보스 패턴 프리뷰: ?bosslab=1&boss=B14 (개발/테스트용)
 
+// 타이틀에 25분 캠페인 진입 버튼을 노출할지. 섹터 원정으로 일원화하며 숨김(이사 결정).
+//  ⚠️ 기능을 지운 게 아니라 '입구'만 닫았다 — campaign25 코드·데이터·테스트는 전부 그대로다.
+//  되돌리려면 이 값만 true. 그동안에도 ?campaign25=1&play=1 로는 계속 들어갈 수 있어
+//  개발·검증(integrationCheck 15항목)에는 지장이 없다.
+const SHOW_CAMPAIGN25_ENTRY = false;
+
 const LOGICAL_W = BAL.logicalW;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -2243,7 +2249,8 @@ function showTitleScreen() {
     endlessUnlocked: d.endlessUnlocked,      // 무한 원정 해금 시에만 버튼 표시(§6.5)
     endlessBest: d.endlessBest,
     onStart: startPlay,
-    onCampaign25: () => startCampaign25({ mode: 'play', pick: true }),   // 타이틀에서 25분 캠페인 직접 선택(이사: 두 모드 선택 가능하게)
+    // 이 값만 true로 되돌리면 25분 캠페인 버튼이 다시 나온다(아래 SHOW_CAMPAIGN25_ENTRY 참고).
+    onCampaign25: SHOW_CAMPAIGN25_ENTRY ? () => startCampaign25({ mode: 'play', pick: true }) : null,
     onEndless: d.endlessUnlocked ? startEndless : null,
     onHangar: showHangar,
     onIntro: () => playIntro(showTitleScreen),
