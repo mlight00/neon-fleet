@@ -1716,7 +1716,8 @@ function update(dt) {
         const rawHp = Math.max(BAL.boss.hp, r.maxPower * BAL.boss.hpPerPower) * r.mods.boss * (b.pattern.tanky ?? 1) * variantHp;
         // 전체 난이도 배수 × 보스 전용 배수 (상한 이후에 곱해 '체력 상한' 자체를 함께 끌어올린다)
         const sectorBossScale = 1 + Math.max(0, r.sector - 1) * 0.22;   // 섹터 깊을수록 보스 단단(섹터5≈1.9배·섹터6≈2.1배) — 후반 보스 너무 쉽게 죽는 문제 해결(이사)
-        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap) * BAL.difficulty.globalMult * BAL.difficulty.bossHpMult * sectorBossScale);
+        const sectorHpMult = BAL.boss.sectorHpMult?.[r.sector] ?? 1;    // 특정 섹터만 따로 조정(섹터 1=2배, 이사)
+        b.hp = b.maxHp = Math.round(Math.min(rawHp * totalMult / bossN, hpCap) * BAL.difficulty.globalMult * BAL.difficulty.bossHpMult * sectorBossScale * sectorHpMult);
         r.bosses.push(b);
       }
       r.boss = r.bosses[0];   // 연출·클리어 배너 앵커용 선두

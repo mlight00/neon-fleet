@@ -163,3 +163,15 @@ test('FB-13: 크기는 여전히 지급 숫자에 비례한다 (작은 보상 = 
   const big = new Crystal(0, 0, 300, CONTACT_WORLD);
   assert.ok(big.payout > small.payout && big.r > small.r, '보상이 크면 크리스탈도 크다');
 });
+
+test('FB-14: 섹터별 보스 HP 배수표 — 지정한 섹터에만 걸린다', () => {
+  const T = BAL.boss.sectorHpMult;
+  assert.ok(T && typeof T === 'object', '섹터별 배수표 존재');
+  assert.equal(T[1], 2, '섹터 1 보스 2배(이사 요청)');
+  // 표에 없는 섹터는 손대지 않는다 — 기본 곡선(1+(섹터-1)×0.22)만 적용돼야 한다
+  for (const s of [2, 3, 4, 5, 6]) {
+    assert.equal(T[s] ?? 1, 1, `섹터 ${s}는 배수 없음`);
+  }
+  assert.ok(mainSrc.includes('BAL.boss.sectorHpMult?.[r.sector] ?? 1'), '없으면 1로 폴백');
+  assert.ok(/sectorBossScale \* sectorHpMult\)/.test(mainSrc), 'HP 계산에 곱해진다');
+});
