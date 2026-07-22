@@ -310,8 +310,10 @@ function buildEncounter(node) {
   }
   // 정예 노드 = 미니보스(기존). 추가로, 섹터 무기 조합에서 보조 무기가 아직 없으면 전투/보급 노드에도 미니보스를 확정 배치한다.
   // 미니보스 POW가 보조 무기(=공명 조합)의 입구인데 정예 변이몹은 섹터 1에서 등장 확률 0%라 조합이 영영 안 나왔다(이사 지적).
-  const needWing = !!r.squad.reson && !r.squad.wing?.weaponId;
-  if (node.type === 'elite' || (needWing && (node.type === 'combat' || node.type === 'supply'))) {
+  // 보조 무기가 없으면 미니보스를 확정 배치하되, 앞 두 노드는 비워 화력을 불릴 시간을 준다(이사).
+  // hazard도 포함 — 경로가 전부 hazard/repair라 미니보스를 한 번도 못 만나는 상황 방지.
+  const needWing = !!r.squad.reson && !r.squad.wing?.weaponId && node.col >= BAL.midboss.wingUnlockMinCol;
+  if (node.type === 'elite' || (needWing && (node.type === 'combat' || node.type === 'supply' || node.type === 'hazard'))) {
     pending.push({ type: 'midboss', trackY: totalTrack * BAL.midboss.progress });
   }
   pending.sort((a, b) => a.trackY - b.trackY);
@@ -1974,7 +1976,7 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
   const data = save.get();
   const isRecord = r.maxPower > data.best;
   const best = Math.max(data.best, r.maxPower);
-  const earned = Math.round(r.world.coins * r.world.stats.coinMult);   // 전투 중 획득 코인
+  const earned = Math.round(r.world.coins * r.world.stats.coinMult * BAL.economy.coinBankMult);   // 전투 중 획득 코인(격납고 적립 배수 적용)
   // 진행도(0~1): 완료 섹터 + 현재 섹터 내 노드 진행 / 캠페인 섹터 수.
   const progress = ((r.sector - 1) + (r.done.length / (BAL.sector.depth + 1))) / BAL.campaign.sectors;
   const total = reason === 'death'
@@ -1996,7 +1998,7 @@ function winCampaign() {
   state = 'done'; drafting = false; betweenStages = false; setBgmIntensity(0.2); playBgm('title');
   const data = save.get();
   const best = Math.max(data.best, r.maxPower);
-  const earned = Math.round(r.world.coins * r.world.stats.coinMult);
+  const earned = Math.round(r.world.coins * r.world.stats.coinMult * BAL.economy.coinBankMult);
   if (!r.settled) {
     r.settled = true;
     // 캠페인 완주 정산 (이 경로는 캠페인 전용) → stage 갱신 + 완주·해금 플래그

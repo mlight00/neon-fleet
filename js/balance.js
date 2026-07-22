@@ -26,7 +26,10 @@ export const BAL = {
   // enemyHpCapPerStage: 화력 비례 HP 상한을 스테이지마다 이만큼 올림 → 깊은 판에선 즉사 안 함(무한 상승)
   // droneGainMult 하향 = 진화 감속. 화력비례 상한(Cap)을 크게 올려 강해져도 적이 안 녹게(즉사 방지) →
   //  후반 난이도 역전을 막고, 실제 위협은 밀도(spawn)+탄막(shotCap)+회피로 온다.
-  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5 },
+  // coinBankMult = 원정 종료 시 격납고로 적립되는 코인 배수. 노드 보상·적 처치·드론 초과분 등
+  //  모든 코인 경로가 이 한 지점을 지나므로 여기서만 조정하면 전체 수급이 비례한다.
+  //  (섹터 5까지 한 번에 전체 강화 항목의 1/4을 살 수 있어 과했다 → 0.5, 이사)
+  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5, coinBankMult: 0.5 },
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
@@ -379,6 +382,10 @@ export const BAL = {
   // 격파 = 드론 대량 회수, 놓치면 그냥 통과 (패널티 없음)
   midboss: {
     progress: 0.55,          // 트랙 진행 55% 지점에서 등장
+    // 보조 무기 해금용 미니보스가 나오기 시작하는 노드 열. 0이면 첫 노드부터 나오는데,
+    // 그 시점엔 무기 강화가 하나도 없어 격파가 너무 어려웠다(이사) → 2열부터(=세 번째 노드).
+    // 그 사이 두 노드에서 크리스탈·수송선으로 드론(=화력)을 불린 뒤 만나게 된다.
+    wingUnlockMinCol: 2,
     hpMin: 900, hpPerPower: 4, // HP = max(hpMin, 그 시점 최대 총화력 x 4) — 집중 사격 3~5초감
     speedRatio: 0.35, ownSpeed: 42, // 하강 = 스크롤 x 비율 + 자체 속도 (화면 통과 약 7초)
     swayAmp: 90, swayHz: 0.3,

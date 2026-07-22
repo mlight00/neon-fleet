@@ -84,3 +84,47 @@ test('FB-06: 초기 기함 승급이 빨라지고 후반은 유지된다', () =>
   assert.ok(entSrc.includes('cruisersNeededForTier(this.tier, E)'), '승급 판정 배선');
   assert.ok(mainSrc.includes('cruisersNeededForTier(r.squad.tier, BAL.escort)'), 'HUD 게이지도 같은 값');
 });
+
+// ── 2026-07-22 (2) 경제·난이도 조정 ────────────────────────────────
+import { nodeCoinReward, generateSectorMap as genMap } from '../js/logic.js';
+
+test('FB-07: 격납고 적립 코인이 절반 — 모든 코인 경로가 한 지점을 지난다', () => {
+  assert.equal(BAL.economy.coinBankMult, 0.5, '적립 배수 0.5');
+  // 정산 두 곳(사망·완주) 모두 배수를 적용해야 한다 — 한쪽만 하면 완주 보상만 후해진다
+  assert.equal((mainSrc.match(/\* BAL\.economy\.coinBankMult\)/g) || []).length, 2,
+    'endExpedition·winCampaign 양쪽 적용');
+  // 인게임 소비(정비 모듈 구매)는 world.coins를 그대로 쓰므로 영향 없어야 한다
+  assert.ok(mainSrc.includes('r.world.addCoins(-cost);'), '소비는 배수와 무관');
+});
+
+test('FB-08: 노드 코인 자체는 그대로 — 줄어드는 건 적립 단계뿐', () => {
+  // 인게임 정비 비용과의 균형이 깨지지 않도록 노드 보상 공식은 손대지 않았다
+  const NR = BAL.nodeReward.coinMult;
+  assert.equal(nodeCoinReward(1, 0, 'combat', NR), 50);
+  assert.equal(nodeCoinReward(5, 5, 'boss', NR), Math.round((40 + 50 + 25) * 2.5));
+});
+
+test('FB-09: 보조 무기용 미니보스는 첫 노드에 안 나온다', () => {
+  assert.equal(BAL.midboss.wingUnlockMinCol, 2, '3번째 노드부터');
+  assert.ok(mainSrc.includes('node.col >= BAL.midboss.wingUnlockMinCol'), '열 게이트 배선');
+  assert.ok(mainSrc.includes("node.type === 'hazard'"), 'hazard도 포함 — 경로에서 완전히 놓치는 것 방지');
+});
+
+test('FB-10: 그래도 대부분의 경로에서 미니보스를 만난다 (해금이 막히면 안 된다)', () => {
+  let s = 4242;
+  const rng = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const OK = new Set(['combat', 'supply', 'hazard']);
+  let miss = 0;
+  const N = 1500;
+  for (let i = 0; i < N; i++) {
+    const map = genMap(1, rng); const cols = map.cols || map;
+    let node = cols[0][0], found = false;
+    while (node?.next?.length) {
+      const nx = cols[node.col + 1];
+      node = nx[node.next[Math.floor(rng() * node.next.length)]] || nx[0];
+      if (node.type === 'elite' || (node.col >= BAL.midboss.wingUnlockMinCol && OK.has(node.type))) found = true;
+    }
+    if (!found) miss++;
+  }
+  assert.ok(miss / N < 0.05, `미니보스를 못 만나는 경로 ${(miss / N * 100).toFixed(1)}% — 5% 미만이어야 한다`);
+});
