@@ -509,14 +509,8 @@ export const ui = {
         ? `<button class="map-node" data-node="${node.id}" data-id="${node.id}" style="${st}" title="${m.label}">${m.icon}</button>`
         : `<div class="map-node" data-id="${node.id}" style="${st}" title="${m.label}">${m.icon}</div>`;
     }
-    // 노드 정보(§5.6): 도달 노드 아이콘 아래 보상 요약. 배경 그림 위에서도 보이게 어두운 알약 배경+흰 글씨+그림자.
-    const INFO = { combat: '코인 보통·모듈', supply: '드론 다수·짧음', hazard: '코인+20%·모듈', elite: '코인+80%·희귀', repair: '회복/정비', boss: '섹터 보스' };
-    let infos = '';
-    for (const col of map.cols) for (const node of col) {
-      if (!reachIds.has(node.id) || !INFO[node.type]) continue;
-      const p = pos(node);
-      infos += `<div style="position:absolute;left:${p.x - 42}px;top:${p.y + 22}px;width:84px;text-align:center;font-size:9.5px;line-height:1.2;color:#eaf3ff;background:rgba(6,10,20,0.72);border-radius:5px;padding:1px 0;text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${INFO[node.type]}</div>`;
-    }
+    // (노드 아래 상시 보상 라벨은 제거 — 아이콘을 덮어 지저분했다. 설명은 마우스오버·키보드 포커스
+    //  팝업(map-tip)과 아래 범례가 이미 담당한다. 이사 요청)
     const legend = Object.values(META).map((m) => `<span style="white-space:nowrap">${m.icon}${m.label}</span>`).join(' · ');
     panel(`
       <h2 style="color:#3ff5e0">섹터 ${sector} · 항로 선택</h2>
@@ -524,7 +518,6 @@ export const ui = {
       <div style="position:relative;width:${W}px;height:${H}px;margin:6px auto">
         <svg width="${W}" height="${H}" style="position:absolute;left:0;top:0;pointer-events:none">${lines}</svg>
         ${nodes}
-        ${infos}
         <div id="map-tip" style="position:absolute;display:none;transform:translate(-50%,-100%);font-size:13px;font-weight:600;line-height:1.3;color:#eaf3ff;background:rgba(4,8,16,0.96);border:1px solid #3ff5e0;border-radius:8px;padding:6px 11px;white-space:nowrap;pointer-events:none;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,0.6)"></div>
       </div>
       <p style="font-size:10.5px;color:#9fb8d8;line-height:1.6">${legend}</p>
