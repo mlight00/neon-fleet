@@ -818,7 +818,7 @@ export class Squad {
     const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];
     const ascPierce = 0;
     const wCoef = this.weapon === 'homing' ? W.homing.coef : this.weapon === 'laser' ? W.laser.coef : W.vulcan.coef;
-    const escortShare = this.count > 1 ? 0.3 + dEff.escortShareBonus : 0;   // 군체 교리: 드론 사격 비중↑
+    const escortShare = this.count > 1 ? BAL.squad.escortShare + dEff.escortShareBonus : 0;   // 군체 교리: 드론 사격 비중↑ (기본값은 balance.squad.escortShare — 튜너 조정 대상)
     this.fireEscort(dt, world, baseDps * wCoef * escortShare * phaseMul * ks.supportMult);   // 위상 피해 + 군체 용광로 유령 보너스
 
     // 슬롯별 독립 발사(§5.3): main은 기존 하드포인트, wing은 추가 하드포인트에서 병렬 발사.

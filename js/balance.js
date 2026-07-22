@@ -6,6 +6,7 @@ export const BAL = {
   scrollSpeedLateBonus: 1.1, // 판 후반(진행 70%~) 속도 배율
 
   squad: {
+    escortShare: 0.3,        // 총 화력 중 호위 드론이 쏘는 비중(나머지는 기함). 튜너에서 조정 가능(이사)
     start: 8,        // 시작 드론 수
     fireRate: 2,     // 드론 1기당 초당 발사 수
     damage: 1,       // 탄환 1발 데미지

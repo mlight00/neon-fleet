@@ -229,6 +229,11 @@ const CORE_PRELOAD = [
   ...Object.keys(SPRITE_SIZES).filter((id) => id.startsWith('MOUNT_') || id.startsWith('PROJ_') || id.startsWith('VFX_')),
 ];
 
+/** 스프라이트 캐시 비우기 — SPRITE_SIZES를 바꾼 뒤 다시 로드해야 새 크기로 그려진다(밸런스 튜너). */
+export function invalidateSpriteCache() {
+  cache.clear();
+}
+
 /** 타이틀에서는 전투 공통 자산만 로드한다. 보스 레이어는 등장 예고 시 별도 지연 로드한다. */
 export function preloadStyle(style = artStyle) {
   return preloadSprites(CORE_PRELOAD, style);

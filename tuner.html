@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>네온 함대 — 밸런스 튜너</title>
+<link rel="preload" href="assets/fonts/Pretendard-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+  @font-face{font-family:Pretendard;src:url('assets/fonts/Pretendard-Regular.woff2') format('woff2');font-weight:400;font-display:swap}
+  @font-face{font-family:Pretendard;src:url('assets/fonts/Pretendard-Bold.woff2') format('woff2');font-weight:700;font-display:swap}
+  :root{
+    --bg:#080b12; --panel:#0e131c; --sunk:#050810; --line:rgba(190,220,255,.13); --line2:rgba(190,220,255,.28);
+    --ink:#e9f1f9; --ink2:#a9bccf; --ink3:#7c8fa3; --accent:#3ff5e0; --gold:#ffd93d; --danger:#ff5c85;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,"Malgun Gothic",system-ui,sans-serif;
+       font-size:14px;line-height:1.6;word-break:keep-all}
+  .mono{font-family:Consolas,"Cascadia Mono",ui-monospace,monospace}
+
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#080b12 78%,rgba(8,11,18,.92));
+         border-bottom:1px solid var(--line2);padding:14px 20px 12px}
+  .hrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:1180px;margin:0 auto}
+  h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+  h1 small{display:block;font-size:10px;color:var(--ink3);letter-spacing:.2em;font-weight:400;
+           font-family:Consolas,ui-monospace,monospace;text-transform:uppercase}
+  #search{flex:1;min-width:180px;background:var(--sunk);border:1px solid var(--line);color:var(--ink);
+          padding:8px 11px;border-radius:2px;font:inherit;font-size:13px}
+  #search:focus{outline:none;border-color:var(--accent)}
+  button{background:#161b22;border:1px solid var(--line2);color:var(--ink);padding:8px 13px;border-radius:2px;
+         font:inherit;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.02em;white-space:nowrap}
+  button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  button:disabled{opacity:.38;cursor:default}
+  button.primary{background:#12312e;border-color:var(--accent);color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  #count{font-size:12px;color:var(--ink3);font-family:Consolas,ui-monospace,monospace;white-space:nowrap}
+  #count.on{color:var(--gold)}
+
+  main{max-width:1180px;margin:0 auto;padding:18px 20px 90px}
+  .note{border-left:2px solid var(--accent);background:rgba(63,245,224,.07);padding:11px 14px;margin:0 0 18px;
+        font-size:13px;color:var(--ink2)}
+  .note b{color:var(--ink)}
+  h2.big{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin:26px 0 10px;
+         font-family:Consolas,ui-monospace,monospace;display:flex;gap:9px;align-items:center}
+  h2.big::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  .sec{border:1px solid var(--line);background:var(--panel);margin-bottom:8px}
+  .sec>summary{padding:10px 14px;cursor:pointer;display:flex;align-items:baseline;gap:10px;
+               background:var(--sunk);user-select:none;list-style:none}
+  .sec>summary::-webkit-details-marker{display:none}
+  .sec>summary::before{content:"▸";color:var(--ink3);font-size:11px;transition:transform .12s}
+  .sec[open]>summary::before{transform:rotate(90deg)}
+  .sec>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .stitle{font-weight:700;font-size:14px}
+  .sdesc{font-size:11.5px;color:var(--ink3)}
+  .body{padding:4px 0}
+
+  .row{display:grid;grid-template-columns:minmax(190px,1.5fr) minmax(210px,1.4fr) 100px 82px;gap:12px;
+       align-items:center;padding:7px 14px;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row.changed{background:rgba(255,217,61,.055);box-shadow:inset 2px 0 0 var(--gold)}
+  .nm{font-size:13.5px;font-weight:700}
+  .sub{font-size:10.5px;color:var(--ink3);font-family:Consolas,ui-monospace,monospace;
+       overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ctrl{display:flex;align-items:center;gap:9px}
+  .sld{flex:1;min-width:70px;accent-color:var(--accent);height:18px}
+  .num{width:92px;background:var(--sunk);border:1px solid var(--line);color:var(--ink);padding:5px 7px;
+       border-radius:2px;font-family:Consolas,ui-monospace,monospace;font-size:12.5px;text-align:right}
+  .num:focus{outline:none;border-color:var(--accent)}
+  .num.bad{border-color:var(--danger);color:var(--danger)}
+  .base{font-size:11px;color:var(--ink3);font-family:Consolas,ui-monospace,monospace;text-align:right;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mini{padding:4px 8px;font-size:11px;font-weight:400}
+
+  #io-wrap{margin-top:24px;border:1px solid var(--line);background:var(--panel)}
+  #io-wrap>summary{padding:10px 14px;cursor:pointer;background:var(--sunk);font-weight:700;font-size:13px}
+  #io{width:100%;height:190px;background:var(--sunk);border:0;border-top:1px solid var(--line);color:var(--ink2);
+      padding:12px 14px;font-family:Consolas,ui-monospace,monospace;font-size:12px;resize:vertical}
+  #io:focus{outline:none}
+  .io-act{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+
+  #toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);background:#12312e;
+         border:1px solid var(--accent);color:var(--accent);padding:10px 18px;border-radius:2px;font-weight:700;
+         font-size:13px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:20}
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:760px){
+    .row{grid-template-columns:1fr 1fr;grid-template-areas:"label label" "ctrl ctrl" "base reset";gap:6px 10px}
+    .label{grid-area:label}.ctrl{grid-area:ctrl}.base{grid-area:base;text-align:left}.mini{grid-area:reset}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <h1>밸런스 튜너<small>Neon Fleet Tuner</small></h1>
+    <input id="search" type="search" placeholder="이름·경로로 검색 (예: 체력, 크기, homing)" autocomplete="off">
+    <span id="count">변경 없음</span>
+    <button id="btn-open-game">게임 열기</button>
+    <button id="btn-save" class="primary">저장 · 적용</button>
+    <button id="btn-reset-all">전체 초기화</button>
+  </div>
+</header>
+
+<main>
+  <p class="note">
+    <b>게임을 켜둔 채로 조정하세요.</b> 저장을 누르면 게임 탭이 <b>새로고침 없이</b> 바로 반영합니다
+    (다음 적·다음 발사부터). 크기는 그림을 다시 불러오므로 잠깐 깜빡일 수 있습니다.
+    원본 파일은 건드리지 않으니 <b>전체 초기화</b>로 언제든 되돌아갑니다.
+    마음에 드는 값이 나오면 <b>내보내기</b>로 복사해서 저에게 주시면 영구 반영해 드립니다.
+  </p>
+
+  <h2 class="big">핵심 <span id="core-count" class="mono"></span></h2>
+  <div id="core"></div>
+
+  <h2 class="big">전체 <span id="all-count" class="mono"></span></h2>
+  <div id="all"></div>
+
+  <details id="io-wrap">
+    <summary>내보내기 · 불러오기</summary>
+    <textarea id="io" spellcheck="false" placeholder="내보내기를 누르면 여기에 JSON이 나옵니다. 반대로 JSON을 붙여넣고 불러오기를 누르면 그대로 적용됩니다."></textarea>
+    <div class="io-act">
+      <button id="btn-export" class="primary">내보내기</button>
+      <button id="btn-import">불러오기</button>
+    </div>
+  </details>
+</main>
+
+<div id="toast"></div>
+<script type="module" src="js/tuner.js"></script>
+</body>
+</html>

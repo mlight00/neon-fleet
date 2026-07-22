@@ -14,7 +14,8 @@ import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
 import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, cruisersNeededForTier, effectiveFirepower, progressPatch, bossCountFor, invertGateOp } from './logic.js';
-import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES } from './sprites.js';
+import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES, SPRITE_SIZES, invalidateSpriteCache } from './sprites.js';
+import { loadPatch, applyFlat, subscribePatch } from './tuning.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
 import { initAudio, unlockAudio, playBgm, setBgmIntensity, sfx, toggleMute, isMuted, setBgmVolume, setSfxVolume, getSettings } from './audio.js';
@@ -2242,6 +2243,25 @@ requestAnimationFrame(frame);
 // 아트 스타일: 페인티드 메탈(C)로 고정. 세라믹/카툰은 디자인 확정 전까지 숨김
 // (스타일 인프라는 유지 — 새 스타일이 생기면 styleNames를 다시 넘겨 선택 UI 복원)
 setArtStyle('C');
+// ── 밸런스 튜너 오버라이드 (tuner.html에서 저장한 값) ──
+// 원본 balance.js/sprites.js는 그대로 두고 값만 덮어쓴다. 게임 코드가 BAL을 읽을 때마다
+// 참조하므로 다음 스폰·다음 발사부터 바로 먹는다. 크기(SPRITE_SIZES)만 캐시를 비우고 다시 로드해야 한다.
+function applyTuning(patch, { reloadArt = false } = {}) {
+  const a = applyFlat(BAL, patch.bal);
+  const b = applyFlat(SPRITE_SIZES, patch.sprite);
+  const changedArt = b.applied > 0;
+  if (changedArt && reloadArt) { invalidateSpriteCache(); preloadStyle(); }
+  return { bal: a.applied, sprite: b.applied, skipped: [...a.skipped, ...b.skipped], changedArt };
+}
+const _tuning = applyTuning(loadPatch());
+if (_tuning.bal || _tuning.sprite) console.info(`[튜너] 적용 ${_tuning.bal}개(밸런스)·${_tuning.sprite}개(크기)`);
+// 튜너 탭에서 저장하면 새로고침 없이 즉시 반영 (같은 출처라 storage 이벤트가 온다)
+subscribePatch((p) => {
+  const r = applyTuning(p, { reloadArt: true });
+  run?.effects?.text?.(LOGICAL_W / 2, 90, `튜너 적용 · ${r.bal + r.sprite}개`, COLORS.reward, 14);
+  console.info('[튜너] 실시간 적용', r);
+});
+
 preloadStyle();
 
 function showTitleScreen() {
