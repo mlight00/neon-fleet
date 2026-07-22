@@ -1606,7 +1606,9 @@ function update(dt) {
       // 적 HP = 기본 × 난이도배수 × 화력비례(상한 있음: 강해질수록 DPS가 앞서 쓸어버리는 손맛 — A2)
       // 화력 비례 HP 상한을 난이도에 따라 올려 깊은 판에선 즉사(방치 클리어) 방지
       const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (difficultyLevel - 1);
-      const pf = 1 + Math.min(hpCapS, Math.max(0, r.maxPower) / BAL.economy.enemyHpPowerScale);
+      // 적 HP 기준 화력에도 격납고 강화를 반영(보스와 동일 원리, 이사). 상한 hpCapS는 그대로 적용된다.
+      const enemyPower = effectiveFirepower(Math.max(0, r.maxPower), r.world.stats, BAL.squad, BAL.economy.enemyHangarWeight);
+      const pf = 1 + Math.min(hpCapS, enemyPower / BAL.economy.enemyHpPowerScale);
       const gMul = BAL.difficulty.globalMult;   // 전체 난이도 배수(사용자 조정): 체력 ×gMul, 발사 주기 ÷gMul(더 빠름)
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1) * gMul * BAL.difficulty.enemyHpMult); if (e.fireInterval) e.fireInterval *= mods.enemyRate / gMul; return e; };
       // 적 스폰 헬퍼: 난이도 스케일 + 변이(어픽스=섹터 확률) 롤 + 등록

@@ -34,7 +34,11 @@ export const BAL = {
   //  접촉 자동 수집으로 바꾸면서 무위험이 됐다. 그 결과 공짜 크리스탈(+66)이 HP 110을 깎아야 하는
   //  대형 수송선(+19)보다 3.5배 더 줬다 — 리스크-보상이 완전히 뒤집혀 있었다(이사 지적).
   //  → 크리스탈은 '잔돈', 대량 보급은 부숴야 하는 수송선. 아래 배수로 그 순서를 되돌린다.
-  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5, coinBankMult: 0.5, crystalContactMult: 0.25 },
+  // enemyHangarWeight = 적 HP에 격납고 영구 강화를 반영하는 정도(0=옛 동작, 1=완전 반영).
+  //  보스와 같은 맹점 — 화력(드론 수)만 보고 공격력·연사력 강화를 안 봐서, 강화가 쌓일수록
+  //  적만 물러졌다. 보스(boss.hangarWeight)와 따로 두어 각각 조절 가능.
+  //  적 HP는 hpCap(화력 비례 상한)이 있어 무한정 단단해지지는 않는다.
+  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5, coinBankMult: 0.5, crystalContactMult: 0.25, enemyHangarWeight: 1 },
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
