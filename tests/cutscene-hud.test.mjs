@@ -40,8 +40,17 @@ test('CS-03: 타임라인 순서가 어긋나지 않는다', () => {
   assert.ok(CUT.fadeIn < CUT.shipFrom, '페이드인 후 기함 등장');
   assert.ok(CUT.shipFrom < CUT.titleAt, '기함이 먼저, 타이틀은 뒤');
   assert.ok(CUT.titleAt < CUT.outStart, '타이틀을 읽을 시간이 있다');
+  assert.ok(CUT.outStart - CUT.titleAt >= 1.0, '타이틀 노출 1초 이상');
   assert.ok(CUT.outStart < CUT.outEnd, '페이드아웃 구간 존재');
   assert.ok(CUT.outEnd >= 4 && CUT.outEnd <= 8, '컷신 길이 4~8초');
+});
+
+test('CS-03b: 타이틀이 뜰 때 기함은 이미 화면 밖 (글자를 뚫고 지나가면 안 된다)', () => {
+  const c = mk();
+  c.t = CUT.titleAt;
+  const s = shipPose(c, W, H);
+  // 기함 스프라이트 반높이를 넉넉히 잡아도 타이틀 밴드(상단 0.2H 부근)에 닿지 않아야 한다
+  assert.ok(s.y < -40, `타이틀 시점 기함 y=${s.y.toFixed(0)} — 화면 위로 완전히 빠져나가 있어야 한다`);
 });
 
 test('CS-04: 배경 이미지가 없으면 인게임 연출로 폴백한다 (게임이 멈추면 안 됨)', () => {

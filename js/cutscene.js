@@ -7,12 +7,14 @@ import { getSprite } from './sprites.js';
 import { COLORS, blit } from './render.js';
 
 /** 컷신 타임라인(초). 전체 길이 = outEnd. */
+// 순서가 중요하다: 기함이 화면 가운데로 올라가므로 타이틀이 먼저 뜨면 글자를 뚫고 지나간다.
+// → ①보스 침몰 ②기함 이탈 ③(기함이 빠져나간 뒤) 타이틀. 타이틀이 마지막 비트가 되어 마무리도 깔끔하다.
 export const CUT = Object.freeze({
   fadeIn: 0.45,
   sinkFrom: 0.0, sinkTo: 4.1,   // 보스가 기울며 아래로 가라앉는 구간
-  shipFrom: 1.1, shipTo: 4.3,   // 기함이 아래에서 올라와 화면 위로 빠져나가는 구간
-  titleAt: 1.7,
-  outStart: 4.3, outEnd: 4.9,
+  shipFrom: 0.9, shipTo: 3.4,   // 기함이 아래에서 올라와 화면 위로 빠져나가는 구간(3.1초쯤 화면 이탈)
+  titleAt: 3.2,                 // 기함이 나간 뒤에 뜬다
+  outStart: 4.6, outEnd: 5.2,
   burstEvery: 0.24,             // 보스 위 연쇄 폭발 간격
 });
 
@@ -45,15 +47,19 @@ export function tickCutscene(c, dt, effects, sfx) {
   return !c.done;
 }
 
-/** 보스의 현재 위치·기울기·투명도 (순수 — 테스트 가능). */
+/** 보스의 현재 위치·기울기·투명도 (순수 — 테스트 가능).
+ *  배경 잔해가 좌우를 감싸므로 보스는 가운데 통로 안에 들어가야 한다 → scale 0.78.
+ *  가라앉으며 옆으로도 조금 흘러가야 '표류하는 잔해'로 읽힌다. */
 export function bossPose(c, logicalW, logicalH) {
   const p = Math.max(0, Math.min(1, (c.t - CUT.sinkFrom) / (CUT.sinkTo - CUT.sinkFrom)));
   const ease = p * p;                       // 가속하며 가라앉는다
   return {
-    x: logicalW * 0.5,
+    x: logicalW * 0.5 + logicalW * 0.1 * ease,   // 살짝 옆으로 표류
     y: logicalH * 0.34 + logicalH * 0.5 * ease,
     roll: 0.62 * p,                          // 기울어짐
     alpha: Math.max(0, 1 - Math.max(0, p - 0.55) / 0.45),
+    scale: 0.78,
+    burn: 0.1 + 0.3 * p,                     // 함체가 달아오르는 정도(약하게 — 강하면 아트가 붉은 실루엣으로 뭉갠다)
     r: logicalW * 0.3,
   };
 }
@@ -93,9 +99,9 @@ export function drawCutscene(ctx, c, logicalW, logicalH, effects) {
     ctx.translate(bp.x, bp.y);
     ctx.rotate(bp.roll);
     ctx.globalAlpha = bp.alpha;
-    blit(ctx, bossArt, 0, 0, 1);
-    ctx.globalCompositeOperation = 'source-atop';   // 함체 안쪽만 붉게 달군다
-    ctx.fillStyle = `rgba(150,20,24,${(0.2 + 0.55 * Math.min(1, c.t / CUT.sinkTo)).toFixed(2)})`;
+    blit(ctx, bossArt, 0, 0, bp.scale);
+    ctx.globalCompositeOperation = 'source-atop';   // 함체 안쪽만 달군다(약하게 — 강하면 아트가 뭉갠다)
+    ctx.fillStyle = `rgba(190,60,30,${bp.burn.toFixed(2)})`;
     ctx.fillRect(-bp.r * 2, -bp.r * 2, bp.r * 4, bp.r * 4);
     ctx.restore();
   }
@@ -107,13 +113,17 @@ export function drawCutscene(ctx, c, logicalW, logicalH, effects) {
     ctx.save();
     ctx.translate(sp.x, sp.y);
     // 엔진 화염 — 속도가 붙을수록 길게
-    const flame = 26 + 54 * sp.p;
-    const g = ctx.createLinearGradient(0, 10, 0, 10 + flame);
-    g.addColorStop(0, 'rgba(120,232,255,0.9)');
+    // 컷신의 주인공이라 인게임보다 크게 — 인게임 크기(A3=68px)로는 화면에서 점처럼 보인다.
+    const SHIP_SCALE = 2.1;
+    const half = (shipArt.logicalH * SHIP_SCALE) / 2;
+    const flame = 34 + 74 * sp.p;
+    const g = ctx.createLinearGradient(0, half - 6, 0, half - 6 + flame);
+    g.addColorStop(0, 'rgba(150,240,255,0.95)');
+    g.addColorStop(0.35, 'rgba(90,200,255,0.5)');
     g.addColorStop(1, 'rgba(120,232,255,0)');
     ctx.fillStyle = g;
-    ctx.fillRect(-5, 10, 10, flame);
-    blit(ctx, shipArt, 0, 0, 1.25);
+    ctx.fillRect(-7, half - 6, 14, flame);
+    blit(ctx, shipArt, 0, 0, SHIP_SCALE);
     ctx.restore();
   }
 
