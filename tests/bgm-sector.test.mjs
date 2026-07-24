@@ -10,15 +10,19 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const audioSrc = readFileSync(join(root, 'js/audio.js'), 'utf8');
 const mainSrc = readFileSync(join(root, 'js/main.js'), 'utf8');
 
-test('BGM-S1: 섹터 전투 트랙 6종이 등록돼 있다', () => {
+test('BGM-S1: 섹터마다 변주 2곡(a/b) 총 12트랙이 등록돼 있다', () => {
   for (let s = 1; s <= 6; s++) {
-    assert.ok(new RegExp(`battle_s${s}: 'assets/sound/nf_bgm_sector${s}'`).test(audioSrc), `battle_s${s} 등록`);
+    for (const v of ['a', 'b']) {
+      assert.ok(new RegExp(`battle_s${s}${v}: 'assets/sound/nf_bgm_sector${s}${v}'`).test(audioSrc), `battle_s${s}${v} 등록`);
+    }
   }
 });
 
-test('BGM-S2: playBgmForSector가 있고 파일 없으면 battle1로 폴백', () => {
+test('BGM-S2: playBgmForSector가 변주 랜덤 + 파일 없으면 battle1 폴백', () => {
   assert.ok(/export async function playBgmForSector/.test(audioSrc), 'playBgmForSector export');
-  // 폴백 경로: 섹터 곡이 없거나 로드 실패 시 battle1
+  assert.ok(/\['a', 'b'\]\.map/.test(audioSrc), '변주 a/b 후보 구성');
+  assert.ok(/Math\.random\(\)/.test(audioSrc), '변주 랜덤 선택');
+  assert.ok(/sectorPick/.test(audioSrc), '같은 섹터 내 곡 유지 캐시');
   assert.ok(/playBgm\('battle1'/.test(audioSrc), 'battle1 폴백 존재');
 });
 

@@ -4,7 +4,9 @@
 기존처럼 AI 음악 도구(ElevenLabs Music 등)에 아래 영어 프롬프트를 그대로 붙여넣어 만들면 된다.
 
 ## 파일 규칙 (중요)
-- 파일명: `nf_bgm_sector1` … `nf_bgm_sector6`
+- 파일명: `nf_bgm_sector1a` / `nf_bgm_sector1b` … `nf_bgm_sector6a` / `nf_bgm_sector6b`
+  - **섹터마다 변주 2곡(a·b)** 을 두면 진입 때마다 게임이 **랜덤으로 하나**를 튼다(색다름 ↑). 1곡만 만들면 `…1a`만 넣어도 됨.
+  - 같은 섹터 안에서 노드를 넘어가도 곡은 유지되고, **섹터가 바뀔 때만 새로 추첨**된다.
 - 위치: `assets/sound/` (기존 `nf_bgm_battle1.ogg`와 같은 폴더)
 - 형식: `.ogg` **또는** `.mp3` (게임이 .ogg 먼저, 없으면 .mp3 시도). 둘 다 넣으면 가장 안전.
   - AI가 .wav로 주면 변환 필요: `ffmpeg -i nf_bgm_sector1.wav -c:a libvorbis -q:a 5 nf_bgm_sector1.ogg`

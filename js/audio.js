@@ -6,14 +6,14 @@ const BGM_FILES = {
   title: 'assets/sound/nf_bgm_title',
   battle1: 'assets/sound/nf_bgm_battle1',
   boss: 'assets/sound/nf_bgm_boss',
-  // 섹터별 전투 BGM(선택). 파일이 아직 없으면 playBgmForSector가 battle1로 폴백한다 → 무음 없음.
-  //  파일명 규칙: assets/sound/nf_bgm_sector{1..6}.ogg(권장) 또는 .mp3. 프롬프트는 docs/BGM_SECTOR_PROMPTS.md.
-  battle_s1: 'assets/sound/nf_bgm_sector1',
-  battle_s2: 'assets/sound/nf_bgm_sector2',
-  battle_s3: 'assets/sound/nf_bgm_sector3',
-  battle_s4: 'assets/sound/nf_bgm_sector4',
-  battle_s5: 'assets/sound/nf_bgm_sector5',
-  battle_s6: 'assets/sound/nf_bgm_sector6',
+  // 섹터별 전투 BGM: 섹터마다 변주 2곡(a/b) — 진입 때마다 랜덤. 파일 없으면 battle1 폴백 → 무음 없음.
+  //  파일명 규칙: assets/sound/nf_bgm_sector{1..6}{a,b}.ogg(+.mp3). 프롬프트는 docs/BGM_SECTOR_PROMPTS.md.
+  battle_s1a: 'assets/sound/nf_bgm_sector1a', battle_s1b: 'assets/sound/nf_bgm_sector1b',
+  battle_s2a: 'assets/sound/nf_bgm_sector2a', battle_s2b: 'assets/sound/nf_bgm_sector2b',
+  battle_s3a: 'assets/sound/nf_bgm_sector3a', battle_s3b: 'assets/sound/nf_bgm_sector3b',
+  battle_s4a: 'assets/sound/nf_bgm_sector4a', battle_s4b: 'assets/sound/nf_bgm_sector4b',
+  battle_s5a: 'assets/sound/nf_bgm_sector5a', battle_s5b: 'assets/sound/nf_bgm_sector5b',
+  battle_s6a: 'assets/sound/nf_bgm_sector6a', battle_s6b: 'assets/sound/nf_bgm_sector6b',
 };
 
 let ctx = null;
@@ -175,17 +175,32 @@ export async function playBgm(name, { fade = 1.2, restart = false } = {}) {
   bgmSlot = { name, src, gain, filter };
 }
 
+// 섹터별로 이번에 뽑은 변주를 기억 → 같은 섹터 내 노드 이동 땐 곡을 유지(안 끊김), 섹터가 바뀌면 새로 추첨.
+let sectorPick = { sector: null, name: null };
+
 /**
- * 섹터별 전투 BGM 재생(색다른 느낌). 해당 섹터 곡이 있으면 그걸, 없으면 기본 전투곡(battle1)으로 폴백 → 무음 없음.
+ * 섹터별 전투 BGM 재생(색다른 느낌). 섹터마다 변주 2곡(a/b) 중 랜덤 1곡.
+ *  같은 섹터를 이어 진입하면 같은 변주를 유지하고, 섹터가 바뀔 때만 새로 뽑는다.
+ *  해당 섹터 곡이 하나도 없으면 기본 전투곡(battle1)으로 폴백 → 무음 없음.
  *  sector = 1~6. 언락 전엔 큐잉만(전투는 언락 이후라 실전 진입 시 다시 호출되어 섹터 곡이 걸린다).
  */
 export async function playBgmForSector(sector, opts = {}) {
-  const name = `battle_s${sector}`;
-  if (unlocked && BGM_FILES[name]) {
+  const variants = ['a', 'b'].map((v) => `battle_s${sector}${v}`).filter((n) => BGM_FILES[n]);
+  if (unlocked && variants.length) {
+    let name;
+    if (sectorPick.sector === sector && variants.includes(sectorPick.name)) {
+      name = sectorPick.name;                                   // 같은 섹터 → 곡 유지
+    } else {
+      name = variants[Math.floor(Math.random() * variants.length)];   // 섹터 진입 → 변주 추첨
+      sectorPick = { sector, name };
+    }
     const buf = await loadBgm(name);
-    if (buf) return playBgm(name, opts);   // 섹터 곡 있음 → 재생
+    if (buf) return playBgm(name, opts);
+    for (const alt of variants) {                               // 뽑은 변주 로드 실패 시 다른 변주
+      if (alt !== name) { const b2 = await loadBgm(alt); if (b2) { sectorPick = { sector, name: alt }; return playBgm(alt, opts); } }
+    }
   }
-  return playBgm('battle1', opts);          // 폴백: 섹터 곡이 아직 없음(파일 미제작) → 기본 전투곡
+  return playBgm('battle1', opts);           // 폴백: 섹터 곡이 아직 없음(파일 미제작) → 기본 전투곡
 }
 
 /**
