@@ -105,8 +105,12 @@ html, body {
 #overlay .panel.title-screen .title-kor { font-size: 12px; letter-spacing: 0.34em; margin: 3px 0 0; }
 #overlay .panel.title-screen .big { font-size: 14px; }
 #overlay .panel.title-screen p { margin: 5px 0; }
-#overlay .panel.title-screen .btn-row { margin-top: 12px; }
-#overlay .panel.title-screen .btn-row button { padding: 10px 6px; font-size: 13.5px; max-width: 168px; }
+/* 타이틀 버튼: 두 행(출격/섹터·격납고)의 폭을 하나로 통일해 좌우 정렬을 맞춘다.
+   버튼이 한 개뿐인 행에서도 폭이 같아지도록 행 자체를 고정폭(230px)으로 두고 세로로 쌓는다.
+   (이사 피드백: 좌측 정렬 안 맞음·크기 축소·라운드 증가) */
+#overlay .panel.title-screen .btn-row { margin-top: 9px; flex-direction: column; width: 230px; max-width: 78vw; margin-left: auto; margin-right: auto; }
+/* margin: 0 을 명시 — .sub-btn(격납고 등)의 margin-left:8px 가 버튼을 8px 밀어 좌우 정렬을 깨던 문제. */
+#overlay .panel.title-screen .btn-row button { flex: none; width: 100%; max-width: none; margin: 0; padding: 8px 10px; font-size: 12.5px; border-radius: 8px; letter-spacing: 1px; }
 
 /* 주 액션 버튼 = 미니멀 각진 콘솔: 다크 건메탈 + 얇은 화이트 라인 + 좌측 시안 미세 포인트.
    다층 그라디언트·빛 스윕 등 장식 제거, 각진 모서리·넓은 자간으로 절제된 무채색 테크 톤
