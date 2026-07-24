@@ -53,6 +53,36 @@
 
 ---
 
-## (선택) 나중에 더 하고 싶으면
-- **섹터별 보스곡**도 같은 방식으로 확장 가능(현재는 보스곡 `nf_bgm_boss` 1개 공용). 원하면 `nf_bgm_boss_sN` 규칙으로 배선해줄 수 있음 — 지금은 스테이지 6곡에 집중.
-- 각 곡을 만들어 넣을 때마다 이어붙여 루프만 확인하면 됨.
+---
+
+# 섹터별 보스곡 — AI 생성 프롬프트
+
+각 섹터 보스전에 전용 곡을 깐다. 공통 규칙은 위와 동일(완전 루프·instrumental·BPM 상승).
+- 파일명: `nf_bgm_boss_sector1` … `nf_bgm_boss_sector6` (보스는 섹터당 1곡)
+- 위치: `assets/sound/` · 형식 `.ogg`/`.mp3`
+- **넣기 전까지는 기존 공용 보스곡(`nf_bgm_boss`)이 나온다** — 무음/오류 없음. 게임 연결 완료(`playBgmForBoss`).
+- 톤: 기존 보스곡(130bpm 하이브리드 오케스트라)과 같은 계열, 섹터가 오를수록 웅장·긴박.
+
+## 섹터 1 보스 · 리퍼 로드 (낫의 군주)
+> epic boss battle music, hybrid orchestral synth, 126 bpm, cold ominous strings, scything metallic stabs, heavy war drums, a bladed reaper warlord rising from frozen space, menacing and grand, seamless loop, no intro no outro, instrumental, 90 seconds
+
+## 섹터 2 보스 · 볼텍스 마우 (소용돌이 아가리)
+> epic boss battle music, hybrid orchestral synth, 128 bpm, swirling arpeggios, crystalline glassy stabs, deep spiraling bass, huge drums, a devouring vortex maw amid shattered prisms, hypnotic and threatening, seamless loop, no intro no outro, instrumental, 90 seconds
+
+## 섹터 3 보스 · 옵시디언 클로 (흑요석 발톱)
+> epic boss battle music, heavy industrial hybrid orchestral synth, 130 bpm, molten distorted bass, clanging metal percussion, pounding drums, ominous brass, an obsidian-clawed juggernaut in a burning furnace, brutal and heavy, seamless loop, no intro no outro, instrumental, 92 seconds
+
+## 섹터 4 보스 · 보이드 세라프 (공허의 천사)
+> epic boss battle music, hybrid orchestral synth, 132 bpm, soaring tragic strings, ethereal choir accents, ringing bell tones, thunderous drums, a colossal void seraph over a broken armada, sorrowful yet overwhelming, seamless loop, no intro no outro, instrumental, 95 seconds
+
+## 섹터 5 보스 · 네온 아비터 (네온 심판자)
+> epic boss battle music, dark-choir hybrid orchestral synth, 134 bpm, thunderous angelic choir, crackling electric arpeggios, massive drums, sacred neon cathedral judgment, the Neon Arbiter passing sentence, sacred and terrifying, maximum tension, seamless loop, no intro no outro, instrumental, 96 seconds
+
+## 섹터 6 보스 · 하이브 퀸 (최종 · 벌집 여왕)
+> climactic final boss battle music, dark relentless hybrid orchestral synth, 138 bpm, pounding war drums, monstrous low brass, swarming aggressive arpeggios, menacing choir, the alien Hive Queen at the crown core, desperate epic final confrontation, overwhelming grandeur, seamless loop, no intro no outro, instrumental, 100 seconds
+
+---
+
+## 변주를 원하면
+- 보스곡도 스테이지처럼 변주 2곡(a/b) 랜덤을 원하면 알려주세요 — 지금은 보스당 1곡(`nf_bgm_boss_sectorN`)입니다.
+- wav로 주시면 스테이지곡처럼 제가 루프 가공+ogg/mp3 변환해서 넣겠습니다.

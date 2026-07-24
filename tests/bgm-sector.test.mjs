@@ -31,3 +31,14 @@ test('BGM-S3: 게임이 섹터별 BGM을 호출한다(노드 시작 + 캠페인 
   assert.ok(/playBgmForSector\(r\.sector\)/.test(mainSrc), '노드 시작에서 섹터 BGM');
   assert.ok(/playBgmForSector\(region\.i\)/.test(mainSrc), '캠페인 지역 진입에서 섹터 BGM');
 });
+
+test('BGM-S4: 섹터별 보스곡 6트랙 + playBgmForBoss 폴백 + 게임 배선', () => {
+  for (let s = 1; s <= 6; s++) {
+    assert.ok(new RegExp(`boss_s${s}: 'assets/sound/nf_bgm_boss_sector${s}'`).test(audioSrc), `boss_s${s} 등록`);
+  }
+  assert.ok(/export async function playBgmForBoss/.test(audioSrc), 'playBgmForBoss export');
+  assert.ok(/playBgm\('boss'/.test(audioSrc), '공용 보스곡 폴백');
+  // 캠페인 보스(region.i) + classic 보스(r.sector) 배선
+  assert.ok(/playBgmForBoss\(region\.i\)/.test(mainSrc), '캠페인 보스에서 섹터 보스곡');
+  assert.ok(/playBgmForBoss\(r\.sector\)/.test(mainSrc), 'classic 보스에서 섹터 보스곡');
+});

@@ -18,7 +18,7 @@ import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES, SPRITE_SIZES, inva
 import { loadPatch, applyFlat, subscribePatch } from './tuning.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
-import { initAudio, unlockAudio, playBgm, playBgmForSector, setBgmIntensity, sfx, toggleMute, isMuted, setBgmVolume, setSfxVolume, getSettings } from './audio.js';
+import { initAudio, unlockAudio, playBgm, playBgmForSector, playBgmForBoss, setBgmIntensity, sfx, toggleMute, isMuted, setBgmVolume, setSfxVolume, getSettings } from './audio.js';
 import { playIntro } from './intro.js';
 import { createZoneBackdrop } from './zone-backdrop.js';
 // ── Gate 1: 8분 핵심 재미 (전면개편 §5). ?coreLoopTest=1 하네스에서 전체 스택을 구동. ──
@@ -928,7 +928,7 @@ function spawnCampaignBoss(i, bossId, t) {
   preloadBossArt(bossId);
   cl.bossActive = true; cl.bossSpawnT = t;
   cl.regionResults.push({ region: i, boss: bossId, ttk: null, killed: false });
-  playBgm('boss'); setBgmIntensity(0.86); sfx('boss_in');
+  playBgmForBoss(region.i); setBgmIntensity(0.86); sfx('boss_in');   // 섹터별 보스곡(없으면 공용 boss 폴백)
   r.effects.text(LOGICAL_W / 2, logicalH * 0.35, boss.korName || bossId, COLORS.danger, 20);
   r.effects.flash(0.4);
 }
@@ -1707,7 +1707,7 @@ function update(dt) {
       r.phase = 'boss';
       w.scrollSpeed = 40; // 보스전: 트랙 거의 정지, 별만 천천히
       sfx('boss_in');
-      setBgmIntensity(0.86); playBgm('boss'); // 보스 BGM으로 크로스페이드
+      setBgmIntensity(0.86); playBgmForBoss(r.sector); // 섹터별 보스곡(없으면 공용 boss 폴백)
       // 보스 정체성 = 캠페인/엔드리스 순서(§6.2). 서사형 보스 B7/B22는 항상 단독.
       const { bossTier } = r.progression;
       const bossId = campaignBossId(r.sector, r.mode, BAL.campaign.bosses, BAL.campaign.endlessBosses);

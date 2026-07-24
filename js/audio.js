@@ -14,6 +14,11 @@ const BGM_FILES = {
   battle_s4a: 'assets/sound/nf_bgm_sector4a', battle_s4b: 'assets/sound/nf_bgm_sector4b',
   battle_s5a: 'assets/sound/nf_bgm_sector5a', battle_s5b: 'assets/sound/nf_bgm_sector5b',
   battle_s6a: 'assets/sound/nf_bgm_sector6a', battle_s6b: 'assets/sound/nf_bgm_sector6b',
+  // 섹터별 보스곡(선택). 파일 없으면 playBgmForBoss가 공용 보스곡(boss)으로 폴백 → 무음 없음.
+  //  파일명 규칙: assets/sound/nf_bgm_boss_sector{1..6}.ogg(+.mp3). 프롬프트는 docs/BGM_SECTOR_PROMPTS.md.
+  boss_s1: 'assets/sound/nf_bgm_boss_sector1', boss_s2: 'assets/sound/nf_bgm_boss_sector2',
+  boss_s3: 'assets/sound/nf_bgm_boss_sector3', boss_s4: 'assets/sound/nf_bgm_boss_sector4',
+  boss_s5: 'assets/sound/nf_bgm_boss_sector5', boss_s6: 'assets/sound/nf_bgm_boss_sector6',
 };
 
 let ctx = null;
@@ -201,6 +206,19 @@ export async function playBgmForSector(sector, opts = {}) {
     }
   }
   return playBgm('battle1', opts);           // 폴백: 섹터 곡이 아직 없음(파일 미제작) → 기본 전투곡
+}
+
+/**
+ * 섹터별 보스곡 재생. 해당 섹터 보스곡이 있으면 그걸, 없으면 공용 보스곡(boss)으로 폴백 → 무음 없음.
+ *  sector = 1~6. 파일명 nf_bgm_boss_sector{sector}.ogg(+.mp3).
+ */
+export async function playBgmForBoss(sector, opts = {}) {
+  const name = `boss_s${sector}`;
+  if (unlocked && BGM_FILES[name]) {
+    const buf = await loadBgm(name);
+    if (buf) return playBgm(name, opts);     // 섹터 보스곡 있음 → 재생
+  }
+  return playBgm('boss', opts);              // 폴백: 섹터 보스곡 없음 → 공용 보스곡
 }
 
 /**
