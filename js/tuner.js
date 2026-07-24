@@ -6,6 +6,19 @@ import { GROUPS, coreKeySet, coreCount, artFor } from './tuner-spec.js';
 import { flatten, getPath, loadPatch, savePatch, clearPatch, emptyPatch } from './tuning.js';
 import { Charger, Mine, Debris } from './entities.js';
 
+// ── 스프라이트별 등장 섹터 (이름 옆 "(섹터N)" 표시용) ──
+// 적 도입 섹터: chunks.js ENEMY_MIN_STAGE와 동일(스프라이트 ID 기준). 보스는 BAL.gate2.regions에서 동적 추출.
+const ENEMY_SECTOR = { B1: 1, B2: 2, B6: 2, B4: 3, B16: 3, B18: 3, B3: 4, B5: 4, B17: 4, B20: 4, B19: 5, B21: 6 };
+const BOSS_SECTOR = Object.fromEntries((BAL.gate2?.regions || []).map((r) => [r.boss, r.i]));  // {B8:1,B9:2,B10:3,B11:4,B22:5,B7:6}
+/** 스프라이트 ID의 등장 섹터 접미사. 적=도입, 보스=캠페인 섹터, B12~B15=엔드리스. 없으면 ''. */
+function sectorSuffix(ns, path) {
+  if (ns !== 'sprite') return '';
+  const s = BOSS_SECTOR[path] ?? ENEMY_SECTOR[path];
+  if (s) return ` (섹터${s})`;
+  if (/^B(12|13|14|15)$/.test(path)) return ' (엔드리스)';
+  return '';
+}
+
 // 원본 기본값 스냅샷 — 페이지 로드 시 한 번. 이후 편집은 이 사본과 비교해 '변경분'만 저장한다.
 const BASE = { bal: JSON.parse(JSON.stringify(BAL)), sprite: { ...SPRITE_SIZES } };
 const SRC = { bal: BAL, sprite: SPRITE_SIZES };
@@ -83,7 +96,7 @@ function makeRow(item) {
     left.appendChild(el('div', 'thumb none'));   // 자리를 비워두면 이름 줄이 어긋난다
   }
   const txt = el('div', 'ltext');
-  txt.appendChild(el('div', 'nm', item.name || path));
+  txt.appendChild(el('div', 'nm', (item.name || path) + sectorSuffix(ns, path)));
   const sub = el('div', 'sub');
   sub.textContent = item.desc ? `${item.desc} · ${path}` : path;
   txt.appendChild(sub);
