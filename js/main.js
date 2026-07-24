@@ -18,7 +18,7 @@ import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES, SPRITE_SIZES, inva
 import { loadPatch, applyFlat, subscribePatch } from './tuning.js';
 import { createSave } from './save.js';
 import { ui } from './ui.js';
-import { initAudio, unlockAudio, playBgm, setBgmIntensity, sfx, toggleMute, isMuted, setBgmVolume, setSfxVolume, getSettings } from './audio.js';
+import { initAudio, unlockAudio, playBgm, playBgmForSector, setBgmIntensity, sfx, toggleMute, isMuted, setBgmVolume, setSfxVolume, getSettings } from './audio.js';
 import { playIntro } from './intro.js';
 import { createZoneBackdrop } from './zone-backdrop.js';
 // ── Gate 1: 8분 핵심 재미 (전면개편 §5). ?coreLoopTest=1 하네스에서 전체 스택을 구동. ──
@@ -232,7 +232,7 @@ function enterNode(node) {
   if (node.type === 'repair') { enterRepair(node); return; }
   buildEncounter(node);
   state = 'play'; drafting = false; ui.hide();
-  setBgmIntensity(0.3); playBgm('battle1'); sfx('start');
+  setBgmIntensity(0.3); playBgmForSector(r.sector); sfx('start');   // 섹터별 전투 BGM(없으면 battle1 폴백)
   const label = { combat: '교전', elite: '정예 교전', hazard: '위험 지대', supply: '보급', boss: '섹터 보스' }[node.type] || '교전';
   r.effects.text(LOGICAL_W / 2, logicalH * 0.4, label, node.type === 'boss' ? COLORS.danger : COLORS.reward);
   r.effects.flash(0.3);
@@ -904,6 +904,7 @@ function enterCampaignRegion(i, t) {
   r.effects.text(LOGICAL_W / 2, logicalH * 0.28, `${region.i}. ${region.name}`, COLORS.reward, 20);
   const rt = BAL.gate2.regionThreat[region.i - 1];   // §7.5 지역별 위협 테마 안내(무엇을 시험하는지 한 줄)
   if (rt) { cl.regionThreatLabel = rt.label; r.effects.text(LOGICAL_W / 2, logicalH * 0.28 + 26, rt.label, '#8fb4d8', 13); }
+  playBgmForSector(region.i);   // 섹터별 전투 BGM으로 전환(없으면 battle1 폴백) — 지역마다 색다른 느낌
 }
 
 /** 지역 보스 등장: 잔여 정리 + 지역 TTK 목표로 양측 클램프 설치(공용 헬퍼). */

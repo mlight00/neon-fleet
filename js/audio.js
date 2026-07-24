@@ -6,6 +6,14 @@ const BGM_FILES = {
   title: 'assets/sound/nf_bgm_title',
   battle1: 'assets/sound/nf_bgm_battle1',
   boss: 'assets/sound/nf_bgm_boss',
+  // 섹터별 전투 BGM(선택). 파일이 아직 없으면 playBgmForSector가 battle1로 폴백한다 → 무음 없음.
+  //  파일명 규칙: assets/sound/nf_bgm_sector{1..6}.ogg(권장) 또는 .mp3. 프롬프트는 docs/BGM_SECTOR_PROMPTS.md.
+  battle_s1: 'assets/sound/nf_bgm_sector1',
+  battle_s2: 'assets/sound/nf_bgm_sector2',
+  battle_s3: 'assets/sound/nf_bgm_sector3',
+  battle_s4: 'assets/sound/nf_bgm_sector4',
+  battle_s5: 'assets/sound/nf_bgm_sector5',
+  battle_s6: 'assets/sound/nf_bgm_sector6',
 };
 
 let ctx = null;
@@ -165,6 +173,19 @@ export async function playBgm(name, { fade = 1.2, restart = false } = {}) {
   src.connect(filter).connect(gain).connect(masterBgm);
   src.start(now);
   bgmSlot = { name, src, gain, filter };
+}
+
+/**
+ * 섹터별 전투 BGM 재생(색다른 느낌). 해당 섹터 곡이 있으면 그걸, 없으면 기본 전투곡(battle1)으로 폴백 → 무음 없음.
+ *  sector = 1~6. 언락 전엔 큐잉만(전투는 언락 이후라 실전 진입 시 다시 호출되어 섹터 곡이 걸린다).
+ */
+export async function playBgmForSector(sector, opts = {}) {
+  const name = `battle_s${sector}`;
+  if (unlocked && BGM_FILES[name]) {
+    const buf = await loadBgm(name);
+    if (buf) return playBgm(name, opts);   // 섹터 곡 있음 → 재생
+  }
+  return playBgm('battle1', opts);          // 폴백: 섹터 곡이 아직 없음(파일 미제작) → 기본 전투곡
 }
 
 /**
