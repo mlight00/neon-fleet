@@ -279,7 +279,10 @@ function buildEncounter(node) {
   r.phase = 'track'; w.phase = 'track';
   r.traveled = 0; r.clearShown = false;
   const perRun = (node.type === 'hazard' || node.type === 'supply' || node.type === 'boss') ? BAL.sector.shortLen : BAL.sector.combatLen;
-  const totalTrack = BAL.chunk.heightPx * perRun;
+  const baseTrack = BAL.chunk.heightPx * perRun;
+  const padPx = (BAL.sector.extraSeconds || 0) * BAL.scrollSpeed;   // 각 노드 +N초(보스 노드는 보스 출현이 그만큼 늦춰짐)
+  const totalTrack = baseTrack + padPx;
+  const trackScale = totalTrack / baseTrack;                        // 청크 콘텐츠를 늘어난 트랙에 고르게 펼침(빈 구간 방지)
   r.totalTrack = totalTrack;
   const tb = BAL.chunk.tierBounds;
   const bounds = [Math.max(0.1, tb[0] - mods.tierShift), Math.max(0.35, tb[1] - mods.tierShift)];
@@ -303,7 +306,7 @@ function buildEncounter(node) {
     prev = chunk;
     for (const it of chunk.items) {
       if (it.type === 'storm') continue;
-      pending.push({ ...it, trackY: i * BAL.chunk.heightPx + it.y * BAL.chunk.heightPx });
+      pending.push({ ...it, trackY: (i * BAL.chunk.heightPx + it.y * BAL.chunk.heightPx) * trackScale });
     }
   }
   if (r.sector === 1 && node.col === 0 && !r.squad.reson) pending.push({ type: 'weaponGate', trackY: 380 }); // 무기 선택 게이트 — 섹터 무기 조합(reson)이면 제거(시작무기+POW로 충분, 이사: 무기선택 또 나옴)
