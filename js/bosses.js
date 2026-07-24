@@ -48,6 +48,10 @@ export class Boss {
     this.korName = def.korName;
     // 보스별 고유 공격 패턴 (부채꼴 슬롯이 kind별 서명기로 대체된다)
     this.pattern = BAL.bossPatterns[def.id] ?? { kind: 'brood' };
+    // 보스별 난이도 미세조정(튜너). dmg=발사체 데미지 배수, fire=발사 빈도 배수. hp는 main.js가 TTK에 적용.
+    const bt = BAL.bossTune?.[def.id] || {};
+    this._dmgMult = bt.dmg ?? 1;
+    this._fireMult = bt.fire ?? 1;
     // 보스 변주: 로스터 2회차부터(loop>0) 시작부터 광폭 + 탄 추가 + 빠른 발사
     const V = BAL.bossVariant;
     const loop = Math.floor((Math.max(1, stage) - 1) / 5);
@@ -93,7 +97,9 @@ export class Boss {
     }));
   }
   get enraged() { return this.variantAlwaysEnrage || this.hp <= this.maxHp * BAL.boss.enrageRatio; }
-  interval(base) { return base * this.rateMult * this.variantFaster * (this.enraged ? BAL.boss.enrageRate : 1); }
+  interval(base) { return base * this.rateMult * this.variantFaster * (this.enraged ? BAL.boss.enrageRate : 1) / (this._fireMult || 1); }
+  /** 발사체 opts의 데미지를 이 보스의 튜너 배수로 조정 (dmgPct·dmgMin) */
+  _scaleDmg(o) { const m = this._dmgMult || 1; if (m !== 1) { if (o.dmgPct != null) o.dmgPct *= m; if (o.dmgMin != null) o.dmgMin *= m; } return o; }
   phaseColor() {
     const ratio = this.hp / this.maxHp;
     return ratio > 0.66 ? COLORS.enemy : ratio > 0.33 ? COLORS.enemyHigh : COLORS.danger;
@@ -144,7 +150,7 @@ export class Boss {
     this.shotT -= dt;
     if (this.shotT <= 0) {
       this.shotT = this.interval(BAL.boss.shotInterval) * (this.pattern.shotMult ?? 1);
-      world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, { r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin, color: this.shotStyle().color }));
+      world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, this._scaleDmg({ r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin, color: this.shotStyle().color })));
     }
     if (this.rainWarnT > 0) this.rainWarnT = Math.max(0, this.rainWarnT - dt);   // 융단 폭격 예고 타이머
     // 서명 공격: 보스 종류별 고유 패턴 (기존 부채꼴 슬롯)
@@ -173,7 +179,7 @@ export class Boss {
     const B = BAL.boss;
     const fb = this.variantFanBonus || 0;   // 변주판 추가 탄 수
     const st = this.shotStyle();
-    const fanOpts = { r: 7, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin, color: st.color, shape: st.shape };
+    const fanOpts = this._scaleDmg({ r: 7, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin, color: st.color, shape: st.shape });
     switch (P.kind) {
       case 'crescent': { // 리퍼 로드: 아래로 넓게 베어내리는 참격 볼리
         this.fanT = this.interval(B.fanInterval);
@@ -500,7 +506,7 @@ export class HiveQueen extends Boss {
   fireSignature(world) {
     if (this.hivePhase === 1) { super.fireSignature(world); return; }
     const B = BAL.boss;
-    const base = { r: 6, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin, color: '#ff79c8', shape: 'orb' };
+    const base = this._scaleDmg({ r: 6, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin, color: '#ff79c8', shape: 'orb' });
     if (this.hivePhase === 2) {
       // 왕관 방어: 회전 고리에서 플레이어 방향 약 60도는 비워 읽을 수 있는 탈출구를 만든다.
       this.fanT = this.interval(B.fanInterval * 0.82);
@@ -697,7 +703,7 @@ export class NeonArbiter extends Boss {
   _fireWall(world, safeStart) {
     const C = AR();
     const slotW = this.logicalW / C.wallCount;
-    const st = { r: 7, dmgPct: BAL.boss.fanDamagePct, dmgMin: BAL.boss.fanDamageMin, color: '#8affff', shape: 'orb' };
+    const st = this._scaleDmg({ r: 7, dmgPct: BAL.boss.fanDamagePct, dmgMin: BAL.boss.fanDamageMin, color: '#8affff', shape: 'orb' });
     for (let s = 0; s < C.wallCount; s++) {
       if (s >= safeStart && s < safeStart + C.wallGapSlots) continue;   // 안전 통로 비움
       const px = (s + 0.5) * slotW;
@@ -707,7 +713,7 @@ export class NeonArbiter extends Boss {
 
   _fireRing(world) {
     const C = AR();
-    const st = { r: 6, dmgPct: BAL.boss.fanDamagePct, dmgMin: BAL.boss.fanDamageMin, color: '#b44cff', shape: 'ring' };
+    const st = this._scaleDmg({ r: 6, dmgPct: BAL.boss.fanDamagePct, dmgMin: BAL.boss.fanDamageMin, color: '#b44cff', shape: 'ring' });
     // 편대 방향 ±35° 안에 빈 각도(≥55°)를 남긴다 (읽고 통과 가능하도록 느린 속도)
     const toSquad = Math.atan2(world.squad.x - this.x, world.squad.y - this.y);
     const rng = world.rng || Math.random;

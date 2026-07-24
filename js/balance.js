@@ -383,6 +383,24 @@ export const BAL = {
     B15: { kind: 'laserSweep', stack: 3, sweepHz: 0.35, sweepW: 200, speed: 340, interval: 0.05, shotMult: 1.4 }, // 옵틱 워든: 소탕 레이저
   },
 
+  // 보스별 난이도 미세조정(튜너 노출). 배수 1 = 원본 유지.
+  //   hp   : 목표 처치시간 배수(클수록 오래 버팀=체력 체감↑). bossTtk 범위에 곱해진다.
+  //   dmg  : 이 보스 발사체 데미지 배수.
+  //   fire : 이 보스 발사 빈도 배수(클수록 빠름). interval을 나눈다.
+  // 섹터 보스 6종(B8·B9·B10·B11·B22·B7) + 엔드리스 4종(B12~B15).
+  bossTune: {
+    B8:  { hp: 1, dmg: 1, fire: 1 },
+    B9:  { hp: 1, dmg: 1, fire: 1 },
+    B10: { hp: 1, dmg: 1, fire: 1 },
+    B11: { hp: 1, dmg: 1, fire: 1 },
+    B22: { hp: 1, dmg: 1, fire: 1 },
+    B7:  { hp: 1, dmg: 1, fire: 1 },
+    B12: { hp: 1, dmg: 1, fire: 1 },
+    B13: { hp: 1, dmg: 1, fire: 1 },
+    B14: { hp: 1, dmg: 1, fire: 1 },
+    B15: { hp: 1, dmg: 1, fire: 1 },
+  },
+
   // 보스 변주: 로스터가 한 바퀴 돈 뒤(스테이지 6+) 같은 보스가 강화판으로 재등장.
   // loop = floor((stage-1)/5). 같은 스프라이트로 시작부터 광폭 + 탄 추가 + 빠른 발사.
   bossVariant: {

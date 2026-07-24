@@ -679,6 +679,9 @@ function ttkClampCfg(ttkRange) {
  *  BREAK 등 내부 배수는 damageTakenMult()로 사전 조회해 실손실 기준으로 예산을 건다.
  */
 function installBossTtkClamp(boss, avgDps, ttkRange) {
+  // 보스별 체력 튜너(hp 배수): 목표 처치시간(TTK) 범위에 곱해 오래 버티게 → 체력 체감↑ (HP·dpsCap 동반 상승)
+  const hpMul = BAL.bossTune?.[boss.spriteId]?.hp ?? 1;
+  if (hpMul !== 1) ttkRange = [ttkRange[0] * hpMul, ttkRange[1] * hpMul];
   const c = ttkClampCfg(ttkRange);
   boss.hp = boss.maxHp = Math.round(Math.max(BAL.boss.hp * 0.25, avgDps * c.hpMult));  // 고정 HP(불변) → STAGGER 분모 안정
   boss.dpsCap = boss.maxHp / c.minTTKSec;                // 하한: 초당 피해 상한(TTK 하한)

@@ -2,7 +2,7 @@
 // 게임과 같은 출처라 저장소를 공유한다 → 저장하면 게임 탭이 storage 이벤트로 즉시 반영.
 import { BAL } from './balance.js';
 import { SPRITE_SIZES, preloadSprites, getSprite } from './sprites.js';
-import { GROUPS, coreKeySet, coreCount, artFor } from './tuner-spec.js';
+import { GROUPS, coreKeySet, catCount, artFor } from './tuner-spec.js';
 import { flatten, getPath, loadPatch, savePatch, clearPatch, emptyPatch } from './tuning.js';
 import { Charger, Mine, Debris } from './entities.js';
 
@@ -155,14 +155,15 @@ function section(title, desc, open) {
   return { d, body };
 }
 
-// ── 핵심 항목 ──
+// ── 정렬 항목: 내 함대(펼침) + 적 섹터별(접힘, 길어서) ──
 function buildCore() {
-  const host = $('#core');
+  const fleetHost = $('#fleet'), enemyHost = $('#enemy');
   for (const g of GROUPS) {
-    const { d, body } = section(g.title, g.desc, true);
+    const enemy = g.cat === 'enemy';
+    const { d, body } = section(g.title, g.desc, !enemy);   // 함대는 펼침, 적 섹터는 접어 둔다(검색·클릭 시 펼침)
     let n = 0;
     for (const item of g.items) { const r = makeRow(item); if (r) { body.appendChild(r); n++; } }
-    if (n) host.appendChild(d);
+    if (n) (enemy ? enemyHost : fleetHost).appendChild(d);
   }
 }
 
@@ -289,7 +290,8 @@ async function drawThumbs() {
 buildCore();
 buildAll();
 refreshStatus();
-$('#core-count').textContent = `${coreCount()}개`;
+$('#fleet-count').textContent = `${catCount('fleet')}개`;
+$('#enemy-count').textContent = `${catCount('enemy')}개`;
 $('#btn-save').addEventListener('click', doSave);
 $('#btn-reset-all').addEventListener('click', doResetAll);
 $('#btn-export').addEventListener('click', doExport);
