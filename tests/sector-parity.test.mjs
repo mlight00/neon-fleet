@@ -44,7 +44,7 @@ test('SP-04: 중간보스는 최종 보스(하이브 퀸)가 아니라 직전 �
   assert.equal(midFor(1), 'B8', '섹터 1 = 리퍼 로드');
   assert.equal(midFor(3), 'B9', '섹터 3 = 직전 섹터(2) 보스');
   assert.equal(C.bosses[C.bosses.length - 1], 'B7', '하이브 퀸은 최종 보스 자리 유지');
-  assert.ok(mainSrc.includes('new MidBoss(LOGICAL_W, contentTier, r.maxPower, midId)'), '스폰이 bossId 전달');
+  assert.ok(/new MidBoss\(LOGICAL_W, contentTier, r\.maxPower[^,]*, midId\)/.test(mainSrc), '스폰이 bossId 전달');
 });
 
 test('SP-05: 타이틀 로고 배경 박스 제거 — 통짜 이미지 대신 엠블럼 + 텍스트', () => {

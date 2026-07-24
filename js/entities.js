@@ -456,6 +456,26 @@ export class Squad {
   get power() {
     return this.flagPower + this.supportPower;
   }
+  /**
+   * 무기 성장 배수(≥1, 원정 시작 대비). 적 체력 스케일이 무기 강화를 따라가게 하는 값.
+   * fire()의 baseDps에 곱해지는 '런 중 성장' 인자(무기 레벨·진화 레벨·초진화 dmg/rate)를 그대로 재현하고,
+   * 해석식이 못 잡는 진화 거동(관통·분열·다탄·폭발) 실효 화력을 상수(evoEffectiveMult 등)로 보정한다.
+   * 시작(Lv1·미진화) = 1.0 → 초반 난이도 불변.
+   */
+  weaponPowerMult() {
+    const W = BAL.weapons, WEB = BAL.weaponEvolution;
+    const lv = Math.min(this.weaponLv || 1, W.lvCoef.length);
+    const lvRatio = (W.lvCoef[lv - 1] || 1) / (W.lvCoef[0] || 1);           // 무기 레벨 배수 (baseDps의 lvCoef)
+    const evoId = this.weaponEvolutions[this.weapon];
+    const superId = this.weaponEvolutions2[this.weapon];
+    const evoMult = evoLevelMult(evoId, this.evoLevels[this.weapon], WEB.evoLevelStep);   // 진화 레벨 램프
+    const se = superEvoEffects(superId, BAL.weaponSuperEvolution);
+    const superLv = this.superLevels[this.weapon] || 0;
+    const seFactor = se.dmgMult * (se.rateMult ?? 1) * (1 + Math.max(0, superLv - 1) * WEB.superLevelStep);  // 초진화 dmg×rate
+    const evoEff = evoId ? (WEB.evoEffectiveMult ?? 1) : 1;                 // 진화 거동 실효 보정
+    const superEff = superId ? (WEB.superEffectiveMult ?? 1) : 1;
+    return lvRatio * evoMult * seFactor * evoEff * superEff;
+  }
   /** 보상 드론 획득 배수 (군체 교리 + 순양함 존재 시 +10%) */
   get rewardGainMult() {
     return (this.doctrine === 'swarm' && (this.cruisers || 0) > 0) ? 1 + BAL.doctrine.swarm.droneGainBonus : 1;

@@ -39,7 +39,10 @@ export const BAL = {
   //  보스와 같은 맹점 — 화력(드론 수)만 보고 공격력·연사력 강화를 안 봐서, 강화가 쌓일수록
   //  적만 물러졌다. 보스(boss.hangarWeight)와 따로 두어 각각 조절 가능.
   //  적 HP는 hpCap(화력 비례 상한)이 있어 무한정 단단해지지는 않는다.
-  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5, coinBankMult: 0.5, crystalContactMult: 0.25, enemyHangarWeight: 1 },
+  economy: { droneGainMult: 0.22, enemyHpPowerScale: 130, enemyHpPowerCap: 12, enemyHpCapPerStage: 1.5, coinBankMult: 0.5, crystalContactMult: 0.25, enemyHangarWeight: 1,
+    // 난이도 곡선: 무기 강화(레벨·진화·초진화)로 실DPS가 몇 배가 되는데 적 체력은 드론수·격납고만 따라와
+    //  후반에 플레이어가 적을 압도한다(이사 피드백). → 무기 성장 배수를 적 체력에도 반영. weight 0=옛 동작, 1=완전 추종.
+    weaponHpWeight: 0.6 },
 
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
@@ -93,6 +96,10 @@ export const BAL = {
   weaponEvolution: {
     evoLevelStep: 0.14,   // 진화 레벨(1→2→3)당 그 무기 피해 배수 증가 → "강해지는 게 느껴진다"
     superLevelStep: 0.12, // 초진화 레벨(1→2→3)당 추가 피해 배수
+    // 난이도 곡선(적 체력 추종용): 1차 진화·초진화는 관통·분열·다탄·폭발 등 '실효 화력'이 크게 뛰는데
+    //  해석식(evoLevelStep 램프)은 이걸 못 잡는다. 적 체력이 무기 진화를 따라가도록 상수 보정. 1=보정 없음.
+    evoEffectiveMult: 1.8,   // 무기를 1차 진화하면 실효 화력 ≈ +80% (시즈/와스프/니들/폭풍/프리즘/커터 평균)
+    superEffectiveMult: 1.4, // 초진화하면 그 위로 ≈ +40%
     duplicateReward: { drones: 20, coin: 10 },  // (미사용) 옛 대체 보상
     // 양갈래를 정반대 스타일로 확실히 구분 (광역/연쇄 ↔ 단일/관통)
     vulcan_storm:  { spread: 1.7, ricochetFrac: 0.75, ricochetRadius: 165, bounces: 2 },                       // 폭풍: 넓게 뿌리고 적 사이를 2번 튕김(다수전) · 반동피해 0.6→0.75

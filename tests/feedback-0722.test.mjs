@@ -198,8 +198,12 @@ test('FB-16: 일반 적 HP도 격납고 강화를 반영한다 (보스와 별도
   assert.equal(BAL.economy.enemyHangarWeight, 1, '적 반영 가중치');
   assert.ok(mainSrc.includes('effectiveFirepower(Math.max(0, r.maxPower), r.world.stats, BAL.squad, BAL.economy.enemyHangarWeight)'),
     '적 스케일 배선');
-  assert.ok(mainSrc.includes('const pf = 1 + Math.min(hpCapS, enemyPower / BAL.economy.enemyHpPowerScale)'),
+  assert.ok(mainSrc.includes('Math.min(hpCapS, enemyPower / BAL.economy.enemyHpPowerScale)'),
     '실효 화력으로 계산');
+  // 난이도 곡선: 무기 강화(레벨·진화·초진화)도 적 체력에 반영 — 캡 바깥에서 곱해 실DPS를 따라간다
+  assert.ok(mainSrc.includes('weaponPowerMult()') && mainSrc.includes('BAL.economy.weaponHpWeight'),
+    '무기 강화가 적 체력에 반영된다');
+  assert.equal(typeof BAL.economy.weaponHpWeight, 'number', '무기 추종 가중치 존재');
   assert.ok(!/Math\.max\(0, r\.maxPower\) \/ BAL\.economy\.enemyHpPowerScale/.test(mainSrc),
     '옛 계산(원시 화력)이 남아 있으면 안 된다');
   // 보스와 따로 조절할 수 있어야 한다 — 한쪽만 되돌리는 상황이 실제로 생긴다

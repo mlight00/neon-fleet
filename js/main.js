@@ -1615,7 +1615,9 @@ function update(dt) {
       const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (difficultyLevel - 1);
       // 적 HP 기준 화력에도 격납고 강화를 반영(보스와 동일 원리, 이사). 상한 hpCapS는 그대로 적용된다.
       const enemyPower = effectiveFirepower(Math.max(0, r.maxPower), r.world.stats, BAL.squad, BAL.economy.enemyHangarWeight);
-      const pf = 1 + Math.min(hpCapS, enemyPower / BAL.economy.enemyHpPowerScale);
+      // 무기 강화(레벨·진화·초진화) 추종: 캡(드론수 폭주 방지)은 드론 화력에만 걸고, 무기 배수는 캡 바깥에서 곱해 실DPS를 따라간다.
+      const weaponPf = 1 + BAL.economy.weaponHpWeight * (r.squad.weaponPowerMult() - 1);
+      const pf = (1 + Math.min(hpCapS, enemyPower / BAL.economy.enemyHpPowerScale)) * weaponPf;
       const gMul = BAL.difficulty.globalMult;   // 전체 난이도 배수(사용자 조정): 체력 ×gMul, 발사 주기 ÷gMul(더 빠름)
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1) * gMul * BAL.difficulty.enemyHpMult); if (e.fireInterval) e.fireInterval *= mods.enemyRate / gMul; return e; };
       // 적 스폰 헬퍼: 난이도 스케일 + 변이(어픽스=섹터 확률) 롤 + 등록
@@ -1660,7 +1662,7 @@ function update(dt) {
         // 중간보스 정체 = 캠페인 순서상 '직전 섹터의 보스'(섹터 1은 그 섹터 보스의 축소판).
         // 이전엔 bossDefFor(sector-1)이라 섹터 1에서 로스터 0번 = B7 하이브 퀸(섹터 6 최종 보스)이 나왔다(이사 지적).
         const midId = campaignBossId(Math.max(1, r.sector - 1), r.mode, BAL.campaign.bosses, BAL.campaign.endlessBosses);
-        const mb = new MidBoss(LOGICAL_W, contentTier, r.maxPower, midId);
+        const mb = new MidBoss(LOGICAL_W, contentTier, r.maxPower * weaponPf, midId);   // 무기 강화 추종(잡몹과 동일)
         preloadBossArt(mb.def.id);   // 중간보스 아트 지연 로드 — 없으면 붉은 타원 폴백+텍스트만 보임(이사 지적)
         w.entities.push(mb);
       }
@@ -1712,7 +1714,7 @@ function update(dt) {
       preloadBossArt(resolvedBossId); // 등장 이동 시간 동안 전용 레이어를 지연 로드
       const bossN = bossCountFor(resolvedBossId, bossTier, BAL.boss);
       // 보스 HP 기준 화력 = 함대 화력 × 격납고 강화 배수. 격납고를 빼면 강화할수록 보스가 물러진다(이사).
-      const bossPower = effectiveFirepower(r.maxPower, r.world.stats, BAL.squad, BAL.boss.hangarWeight);
+      const bossPower = effectiveFirepower(r.maxPower, r.world.stats, BAL.squad, BAL.boss.hangarWeight) * weaponPf;   // 무기 강화 추종(엔드리스/클래식 보스; 캠페인 섹터 보스는 실측 avgDps)
       const hpCap = Math.max(BAL.boss.hp, bossPower * BAL.boss.hpPerPowerCap); // A4: 화력 대비 상한 → 처치시간 상한
       const totalMult = bossN > 1 ? BAL.boss.multiTotalMult : 1;                 // 다중 총 HP 배수(각=이/보스수)
       r.bosses = [];
