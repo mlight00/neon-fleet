@@ -280,6 +280,7 @@ $('#core-count').textContent = `${coreCount()}개`;
 $('#btn-save').addEventListener('click', doSave);
 $('#btn-reset-all').addEventListener('click', doResetAll);
 $('#btn-export').addEventListener('click', doExport);
+$('#btn-export-top')?.addEventListener('click', doExport);   // 헤더 상단 내보내기(항상 보임)
 $('#btn-import').addEventListener('click', doImport);
 $('#search').addEventListener('input', (e) => applyFilter(e.target.value));
 $('#btn-open-game').addEventListener('click', () => window.open('index.html', 'neonfleet-game'));
