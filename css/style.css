@@ -142,10 +142,13 @@ html, body {
 }
 #overlay button:active { transform: translateY(0); }
 
-/* 텍스트 링크형·상점·스타일 버튼은 콘솔 장식(좌측 바·스윕)을 쓰지 않는다 */
+/* 텍스트 링크형·상점·스타일·맵노드 버튼은 콘솔 장식(좌측 바·스윕)을 쓰지 않는다 */
 #overlay .link-btn::before, #overlay .link-btn::after,
 #overlay .h-buy::before, #overlay .h-buy::after,
+#overlay .map-node::before, #overlay .map-node::after,
 #overlay .style-btn::before, #overlay .style-btn::after { display: none; }
+/* 원형 항로 노드는 좌측 바·hover 이동/배경 변화 없이 아이콘 원만 (막대바 사고 방지) */
+#overlay button.map-node:hover { background: rgba(10, 16, 28, 0.9); transform: none; }
 
 /* 선택 카드(코어루프 시작무기·행동변화·프레임 + 25분 캠페인). 일반 청록 pill 버튼을 덮어
    다크 카드·가독 텍스트·게임 스트립 폭에 맞춘 작은 크기로. (텍스트 안 보임·촌스러움·오버플로 해결) */
