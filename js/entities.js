@@ -1401,7 +1401,40 @@ export class Bullet {
     ctx.restore();
   }
 
+  /** 공명 '레일 스톰' 전용 발사체 — 흰 네모박스 대신 시안 레일포(외곽 오라+방추 본체+레일 마디+백열 코어). */
+  drawResonanceRail(ctx) {
+    const c = this.color || '#79ecff';
+    const w = this.beamW || 9;
+    const L = 50;
+    const top = Math.min(this.y, this.prevY ?? this.y) - L / 2;
+    const bot = Math.max(this.y, this.prevY ?? this.y) + L / 2;
+    const h = bot - top, x = this.x;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';   // 가산 발광 → 박스가 아니라 에너지 빔처럼 보인다
+    // 1) 좌우로 부드럽게 사라지는 외곽 오라
+    const g = ctx.createLinearGradient(x - w * 2, 0, x + w * 2, 0);
+    g.addColorStop(0, 'rgba(60,170,255,0)'); g.addColorStop(0.5, c); g.addColorStop(1, 'rgba(60,170,255,0)');
+    ctx.globalAlpha = 0.45; ctx.fillStyle = g;
+    ctx.fillRect(x - w * 2, top, w * 4, h);
+    // 2) 양끝이 뾰족한 방추형 본체
+    ctx.globalAlpha = 0.95; ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.moveTo(x, top - 11); ctx.lineTo(x - w, top + 9); ctx.lineTo(x - w * 0.55, bot);
+    ctx.lineTo(x + w * 0.55, bot); ctx.lineTo(x + w, top + 9);
+    ctx.closePath(); ctx.fill();
+    // 3) 레일 마디(가로 에너지 룽) — '레일포' 질감
+    ctx.strokeStyle = '#e6fbff'; ctx.globalAlpha = 0.85; ctx.lineWidth = 2;
+    for (let yy = top + 8; yy < bot - 2; yy += 11) {
+      ctx.beginPath(); ctx.moveTo(x - w * 0.85, yy); ctx.lineTo(x + w * 0.85, yy); ctx.stroke();
+    }
+    // 4) 백열 코어 심
+    ctx.globalAlpha = 1; ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x - 1.6, top - 9, 3.2, h + 9);
+    ctx.restore();
+  }
+
   draw(ctx) {
+    if (this.resonanceId === 'railStorm') { this.drawResonanceRail(ctx); return; }   // 공명 레일 전용 렌더
     const art = this.artId && getSprite(this.artId);
     if (art && this.kind !== 'tracer') {
       const a = Math.atan2(this.vx, -this.vy);

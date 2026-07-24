@@ -470,8 +470,8 @@ export const BAL = {
     },
     // 무기 조합 공명 3종(§5.4). 발동은 피해배수만 금지 — 모양·표적·소리 중 2+ 변화.
     resonance: {
-      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 18, cooldown: 0.14, dmgFrac: 65, width: 36, pierce: 8 }, // 발칸·레이저 명중 누적→관통 레일
-      microMissile: { pair: ['vulcan', 'homing'], chargePerHit: 1, threshold: 44, cooldown: 0.6, count: 6, dmgFrac: 3.9 },            // 발칸·유도 명중 누적→소형 미사일 묶음 분산추적
+      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 36, cooldown: 0.14, dmgFrac: 65, width: 36, pierce: 8 }, // 발칸·레이저 명중 누적→관통 레일 (빈도 절반: threshold 18→36, 이사)
+      microMissile: { pair: ['vulcan', 'homing'], chargePerHit: 1, threshold: 88, cooldown: 0.6, count: 6, dmgFrac: 3.9 },            // 발칸·유도 명중 누적→소형 미사일 묶음 (빈도 절반: threshold 44→88, 이사)
       seekerBeam: { pair: ['laser', 'homing'],  markDuration: 2.8, cooldown: 0.5, missileBonus: 2.0 },                                // 레이저 표식→미사일 우선추적·증폭, 파괴 시 표식 이동
       minFirstAt: 255, maxFirstAt: 285,  // 첫 공명 확정 완성 창
       telegraphLead: 30,                 // 완성 전 예고 시간(20~40s 창의 중앙)

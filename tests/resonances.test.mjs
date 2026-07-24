@@ -111,3 +111,27 @@ test('공명 예고: 충전형은 절반 이상, 표식형은 표식 없을 때 
   onLaserMark(s2, CFG, 'x', 1);
   assert.equal(shouldTelegraph(s2, CFG), false);
 });
+
+// ── 이사 요청(공명무기 손보기): 발사 빈도 절반 + 레일 스톰 전용 발사체(흰 네모박스 제거) ──
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+const entitiesSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../js/entities.js'), 'utf8');
+
+test('RW-빈도: 충전형 공명 발사 빈도를 절반으로 (threshold 2배)', () => {
+  // 빈도 = 1/충전시간 ∝ 1/threshold. 예전 railStorm 18·microMissile 44 → 절반이면 36·88.
+  assert.equal(CFG.railStorm.threshold, 36, '레일 스톰 threshold=36 (18의 2배 → 빈도 절반)');
+  assert.equal(CFG.microMissile.threshold, 88, '마이크로 미사일 threshold=88 (44의 2배)');
+  // 실제로 threshold 미만에선 발동 안 하고, 도달하면 발동한다(빈도가 threshold로 결정됨을 확인)
+  const s = createResonanceState();
+  setLoadout(s, ['vulcan', 'laser']);
+  s.charge = CFG.railStorm.threshold - 1;
+  assert.equal(tryProc(s, CFG, 10), null, 'threshold 직전엔 발동 안 함');
+  s.charge = CFG.railStorm.threshold;
+  assert.ok(tryProc(s, CFG, 10), 'threshold 도달 시 발동');
+});
+
+test('RW-렌더: 레일 스톰은 전용 발사체(흰 네모박스 아님)로 그린다', () => {
+  assert.ok(entitiesSrc.includes('drawResonanceRail'), '전용 렌더 메서드 존재');
+  assert.ok(/this\.resonanceId === 'railStorm'.*drawResonanceRail/s.test(entitiesSrc), 'draw()가 railStorm을 전용 렌더로 분기');
+});

@@ -642,7 +642,7 @@ function spawnResonance(spec, sq, w) {
   if (spec.kind === 'rail') {
     const hx = BAL.gate1.loadout.hardpointX.wing;
     const b = new Bullet(sq.x + hx, sq.y - 10, shotBase * spec.dmgFrac, {
-      vy: -BAL.weapons.laser.speed * 1.15, kind: 'laser', pierce: spec.pierce, beamW: 9, lv: 3, color: '#e9f7ff',   // 시각 폭 9(←spec.width 36은 폭72 흰 네모박스로 보임). 관통 판정은 pierce로 유지
+      vy: -BAL.weapons.laser.speed * 1.15, kind: 'laser', pierce: spec.pierce, beamW: 9, lv: 3, color: '#79ecff',   // 레일 스톰 전용 렌더(drawResonanceRail)가 resonanceId로 분기 — 흰 네모박스 대신 시안 레일포. 관통 판정은 pierce
     });
     b.resonanceId = 'railStorm'; b.fromResonance = true; b.sourceWeaponId = null;
     w.bullets.push(b);
