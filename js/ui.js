@@ -504,7 +504,7 @@ export const ui = {
       const op = isDone ? 0.3 : isReach ? 1 : 0.62;
       const bd = isReach ? '#3ff5e0' : m.color;
       const glow = isReach ? 'box-shadow:0 0 12px #3ff5e0;' : '';
-      const st = `position:absolute;left:${p.x - 22}px;top:${p.y - 22}px;width:44px;height:44px;border-radius:50%;border:2px solid ${bd};background:rgba(10,16,28,0.9);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:${op};${glow}${isReach ? 'cursor:pointer' : 'cursor:default'}`;
+      const st = `box-sizing:border-box;appearance:none;-webkit-appearance:none;padding:0;margin:0;position:absolute;left:${p.x - 22}px;top:${p.y - 22}px;width:44px;height:44px;border-radius:50%;border:2px solid ${bd};background:rgba(10,16,28,0.9);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:${op};${glow}${isReach ? 'cursor:pointer' : 'cursor:default'}`;
       nodes += isReach
         ? `<button class="map-node" data-node="${node.id}" data-id="${node.id}" style="${st}" title="${m.label}">${m.icon}</button>`
         : `<div class="map-node" data-id="${node.id}" style="${st}" title="${m.label}">${m.icon}</div>`;
