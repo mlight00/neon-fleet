@@ -450,20 +450,36 @@ export const ui = {
     attachKeyNav(overlay.querySelectorAll('.ks-card'), (b) => onPick(b.dataset.id));
   },
 
-  /** 정비 노드: 긴급 수리 vs 모듈 정비(유료) 택1 (§5.5) */
-  showRepair({ heal, cost, coins, canAfford, onHeal, onModule }) {
+  /** 정비 노드: 긴급 수리 vs 모듈 정비(유료) 택1 (§5.5). 버튼은 라벨만 표기(이사). */
+  showRepair({ cost, coins, canAfford, onHeal, onModule }) {
     panel(`
       <h2 style="color:#7cff6b">🔧 정비 노드</h2>
       <p><small>하나만 선택할 수 있습니다. 보유 코인 🪙 ${coins.toLocaleString()}</small></p>
-      <div class="btn-row" style="flex-direction:column;gap:10px;align-items:stretch">
-        <button id="btn-repair-heal">🩹 긴급 수리 · 드론 +${heal}</button>
-        <button id="btn-repair-mod"${canAfford ? '' : ' disabled style="opacity:0.5;cursor:not-allowed"'}>🧩 모듈 정비 · 🪙 ${cost.toLocaleString()} → 모듈 3택</button>
+      <div class="btn-row" style="flex-direction:column;gap:10px;align-items:stretch;width:300px;max-width:82vw;margin:14px auto 0">
+        <button id="btn-repair-heal" class="repair-btn">🩹 긴급 수리</button>
+        <button id="btn-repair-mod" class="repair-btn"${canAfford ? '' : ' disabled style="opacity:0.5;cursor:not-allowed"'}>🧩 모듈 정비</button>
       </div>
       ${canAfford ? '' : `<p style="color:#ff9c41;font-size:11px">모듈 정비에 코인이 ${(cost - coins).toLocaleString()} 부족합니다.</p>`}
     `);
     document.getElementById('btn-repair-heal').addEventListener('click', onHeal);
     const mb = document.getElementById('btn-repair-mod');
     if (canAfford) mb.addEventListener('click', onModule);
+  },
+
+  /** 긴급 수리 세부: 기함 내구도가 손상됐을 때 [기함 내구도 수리] vs [드론 보충] 택1 (이사). */
+  showEmergencyRepair({ hullPct, drones, onHull, onDrone, onBack }) {
+    panel(`
+      <h2 style="color:#7cff6b">🩹 긴급 수리</h2>
+      <p><small>기함 내구도가 손상되었습니다 · 현재 <b style="color:#ff9c41">${hullPct}%</b>. 하나를 선택하세요.</small></p>
+      <div class="btn-row" style="flex-direction:column;gap:10px;align-items:stretch;width:300px;max-width:82vw;margin:14px auto 0">
+        <button id="btn-em-hull" class="repair-btn">🛠️ 기함 내구도 수리</button>
+        <button id="btn-em-drone" class="repair-btn">🚀 드론 보충 · +${drones}</button>
+        ${onBack ? '<button id="btn-em-back" class="repair-btn sub-btn">← 뒤로</button>' : ''}
+      </div>
+    `);
+    document.getElementById('btn-em-hull').addEventListener('click', onHull);
+    document.getElementById('btn-em-drone').addEventListener('click', onDrone);
+    if (onBack) document.getElementById('btn-em-back').addEventListener('click', onBack);
   },
 
   /** 섹터 분기 맵: 갈림길에서 다음 노드를 고른다 (게임 일시 정지) */

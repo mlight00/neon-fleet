@@ -238,28 +238,40 @@ function enterNode(node) {
   r.effects.flash(0.3);
 }
 
-/** 정비 노드(트랙 없음): [긴급 수리] 드론 회복 vs [모듈 정비] 코인 지불→모듈 3택 (택1, §5.5) → 맵 복귀 */
+/** 정비 노드(트랙 없음): [긴급 수리] vs [모듈 정비] 택1 (§5.5). 긴급 수리는 내구도 손상 시 수리/드론 재선택 → 맵 복귀 */
 function enterRepair(node) {
   const r = run;
   state = 'map';
   const cost = BAL.nodeReward.repairModuleCostPerSector * r.sector;              // 25 × sector
   const heal = Math.max(BAL.nodeReward.repairHealMin, Math.round(r.squad.count * BAL.nodeReward.repairHealPct));  // max(12, count×0.35)
-  ui.showRepair({
-    heal, cost, coins: r.world.coins, canAfford: r.world.coins >= cost,
-    onHeal() { r.squad.applyDelta(heal, r.world); sfx('pickup'); completeNode(node); },
-    onModule() {
-      if (r.world.coins < cost) return;   // 방어: 부족 시 무시(버튼도 비활성)
-      r.world.addCoins(-cost);
-      const opts = draftOptions(r.modules, r.rng, 3);
-      if (opts.length) {
-        drafting = true;
-        ui.showDraft({
-          options: opts, owned: moduleSummary(r.modules),
-          onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); completeNode(node); },
-        });
-      } else { completeNode(node); }
-    },
-  });
+  const surv = r.squad.surv;
+  const hullDamaged = () => surv && surv.hull < surv.hullMax;                    // 기함 내구도 손상 여부
+  const doDrone = () => { r.squad.applyDelta(heal, r.world); sfx('pickup'); completeNode(node); };
+  const doHull = () => { surv.hull = surv.hullMax; sfx('pickup'); completeNode(node); };   // 내구도 완전 수리
+  const doModule = () => {
+    if (r.world.coins < cost) return;   // 방어: 부족 시 무시(버튼도 비활성)
+    r.world.addCoins(-cost);
+    const opts = draftOptions(r.modules, r.rng, 3);
+    if (opts.length) {
+      drafting = true;
+      ui.showDraft({
+        options: opts, owned: moduleSummary(r.modules),
+        onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); completeNode(node); },
+      });
+    } else { completeNode(node); }
+  };
+  function openMenu() {
+    ui.showRepair({
+      cost, coins: r.world.coins, canAfford: r.world.coins >= cost,
+      onHeal() {
+        // 긴급 수리: 내구도가 손상됐으면 [내구도 수리] vs [드론 보충] 재선택, 온전하면 바로 드론 보충
+        if (hullDamaged()) ui.showEmergencyRepair({ hullPct: Math.round(hullFrac(surv) * 100), drones: heal, onHull: doHull, onDrone: doDrone, onBack: openMenu });
+        else doDrone();
+      },
+      onModule: doModule,
+    });
+  }
+  openMenu();
 }
 
 /** 노드 인카운터 트랙 구성 (타입별 청크 필터·길이·보스 게이트). r.progression은 enterNode에서 설정됨. */

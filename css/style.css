@@ -184,6 +184,8 @@ html, body {
 /* 주 액션 버튼(출격/도전) + 격납고를 같은 크기로 나란히 */
 #overlay .btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
 #overlay .btn-row button { flex: 1 1 0; margin-top: 0; padding: 14px 6px; max-width: 200px; font-size: 16px; white-space: nowrap; }
+/* 정비 노드 버튼: 세로 스택·박스 폭에 맞춰 넓게, 텍스트 넘침 방지(줄바꿈 허용) */
+#overlay .panel .repair-btn { max-width: none; width: 100%; white-space: normal; }
 /* 보조 버튼 = 더 어두운 미니멀 아웃라인 (주 버튼과 위계 구분, 시안 포인트 없음). */
 #overlay .btn-row .sub-btn, #overlay button.sub-btn {
   color: #c4cdd6;
