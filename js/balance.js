@@ -66,8 +66,10 @@ export const BAL = {
     minStageToFire: 1,                 // 이 단계 미만이면 발사 안 함 (오클릭 안전)
     blastCoef: 0.24,                   // 랜스 피해 = power × blastCoef × stageMult × 발사속도·공격력·무기레벨·무기계수 (자동사격과 동일 스케일; 계수 추가분만큼 기존 0.47→0.24로 보정)
     stageMult: [0, 1, 2.4, 4.2, 6.5],  // stage 1..4 (index 0 미사용)
-    width: [0, 26, 40, 56, 78],        // 빔 반폭 by stage
-    widthPerTier: 0.2,                 // 기함 등급(tier)당 빔 너비 배수 +0.2 → T0 1.0× ~ T5 2.0×(업그레이드 체감, 이사)
+    // 빔 반폭 = 기함 시각 半폭 × widthShipMult × (1 + widthStageStep×(stage-1)).
+    //  기함 폭에 연동 → 업그레이드로 기함이 커질수록 빔도 넓어지고, 항상 기함과 비례해 과하게 넓지 않다(이사).
+    widthShipMult: 1.05,               // 기함 폭 대비 빔 배수(1.0=기함 폭과 동일)
+    widthStageStep: 0.18,              // 차지 단계당 빔 너비 +18%
   },
 
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)

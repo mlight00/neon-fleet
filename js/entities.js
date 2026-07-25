@@ -768,8 +768,9 @@ export class Squad {
   fireLance(world, stage) {
     const ch = BAL.charge;
     const mfx = world.mfx || {};
-    const trait = BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)];  // 기함 개성: 광역 기함일수록 랜스도 넓게
-    const halfW = ch.width[Math.min(stage, ch.width.length - 1)] * (0.7 + 0.3 * trait.spread) * (1 + (ch.widthPerTier || 0) * this.tier);  // 기함 등급이 오를수록 빔이 넓어진다(이사)
+    // 빔 반폭 = 기함 시각 半폭 기준(업그레이드로 기함이 커질수록 빔도 넓어지되 항상 기함과 비례, 이사).
+    const shipHalfW = (SHIP_DEFS[Math.min(this.tier, SHIP_DEFS.length - 1)]?.visualWidth || 40) * 0.5;
+    const halfW = shipHalfW * (ch.widthShipMult ?? 1.05) * (1 + (ch.widthStageStep ?? 0.18) * (stage - 1));
     // 차지 피해도 자동사격과 같은 계수(발사속도·공격력·무기레벨·무기계수)로 스케일 → 강화할수록 같이 강해진다.
     const W = BAL.weapons;
     const fireRate = (world.stats?.fireRate ?? BAL.squad.fireRate) * (mfx.fireRateMult ?? 1);
