@@ -1629,6 +1629,10 @@ function update(dt) {
     w.scrollSpeed = BAL.scrollSpeed * late;
     r.traveled += w.scrollSpeed * dt;
     r.scrollY += w.scrollSpeed * dt;
+    // 무기 강화(레벨·진화·초진화) 추종 배수 — while 루프 밖(트랙 분기 최상위)에 둔다.
+    //  잡몹 pf·중간보스뿐 아니라 트랙 종료 후 '보스 스폰'(while 밖)에서도 써야 하므로 여기서 1회 계산.
+    //  (이전엔 while 안에서 선언 → 보스 스폰 지점에서 ReferenceError → 보스 스폰 중단 → 빈 bosses로 오격파)
+    const weaponPf = 1 + BAL.economy.weaponHpWeight * (r.squad.weaponPowerMult() - 1);
 
     while (r.pending.length && r.pending[0].trackY <= r.traveled) {
       const it = r.pending.shift();
@@ -1642,8 +1646,7 @@ function update(dt) {
       const hpCapS = BAL.economy.enemyHpPowerCap + BAL.economy.enemyHpCapPerStage * (difficultyLevel - 1);
       // 적 HP 기준 화력에도 격납고 강화를 반영(보스와 동일 원리, 이사). 상한 hpCapS는 그대로 적용된다.
       const enemyPower = effectiveFirepower(Math.max(0, r.maxPower), r.world.stats, BAL.squad, BAL.economy.enemyHangarWeight);
-      // 무기 강화(레벨·진화·초진화) 추종: 캡(드론수 폭주 방지)은 드론 화력에만 걸고, 무기 배수는 캡 바깥에서 곱해 실DPS를 따라간다.
-      const weaponPf = 1 + BAL.economy.weaponHpWeight * (r.squad.weaponPowerMult() - 1);
+      // 무기 강화 추종 배수(weaponPf)는 while 루프 밖에서 이미 계산됨. 캡(드론수 폭주 방지)은 드론 화력에만, 무기 배수는 캡 밖에서 곱해 실DPS 추종.
       const pf = (1 + Math.min(hpCapS, enemyPower / BAL.economy.enemyHpPowerScale)) * weaponPf;
       const gMul = BAL.difficulty.globalMult;   // 전체 난이도 배수(사용자 조정): 체력 ×gMul, 발사 주기 ÷gMul(더 빠름)
       const scaleEnemy = (e) => { e.hp = e.maxHp = Math.round(e.hp * mods.enemyHp * pf * (e.hpScaleMul ?? 1) * gMul * BAL.difficulty.enemyHpMult); if (e.fireInterval) e.fireInterval *= mods.enemyRate / gMul; return e; };
@@ -1766,11 +1769,11 @@ function update(dt) {
     r.scrollY += 30 * dt;
     for (const b of r.bosses) { if (b.dead) b.deathT += dt; else b.update(dt, w); }  // 죽은 보스는 페이드, 산 보스는 교전 지속
     w.boss = r.bosses.find((b) => !b.dead) || r.bosses[0];   // 호밍 표적 = 살아있는 선두
-    if (r.bossLab && r.bosses.every((b) => b.dead)) {   // 보스랩: 처치하면 잠시 뒤 재소환(패턴 반복 관찰)
+    if (r.bossLab && r.bosses.length && r.bosses.every((b) => b.dead)) {   // 보스랩: 처치하면 잠시 뒤 재소환(패턴 반복 관찰)
       r._labRespawnT = (r._labRespawnT || 0) + dt;
       if (r._labRespawnT > 1.2) { r._labRespawnT = 0; spawnBossLabBoss(r.bossLab); }
     }
-    if (r.bosses.every((b) => b.dead) && !r.coreLoop && !r.campaign25 && !r.bossLab) {   // 코어루프·25분캠페인·보스랩은 자체 종료/재개 처리(캠페인 연출 미진입)
+    if (r.bosses.length && r.bosses.every((b) => b.dead) && !r.coreLoop && !r.campaign25 && !r.bossLab) {   // .length: 빈 배열의 every()=true로 인한 보스 없는 오격파 차단(campaign25와 동일 가드)
       sfx('boss_die');
       // 섹터 보스 = 대량 코인. 사망 직후 컷신 전환이라 수거가 불가능하므로 직접 지급(이 블록은 phase 전환으로 단일 발동).
       const bc = Math.round(BAL.coin.sectorBoss);
