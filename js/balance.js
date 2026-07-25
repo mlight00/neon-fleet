@@ -52,6 +52,7 @@ export const BAL = {
     blastCoef: 0.24,                   // 랜스 피해 = power × blastCoef × stageMult × 발사속도·공격력·무기레벨·무기계수 (자동사격과 동일 스케일; 계수 추가분만큼 기존 0.47→0.24로 보정)
     stageMult: [0, 1, 2.4, 4.2, 6.5],  // stage 1..4 (index 0 미사용)
     width: [0, 26, 40, 56, 78],        // 빔 반폭 by stage
+    widthPerTier: 0.2,                 // 기함 등급(tier)당 빔 너비 배수 +0.2 → T0 1.0× ~ T5 2.0×(업그레이드 체감, 이사)
   },
 
   // 적 스폰 배수: 트랙의 적 항목(크리처/저격/포탑/위버)을 이 배수만큼 복제 (미러 배치)
@@ -470,8 +471,8 @@ export const BAL = {
     },
     // 무기 조합 공명 3종(§5.4). 발동은 피해배수만 금지 — 모양·표적·소리 중 2+ 변화.
     resonance: {
-      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 36, cooldown: 0.14, dmgFrac: 65, width: 36, pierce: 8 }, // 발칸·레이저 명중 누적→관통 레일 (빈도 절반: threshold 18→36, 이사)
-      microMissile: { pair: ['vulcan', 'homing'], chargePerHit: 1, threshold: 88, cooldown: 0.6, count: 6, dmgFrac: 3.9 },            // 발칸·유도 명중 누적→소형 미사일 묶음 (빈도 절반: threshold 44→88, 이사)
+      railStorm:  { pair: ['vulcan', 'laser'],  chargePerHit: 1, threshold: 180, cooldown: 0.14, dmgFrac: 65, width: 36, pierce: 8 }, // 발칸·레이저 명중 누적→관통 레일 (빈도 20%로: threshold 36→180, 이사)
+      microMissile: { pair: ['vulcan', 'homing'], chargePerHit: 1, threshold: 440, cooldown: 0.6, count: 6, dmgFrac: 3.9 },           // 발칸·유도 명중 누적→소형 미사일 묶음 (빈도 20%로: threshold 88→440, 이사)
       seekerBeam: { pair: ['laser', 'homing'],  markDuration: 2.8, cooldown: 0.5, missileBonus: 2.0 },                                // 레이저 표식→미사일 우선추적·증폭, 파괴 시 표식 이동
       minFirstAt: 255, maxFirstAt: 285,  // 첫 공명 확정 완성 창
       telegraphLead: 30,                 // 완성 전 예고 시간(20~40s 창의 중앙)

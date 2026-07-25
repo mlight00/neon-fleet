@@ -119,9 +119,9 @@ import { dirname, join } from 'node:path';
 const entitiesSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../js/entities.js'), 'utf8');
 
 test('RW-빈도: 충전형 공명 발사 빈도를 절반으로 (threshold 2배)', () => {
-  // 빈도 = 1/충전시간 ∝ 1/threshold. 예전 railStorm 18·microMissile 44 → 절반이면 36·88.
-  assert.equal(CFG.railStorm.threshold, 36, '레일 스톰 threshold=36 (18의 2배 → 빈도 절반)');
-  assert.equal(CFG.microMissile.threshold, 88, '마이크로 미사일 threshold=88 (44의 2배)');
+  // 빈도 = 1/충전시간 ∝ 1/threshold. 빈도 20% 목표 → threshold ×5 (railStorm 36→180, microMissile 88→440).
+  assert.equal(CFG.railStorm.threshold, 180, '레일 스톰 threshold=180 (빈도 20%)');
+  assert.equal(CFG.microMissile.threshold, 440, '마이크로 미사일 threshold=440 (빈도 20%)');
   // 실제로 threshold 미만에선 발동 안 하고, 도달하면 발동한다(빈도가 threshold로 결정됨을 확인)
   const s = createResonanceState();
   setLoadout(s, ['vulcan', 'laser']);
