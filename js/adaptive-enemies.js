@@ -75,6 +75,7 @@ export class Scavenger extends Scrolling {
     this.hp = this.maxHp = Math.round(c.hp * hpScale(stage)); this.r = c.r; this.coin = c.coin;
     this.state = 'seek'; this.target = null; this.stored = 0; this.stayT = c.stayTime;
     this.isEnemy = true; this.dead = false; this.t = Math.random() * 10;
+    this.alwaysCoin = true;   // 코인 탈취 특수 적 → 처치 시 항상 코인 회수(5% 확률 제외, 이사)
   }
   update(dt, world) {
     const c = AE().scavenger; this.t += dt;

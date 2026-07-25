@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { BAL } from '../js/balance.js';
-import { Coin } from '../js/entities.js';
+import { Coin, dropCoin } from '../js/entities.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const mainSrc = readFileSync(join(root, 'js/main.js'), 'utf8');
@@ -56,7 +56,18 @@ test('COIN-4: 넓은 수거 반경이면 멀리서도 끌려와 수거된다', (
   assert.equal(w.coins, 7);
 });
 
-test('COIN-5: 게임 배선 — spawnCoin·pickupRange·HUD 코인·enemyDie 드롭', () => {
+test('COIN-6: 일반 몹은 확률(5%) 드랍, chance 1은 항상', () => {
+  assert.equal(BAL.coin.dropChance, 0.05, '드랍 확률 5%');
+  let n = 0; const w = { spawnCoin: () => { n++; } };
+  for (let i = 0; i < 200; i++) dropCoin(w, 0, 0, 5, 1);
+  assert.equal(n, 200, 'chance 1 = 항상 드랍(정예·중간보스·스캐빈저)');
+  n = 0; for (let i = 0; i < 200; i++) dropCoin(w, 0, 0, 5, 0);
+  assert.equal(n, 0, 'chance 0 = 드랍 안 함');
+  n = 0; for (let i = 0; i < 10000; i++) dropCoin(w, 0, 0, 5, BAL.coin.dropChance);
+  assert.ok(n > 200 && n < 800, `~5% 근사 (${n}/10000)`);   // 500 기대, 넉넉한 밴드로 플래키 방지
+});
+
+test('COIN-7: 게임 배선 — spawnCoin·pickupRange·HUD 코인·enemyDie 드롭', () => {
   assert.ok(/spawnCoin\(x, y, value\)/.test(mainSrc), 'world.spawnCoin');
   assert.ok(/pickupRange: BAL\.coin\.pickupBase/.test(mainSrc), 'stats.pickupRange = magnet 강화');
   assert.ok(/coins: Math\.round\(r\.world\.coins\)/.test(mainSrc), 'HUD에 coins 전달');

@@ -2336,7 +2336,7 @@ export class Creature extends Scrolling {
       this.dead = true;
       affixOnDeath(this, world);             // 엘리트 변이 보상
       world.effects.burst(this.x, this.y, COLORS.enemy, 12);
-      dropCoin(world, this.x, this.y, 1);
+      dropCoin(world, this.x, this.y, 1, BAL.coin.dropChance);
       // 격파 현상금: 중/대형은 드론 회수 (파괴 보상 확대)
       const bounty = BAL.creature.bounty[this.size];
       if (bounty > 0) world.squad.applyDelta(bounty, world);
@@ -2409,7 +2409,7 @@ export class Meteor extends Scrolling {
     if (this.hp <= 0) {
       this.dead = true;
       world.effects.burst(this.x, this.y, '#ff9c41', 14);
-      dropCoin(world, this.x, this.y, BAL.meteor.coin);
+      dropCoin(world, this.x, this.y, BAL.meteor.coin, BAL.coin.dropChance);
       sfx('explode_s');
     }
   }
@@ -2726,7 +2726,7 @@ export class Sniper {
       this.dead = true;
       affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemyMid, 14);
-      dropCoin(world, this.x, this.y, 3);
+      dropCoin(world, this.x, this.y, 3, BAL.coin.dropChance);
       sfx('explode_s');
     }
   }
@@ -2812,7 +2812,7 @@ export class Turret extends Scrolling {
       this.dead = true;
       affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemyHigh, 16);
-      dropCoin(world, this.x, this.y, BAL.turret.coin);
+      dropCoin(world, this.x, this.y, BAL.turret.coin, BAL.coin.dropChance);
       sfx('explode_l');
     }
   }
@@ -2899,7 +2899,7 @@ export class Weaver {
       this.dead = true;
       affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemy, 10);
-      dropCoin(world, this.x, this.y, 2);
+      dropCoin(world, this.x, this.y, 2, BAL.coin.dropChance);
       sfx('explode_s');
     }
   }
@@ -2993,7 +2993,7 @@ export class Charger extends Scrolling {
       this.dead = true;
       affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemyHigh, 14);
-      dropCoin(world, this.x, this.y, BAL.charger.coin);
+      dropCoin(world, this.x, this.y, BAL.charger.coin, BAL.coin.dropChance);
       world.squad.applyDelta(BAL.charger.bounty, world);
       if (this.splits > 0) {
         for (let i = 0; i < this.splits; i++) {
@@ -3100,7 +3100,7 @@ export class Mine extends Scrolling {
     if (affixAbsorb(this, world)) return;
     this.hp -= dmg;
     if (this.hp <= 0) {
-      dropCoin(world, this.x, this.y, BAL.mine.coin);             // 쏘아서 미리 터뜨리면 코인 (멀면 안전)
+      dropCoin(world, this.x, this.y, BAL.mine.coin, BAL.coin.dropChance);             // 쏘아서 미리 터뜨리면 코인 (멀면 안전)
       this.explode(world);
     }
   }
@@ -3291,17 +3291,20 @@ export function drawEHp(ctx, e) {
   ctx.fillStyle = COLORS.enemyCore;
   ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r * 2 * Math.max(0, e.hp / e.maxHp), 3);
 }
-// 코인 드롭 공용: 적 처치 위치에 코인을 떨어뜨린다(기함이 수거). 헤드리스 스텁(world.spawnCoin 없음)은 즉시 적립 폴백.
-export function dropCoin(world, x, y, value) {
+// 코인 드롭 공용: 적 처치 위치에 코인을 떨어뜨린다(기함이 수거). chance<1이면 그 확률로만 드랍(일반 몹).
+//  헤드리스 스텁(world.spawnCoin 없음)은 즉시 적립 폴백.
+export function dropCoin(world, x, y, value, chance = 1) {
+  if (chance < 1 && Math.random() >= chance) return;   // 일반 몹: 확률 드랍(이사 5%)
   if (world.spawnCoin) world.spawnCoin(x, y, value);
   else if (world.addCoins) world.addCoins(value);
 }
 export function enemyDie(e, world, color, coin) {
   e.dead = true; affixOnDeath(e, world);
   world.effects.burst(e.x, e.y, color, 14);
-  // 코인은 그 자리에 떨어뜨려 기함이 수거(이사 개편). 정예(★) 변이는 더 많이.
-  const drop = coin * ((e.affixes && e.affixes.includes('elite')) ? (BAL.affix?.eliteCoinMult || 4) : 1);
-  dropCoin(world, e.x, e.y, drop);
+  // 일반 몹은 5% 확률로만 코인 드랍(이사). 정예(★)·항상드랍 적(스캐빈저 등)은 항상 + 정예는 더 많이.
+  const elite = e.affixes && e.affixes.includes('elite');
+  const drop = coin * (elite ? (BAL.affix?.eliteCoinMult || 4) : 1);
+  dropCoin(world, e.x, e.y, drop, (elite || e.alwaysCoin) ? 1 : BAL.coin.dropChance);
   sfx('explode_s');
 }
 
