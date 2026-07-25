@@ -450,7 +450,7 @@ export class Squad {
   }
   /** 순양함 화력 (드론 환산): 순양함이 별도로 쏘는 화력. */
   get supportPower() {
-    return (this.cruisers || 0) * BAL.escort.cruiserPower;
+    return (this.cruisers || 0) * (BAL.escort.cruiserPower + (this.cruiserBonus || 0));   // 격납고 cruiser 강화 반영
   }
   /** 총 화력 = 기함 + 순양함 (적 스케일·보스 HP·기록에 쓰는 함대 전체 화력) */
   get power() {
@@ -610,6 +610,7 @@ export class Squad {
   /** Gate 1 원정 시스템 주입(§11 모듈 분리). main.js가 상태 객체를 만들어 넘긴다. */
   installGate1({ surv = null, reson = null, frameState = null, frameId = null, mainWeapon = 'vulcan' } = {}) {
     this.surv = surv;
+    if (surv && this.hullBonus) { surv.hullMax += this.hullBonus; surv.hull = surv.hullMax; }   // 격납고 hull 강화 반영
     this.reson = reson;
     this.frameState = frameState;
     this.frameId = frameId;
@@ -1706,6 +1707,57 @@ function fixedPayout(raw, world, extraMult = 1) {
   return droneReward(raw, world?.mfx?.podRewardMult ?? 1, BAL.economy.droneGainMult, (world?.squad?.rewardGainMult ?? 1) * extraMult);
 }
 
+// 코인 픽업: 적 처치 시 그 자리에 떨어진다. 기함 '수거 반경'(격납고 magnet 강화) 안에 들어오면
+//  기함으로 끌려와 수거된다(world.addCoins). 못 받으면 아래로 흘러 사라진다 → "직접 수거" 손맛(이사 개편).
+export class Coin extends Scrolling {
+  constructor(x, y, value) {
+    super(x, y);
+    this.value = Math.max(1, Math.round(value));
+    const C = BAL.coin;
+    this.r = C.r + Math.min(9, Math.sqrt(this.value) * 0.8);   // 값 클수록 살짝 큼
+    this.vx = (Math.random() - 0.5) * 140;                     // 처치 순간 튀어오름
+    this.vy = -70 - Math.random() * 90;
+    this.t = Math.random() * 6;
+    this.isCoin = true;
+  }
+  update(dt, world) {
+    const C = BAL.coin, sq = world.squad;
+    const range = world.stats?.pickupRange ?? C.pickupBase;   // 격납고 magnet 강화 반영
+    const dx = sq.x - this.x, dy = sq.y - this.y, d = Math.hypot(dx, dy) || 1;
+    if (d <= range) {
+      // 수거 반경 안 → 기함으로 가속 흡인
+      this.x += (dx / d) * C.magnetSpeed * dt;
+      this.y += (dy / d) * C.magnetSpeed * dt;
+    } else {
+      // 밖 → 초기 팝 감쇠 + 스크롤 하강 + 살짝 좌우 흔들림
+      this.vx *= (1 - Math.min(1, 4 * dt));
+      this.vy *= (1 - Math.min(1, 4 * dt));
+      this.t += dt;
+      this.x += this.vx * dt + Math.sin(this.t * C.swayHz * Math.PI * 2) * C.swayAmp * dt;
+      this.y += this.vy * dt + (world.scrollSpeed + C.fallSpeed) * dt;
+    }
+    if (d <= C.collectR) {
+      this.dead = true;
+      world.addCoins(this.value);
+      world.effects.text(this.x, this.y - 8, `+${this.value}`, '#ffd93d', 12);
+      sfx('pickup');
+    } else if (this.y > world.logicalH + 44) {
+      this.dead = true;   // 아래로 놓치면 소멸(수거 실패)
+    }
+  }
+  draw(ctx) {
+    const r = this.r;
+    glow(ctx, '#ffd93d', 8, (c) => {
+      c.fillStyle = '#ffd93d';
+      c.beginPath(); c.arc(this.x, this.y, r, 0, Math.PI * 2); c.fill();
+    });
+    ctx.fillStyle = '#fff4b0';   // 하이라이트
+    ctx.beginPath(); ctx.arc(this.x - r * 0.28, this.y - r * 0.3, r * 0.34, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,105,15,0.9)'; ctx.lineWidth = 1.5;   // 안쪽 링
+    ctx.beginPath(); ctx.arc(this.x, this.y, r * 0.6, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
 export class Crystal extends Scrolling {
   constructor(x, y, value, world, extraMult = 1) {
     super(x, y);
@@ -2283,7 +2335,7 @@ export class Creature extends Scrolling {
       this.dead = true;
       affixOnDeath(this, world);             // 엘리트 변이 보상
       world.effects.burst(this.x, this.y, COLORS.enemy, 12);
-      world.addCoins(1);
+      dropCoin(world, this.x, this.y, 1);
       // 격파 현상금: 중/대형은 드론 회수 (파괴 보상 확대)
       const bounty = BAL.creature.bounty[this.size];
       if (bounty > 0) world.squad.applyDelta(bounty, world);
@@ -2356,7 +2408,7 @@ export class Meteor extends Scrolling {
     if (this.hp <= 0) {
       this.dead = true;
       world.effects.burst(this.x, this.y, '#ff9c41', 14);
-      world.addCoins(BAL.meteor.coin);
+      dropCoin(world, this.x, this.y, BAL.meteor.coin);
       sfx('explode_s');
     }
   }
@@ -2673,7 +2725,7 @@ export class Sniper {
       this.dead = true;
       affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemyMid, 14);
-      world.addCoins(3);
+      dropCoin(world, this.x, this.y, 3);
       sfx('explode_s');
     }
   }
@@ -2759,7 +2811,7 @@ export class Turret extends Scrolling {
       this.dead = true;
       affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemyHigh, 16);
-      world.addCoins(BAL.turret.coin);
+      dropCoin(world, this.x, this.y, BAL.turret.coin);
       sfx('explode_l');
     }
   }
@@ -2846,7 +2898,7 @@ export class Weaver {
       this.dead = true;
       affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemy, 10);
-      world.addCoins(2);
+      dropCoin(world, this.x, this.y, 2);
       sfx('explode_s');
     }
   }
@@ -2940,7 +2992,7 @@ export class Charger extends Scrolling {
       this.dead = true;
       affixOnDeath(this, world);
       world.effects.burst(this.x, this.y, COLORS.enemyHigh, 14);
-      world.addCoins(BAL.charger.coin);
+      dropCoin(world, this.x, this.y, BAL.charger.coin);
       world.squad.applyDelta(BAL.charger.bounty, world);
       if (this.splits > 0) {
         for (let i = 0; i < this.splits; i++) {
@@ -3047,7 +3099,7 @@ export class Mine extends Scrolling {
     if (affixAbsorb(this, world)) return;
     this.hp -= dmg;
     if (this.hp <= 0) {
-      world.addCoins(BAL.mine.coin);             // 쏘아서 미리 터뜨리면 코인 (멀면 안전)
+      dropCoin(world, this.x, this.y, BAL.mine.coin);             // 쏘아서 미리 터뜨리면 코인 (멀면 안전)
       this.explode(world);
     }
   }
@@ -3187,7 +3239,7 @@ export class MidBoss extends Scrolling {
     world.effects.flash(0.25);
     const drones = M.rewardDrones + M.rewardDronesPerStage * (this.stage - 1);
     world.squad.applyDelta(drones, world, `${this.def.korName} 격파!`);
-    world.addCoins(M.coin);
+    dropCoin(world, this.x, this.y, BAL.coin.miniboss);
     sfx('explode_l');
   }
 
@@ -3238,9 +3290,18 @@ export function drawEHp(ctx, e) {
   ctx.fillStyle = COLORS.enemyCore;
   ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r * 2 * Math.max(0, e.hp / e.maxHp), 3);
 }
+// 코인 드롭 공용: 적 처치 위치에 코인을 떨어뜨린다(기함이 수거). 헤드리스 스텁(world.spawnCoin 없음)은 즉시 적립 폴백.
+export function dropCoin(world, x, y, value) {
+  if (world.spawnCoin) world.spawnCoin(x, y, value);
+  else if (world.addCoins) world.addCoins(value);
+}
 export function enemyDie(e, world, color, coin) {
   e.dead = true; affixOnDeath(e, world);
-  world.effects.burst(e.x, e.y, color, 14); world.addCoins(coin); sfx('explode_s');
+  world.effects.burst(e.x, e.y, color, 14);
+  // 코인은 그 자리에 떨어뜨려 기함이 수거(이사 개편). 정예(★) 변이는 더 많이.
+  const drop = coin * ((e.affixes && e.affixes.includes('elite')) ? (BAL.affix?.eliteCoinMult || 4) : 1);
+  dropCoin(world, e.x, e.y, drop);
+  sfx('explode_s');
 }
 
 // B16 봄버: 넓은 하강 산탄(융단) — 아래 방치 시 맞음

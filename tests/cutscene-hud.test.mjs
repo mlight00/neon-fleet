@@ -96,7 +96,7 @@ test('CS-10: 보스 아트 id를 Boss(spriteId)·MidBoss(def.id) 양쪽에서 �
 });
 
 test('CS-07: 무기 표기 중복 제거 — 좌측 슬롯이 뜨면 우상단은 생략', () => {
-  assert.ok(/loadoutHud = false \}/.test(renderSrc), 'drawHUD에 loadoutHud 인자');
+  assert.ok(/loadoutHud = false/.test(renderSrc), 'drawHUD에 loadoutHud 인자');
   assert.ok(renderSrc.includes('if (weapon && !loadoutHud)'), '좌측 HUD면 우상단 무기 미표기');
   assert.ok(renderSrc.includes('} else if (shield) {'), '보호막 표시는 남긴다');
   assert.ok(mainSrc.includes('loadoutHud: !!r.squad.surv'), '적재 HUD가 뜨는 모드에서만 생략');

@@ -19,7 +19,7 @@ test('기본값: 저장 없으면 best 0, coins 0, stage 1, style C(미선택), 
   // 핵심 진행 기본값(구 필드 회귀 방지)
   assert.equal(d.best, 0); assert.equal(d.coins, 0); assert.equal(d.stage, 1);
   assert.equal(d.style, 'C'); assert.equal(d.styleChosen, false); assert.equal(d.stageMigrated, true);
-  assert.deepEqual(d.up, { drones: 0, dmg: 0, rate: 0, coin: 0 });
+  assert.deepEqual(d.up, { drones: 0, dmg: 0, rate: 0, coin: 0, magnet: 0, hull: 0, cruiser: 0 });
   assert.deepEqual(d.snd, { bgm: 0.5, sfx: 0.8, mute: false });
   // Gate 1 메타 필드 기본값(§10)
   assert.equal(d.saveVersion, 2);
@@ -57,7 +57,7 @@ test('reset: 진행 초기화하되 사운드·인트로 시청 여부는 유지
   assert.equal(d.best, 0);
   assert.equal(d.coins, 0);
   assert.equal(d.stage, 1);
-  assert.deepEqual(d.up, { drones: 0, dmg: 0, rate: 0, coin: 0 });
+  assert.deepEqual(d.up, { drones: 0, dmg: 0, rate: 0, coin: 0, magnet: 0, hull: 0, cruiser: 0 });
   assert.equal(d.introSeen, true);            // 유지
   assert.deepEqual(d.snd, { bgm: 0.2, sfx: 0.3, mute: true }); // 유지
 });
@@ -67,7 +67,7 @@ test('구버전 저장(up/snd 없음)을 읽어도 기본값이 채워진다', (
   const fake = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
   const d = createSave(fake).get();
   assert.equal(d.best, 10);
-  assert.deepEqual(d.up, { drones: 0, dmg: 0, rate: 0, coin: 0 });
+  assert.deepEqual(d.up, { drones: 0, dmg: 0, rate: 0, coin: 0, magnet: 0, hull: 0, cruiser: 0 });
   assert.deepEqual(d.snd, { bgm: 0.5, sfx: 0.8, mute: false });
 });
 

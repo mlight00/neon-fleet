@@ -167,12 +167,17 @@ export const ui = {
 
   /** 격납고: 코인으로 영구 강화 구매 */
   showHangar({ data, hangar, squadBase, onBuy, onBack }) {
+    const U = hangar.upgrades;
     const cur = {
-      drones: (lv) => `${squadBase.start + lv * hangar.upgrades.drones.step}기`,
-      dmg: (lv) => (squadBase.damage + lv * hangar.upgrades.dmg.step).toFixed(1),
-      rate: (lv) => `${(squadBase.fireRate + lv * hangar.upgrades.rate.step).toFixed(1)}/s`,
-      coin: (lv) => `x${(1 + lv * hangar.upgrades.coin.step).toFixed(1)}`,
+      drones: (lv) => `${squadBase.start + lv * U.drones.step}기`,
+      dmg: (lv) => (squadBase.damage + lv * U.dmg.step).toFixed(1),
+      rate: (lv) => `${(squadBase.fireRate + lv * U.rate.step).toFixed(1)}/s`,
+      coin: (lv) => `x${(1 + lv * U.coin.step).toFixed(1)}`,
+      magnet: (lv) => `+${lv * U.magnet.step}px`,
+      hull: (lv) => `+${lv * U.hull.step}`,
+      cruiser: (lv) => `+${lv * U.cruiser.step}`,
     };
+    const fmtCur = (key, lv) => (cur[key] ? cur[key](lv) : `Lv ${lv}`);   // 미정의 키 안전 폴백
     const rows = Object.entries(hangar.upgrades).map(([key, def]) => {
       const lv = data.up[key];
       const maxed = lv >= hangar.maxLv;
@@ -184,7 +189,7 @@ export const ui = {
           <div class="h-info">
             <b>${def.name}</b>
             <span class="h-pips">${pips}</span>
-            <small>${def.desc}: ${cur[key](lv)}${maxed ? '' : ' → ' + cur[key](lv + 1)}</small>
+            <small>${def.desc}: ${fmtCur(key, lv)}${maxed ? '' : ' → ' + fmtCur(key, lv + 1)}</small>
           </div>
           <button class="h-buy" data-key="${key}" ${maxed || !afford ? 'disabled' : ''}>
             ${maxed ? '최고 레벨 (MAX)' : `강화 🪙 ${cost.toLocaleString()}`}

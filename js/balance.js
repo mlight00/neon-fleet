@@ -44,6 +44,21 @@ export const BAL = {
     //  후반에 플레이어가 적을 압도한다(이사 피드백). → 무기 성장 배수를 적 체력에도 반영. weight 0=옛 동작, 1=완전 추종.
     weaponHpWeight: 0.6 },
 
+  // 코인 드롭·수거: 적을 격파하면 코인이 그 자리에 떨어지고, 기함이 '수거 반경' 안으로 끌어와 모은다(이사 개편).
+  //  일반 적=적은 코인(적별 coin 값), 중간(정예)보스=miniboss, 섹터 보스=sectorBoss(여러 개로 분산).
+  coin: {
+    r: 10,                 // 코인 픽업 반경(시각·판정)
+    pickupBase: 85,        // 기함 코인 수거 반경 기본값(격납고 magnet 강화로 확장)
+    magnetSpeed: 620,      // 수거 반경 안에서 코인이 기함으로 끌려오는 속도(px/s)
+    collectR: 16,          // 이 거리 안이면 수거 완료
+    fallSpeed: 52,         // 미수거 코인 하강 속도(스크롤에 더해짐)
+    swayAmp: 20, swayHz: 0.8,  // 낙하 중 살짝 좌우로 흔들림
+    creature: 2,           // 크리처(스웜) 처치 코인
+    miniboss: 45,          // 중간(정예) 보스 — 여러 개로 분산
+    sectorBoss: 280,       // 섹터 보스 — 여러 개로 대량 분산
+    unit: 15,              // 큰 보상을 이 단위로 쪼개 여러 코인으로 뿌린다(수거 손맛)
+  },
+
   // 차지 랜스 (홀드→충전→발사): 자동사격을 멈추고 에너지를 모아 정면 관통 빔 발사
   charge: {
     stageTime: 0.5,                    // 단계당 충전 시간(초)
@@ -617,7 +632,10 @@ export const BAL = {
       drones: { name: '시작 드론 수', desc: '출격 시 보유 드론 증가', base: 60, step: 2, unit: '기' },
       dmg: { name: '공격력', desc: '탄환 1발의 피해 증가', base: 90, step: 0.1, unit: '' },
       rate: { name: '연사력', desc: '초당 발사 횟수 증가', base: 90, step: 0.2, unit: '/s' },
-      coin: { name: '코인 획득량', desc: '획득 코인 증가', base: 50, step: 0.1, unit: 'x' },
+      coin: { name: '코인 적립 배수', desc: '출격 종료 시 격납고 적립 코인 증가', base: 50, step: 0.1, unit: 'x' },
+      magnet: { name: '코인 수거 범위', desc: '코인을 끌어오는 반경 증가', base: 55, step: 24, unit: 'px' },
+      hull: { name: '기함 내구도', desc: '기함 최대 내구도 증가', base: 70, step: 16, unit: '' },
+      cruiser: { name: '순양함 화력', desc: '순양함 1척의 화력 증가', base: 80, step: 12, unit: '' },
     },
   },
 };

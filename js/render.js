@@ -163,7 +163,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '', loadoutHud = false }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '', loadoutHud = false, coins = 0 }) {
   ctx.save();
   // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
@@ -260,6 +260,13 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillText(`섹터 ${stage}`, 12, 67);
     }
   }
+  // 코인(이번 출격에서 수거한 액수) — 항상 표시(보스전 포함), 우상단
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 14px Pretendard, sans-serif';
+  ctx.fillStyle = '#ffd93d';
+  ctx.fillText(`🪙 ${coins.toLocaleString()}`, logicalW - 12, 24);
+  ctx.textAlign = 'left';
+
   // 보유 모듈 아이콘 줄 (빌드가 커지는 게 보인다)
   if (modules && modules.length) {
     ctx.font = '13px Pretendard, sans-serif';

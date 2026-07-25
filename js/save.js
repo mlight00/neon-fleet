@@ -10,7 +10,7 @@ const DEFAULTS = {
   endlessUnlocked: false,                       // 무한 원정 해금 여부
   endlessBest: 0,                               // 엔드리스 최고 도달 섹터(캠페인 기록과 별도, §6.5)
   stageMigrated: true,                          // stage 기록 마이그레이션 완료 플래그(신규 저장은 항상 true)
-  up: { drones: 0, dmg: 0, rate: 0, coin: 0 }, // 격납고 강화 레벨
+  up: { drones: 0, dmg: 0, rate: 0, coin: 0, magnet: 0, hull: 0, cruiser: 0 }, // 격납고 강화 레벨
   snd: { bgm: 0.5, sfx: 0.8, mute: false },     // 사운드 설정
   // ── Gate 1: 메타 진행 필드(§10.2). 구 저장은 안전 기본값으로 백필, 멱등. Gate 3에서 실제 해금 로직 사용. ──
   threatLevel: 0,                               // 위협 단계(0=기본)

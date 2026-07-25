@@ -2,7 +2,7 @@
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
 import { createStarfield, drawHUD, drawCoreLoopHud, drawSectorLoadoutHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
-import { Squad, Crystal, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
+import { Squad, Crystal, Coin, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
 import { bossDefById, preloadBossArt, preloadSprites } from './sprites.js';
 import { createCutscene, tickCutscene, drawCutscene, drawCutsceneBackdrop, cutsceneReady, CUT } from './cutscene.js';
 import { maybeAffix, applyAffixes } from './affixes.js';
@@ -145,8 +145,11 @@ function newExpedition(mode = 'campaign', opts = {}) {
     fireRate: BAL.squad.fireRate + up.rate * H.rate.step,
     damage: BAL.squad.damage + up.dmg * H.dmg.step,
     coinMult: 1 + up.coin * H.coin.step,
+    pickupRange: BAL.coin.pickupBase + (up.magnet || 0) * H.magnet.step,   // 코인 수거 반경(격납고 magnet)
   };
   const squad = new Squad(LOGICAL_W, logicalH, stats.startCount);
+  squad.cruiserBonus = (up.cruiser || 0) * H.cruiser.step;   // 격납고: 순양함 1척 화력 +
+  squad.hullBonus = (up.hull || 0) * H.hull.step;            // 격납고: 기함 내구도 + (installGate1에서 surv에 반영)
   const effects = createEffects();
   const world = {
     bal: BAL, input, squad, effects,
@@ -160,6 +163,13 @@ function newExpedition(mode = 'campaign', opts = {}) {
     stats,
     mfx: computeMfx([]),          // 모듈 효과 누적기 (빈 상태 = 중립)
     addCoins(n) { this.coins += n; },
+    // 코인 드롭: 큰 값은 unit 단위로 쪼개 여러 코인으로 흩뿌린다(수거 손맛). 일반 적(값<unit)은 1개.
+    spawnCoin(x, y, value) {
+      const v = Math.max(1, Math.round(value));
+      const n = Math.max(1, Math.round(v / BAL.coin.unit));
+      const each = v / n;
+      for (let i = 0; i < n; i++) this.entities.push(new Coin(x + (Math.random() - 0.5) * 22, y + (Math.random() - 0.5) * 14, each));
+    },
     spawnEntity(e) { this.entities.push(e); },
     spawnEnemyBullet(b) { if (this.enemyBullets.length < this.stageMods.shotCap) this.enemyBullets.push(b); },
     notifyEnemyKilled(e) { onEnemyKilled(e, this); },   // 랜스·메아리·시즈 등 entities.js 킬 경로가 호출하는 중앙 알림
@@ -1762,6 +1772,10 @@ function update(dt) {
     }
     if (r.bosses.every((b) => b.dead) && !r.coreLoop && !r.campaign25 && !r.bossLab) {   // 코어루프·25분캠페인·보스랩은 자체 종료/재개 처리(캠페인 연출 미진입)
       sfx('boss_die');
+      // 섹터 보스 = 대량 코인. 사망 직후 컷신 전환이라 수거가 불가능하므로 직접 지급(이 블록은 phase 전환으로 단일 발동).
+      const bc = Math.round(BAL.coin.sectorBoss);
+      w.addCoins(bc);
+      const bl = r.bosses[0]; if (bl) r.effects.text(bl.x, bl.y - 30, `🪙 +${bc.toLocaleString()}`, '#ffd93d', 24);
       setBgmIntensity(0.24); playBgm('title'); // 승리 여운 BGM으로 전환
       // 섹터 보스 = 전체화면 컷신(배경 일러스트 + 침몰하는 보스 + 이탈하는 기함).
       // 배경 이미지가 아직 없으면 cutsceneReady()가 false → 기존 인게임 연출로 폴백한다.
@@ -2155,6 +2169,7 @@ function draw() {
       upgradeMax: needCruisers,            // 필요한 순양함 (0 = 최종 티어)
       scheduledTier: !!r.campaign25,       // 캠페인=시간 스케줄 승급 → 순양함 게이지 숨김(오해 방지)
       stage: r.sector,
+      coins: Math.round(r.world.coins),    // 이번 출격에서 수거한 코인(HUD 표시)
       weapon: r.squad.weapon,
       weaponLv: r.squad.weaponLv,
       weaponEvo: weaponEvoLabel(r.squad),

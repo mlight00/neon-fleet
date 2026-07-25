@@ -49,12 +49,12 @@ test('campaignCleared·endlessUnlocked 기본값 false, 설정 시 저장', () =
 
 // ─── 6. 구버전 저장 로드 시 기존 데이터 보존 (필드 병합만) ──
 test('구버전 저장(신규 필드 없음) 로드 → 기존 데이터 보존 + 신규 필드는 기본값', () => {
-  const old = { best: 300, coins: 700, stage: 5, stageMigrated: true, introSeen: true, up: { drones: 4, dmg: 2, rate: 1, coin: 3 }, snd: { bgm: 0.3, sfx: 0.6, mute: false } };
+  const old = { best: 300, coins: 700, stage: 5, stageMigrated: true, introSeen: true, up: { drones: 4, dmg: 2, rate: 1, coin: 3, magnet: 0, hull: 0, cruiser: 0 }, snd: { bgm: 0.3, sfx: 0.6, mute: false } };
   const d = mkSave(old).get();
   assert.equal(d.best, 300);                 // 보존
   assert.equal(d.coins, 700);
   assert.equal(d.stage, 5);
-  assert.deepEqual(d.up, { drones: 4, dmg: 2, rate: 1, coin: 3 });
+  assert.deepEqual(d.up, { drones: 4, dmg: 2, rate: 1, coin: 3, magnet: 0, hull: 0, cruiser: 0 });
   assert.equal(d.introSeen, true);
   assert.equal(d.campaignCleared, false);    // 신규 필드는 기본값 병합
   assert.equal(d.endlessUnlocked, false);
@@ -86,7 +86,7 @@ test('progressPatch: 기존 기록보다 크지 않으면 저장 변경 없음(�
 });
 
 test('기록 분리 시나리오: 캠페인 6 완주 후 엔드리스를 돌려도 stage는 6을 유지', () => {
-  const s = mkSave({ stage: 6, endlessBest: 0, endlessUnlocked: true, campaignCleared: true, coins: 500, best: 800, stageMigrated: true, up: { drones: 3, dmg: 2, rate: 1, coin: 2 } });
+  const s = mkSave({ stage: 6, endlessBest: 0, endlessUnlocked: true, campaignCleared: true, coins: 500, best: 800, stageMigrated: true, up: { drones: 3, dmg: 2, rate: 1, coin: 2, magnet: 0, hull: 0, cruiser: 0 } });
   const apply = (mode, sector) => { const p = progressPatch(mode, sector, s.get()); if (Object.keys(p).length) s.set(p); };
 
   apply('endless', 7);                       // 엔드리스 시작(섹터 7 진입)
@@ -105,7 +105,7 @@ test('기록 분리 시나리오: 캠페인 6 완주 후 엔드리스를 돌려�
   const d = s.get();
   assert.equal(d.coins, 500); assert.equal(d.best, 800);
   assert.equal(d.campaignCleared, true); assert.equal(d.endlessUnlocked, true);
-  assert.deepEqual(d.up, { drones: 3, dmg: 2, rate: 1, coin: 2 });
+  assert.deepEqual(d.up, { drones: 3, dmg: 2, rate: 1, coin: 2, magnet: 0, hull: 0, cruiser: 0 });
 });
 
 test('기록 분리: 새로고침(저장소 재로드) 후에도 두 기록이 분리 유지', () => {
