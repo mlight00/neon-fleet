@@ -58,6 +58,10 @@ let logicalH = 800;
 function resize() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  // 뷰포트가 0(모바일 백그라운드·앱 전환·URL바 전환 중 resize)일 때 그대로 계산하면
+  //  scale=0 → logicalH=NaN → 다음 draw의 createLinearGradient가 예외 → rAF 중단 → 영구 프리즈.
+  //  이런 퇴화 resize는 무시하고 직전 유효 치수를 유지한다.
+  if (!vw || !vh) return;
   const maxW = Math.min(vw, vh * 0.62); // PC 와이드에선 세로 기둥
   scale = maxW / LOGICAL_W;
   logicalH = Math.round(vh / scale);
@@ -2070,6 +2074,8 @@ function showHangar() {
 // ───────────────────────── 그리기
 function draw() {
   syncPlayButtons();   // 상태에 따라 일시정지·차지 버튼 표시/숨김 (draw는 headless step에서도 호출됨)
+  // 방어: 치수가 비정상(NaN·0·음수)이면 렌더를 건너뛴다 — createLinearGradient 등이 비유한값에 예외를 던져 프리즈되는 것을 차단.
+  if (!Number.isFinite(logicalH) || logicalH <= 0 || !Number.isFinite(scale) || scale <= 0) return;
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
@@ -2252,11 +2258,17 @@ function syncPlayButtons() {
 
 // ───────────────────────── 루프
 let last = performance.now();
+let _frameErrLogged = false;
 function frame(t) {
   const dt = Math.min((t - last) / 1000, 0.05);
   last = t;
-  if (!paused && !drafting && !betweenStages) update(dt);   // 일시정지·드래프트·요약 중엔 화면만 유지
-  draw();
+  // update/draw에서 예외가 나도 rAF 재예약은 반드시 한다 → 한 프레임 오류가 게임을 영구 정지시키지 않게(회복형 루프).
+  try {
+    if (!paused && !drafting && !betweenStages) update(dt);   // 일시정지·드래프트·요약 중엔 화면만 유지
+    draw();
+  } catch (e) {
+    if (!_frameErrLogged) { console.error('[네온 함대] 프레임 처리 중 예외 — 무시하고 계속:', e); _frameErrLogged = true; }
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

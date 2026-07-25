@@ -1405,9 +1405,11 @@ export class Bullet {
   drawResonanceRail(ctx) {
     const c = this.color || '#79ecff';
     const w = this.beamW || 9;
+    const py = Number.isFinite(this.prevY) ? this.prevY : this.y;
+    if (!Number.isFinite(this.x) || !Number.isFinite(this.y)) return;   // 비유한 좌표 → 렌더 스킵(마디 루프 무한반복·gradient 예외 방지)
     const L = 50;
-    const top = Math.min(this.y, this.prevY ?? this.y) - L / 2;
-    const bot = Math.max(this.y, this.prevY ?? this.y) + L / 2;
+    const top = Math.min(this.y, py) - L / 2;
+    const bot = Math.max(this.y, py) + L / 2;
     const h = bot - top, x = this.x;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';   // 가산 발광 → 박스가 아니라 에너지 빔처럼 보인다
@@ -1424,7 +1426,7 @@ export class Bullet {
     ctx.closePath(); ctx.fill();
     // 3) 레일 마디(가로 에너지 룽) — '레일포' 질감
     ctx.strokeStyle = '#e6fbff'; ctx.globalAlpha = 0.85; ctx.lineWidth = 2;
-    for (let yy = top + 8; yy < bot - 2; yy += 11) {
+    for (let yy = top + 8, n = 0; yy < bot - 2 && n < 40; yy += 11, n++) {   // n<40: 어떤 입력에도 무한루프 불가
       ctx.beginPath(); ctx.moveTo(x - w * 0.85, yy); ctx.lineTo(x + w * 0.85, yy); ctx.stroke();
     }
     // 4) 백열 코어 심
