@@ -224,7 +224,7 @@ export const ui = {
     if (onQuit) document.getElementById('btn-quit').addEventListener('click', onQuit);
   },
 
-  showLose({ stage, maxPower = 0, coins, bonus = 0, best = 0, isRecord, modules = [], onRetry, onHangar }) {
+  showLose({ stage, maxPower = 0, coins, bonus = 0, best = 0, isRecord, modules = [], onRetry, onHangar, freeUpgrade = null }) {
     const mods = modules.length
       ? `<p style="font-size:16px;letter-spacing:2px;margin-top:6px">${modules.map((m) => m.icon + (m.count > 1 ? m.count : '')).join(' ')}</p>` : '';
     const total = (coins || 0) + (bonus || 0);
@@ -235,6 +235,27 @@ export const ui = {
            <div>총 획득 <b>🪙 +${total.toLocaleString()}</b></div>
          </div>`
       : (total > 0 ? `<p>획득 코인: <b>🪙 +${total.toLocaleString()}</b></p>` : '');
+    // P0-A: 첫 실제 사망 무료 긴급 개조. options 있으면 선택 카드, chosenName 있으면 완료 문구.
+    let freeBlock = '';
+    if (freeUpgrade && freeUpgrade.options && freeUpgrade.options.length) {
+      const cards = freeUpgrade.options.map((o, i) =>
+        `<button class="draft-card free-up" data-idx="${i}" aria-label="무료 긴급 개조: ${o.name} ${o.delta}">
+           <div class="card-label">${o.name}</div>
+           <div class="card-desc" style="color:#ffd93d;font-weight:700">${o.delta}</div>
+         </button>`).join('');
+      freeBlock = `
+        <div class="free-upgrade" style="margin:12px 0 4px;padding:12px 8px 10px;border:1px solid rgba(124,255,156,0.35);border-radius:10px;background:rgba(124,255,156,0.06)">
+          <p class="big" style="color:#7cff9c;font-size:15px;margin:0">첫 원정 지원 · 무료 긴급 개조 1회</p>
+          <p style="font-size:12px;color:#cfe6d6;margin:4px 0 0">실패 데이터를 회수했습니다. 다음 출격부터 영구 적용할 개조를 고르세요.</p>
+          <div class="draft-row">${cards}</div>
+        </div>`;
+    } else if (freeUpgrade && freeUpgrade.chosenName) {
+      freeBlock = `
+        <div class="free-upgrade" style="margin:12px 0 4px;padding:10px;border:1px solid rgba(124,255,156,0.35);border-radius:10px;background:rgba(124,255,156,0.06)">
+          <p class="big" style="color:#7cff9c;font-size:15px;margin:0">${freeUpgrade.chosenName} · 무료 긴급 개조 완료</p>
+          <p style="font-size:12px;color:#cfe6d6;margin:4px 0 0">다음 출격부터 영구 적용됩니다.</p>
+        </div>`;
+    }
     panel(`
       <h2 style="color:#ff3d71">출격 종료</h2>
       <p class="big">스테이지 ${stage} 도달</p>
@@ -242,6 +263,7 @@ export const ui = {
       ${mods}
       ${coinBlock}
       ${best > 0 && !isRecord ? `<p>역대 최고 화력: ${best.toLocaleString()}</p>` : ''}
+      ${freeBlock}
       <p style="color:#9fb8d8"><small>격납고에서 영구 강화하고 더 멀리 진격하세요.</small></p>
       <div class="btn-row">
         <button id="btn-retry">다시 출격</button>
@@ -250,6 +272,15 @@ export const ui = {
     `);
     document.getElementById('btn-retry').addEventListener('click', onRetry);
     if (onHangar) document.getElementById('btn-hangar').addEventListener('click', onHangar);
+    // 무료 개조 카드: 첫 클릭 즉시 전체 비활성(연속 탭 차단) + main.onPick(저장 쪽에서도 재검사).
+    if (freeUpgrade && freeUpgrade.options && freeUpgrade.options.length) {
+      const cardEls = Array.from(overlay.querySelectorAll('.free-up'));
+      cardEls.forEach((b) => b.addEventListener('click', () => {
+        if (b.disabled) return;
+        cardEls.forEach((x) => { x.disabled = true; });
+        freeUpgrade.onPick(freeUpgrade.options[+b.dataset.idx].key);
+      }));
+    }
   },
 
   /** 코어루프 사람 플레이 선택창 (전면개편 §5.1: 시작 무기·행동 변화·두 번째 무기·프레임). 게임 정지. */
@@ -497,6 +528,15 @@ export const ui = {
       repair: { icon: '🔧', label: '수리', color: '#7cff6b' },
       boss: { icon: '👑', label: '보스', color: '#ffd93d' },
     };
+    // 노드 보상·위험 요약(정보 영역·접근 가능 이름·툴팁 공용). 지도 토폴로지·보상 수치는 바꾸지 않는다.
+    const REWARD = {
+      combat: '코인 보통 · 모듈 3택',
+      supply: '드론 다수 · 구간 짧음',
+      hazard: '코인 +20% · 모듈 3택',
+      elite: '코인 +80% · 모듈 4택(희귀 보장)',
+      repair: '긴급 수리 또는 유료 모듈 정비',
+      boss: '섹터 보스 — 돌파 시 다음 섹터',
+    };
     const W = 300, H = 430, mx = 46, my = 40, SP = 84;
     const idToNode = {};
     map.cols.forEach((col) => col.forEach((n) => { idToNode[n.id] = n; }));
@@ -507,6 +547,14 @@ export const ui = {
     const pos = (node) => {
       const n = map.cols[node.col].length;
       return { x: W / 2 + (node.row - (n - 1) / 2) * SP, y: H - my - (node.col / map.depth) * (H - 2 * my) };
+    };
+    // 접근 가능한 이름: 같은 종류 노드가 여럿이어도 열·순번으로 고유해야 한다(P0-D §6.3).
+    //  reach 배열 순서를 좌→우로 정렬해 'N번째'가 화면 순서와 일치하게 한다.
+    const reachOrder = reach.slice().sort((a, b) => pos(a).x - pos(b).x);
+    const ariaFor = (node) => {
+      const m = META[node.type];
+      const ord = reachOrder.indexOf(node) + 1;
+      return `${m.label}, ${node.col + 1}열 ${ord}번째 항로, ${REWARD[node.type] || ''}`;
     };
     let lines = '';
     for (const col of map.cols) for (const node of col) {
@@ -527,12 +575,15 @@ export const ui = {
       const glow = isReach ? 'box-shadow:0 0 12px #3ff5e0;' : '';
       const st = `box-sizing:border-box;appearance:none;-webkit-appearance:none;padding:0;margin:0;position:absolute;left:${p.x - 22}px;top:${p.y - 22}px;width:44px;height:44px;border-radius:50%;border:2px solid ${bd};background:rgba(10,16,28,0.9);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:${op};${glow}${isReach ? 'cursor:pointer' : 'cursor:default'}`;
       nodes += isReach
-        ? `<button class="map-node" data-node="${node.id}" data-id="${node.id}" style="${st}" title="${m.label}">${m.icon}</button>`
+        ? `<button class="map-node" data-node="${node.id}" data-id="${node.id}" style="${st}" title="${m.label}" aria-pressed="false" aria-label="${ariaFor(node)}">${m.icon}</button>`
         : `<div class="map-node" data-id="${node.id}" style="${st}" title="${m.label}">${m.icon}</div>`;
     }
-    // (노드 아래 상시 보상 라벨은 제거 — 아이콘을 덮어 지저분했다. 설명은 마우스오버·키보드 포커스
-    //  팝업(map-tip)과 아래 범례가 이미 담당한다. 이사 요청)
     const legend = Object.values(META).map((m) => `<span style="white-space:nowrap">${m.icon}${m.label}</span>`).join(' · ');
+    // 터치·펜 등 coarse pointer 환경에서만 확정 버튼·2단계 안내를 노출한다(데스크톱은 1클릭 확정 유지).
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    const guide = coarse
+      ? '👆 항로를 탭해 선택하고, 다시 탭하거나 아래 버튼으로 확정하세요.'
+      : '🖱 클릭으로 진격 · 마우스오버 설명 · ⌨ ←→ 이동 · Enter 확정';
     panel(`
       <h2 style="color:#3ff5e0">섹터 ${sector} · 항로 선택</h2>
       <p><small>빛나는 지점을 선택해 진격하세요. 맨 위 지점은 섹터 보스입니다.</small></p>
@@ -541,27 +592,41 @@ export const ui = {
         ${nodes}
         <div id="map-tip" style="position:absolute;display:none;transform:translate(-50%,-100%);font-size:13px;font-weight:600;line-height:1.3;color:#eaf3ff;background:rgba(4,8,16,0.96);border:1px solid #3ff5e0;border-radius:8px;padding:6px 11px;white-space:nowrap;pointer-events:none;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,0.6)"></div>
       </div>
+      <div id="map-info" aria-live="polite" style="min-height:34px;margin:4px auto 2px;max-width:280px;padding:7px 10px;border:1px solid rgba(120,200,255,0.22);border-radius:8px;background:rgba(8,14,26,0.7);font-size:12.5px;line-height:1.45;color:#cfe4ff">항로를 선택하세요.</div>
+      <button id="map-confirm" disabled style="display:${coarse ? 'block' : 'none'};width:230px;max-width:78vw;margin:8px auto 0;border-radius:8px" aria-label="선택한 항로로 진격">이 항로로 진격 ▶</button>
       <p style="font-size:10.5px;color:#9fb8d8;line-height:1.6">${legend}</p>
-      <p style="font-size:10.5px;color:#9fb8d8">🖱 클릭·마우스오버 설명 · ⌨ ←→ 이동 · Space 확정 &nbsp; 보유 코인 🪙 ${coins.toLocaleString()}</p>
+      <p style="font-size:10.5px;color:#9fb8d8">${guide} &nbsp; 보유 코인 🪙 ${coins.toLocaleString()}</p>
     `);
-    // 마우스 오버(및 키보드 포커스) 시 노드 설명을 크게 팝업 — 배경 그림 위에서도 잘 보이게 (사용자 요청)
-    const TIP = {
-      combat: '⚔️ 전투 — 코인 보통 · 모듈 3택',
-      supply: '💎 보급 — 드론 다수 · 구간 짧음',
-      hazard: '☄️ 위험 지역 — 코인 +20% · 모듈 3택',
-      elite: '☠️ 정예 전투 — 코인 +80% · 모듈 4택(희귀 보장)',
-      repair: '🔧 수리 — 긴급 수리 또는 유료 모듈 정비',
-      boss: '👑 섹터 보스',
-    };
     const tip = overlay.querySelector('#map-tip');
+    const info = overlay.querySelector('#map-info');
+    const confirmBtn = overlay.querySelector('#map-confirm');
+    const infoText = (node) => `${META[node.type].icon} ${META[node.type].label} — ${REWARD[node.type] || ''}`;
+
+    let selectedId = null;      // 터치 1단계 선택(미확정)
+    let confirmed = false;      // onPick 1회 가드 (두 번째 탭·확정 버튼 동시 입력 방어)
+    const confirmPick = (node) => { if (confirmed || !node) return; confirmed = true; onPick(node); };
+    const selectNode = (node) => {
+      selectedId = node.id;
+      overlay.querySelectorAll('.map-node[data-node]').forEach((b) => {
+        const on = +b.dataset.node === node.id;
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.style.boxShadow = on ? '0 0 16px #ffd93d, 0 0 6px #ffd93d' : '0 0 12px #3ff5e0';
+        b.style.borderColor = on ? '#ffd93d' : '#3ff5e0';
+      });
+      info.textContent = infoText(node);
+      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.setAttribute('aria-label', `${ariaFor(node)} — 진격`); }
+    };
+
+    // 마우스 오버·키보드 포커스: 툴팁 + 정보 영역 갱신(선택 확정과 무관한 미리보기)
     overlay.querySelectorAll('.map-node').forEach((el) => {
       const node = idToNode[+el.dataset.id]; if (!node) return;
       const p = pos(node);
       const show = () => {
-        tip.textContent = TIP[node.type] || (META[node.type] && META[node.type].label) || '';
-        tip.style.left = Math.max(84, Math.min(W - 84, p.x)) + 'px';   // 가장자리 넘침 방지
+        tip.textContent = infoText(node);
+        tip.style.left = Math.max(84, Math.min(W - 84, p.x)) + 'px';
         tip.style.top = (p.y - 26) + 'px';
         tip.style.display = 'block';
+        if (reachIds.has(node.id)) info.textContent = infoText(node);
       };
       const hide = () => { tip.style.display = 'none'; };
       el.addEventListener('mouseenter', show);
@@ -569,11 +634,26 @@ export const ui = {
       el.addEventListener('focus', show);
       el.addEventListener('blur', hide);
     });
-    const pickNode = (b) => onPick(idToNode[+b.dataset.node]);
+
+    // 노드 확정 경로:
+    //  - 마우스 클릭: 즉시 확정 (기존 데스크톱 동작)
+    //  - 터치(coarse) 탭: 첫 탭=선택+설명, 같은 노드 두 번째 탭=확정, 다른 노드 탭=선택만 변경
+    //  - 키보드 Enter/Space: attachKeyNav가 확정(아래) — click은 e.detail===0으로 걸러 2단계로 새지 않게 한다
     overlay.querySelectorAll('[data-node]').forEach((b) => {
-      b.addEventListener('click', () => pickNode(b));
+      const node = idToNode[+b.dataset.node];
+      let lastPT = '';
+      b.addEventListener('pointerdown', (e) => { lastPT = e.pointerType; });
+      b.addEventListener('click', (e) => {
+        if (e.detail === 0) return;   // 키보드가 유발한 click — attachKeyNav가 처리
+        const touch = lastPT === 'touch' || (lastPT === '' && coarse);
+        lastPT = '';
+        if (touch) { if (selectedId === node.id) confirmPick(node); else selectNode(node); }
+        else confirmPick(node);
+      });
     });
-    attachKeyNav(overlay.querySelectorAll('[data-node]'), pickNode);
+    if (confirmBtn) confirmBtn.addEventListener('click', () => { if (selectedId != null) confirmPick(idToNode[selectedId]); });
+    // 키보드: Enter/Space는 attachKeyNav가 onConfirm으로 직접 확정(click 미경유) → 항상 1회 확정
+    attachKeyNav(overlay.querySelectorAll('[data-node]'), (b) => confirmPick(idToNode[+b.dataset.node]));
   },
 
   /** 스테이지 클리어 성과 요약 + 여유 시간 (준비되면 다음 스테이지) */
