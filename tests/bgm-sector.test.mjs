@@ -28,7 +28,7 @@ test('BGM-S2: playBgmForSector가 변주 랜덤 + 파일 없으면 battle1 폴�
 
 test('BGM-S3: 게임이 섹터별 BGM을 호출한다(노드 시작 + 캠페인 지역 진입)', () => {
   assert.ok(mainSrc.includes('playBgmForSector'), 'import·사용');
-  assert.ok(/playBgmForSector\(r\.sector\)/.test(mainSrc), '노드 시작에서 섹터 BGM');
+  assert.ok(/playBgmForSector\(r\.sector,/.test(mainSrc), '노드 시작에서 섹터 BGM(restart 옵션 포함)');
   assert.ok(/playBgmForSector\(region\.i\)/.test(mainSrc), '캠페인 지역 진입에서 섹터 BGM');
 });
 

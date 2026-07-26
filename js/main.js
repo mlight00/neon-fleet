@@ -191,6 +191,10 @@ function newExpedition(mode = 'campaign', opts = {}) {
     maxPower: squad.power, scrollY: 0,
     sector: 1, map: null, node: null, done: [], isBossNode: false,   // 섹터 분기 맵
     mode,                                                            // 'campaign' | 'endless' (§6)
+    // 개발/측정 부트스트랩(coreLoopTest·campaign25·bosslab)은 맵을 만든 뒤 자기가 곧바로 enterNode를 부른다.
+    // enterSectorMap의 자동 루트 진입(P0-B)이 겹치면 첫 노드가 두 번 초기화되어 청크 RNG·mfx·측정이 오염된다
+    // → devDirect면 enterSectorMap이 항로/자동진입을 건너뛴다(Codex P3).
+    devDirect: !!opts.devDirect,
   };
   // 엔드리스는 캠페인 이후 섹터(7)부터 시작 → 보스 순환·변주·다중 보스가 자연히 강해진다.
   const begin = () => startSector(mode === 'endless' ? BAL.campaign.sectors + 1 : 1);
@@ -220,6 +224,7 @@ function startSector(sector) {
 /** 맵 화면(갈림길 선택). 게임 정지 상태(state='map'). */
 function enterSectorMap() {
   const r = run;
+  if (r.devDirect) return;   // 개발/측정 부트스트랩(bosslab·coreLoop·campaign25)은 맵만 만들고 곧바로 enterNode를 부른다 → 자동 루트 진입 생략(Codex P3)
   state = 'map';
   setBgmIntensity(0.2); playBgm('title', { restart: !!r.bgmRestart });
   r.bgmRestart = false;   // 섹터 전환 1회만 재시작(노드 사이 복귀는 이어서)
@@ -254,7 +259,9 @@ function enterNode(node) {
   if (node.type === 'repair') { enterRepair(node); return; }
   buildEncounter(node);
   state = 'play'; drafting = false; ui.hide();
-  setBgmIntensity(0.3); playBgmForSector(r.sector); sfx('start');   // 섹터별 전투 BGM(없으면 battle1 폴백)
+  // 섹터별 전투 BGM(없으면 battle1 폴백). r.bgmRestart는 보통 enterSectorMap이 소비하지만, 개발/측정 부트스트랩은
+  // 그 화면을 건너뛰므로(devDirect) 여기서 소비한다 — 개발 런 재시작 시 전투곡이 처음부터 재생되도록(Codex P3 후속).
+  setBgmIntensity(0.3); playBgmForSector(r.sector, { restart: !!r.bgmRestart }); r.bgmRestart = false; sfx('start');
   const label = { combat: '교전', elite: '정예 교전', hazard: '위험 지대', supply: '보급', boss: '섹터 보스' }[node.type] || '교전';
   r.effects.text(LOGICAL_W / 2, logicalH * 0.4, label, node.type === 'boss' ? COLORS.danger : COLORS.reward);
   r.effects.flash(0.3);
@@ -473,7 +480,7 @@ function startPlay() {
 /** 보스 패턴 프리뷰(개발/테스트): 지정 보스를 즉시 등장시켜 패턴만 관찰·연습. 처치 시 재소환. */
 function startBossLab(bossId = 'B14') {
   drafting = false; betweenStages = false;
-  newExpedition('campaign');
+  newExpedition('campaign', { devDirect: true });   // 개발 진입: 맵만 만들고 아래 enterNode로 직접 진입(자동 루트 진입 생략)
   const r = run, sq = r.squad;
   sq.tier = 3; sq.count = 60; sq.banked = 200;   // 관찰용 중간 화력
   sq.weapon = 'vulcan'; sq.weaponLv = 3;
@@ -512,7 +519,7 @@ function startCoreLoop(opts = {}) {
   const buildId = opts.buildId || 'railStorm';
   const build = coreLoopBuild(buildId);
   drafting = false; betweenStages = false;
-  newExpedition('campaign');            // world/squad/run 생성
+  newExpedition('campaign', { devDirect: true });   // world/squad/run 생성(개발 진입: 자동 루트 진입 생략)
   const r = run, sq = r.squad, w = r.world;
   const surv = createSurvivability(BAL.gate1.survivability);
   const reson = createResonanceState();
@@ -873,7 +880,7 @@ function startCampaign25(opts = {}) {
   const auto = mode === 'measure';
   const build = coreLoopBuild(opts.buildId || 'railStorm');
   drafting = false; betweenStages = false;
-  newExpedition('campaign');
+  newExpedition('campaign', { devDirect: true });   // 개발/측정 진입: 아래 enterNode로 직접 진입(자동 루트 진입 생략)
   const r = run, sq = r.squad, w = r.world;
   const surv = createSurvivability(BAL.gate1.survivability);
   const reson = createResonanceState();
@@ -2053,7 +2060,7 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
   if (toTitle) { showTitleScreen(); return; }
   // P0-A: 첫 실제 사망(death)에서만 무료 긴급 개조 자격을 계산한다. quit·캠페인 완료·개발 종료는 제외.
   //  정산은 위에서 r.settled로 이미 1회 끝났다 — 아래는 결과 화면만 그린다(개조 선택 후에도 endExpedition 재호출 없음).
-  const freeKeys = reason === 'death'
+  const freeKeys = reason === 'death' && !r.bossLab
     ? firstDefeatUpgradeOptions(save.get(), BAL.hangar.upgrades, BAL.hangar.maxLv)
     : [];
   const resultSnap = { stage: r.sector, maxPower: r.maxPower, coins: earned, bonus, best, isRecord, modules: moduleSummary(r.modules) };

@@ -31,3 +31,21 @@ test('FR-15b: 생성되는 섹터 맵의 첫 열은 항상 루트 1개 (자동 �
     assert.equal(map.cols[0].length, 1, `섹터 ${sec} 루트 열 1개`);
   }
 });
+
+// Codex P3: 직접 진입형 개발 부트스트랩이 자동 루트 진입과 겹쳐 첫 노드를 두 번 초기화하던 문제.
+//  → newExpedition의 devDirect 플래그로 enterSectorMap을 건너뛰고, 개발 함수가 enterNode를 단 한 번만 부른다.
+test('FR-16: newExpedition이 opts.devDirect를 run에 기록하고, enterSectorMap이 devDirect면 조기 반환', () => {
+  assert.match(mainSrc, /devDirect: !!opts\.devDirect/);
+  assert.match(mainSrc, /function enterSectorMap\(\)\s*\{\s*\n\s*const r = run;\s*\n\s*if \(r\.devDirect\) return;/);
+});
+
+test('FR-17: 개발 3진입(bosslab·coreLoop·campaign25)이 devDirect:true로 호출한다', () => {
+  const calls = mainSrc.match(/newExpedition\('campaign', \{ devDirect: true \}\)/g) || [];
+  assert.equal(calls.length, 3, '개발 부트스트랩 3곳만 devDirect');
+  // 정상 사용자 진입(startPlay)은 devDirect가 아니다 → 자동 루트 진입 유지
+  assert.match(mainSrc, /newExpedition\('campaign', \{ pickWeapon: true \}\)/);
+});
+
+test('FR-18: enterNode가 r.bgmRestart를 전투곡 restart로 전달하고 즉시 소비한다(개발 재시작 시 곡 재생)', () => {
+  assert.match(mainSrc, /playBgmForSector\(r\.sector, \{ restart: !!r\.bgmRestart \}\); r\.bgmRestart = false;/);
+});

@@ -34,9 +34,10 @@ test('FD-03: 새 저장은 무료 선택 자격이 있다(세 항목)', () => {
   assert.deepEqual(firstDefeatUpgradeOptions({ firstDefeatUpgrade: null, up: fullUp }, UPG, 10), ['drones', 'hull', 'dmg']);
 });
 
-test('FD-04: quit·완료는 자격을 만들지 않는다 (death만 계산 — endExpedition 게이트)', () => {
-  // firstDefeatUpgradeOptions는 저장만 본다; reason 게이팅은 endExpedition의 death 한정 분기가 담당.
-  assert.match(mainSrc, /const freeKeys = reason === 'death'\s*\n?\s*\? firstDefeatUpgradeOptions/);
+test('FD-04: quit·완료·개발종료(BossLab)는 자격을 만들지 않는다 (실사망만 계산 — endExpedition 게이트)', () => {
+  // firstDefeatUpgradeOptions는 저장만 본다; reason 게이팅은 endExpedition의 분기가 담당.
+  // death여도 개발용 BossLab(r.bossLab) 사망은 제외한다(Codex P2: 개발 화면 사망이 첫 사망 혜택을 소모하면 안 됨).
+  assert.match(mainSrc, /const freeKeys = reason === 'death' && !r\.bossLab\s*\n?\s*\? firstDefeatUpgradeOptions/);
 });
 
 test('FD-05: 하나를 고르면 그 레벨만 +1 (지급 로직)', () => {
