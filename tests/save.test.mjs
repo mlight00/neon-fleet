@@ -21,8 +21,9 @@ test('기본값: 저장 없으면 best 0, coins 0, stage 1, style C(미선택), 
   assert.equal(d.style, 'C'); assert.equal(d.styleChosen, false); assert.equal(d.stageMigrated, true);
   assert.deepEqual(d.up, { drones: 0, dmg: 0, rate: 0, coin: 0, magnet: 0, hull: 0, cruiser: 0 });
   assert.deepEqual(d.snd, { bgm: 0.5, sfx: 0.8, mute: false });
-  // Gate 1 메타 필드 기본값(§10)
-  assert.equal(d.saveVersion, 2);
+  // Gate 1 메타 필드 기본값(§10) + P0 리텐션 SAVE_VERSION 3
+  assert.equal(d.saveVersion, 3);
+  assert.equal(d.firstDefeatUpgrade, null);   // P0-A: 첫 사망 무료 개조 미지급
   assert.deepEqual(d.unlocks.startingWeapons, []);
   assert.deepEqual(d.blueprints, {});
   assert.equal(d.threatLevel, 0);
