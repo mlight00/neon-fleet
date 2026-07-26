@@ -13,7 +13,7 @@ import { keystoneIcon, KEYSTONES, freshKeystoneState } from './keystones.js';
 import { claimKill } from './kill-events.js';
 import { PrismWarden, Scavenger, GateParasite } from './adaptive-enemies.js';
 import { mulberry32, pickTier, pickChunk, isSafeChunk, isTutorialSafeChunk, chunkMinTier } from './chunks.js';
-import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, cruisersNeededForTier, effectiveFirepower, progressPatch, bossCountFor, invertGateOp } from './logic.js';
+import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, copyCount, progressionFor, nodeCoinReward, nodeModuleGrant, campaignBossId, cruisersNeededForTier, effectiveFirepower, progressPatch, bossCountFor, invertGateOp, firstDefeatUpgradeOptions, FIRST_DEFEAT_KEYS } from './logic.js';
 import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES, SPRITE_SIZES, invalidateSpriteCache } from './sprites.js';
 import { loadPatch, applyFlat, subscribePatch } from './tuning.js';
 import { createSave } from './save.js';
@@ -224,10 +224,18 @@ function enterSectorMap() {
   setBgmIntensity(0.2); playBgm('title', { restart: !!r.bgmRestart });
   r.bgmRestart = false;   // 섹터 전환 1회만 재시작(노드 사이 복귀는 이어서)
   const d = save.get();
-  // 첫 출격: 루트 노드(단일 선택지)는 자동 진입하되, 그 전에 조작 안내를 1회 표시 (지시서 A-4 §3.5).
-  if (r.sector === 1 && r.done.length === 0 && !d.firstGuideSeen) {
+  // P0-B: 섹터 1 첫 진입은 루트가 정확히 1개뿐이라 항로 화면이 '선택'이 아니라 '확인 클릭'일 뿐이다.
+  //  → 항로 화면을 생략하고 루트로 자동 진입한다. 첫 노드 이후(done>0)·섹터 2+·루트가 여럿인 비정상 입력은 제외.
+  const soloRoot = r.sector === 1 && r.done.length === 0 && !r.node
+    && r.map.cols[0] && r.map.cols[0].length === 1;
+  if (soloRoot) {
     const root = r.map.cols[0][0];
-    ui.showFirstGuide({ combo: !!r.squad.reson, onStart: () => { save.set({ firstGuideSeen: true }); enterNode(root); } });
+    if (!d.firstGuideSeen) {
+      // 최초 사용자: 조작 안내를 1회 보여주고, 안내의 '전투 시작'에서 같은 루트로 진입.
+      ui.showFirstGuide({ combo: !!r.squad.reson, onStart: () => { save.set({ firstGuideSeen: true }); enterNode(root); } });
+    } else {
+      enterNode(root);   // 안내를 이미 본 사용자: 선택지 하나뿐인 첫 항로 클릭 없이 즉시 진입
+    }
     return;
   }
   ui.showSectorMap({
@@ -2043,7 +2051,48 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
     save.set({ best, coins: data.coins + total, ...progressPatch(r.mode, r.sector, data) });
   }
   if (toTitle) { showTitleScreen(); return; }
-  ui.showLose({ stage: r.sector, maxPower: r.maxPower, coins: earned, bonus, best, isRecord, modules: moduleSummary(r.modules), onRetry: startPlay, onHangar: showHangar });
+  // P0-A: 첫 실제 사망(death)에서만 무료 긴급 개조 자격을 계산한다. quit·캠페인 완료·개발 종료는 제외.
+  //  정산은 위에서 r.settled로 이미 1회 끝났다 — 아래는 결과 화면만 그린다(개조 선택 후에도 endExpedition 재호출 없음).
+  const freeKeys = reason === 'death'
+    ? firstDefeatUpgradeOptions(save.get(), BAL.hangar.upgrades, BAL.hangar.maxLv)
+    : [];
+  const resultSnap = { stage: r.sector, maxPower: r.maxPower, coins: earned, bonus, best, isRecord, modules: moduleSummary(r.modules) };
+  showLoseResult(resultSnap, freeKeys);
+}
+
+/**
+ * 결과 화면 렌더 (정산과 분리 — 무료 개조 선택 후 UI만 다시 그린다).
+ *  freeKeys 있음 → 무료 개조 선택 카드. 선택하면 save에 1회 기록 후 같은 스냅샷으로 완료 상태 재렌더.
+ *  justClaimed=true(선택 직후 재렌더)일 때만 완료 문구를 보여준다 — 이미 받은 사용자의 이후 사망마다
+ *  '완료' 문구가 반복 노출되지 않게(그 death엔 카드도 문구도 없이 일반 결과 화면).
+ */
+function showLoseResult(snap, freeKeys, justClaimed = false) {
+  const options = freeKeys.map((k) => {
+    const def = BAL.hangar.upgrades[k];
+    return { key: k, name: def.name, delta: `+${def.step}${def.unit || ''}`, desc: def.desc };
+  });
+  let freeUpgrade = null;
+  if (options.length) {
+    freeUpgrade = {
+      options,
+      onPick(key) {
+        const d = save.get();
+        if (d.firstDefeatUpgrade != null) return;              // 이미 받음(연속 클릭·재호출 방어)
+        if (!FIRST_DEFEAT_KEYS.includes(key)) return;          // 화이트리스트
+        const def = BAL.hangar.upgrades[key];
+        const lv = d.up[key] || 0;
+        if (!def || lv >= BAL.hangar.maxLv) return;            // 최대 레벨 방어
+        // 코인 차감 없음. 강화 레벨 +1과 지급 완료 상태를 한 번의 set으로(어긋남 방지).
+        save.set({ up: { ...d.up, [key]: lv + 1 }, firstDefeatUpgrade: key });
+        sfx('buy');
+        showLoseResult(snap, [], true);                        // 완료 상태로 다시 그림(카드 사라지고 완료 문구)
+      },
+    };
+  } else if (justClaimed) {
+    const chosenKey = save.get().firstDefeatUpgrade;
+    freeUpgrade = chosenKey ? { chosenName: BAL.hangar.upgrades[chosenKey]?.name || '' } : null;
+  }
+  ui.showLose({ ...snap, onRetry: startPlay, onHangar: showHangar, freeUpgrade });
 }
 
 /** 캠페인 최종 보스(하이브 퀸) 격파 → 정산 + 무한 원정 해금 + 승리 화면 (§6.3). */
@@ -2315,7 +2364,25 @@ subscribePatch((p) => {
 
 preloadStyle();
 
+/**
+ * P0-C: 타이틀로 돌아갈 때 이전 전투 상태를 완전히 종료한다.
+ *  draw()의 전투 개체·보스·HUD는 전부 `if (run)` 안에 있으므로 run=null이면 잔상이 남지 않는다
+ *  (CSS로 가리거나 캔버스를 숨기지 않는다 — 상태를 실제로 비운다).
+ *  코인 정산은 하지 않는다: 이미 endExpedition/winCampaign에서 r.settled로 1회 끝났다.
+ *  여러 진입 경로(첫 로드·인트로 후·결과→격납고→뒤로·타이틀→격납고→뒤로·일시정지 끝내기·초기화)가
+ *  같은 정리를 공유하도록 한 곳에 모은다.
+ */
+function resetToTitleState() {
+  state = 'title';
+  run = null;
+  drafting = false;
+  betweenStages = false;
+  paused = false;
+  if (input) { input.active = false; input.charging = false; input.clearSkip?.(); }
+}
+
 function showTitleScreen() {
+  resetToTitleState();
   const d = save.get();
   ui.showTitle({
     best: d.best,
