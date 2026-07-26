@@ -1,11 +1,14 @@
 // 저장 래퍼 — storage 주입식이라 테스트 가능, 실패 시 메모리 폴백
 const KEY = 'neonFleet.v1';
-export const SAVE_VERSION = 2;                   // Gate 1: 메타 해금·설계도·위협 구조 도입(§10)
+export const SAVE_VERSION = 3;                   // P0 리텐션: 첫 사망 무료 긴급 개조(firstDefeatUpgrade) 도입
 const DEFAULTS = {
   saveVersion: SAVE_VERSION,
   best: 0, coins: 0, stage: 1, style: 'C', styleChosen: false,
   introSeen: false,                             // 인트로 크롤 시청 여부
   firstGuideSeen: false,                        // 첫 출격 조작 안내 표시 여부(1회) — 이후 루트 노드 자동 진입 생략
+  // 첫 실제 사망 시 1회 무료 지급하는 전투형 영구 강화. null=아직 안 받음, 그 외=선택한 강화 키('drones'|'hull'|'dmg').
+  // 선택 키 자체가 '지급 완료' 상태를 겸한다(별도 claimed 불리언을 두지 않아 두 값이 어긋날 여지를 없앰, P0-A).
+  firstDefeatUpgrade: null,
   campaignCleared: false,                       // 섹터 6 하이브 퀸 격파 여부 (§6.4)
   endlessUnlocked: false,                       // 무한 원정 해금 여부
   endlessBest: 0,                               // 엔드리스 최고 도달 섹터(캠페인 기록과 별도, §6.5)
@@ -55,7 +58,7 @@ export function createSave(storage = globalThis.localStorage) {
         if (data && data.saveVersion !== SAVE_VERSION) {
           data.saveVersion = SAVE_VERSION;
           for (const k of NESTED_KEYS) if (data[k] == null) data[k] = structuredClone(DEFAULTS[k]);
-          for (const k of ['threatLevel', 'discoveredEnemies', 'bossMemories', 'runHistorySummary']) if (data[k] == null) data[k] = structuredClone(DEFAULTS[k]);
+          for (const k of ['threatLevel', 'discoveredEnemies', 'bossMemories', 'runHistorySummary', 'firstDefeatUpgrade']) if (data[k] == null) data[k] = structuredClone(DEFAULTS[k]);
           dirty = true;
         }
         if (dirty) storage.setItem(KEY, JSON.stringify(data));

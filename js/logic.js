@@ -284,3 +284,19 @@ export function generateSectorMap(sector, rng, depth = 5) {
   for (const col of cols) for (const node of col) node.id = id++;
   return { sector, depth, cols };
 }
+
+// ── P0 리텐션: 첫 실제 사망 무료 긴급 개조 ──────────────────────────
+// 처음 사망한 사용자가 코인이 부족해도 '다음 판은 더 강하다'를 체감하도록 전투형 영구 강화 1개를 무료 지급한다.
+// 코인·연사·수거범위처럼 체감이 약하거나 즉발적이지 않은 항목은 제외하고, 시작 드론·내구도·공격력만 준다.
+export const FIRST_DEFEAT_KEYS = ['drones', 'hull', 'dmg'];
+
+/**
+ * 무료 개조로 고를 수 있는 강화 키 목록 (순수 함수, 테스트용).
+ * 반환이 비면 자격 없음: 이미 받았거나(firstDefeatUpgrade != null), 세 항목이 모두 최대 레벨.
+ *  reason이 'death'인지는 호출부(endExpedition)가 판정한다 — 이 함수는 저장 상태·격납고 설정만 본다.
+ */
+export function firstDefeatUpgradeOptions(saveData, upgrades = {}, maxLv = Infinity) {
+  if (!saveData || saveData.firstDefeatUpgrade != null) return [];
+  const up = saveData.up || {};
+  return FIRST_DEFEAT_KEYS.filter((k) => upgrades[k] && (up[k] || 0) < maxLv);
+}
