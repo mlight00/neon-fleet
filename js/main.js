@@ -29,7 +29,7 @@ import { createWheelStepAccumulator, resolveWheelZoom } from './wheel-input.js';
 import { createChaseProjection, chaseBlendForZoom, advanceChaseBlend, screenToWorldXAtPlayer, projectPoint, projectObject, CHASE_FULL_ZOOM } from './chase-camera.js';
 import { drawWorldProjected, collectEdgeWarnings } from './chase-render.js';
 import { drawWarpField } from './chase-backdrop.js';
-import { PROP_KEYS, PROP_CAPS } from './chase3d-props.js';   // 상수만(THREE 비의존 순수) — 지오메트리는 renderer 가 플래그 뒤에서 생성
+import { PROP_KEYS, PROP_CAPS } from './chase3d-prop-defs.js';   // 순수 상수 전용 모듈(의존 0) — 지오메트리·팩토리는 플래그 뒤 renderer 만 로드(Codex 재검토 P2)
 // 실제 3D 함미 추적(Phase 0, ?chase3d=1 전용). config/mapping은 순수(Three.js 미의존)라 정적 import 안전.
 //  renderer(Three.js 로드)는 플래그가 있을 때만 아래에서 동적 import 한다(§3.2: 플래그 없으면 three 미로드).
 import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, chase3dPropsEnabled, transitionT } from './chase3d-config.js';
@@ -234,7 +234,7 @@ if (CHASE3D_ON) {
     //  Opus5 hero(기본): 3D 는 AURORA 기함만(§9.1). chase3dTest 레거시 장면만 구 전체-3D dev fallback.
     import('./chase3d-renderer.js').then((m) => {
       try {
-        const c = m.createChase3D(canvas3d, { hero: !CHASE3D_TEST });
+        const c = m.createChase3D(canvas3d, { hero: !CHASE3D_TEST, propsEnabled: CHASE3D_PROPS });
         if (c && c.available) {
           chase3d = c;
           if (c.prewarmRun) c.prewarmRun(LOGICAL_W, logicalH, canvas.width, canvas.height).then((p) => console.info('[chase3d] 프리웜', p));   // §10.2 셰이더 사전 준비

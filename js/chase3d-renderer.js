@@ -19,12 +19,12 @@ export const B2_INSTANCE_MAX = 8;    // 실전 B2(중형) 동시 표시 상한
 export const B4_INSTANCE_MAX = 8;    // 실전 B4(저격수) 동시 표시 상한
 
 export function createChase3D(canvas3d, opts = {}) {
-  if (opts.hero) return createHero3D(canvas3d);
+  if (opts.hero) return createHero3D(canvas3d, opts);
   return createLegacy3D(canvas3d);
 }
 
 // ── hero: AURORA 전용 씬 (색관리 §7.3 + IBL + 프리웜 §10.2) ──
-function createHero3D(canvas3d) {
+function createHero3D(canvas3d, opts = {}) {
   const ctl = {
     available: false, degraded: false, hero: true, reason: '', THREE,
     _t: 0, _zoom: 1, _lastW: 0, _lastH: 0, _lastDpr: 0, _rendered: false,
@@ -86,20 +86,23 @@ function createHero3D(canvas3d) {
   const _sV = new THREE.Vector3(), _sDir = new THREE.Vector3(), _sFwd = new THREE.Vector3(),
         _sPos = new THREE.Vector3(), _sScl = new THREE.Vector3(), _sEul = new THREE.Euler(),
         _sQ = new THREE.Quaternion(), _sM = new THREE.Matrix4(), _sCol = new THREE.Color();
-  // ── 소품 스웜(이사: "무기·배지 3D") — 종별 초경량 지오메트리 + 공용 자발광 재질 1개 + instanceColor(개체별 색) ──
+  // ── 소품 스웜(이사: "무기·배지 3D") — 기본 OFF. opts.propsEnabled(=chase3dProps=1)일 때만 GPU 자원까지 생성.
+  //  Codex 재검토 P2: 표시만 OFF 가 아니라 지오메트리·재질·InstancedMesh·프리웜 비용 자체를 0 으로.
   let props = null;
-  try {
-    const pm = createPropMaterial(THREE);
-    props = {};
-    for (const k of PROP_KEYS) {
-      const im = new THREE.InstancedMesh(createPropGeometry(THREE, k), pm, PROP_CAPS[k]);
-      im.count = 0; im.frustumCulled = false;
-      _sCol.setHex(PROP_BASE_COLOR[k]);
-      for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol);   // instanceColor 버퍼 생성 + 기본색
-      scene.add(im);
-      props[k] = { meshes: [im], count: 0, colored: true };
-    }
-  } catch (e) { props = null; /* 소품 실패는 비치명 */ }
+  if (opts.propsEnabled) {
+    try {
+      const pm = createPropMaterial(THREE);
+      props = {};
+      for (const k of PROP_KEYS) {
+        const im = new THREE.InstancedMesh(createPropGeometry(THREE, k), pm, PROP_CAPS[k]);
+        im.count = 0; im.frustumCulled = false;
+        _sCol.setHex(PROP_BASE_COLOR[k]);
+        for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol);   // instanceColor 버퍼 생성 + 기본색
+        scene.add(im);
+        props[k] = { meshes: [im], count: 0, colored: true };
+      }
+    } catch (e) { props = null; /* 소품 실패는 비치명 */ }
+  }
 
   const onLost = (ev) => { ev.preventDefault(); ctl.degraded = true; ctl.reason = 'context-lost'; };
   const onRestored = () => { ctl.degraded = false; ctl.reason = ''; };

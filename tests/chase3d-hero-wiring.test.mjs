@@ -9,9 +9,9 @@ const renderer = readFileSync(new URL('../js/chase3d-renderer.js', import.meta.u
 const entities = readFileSync(new URL('../js/entities.js', import.meta.url), 'utf8');
 const chaseRender = readFileSync(new URL('../js/chase-render.js', import.meta.url), 'utf8');
 
-test('HW-01: hero 가 기본 — createChase3D(canvas3d, { hero: !CHASE3D_TEST })', () => {
-  assert.match(main, /createChase3D\(canvas3d, \{ hero: !CHASE3D_TEST \}\)/);
-  assert.match(renderer, /if \(opts\.hero\) return createHero3D\(canvas3d\);/);
+test('HW-01: hero 가 기본 — createChase3D(canvas3d, { hero, propsEnabled })', () => {
+  assert.match(main, /createChase3D\(canvas3d, \{ hero: !CHASE3D_TEST, propsEnabled: CHASE3D_PROPS \}\)/);
+  assert.match(renderer, /if \(opts\.hero\) return createHero3D\(canvas3d, opts\);/);
 });
 
 test('HW-02: 기함 스왑 최종형(§9.2 + 이사 3회 지적) — "겹침 0·공백 0" 하드 컷 + 워프 플래시', () => {
@@ -94,6 +94,17 @@ test('HW-12: Codex 검토 반영 — 소품 3D 기본 OFF 게이트 + sidecar �
   // 진단: 확장 범위를 따라간다(b4·소품 count)
   assert.match(renderer, /b4Count: b4 \? b4\.count : -1/);
   assert.match(renderer, /propCounts: props \? Object\.fromEntries\(PROP_KEYS\.map/);
+  // Codex 재검토 P2-1: 소품 OFF = GPU 자원 생성까지 OFF(표시만 OFF 금지)
+  const propBlock = renderer.slice(renderer.indexOf('let props = null;'), renderer.indexOf('/** 셰이더 프리웜'));
+  assert.match(propBlock, /if \(opts\.propsEnabled\) \{/);
+  assert.ok(propBlock.indexOf('if (opts.propsEnabled) {') < propBlock.indexOf('createPropMaterial(THREE)'), '재질·지오메트리 생성이 게이트 안');
+  // Codex 재검토 P2-2: 기본 URL 정적 로드 체인 절단 — main 은 순수 상수 모듈만, 팩토리(→aurora-geometry)는 미로드
+  const staticImports = [...main.matchAll(/^\s*import\s+[^;]*from\s+['"]([^'"]+)['"]/gm)].map((m) => m[1]);
+  assert.ok(staticImports.includes('./chase3d-prop-defs.js'), 'main 은 prop-defs(의존 0)만 정적 import');
+  assert.ok(!staticImports.includes('./chase3d-props.js'), 'main 에 chase3d-props(팩토리) 정적 import 없음');
+  assert.ok(!staticImports.some((s) => s.includes('chase3d-aurora')), 'main 에 aurora 계열 정적 import 없음');
+  const defs = readFileSync(new URL('../js/chase3d-prop-defs.js', import.meta.url), 'utf8');
+  assert.ok(!/^\s*import/m.test(defs), 'prop-defs 는 의존 0(어떤 import 도 없음)');
 });
 
 test('HW-03: 기함 본체만 페이드 — 피격핵은 alpha 밖(§9.3 판정 시각 유지)', () => {

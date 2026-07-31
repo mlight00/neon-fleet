@@ -58,7 +58,7 @@ test('C3D-fallback-renderer: 미가용/degraded/휴면이면 frame() 0 반환(RC
 });
 
 test('C3D-fallback-main: 초기화 실패/미가용이면 chase3d 미설정 → RC2 유지(§3.3)', () => {
-  assert.match(main, /const c = m\.createChase3D\(canvas3d, \{ hero: !CHASE3D_TEST \}\);/);   // hero 기본(Opus5 §9.1)
+  assert.match(main, /const c = m\.createChase3D\(canvas3d, \{ hero: !CHASE3D_TEST, propsEnabled: CHASE3D_PROPS \}\);/);   // hero 기본(§9.1) + 소품 자원 게이트(Codex 재검토 P2)
   assert.match(main, /if \(c && c\.available\) \{\s*\n\s*chase3d = c;/);
   assert.match(main, /catch \(e\) \{ console\.warn\('\[chase3d\] 초기화 예외/);
   assert.match(main, /\.catch\(\(e\) => console\.warn\('\[chase3d\] 모듈 로드 실패/);

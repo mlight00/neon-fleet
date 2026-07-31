@@ -4,8 +4,9 @@
 //   - 종당 삼각형 ≤200(수십 개 인스턴스 전제), 재질은 공용 1개(자발광 basic + instanceColor 로 개체별 색)
 //   - 결정적(난수 없음)·THREE 주입(Node 검증 가능)
 import { mergeGeos } from './chase3d-aurora-geometry.js';
-
-export const PROP_KEYS = ['pbullet', 'ebullet', 'missile', 'crystal', 'coin', 'pow', 'pod', 'capsule'];
+// 순수 상수는 chase3d-prop-defs.js 로 분리(Codex 재검토 P2 — 기본 URL 정적 로드 체인 절단). 여기서는 재수출만.
+export { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR } from './chase3d-prop-defs.js';
+import { PROP_KEYS } from './chase3d-prop-defs.js';
 
 /** 소품별 지오메트리(단일 BufferGeometry, 전장 1.0). 카메라 구도(위+뒤)에서 판독되는 형태 우선. */
 export function createPropGeometry(THREE, key) {
@@ -67,12 +68,3 @@ export function createPropGeometry(THREE, key) {
 export function createPropMaterial(THREE) {
   return new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
 }
-
-/** 소품 기본색(2D 팔레트 계승). 탄은 개체 color 가 있으면 그 색이 우선(instanceColor). */
-export const PROP_BASE_COLOR = {
-  pbullet: 0xffd34d, ebullet: 0xff7a5a, missile: 0xffb15c,
-  crystal: 0x7fe8ff, coin: 0xffc93c, pow: 0xffe066, pod: 0x6fe0c8, capsule: 0x9fd4ff,
-};
-
-/** 실전 인스턴스 상한(종별) — 수가 많은 탄은 넉넉히, 픽업은 소량. */
-export const PROP_CAPS = { pbullet: 96, ebullet: 96, missile: 24, crystal: 12, coin: 48, pow: 8, pod: 8, capsule: 8 };
