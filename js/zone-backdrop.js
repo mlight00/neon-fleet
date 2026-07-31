@@ -124,7 +124,9 @@ export function createZoneBackdrop(logicalW) {
   const fields = Array.from({ length: 6 }, (_, i) => buildField(7429 + i * 1777, logicalW));
   let lastSector = 1;
   return {
-    draw(ctx, logicalH, scroll = 0, sector = 1) {
+    // motionAlpha(0~1, 기본 1): "아래로 흐르는 이동층"(먼지·삼각 파편·항적)의 표시 비중.
+    //  함미 추적(이사)에서는 세로 낙하 이동감이 전진 워프와 상충 → main 이 blend 비례로 0까지 내린다. 성운 플레이트·그라디언트는 유지.
+    draw(ctx, logicalH, scroll = 0, sector = 1, motionAlpha = 1) {
       if (sector !== lastSector) { preloadBackdropArt(sector); lastSector = sector; }
       const zone = zoneForSector(sector);
       const zi = sectorBackdropIndex(sector);   // 섹터 1~6 → 0~5 (1:1, R2)
@@ -138,16 +140,17 @@ export function createZoneBackdrop(logicalW) {
       if (!drawVerticalArt(ctx, plate, logicalW, logicalH, scroll, LAYER_SPEEDS.base, 0.94)) {
         drawLandmark(ctx, logicalW, logicalH, zone, scroll);
       }
+      if (!(motionAlpha > 0.01)) { ctx.globalAlpha = 1; return; }   // 완전 추적: 이동층 전부 생략
 
       // 중경: 먼지·파편. 배경과 같은 방향(아래)으로 순환 — backdropLayerY.
       ctx.save();
       for (const d of field.dust) {
         const y = backdropLayerY(d.y, scroll, logicalH, LAYER_SPEEDS.dust);
-        ctx.globalAlpha = d.a; ctx.fillStyle = zone.accent; ctx.fillRect(d.x, y, d.r, d.r);
+        ctx.globalAlpha = d.a * motionAlpha; ctx.fillStyle = zone.accent; ctx.fillRect(d.x, y, d.r, d.r);
       }
       for (const s of field.shards) {
         const y = backdropLayerY(s.y, scroll, logicalH + 100, LAYER_SPEEDS.mid) - 50;
-        ctx.save(); ctx.translate(s.x, y); ctx.rotate(s.rot + scroll * 0.00035); ctx.globalAlpha = s.a; ctx.strokeStyle = zone.glow; ctx.lineWidth = 1;
+        ctx.save(); ctx.translate(s.x, y); ctx.rotate(s.rot + scroll * 0.00035); ctx.globalAlpha = s.a * motionAlpha; ctx.strokeStyle = zone.glow; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(0, -s.s); ctx.lineTo(s.s * 0.36, s.s * 0.4); ctx.lineTo(-s.s * 0.22, s.s); ctx.closePath(); ctx.stroke(); ctx.restore();
       }
       ctx.restore();
@@ -157,7 +160,7 @@ export function createZoneBackdrop(logicalW) {
       for (const s of field.streaks) {
         const y = backdropLayerY(s.y, scroll, logicalH + 160, LAYER_SPEEDS.near) - 80;
         const g = ctx.createLinearGradient(s.x, y, s.x, y + s.len); g.addColorStop(0, zone.glow); g.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.globalAlpha = s.a; ctx.strokeStyle = g; ctx.beginPath(); ctx.moveTo(s.x, y); ctx.lineTo(s.x, y + s.len); ctx.stroke();
+        ctx.globalAlpha = s.a * motionAlpha; ctx.strokeStyle = g; ctx.beginPath(); ctx.moveTo(s.x, y); ctx.lineTo(s.x, y + s.len); ctx.stroke();
       }
       ctx.restore(); ctx.globalAlpha = 1;
     },

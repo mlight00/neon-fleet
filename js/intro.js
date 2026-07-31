@@ -54,7 +54,12 @@ function panelMarkup(panel, index) {
     </section>`;
 }
 
-export function playIntro(onDone) {
+/**
+ * 프롤로그 재생. onDone(reason, meta)로 종료 이유를 알린다:
+ *  reason: 'skip' | 'complete_auto' | 'complete_next', meta: { panelReached }.
+ * hooks.onStart(): DOM 마운트 직후 1회(분석 intro_started 배선용). 콜백만 받고 분석을 직접 부르지 않는다.
+ */
+export function playIntro(onDone, hooks = {}) {
   const el = document.createElement('div');
   el.id = 'intro';
   el.setAttribute('role', 'dialog');
@@ -76,18 +81,19 @@ export function playIntro(onDone) {
   let done = false;
   let timer = 0;
 
-  const finish = () => {
+  const finish = (reason = 'complete_auto') => {
     if (done) return;
     done = true;
     clearTimeout(timer);
     el.classList.add('intro-leave');
     const removeDelay = reduced ? 0 : 420;
-    setTimeout(() => { el.remove(); onDone(); }, removeDelay);
+    setTimeout(() => { el.remove(); onDone(reason, { panelReached: index + 1 }); }, removeDelay);
   };
 
-  const show = (next) => {
+  // viaButton: '다음' 버튼으로 마지막을 넘겼는지(complete_next) vs 자동 진행(complete_auto) 구분.
+  const show = (next, viaButton = false) => {
     if (done) return;
-    if (next >= shots.length) { finish(); return; }
+    if (next >= shots.length) { finish(viaButton ? 'complete_next' : 'complete_auto'); return; }
     index = next;
     shots.forEach((shot, i) => {
       const active = i === index;
@@ -99,7 +105,8 @@ export function playIntro(onDone) {
     timer = setTimeout(() => show(index + 1), shotMs);
   };
 
+  try { hooks.onStart?.(); } catch { /* 분석 실패가 프롤로그를 막지 않음 */ }
   requestAnimationFrame(() => show(0));
-  el.querySelector('#intro-next').addEventListener('click', (e) => { e.stopPropagation(); show(index + 1); });
-  el.querySelector('#intro-skip').addEventListener('click', (e) => { e.stopPropagation(); finish(); });
+  el.querySelector('#intro-next').addEventListener('click', (e) => { e.stopPropagation(); show(index + 1, true); });
+  el.querySelector('#intro-skip').addEventListener('click', (e) => { e.stopPropagation(); finish('skip'); });
 }

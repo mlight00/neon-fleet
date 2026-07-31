@@ -5,7 +5,7 @@
 import { BAL } from './balance.js';
 import { applyGate, hitCrystal, chargeStageFor, dronesToCruisers, canUpgradeFlagship, cruisersNeededForTier, bankUpgrade, bankDemote, invertGateOp } from './logic.js';
 import { circleHit } from './collision.js';
-import { COLORS, WEAPON_COLORS, WEAPON_LABELS, glow, makeSprite, blit, drawGateBox } from './render.js';
+import { COLORS, WEAPON_COLORS, WEAPON_LABELS, WEAPON_LABELS_EN, glow, makeSprite, blit, drawGateBox } from './render.js';
 import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFrame, drawHullFrame, drawWeaponRig, drawUpgradeSequence, weaponProjectileSpriteId, SHIP_DEFS, cruiserBlitScale, droneBlitScale } from './ships.js';
 import { getSprite, bossDefFor, bossDefById } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
@@ -18,6 +18,17 @@ import { frameDamageMult, frameInvulnActive } from './command-frames.js';
 import { resolveHit, canEmergencyRebuild, doEmergencyRebuild, repair as survRepair, hullFrac } from './survivability.js';
 import { sfx } from './audio.js';
 import { UPGRADE_DURATIONS, upgradeGrade } from './creative-direction.js';
+
+// 캔버스 라벨/토스트 언어(포털·Prolific=영어, 그 외 한국어). main.js가 로드 시 setEntityLang(EN) 1회 설정.
+//  캔버스 텍스트는 DOM에 없어 DOM 스캔으로 못 잡으므로 여기서 명시적으로 분기한다(§P0-2).
+let LANG_EN = false;
+export function setEntityLang(v) { LANG_EN = !!v; }
+const ek = (en, ko) => (LANG_EN ? en : ko);                                   // 영어/한국어 선택
+const wl = (w) => ((LANG_EN ? WEAPON_LABELS_EN[w] : WEAPON_LABELS[w]) || w);   // 무기 이름(언어별)
+const EV_NAMES_EN = ['EMBER', 'FLARE', 'ARCLIGHT', 'AURORA', 'ZENITH', 'QUASAR'];         // 기함 등급명(잔광·섬광…의 영문)
+const TRAIT_TAGS_EN = ['Balanced', 'Rapid Fire', 'Focused Fire', 'Wide Barrage', 'Piercing Artillery', 'Maximum Pierce'];
+const evName = (t) => (LANG_EN ? (EV_NAMES_EN[Math.min(t, EV_NAMES_EN.length - 1)] || '') : BAL.evolution.names[t]);
+const traitTag = (t) => (LANG_EN ? (TRAIT_TAGS_EN[Math.min(t, TRAIT_TAGS_EN.length - 1)] || '') : BAL.shipTraits[Math.min(t, BAL.shipTraits.length - 1)].tag);
 
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
 export function createEffects() {
@@ -77,7 +88,8 @@ export function createEffects() {
       for (let i = rings.length - 1; i >= 0; i--) if (rings[i].life <= 0) rings.splice(i, 1);
       for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].life <= 0) flashes.splice(i, 1);
     },
-    draw(ctx, logicalW, logicalH) {
+    // 월드 이펙트(카메라 변환 '안'): 파티클·총구섬광·후광·링·월드 텍스트. 카메라 배율로 함께 확대/축소.
+    drawWorld(ctx) {
       // 파티클: 가산 합성 — 겹칠수록 밝아져 타격 스파크·폭발이 실제로 '빛나' 보인다
       ctx.globalCompositeOperation = 'lighter';
       for (const p of parts) {
@@ -128,6 +140,65 @@ export function createEffects() {
         glow(ctx, t.color, 8, (c) => { c.fillStyle = t.color; c.fillText(t.str, t.x, t.y); });
       }
       ctx.globalAlpha = 1;
+    },
+    // 2.5D 추적 투영 렌더(chaseBlend>0): 각 파티클·섬광·링·텍스트를 개별 투영(§5.2). project(x,y)→{x,y,scale}.
+    //  drawWorld와 동일한 시각이되 위치·크기만 원근 투영. 텍스트는 minTextPx 하한(먼 곳에서도 읽힘).
+    drawWorldProjected(ctx, project, minTextPx = 10) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of parts) {
+        const k = Math.max(0, p.life / p.max);
+        const pp = project(p.x, p.y);
+        ctx.globalAlpha = k;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(pp.x, pp.y, Math.max(0.5, p.size * (0.45 + k * 0.75) * pp.scale), 0, TAU);
+        ctx.fill();
+      }
+      for (const f of flashes) {
+        if (f.delay > 0) continue;
+        const k = Math.max(0, f.life / f.max);
+        const pp = project(f.x, f.y);
+        if (f.kind === 'muzzle') {
+          const s = f.size * (0.7 + (1 - k) * 0.9) * pp.scale;
+          ctx.globalAlpha = k;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.arc(pp.x, pp.y, s * 0.55, 0, TAU); ctx.fill();
+          ctx.strokeStyle = f.color; ctx.lineWidth = Math.max(1, 2 * pp.scale);
+          ctx.beginPath();
+          ctx.moveTo(pp.x - s * 1.7, pp.y); ctx.lineTo(pp.x + s * 1.7, pp.y);
+          ctx.moveTo(pp.x, pp.y - s * 2.0); ctx.lineTo(pp.x, pp.y + s * 1.2);
+          ctx.stroke();
+        } else {
+          const R = f.size * (1 + (1 - k) * 1.5) * pp.scale;
+          ctx.globalAlpha = k * 0.4;
+          ctx.fillStyle = f.color;
+          ctx.beginPath(); ctx.arc(pp.x, pp.y, R, 0, TAU); ctx.fill();
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      for (const r of rings) {
+        if (r.delay > 0) continue;
+        const pp = project(r.x, r.y);
+        ctx.globalAlpha = Math.max(0, r.life / r.max);
+        ctx.strokeStyle = r.color;
+        ctx.lineWidth = Math.max(1, (1 + 5 * (r.life / r.max)) * pp.scale);
+        ctx.beginPath();
+        ctx.arc(pp.x, pp.y, Math.max(0.5, r.r * pp.scale), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'center';
+      for (const t of texts) {
+        const pp = project(t.x, t.y);
+        ctx.globalAlpha = Math.max(0, t.life / t.max);
+        ctx.font = `bold ${Math.max(minTextPx, Math.round((t.size || 20) * pp.scale))}px Pretendard, sans-serif`;
+        glow(ctx, t.color, 8, (c) => { c.fillStyle = t.color; c.fillText(t.str, pp.x, pp.y); });
+      }
+      ctx.globalAlpha = 1;
+    },
+    // 화면 이펙트(카메라 변환 '밖'): 전체 화면 흰색 플래시. 확대돼도 화면 전체를 덮고 85% 축소에도 빈틈이 없다.
+    drawScreen(ctx, logicalW, logicalH) {
       if (flashV > 0) {
         ctx.globalAlpha = flashV;
         ctx.fillStyle = '#ffffff';
@@ -135,6 +206,8 @@ export function createEffects() {
         ctx.globalAlpha = 1;
       }
     },
+    // 하위 호환 래퍼(카메라 미적용 경로·기존 테스트): 월드 → 화면 순서로 한 번에.
+    draw(ctx, logicalW, logicalH) { this.drawWorld(ctx); this.drawScreen(ctx, logicalW, logicalH); },
   };
 }
 
@@ -214,12 +287,12 @@ export class Squad {
     if (this.keystone === 'phase_afterimage') {
       // 위상 잔상 대가: 피격 시 FLOW·RUSH를 전부 잃음
       this.flow = 0; this.rushT = 0; this.grazeCombo = 0;
-      if (wasRush) world.effects.text(this.x, this.y - 40, '폭주 중단!', COLORS.danger, 13);
+      if (wasRush) world.effects.text(this.x, this.y - 40, ek('Overdrive interrupted!', '폭주 중단!'), COLORS.danger, 13);
       return;
     }
     const s = onFlowHit(this._flowState(), BAL.flow);
     this._applyFlowState(s);
-    if (wasRush && s.rushEnded) world.effects.text(this.x, this.y - 40, '폭주 중단!', COLORS.danger, 13);
+    if (wasRush && s.rushEnded) world.effects.text(this.x, this.y - 40, ek('Overdrive interrupted!', '폭주 중단!'), COLORS.danger, 13);
   }
 
   // ── 키스톤 전투 훅 (원정당 1개, keystoneState에 누적) ──
@@ -251,7 +324,7 @@ export class Squad {
       const r = forgeOnKill(ks, BAL.keystone.swarmForge);
       ks.kills = r.kills; ks.forgeT = r.forgeT;
       if (r.procced) {
-        world.effects.text(this.x, this.y - 54, '유령 순양함 소환!', COLORS.ally, 13);
+        world.effects.text(this.x, this.y - 54, ek('Ghost cruisers summoned!', '유령 순양함 소환!'), COLORS.ally, 13);
         world.effects.halo(this.x, this.y, '#57e0ff');
       }
     } else if (this.keystone === 'phase_afterimage') {
@@ -300,7 +373,7 @@ export class Squad {
 
   /** NEON RUSH 발동 연출 (배수 적용은 fire 경로에서, C2). */
   _startRushFx(world) {
-    world.effects.text(this.x, this.y - 70, '폭주 발동!', COLORS.reward, 20);
+    world.effects.text(this.x, this.y - 70, ek('Overdrive!', '폭주 발동!'), COLORS.reward, 20);
     world.effects.ring(this.x, this.y, '#57e0ff');
     world.effects.ring(this.x, this.y, '#ff4cd2');
     world.effects.halo(this.x, this.y, COLORS.reward);
@@ -388,12 +461,12 @@ export class Squad {
       this.weapon = weapon;
       if (wasEvolved) {
         this.weaponLv = BAL.weapons.maxLv;   // 진화 단계 → 새 무기는 베이스 MAX(=진화 직전)로
-        world.effects.text(this.x, this.y - 64, `무기 교체: ${WEAPON_LABELS[weapon]} · 진화 가능!`, WEAPON_COLORS[weapon]);
+        world.effects.text(this.x, this.y - 64, ek(`Weapon swap: ${wl(weapon)} · can evolve!`, `무기 교체: ${WEAPON_LABELS[weapon]} · 진화 가능!`), WEAPON_COLORS[weapon]);
         if (!this.weaponEvolutions[weapon] && !this.pendingWeaponEvolution) {
           this.pendingWeaponEvolution = weapon; this.pendingEvoStage = 'pick1';   // 새 무기 진화 1단계 선택창
         }
       } else {
-        world.effects.text(this.x, this.y - 64, `무기 교체: ${WEAPON_LABELS[weapon]} · Lv${this.weaponLv} 유지`, WEAPON_COLORS[weapon]);
+        world.effects.text(this.x, this.y - 64, ek(`Weapon swap: ${wl(weapon)} · keeps Lv${this.weaponLv}`, `무기 교체: ${WEAPON_LABELS[weapon]} · Lv${this.weaponLv} 유지`), WEAPON_COLORS[weapon]);
       }
       this.triggerUpgradeFx(world, 'switch');
     }
@@ -406,7 +479,7 @@ export class Squad {
     const w = this.weapon;
     if (this.weaponLv < BAL.weapons.maxLv) {
       this.weaponLv++;
-      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} Lv${this.weaponLv} 강화!`, WEAPON_COLORS[w]);
+      world.effects.text(this.x, this.y - 64, ek(`${wl(w)} Lv${this.weaponLv} up!`, `${WEAPON_LABELS[w]} Lv${this.weaponLv} 강화!`), WEAPON_COLORS[w]);
       this.triggerUpgradeFx(world, 'weapon', this.weaponLv);
       return;
     }
@@ -415,19 +488,19 @@ export class Squad {
     const cost = BAL.weapons.evolveAdvanceCost || 1;
     this._evoProg = (this._evoProg || 0) + 1;
     if (this._evoProg < cost) {
-      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 진화 강화 축적 ${this._evoProg}/${cost}`, COLORS.reward, 14);
+      world.effects.text(this.x, this.y - 64, ek(`${wl(w)} evolution charge ${this._evoProg}/${cost}`, `${WEAPON_LABELS[w]} 진화 강화 축적 ${this._evoProg}/${cost}`), COLORS.reward, 14);
       return;
     }
     this._evoProg = 0;
     const st = evolutionStage(w, this.weaponLv, BAL.weapons.maxLv, this.weaponEvolutions, this.evoLevels, this.weaponEvolutions2, this.superLevels);
     if (st === 'evoUp') {
       this.evoLevels[w] = (this.evoLevels[w] || 1) + 1;
-      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 진화 Lv${this.evoLevels[w]} 강화!`, COLORS.reward);
+      world.effects.text(this.x, this.y - 64, ek(`${wl(w)} evolution Lv${this.evoLevels[w]} up!`, `${WEAPON_LABELS[w]} 진화 Lv${this.evoLevels[w]} 강화!`), COLORS.reward);
       world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
       this.triggerUpgradeFx(world, 'evolution');
     } else if (st === 'superUp') {
       this.superLevels[w] = (this.superLevels[w] || 1) + 1;
-      world.effects.text(this.x, this.y - 64, `${WEAPON_LABELS[w]} 초진화 Lv${this.superLevels[w]} 강화!`, COLORS.reward);
+      world.effects.text(this.x, this.y - 64, ek(`${wl(w)} super-evolution Lv${this.superLevels[w]} up!`, `${WEAPON_LABELS[w]} 초진화 Lv${this.superLevels[w]} 강화!`), COLORS.reward);
       world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
       this.triggerUpgradeFx(world, 'super');
     } else if (st === 'pick1' || st === 'pick2' || st === 're') {
@@ -490,7 +563,7 @@ export class Squad {
     const m = dronesToCruisers(this.count, this.cruisers || 0, E);
     if (m.merged > 0) {
       this.count = m.count; this.cruisers = m.cruisers;
-      world.effects.text(this.x, this.y - 44, `순양함 +${m.merged}척`, COLORS.ally, 14);
+      world.effects.text(this.x, this.y - 44, ek(`Cruiser +${m.merged}`, `순양함 +${m.merged}척`), COLORS.ally, 14);
       sfx('pickup');
     }
     // 2) 순양함이 임계치 이상이면 기함 1단계 업그레이드 (여기서만 선택창=모듈 드래프트가 뜬다)
@@ -511,8 +584,8 @@ export class Squad {
       // (선택창 제거: 기함 업그레이드는 자동. 모듈 드래프트는 정비 노드에서만 뜬다)
       world.effects.halo(this.x, this.y, COLORS.reward);
       world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
-      world.effects.text(this.x, this.y - 98, `기함 등급 상승: ${ev.names[this.tier]} · 화력 +${gain}`, COLORS.reward, 18);
-      world.effects.text(this.x, this.y - 76, `기함 특성 획득: 『${BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)].tag}』`, COLORS.ally, 14);
+      world.effects.text(this.x, this.y - 98, ek(`Flagship rank up: ${evName(this.tier)} · power +${gain}`, `기함 등급 상승: ${ev.names[this.tier]} · 화력 +${gain}`), COLORS.reward, 18);
+      world.effects.text(this.x, this.y - 76, ek(`Flagship trait: 『${traitTag(this.tier)}』`, `기함 특성 획득: 『${BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)].tag}』`), COLORS.ally, 14);
       sfx('evolve');
     }
     // 3) 최종 상태(타이탄 + 순양함 만석)에서 넘치는 드론은 체력이 아니라 포인트(코인)로 전환
@@ -522,7 +595,7 @@ export class Squad {
       const coins = Math.floor(excess * E.coinPerExcessDrone);
       if (coins > 0 && world.addCoins) {
         world.addCoins(coins);
-        world.effects.text(this.x, this.y - 44, `초과 드론 ${excess}기 → 점수 +${coins}`, COLORS.reward, 14);
+        world.effects.text(this.x, this.y - 44, ek(`Excess drones ${excess} → score +${coins}`, `초과 드론 ${excess}기 → 점수 +${coins}`), COLORS.reward, 14);
       }
     }
   }
@@ -570,14 +643,14 @@ export class Squad {
     // 1) 순양함이 있으면 1척을 희생해 편대 재건 (순양함 = 여분의 목숨)
     if ((this.cruisers || 0) > 0) {
       this.cruisers -= 1;
-      rescue('⚠ 순양함 1척 소멸 · 편대 재건', `드론 ${refill}기 긴급 사출`);
+      rescue(ek('⚠ 1 cruiser lost · fleet rebuilt', '⚠ 순양함 1척 소멸 · 편대 재건'), ek(`${refill} drones deployed`, `드론 ${refill}기 긴급 사출`));
       return;
     }
     // 2) 등급이 남아 있으면 한 단계 강등 후 재건 (그 티어에서 은행된 화력도 롤백 → 강등→재업글 farming 차단)
     if (this.tier > 0) {
       this.tier -= 1;
       ({ banked: this.banked, stack: this.bankStack } = bankDemote(this.banked, this.bankStack));  // 그 티어 적립분 정확 롤백
-      rescue(`⚠ ${ev.names[this.tier]}로 강등`, `드론 ${refill}기 긴급 사출`);
+      rescue(ek(`⚠ Demoted to ${evName(this.tier)}`, `⚠ ${ev.names[this.tier]}로 강등`), ek(`${refill} drones deployed`, `드론 ${refill}기 긴급 사출`));
       return;
     }
     // 3) 최하 등급에서 전멸 = 진짜 사망
@@ -594,7 +667,7 @@ export class Squad {
     if (this.invulnT > 0) return;   // 진화 무적 (A3)
     if (this.shield) {
       this.shield = false;
-      world.effects.text(this.x, this.y - 40, '보호막 방어!', COLORS.gateGood);
+      world.effects.text(this.x, this.y - 40, ek('Shield blocked!', '보호막 방어!'), COLORS.gateGood);
       world.effects.ring(this.x, this.y, COLORS.gateGood);
       sfx('shield_pop');
       return;
@@ -640,7 +713,7 @@ export class Squad {
     const hullAmt = Math.round(base * (this._hullDmgMult ?? 1));
     const out = resolveHit(this.surv, { amount: hullAmt, onCruiserIndex: (onCruiserIndex != null && onCruiserIndex >= 0) ? onCruiserIndex : null });
     if (out.absorbedBy === 'shield') {
-      world.effects.text(this.x, this.y - 40, '보호막 방어!', COLORS.gateGood);
+      world.effects.text(this.x, this.y - 40, ek('Shield blocked!', '보호막 방어!'), COLORS.gateGood);
       world.effects.ring(this.x, this.y, COLORS.gateGood); sfx('shield_pop');
       return;
     }
@@ -686,7 +759,7 @@ export class Squad {
     world.metrics?.hullRepair();
     world.effects.halo(this.x, this.y, COLORS.reward);
     world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
-    world.effects.text(this.x, this.y - 56, `긴급 재건! 순양함 +${addC} · 구조 수리`, COLORS.reward, 16);
+    world.effects.text(this.x, this.y - 56, ek(`Emergency rebuild! Cruiser +${addC} · hull repaired`, `긴급 재건! 순양함 +${addC} · 구조 수리`), COLORS.reward, 16);
     sfx('evolve');
     return true;
   }
@@ -713,7 +786,7 @@ export class Squad {
     {
       const fs = updateFlow(this._flowState(), dt, BAL.flow);
       this._applyFlowState(fs);
-      if (fs.rushEnded) world.effects.text(this.x, this.y - 50, '폭주 종료', COLORS.ally, 13);
+      if (fs.rushEnded) world.effects.text(this.x, this.y - 50, ek('Overdrive ended', '폭주 종료'), COLORS.ally, 13);
     }
     // 키스톤 타이머: 유령 순양함(군체 용광로) 감소 + 예약 메아리(공명 랜스) 발사
     if (this.keystoneState) {
@@ -1044,7 +1117,7 @@ export class Squad {
       this.cruisers = Math.max(0, this.cruisers - 1);
       world.effects.burst(this.x + pos.x, this.y + pos.y, COLORS.danger, 18, 200);
       world.effects.ring(this.x + pos.x, this.y + pos.y, COLORS.danger);
-      world.effects.text(this.x + pos.x, this.y + pos.y - 20, '순양함 격침!', COLORS.danger, 13);
+      world.effects.text(this.x + pos.x, this.y + pos.y - 20, ek('Cruiser down!', '순양함 격침!'), COLORS.danger, 13);
       sfx('explode_s');
     }
   }
@@ -1099,12 +1172,20 @@ export class Squad {
   }
 
 
-  draw(ctx) {
+  // draw(ctx) 전술 경로 = projector 없음(기존 global transform 안에서 기존과 픽셀 동일).
+  // draw(ctx, projector) 추적 경로 = 각 드론·순양함·궤도기·기함을 자기 월드 중심으로 개별 투영(RC2 §3.2).
+  //  projector = { point(wx,wy)->{x,y,scale}, fitFlagship(p,halfH)->scale, projection }. 게임 규칙·좌표는 불변.
+  draw(ctx, projector = null) {
     const w = this.width;
     const def = SHIP_DEFS[this.tier];
     const color = this.flash > 0 ? COLORS.danger : COLORS.ally;
+    // 개체 월드중심(wx,wy)로 이동하고 표시 배율 s를 반환. 전술(projector 없음)=이동 후 s=1(기존과 동일).
+    const place = (wx, wy) => {
+      if (projector) { const p = projector.point(wx, wy); ctx.translate(p.x, p.y); return p.scale; }
+      ctx.translate(wx, wy); return 1;
+    };
 
-    // 호위 드론 무리 (기함 반경 안쪽은 비움)
+    // 호위 드론 무리 (기함 반경 안쪽은 비움). 추적: Y가 위쪽인 드론일수록 작고 소실점으로 수렴.
     const n = Math.min(this.count, BAL.squad.drawCap);
     const scout = shipSprite(0, this.weapon);
     for (let i = 0; i < n; i++) {
@@ -1114,13 +1195,13 @@ export class Squad {
       const x = this.x + ox;
       const y = this.y + o.y * w * 0.8 + Math.sin(this.t * 3 + o.phase) * 2;
       ctx.save();
-      ctx.translate(x, y);
+      const s = place(x, y);
       ctx.rotate(this.bank * 0.3);
-      blit(ctx, scout, 0, 0, droneBlitScale());   // 고정 표시 폭 — 기함이 커져도 드론은 그대로
+      blit(ctx, scout, 0, 0, droneBlitScale() * s);   // 전술 s=1(고정 폭), 추적 s=깊이 배율
       ctx.restore();
     }
 
-    // 군체 용광로 유령 순양함 (시각 전용, 체력·충돌 없음): 활성 중 기함 좌우에 반투명 편대
+    // 군체 용광로 유령 순양함 (시각 전용, 체력·충돌 없음)
     if (this.keystoneState && this.keystoneState.forgeT > 0) {
       const gc = BAL.keystone.swarmForge.ghostCruisers;
       ctx.save();
@@ -1128,67 +1209,73 @@ export class Squad {
       for (let i = 0; i < gc; i++) {
         const gx = this.x + (i % 2 === 0 ? -1 : 1) * (w * 0.5 + 22);
         const gy = this.y + 10 + Math.floor(i / 2) * 18;
-        ctx.save(); ctx.translate(gx, gy);
-        blit(ctx, scout, 0, 0, 0.7);
-        ctx.restore();
+        ctx.save(); const s = place(gx, gy); blit(ctx, scout, 0, 0, 0.7 * s); ctx.restore();
       }
       ctx.restore();
     }
 
-    // 호위함(호위기·순양함): 좌우 날개 대형 — "함대가 커지는" 체감 + 같이 사격 + 피탄 시 손상 표시
+    // 호위함(호위기·순양함): 각 호위를 자기 월드 슬롯으로 개별 투영 → 표시 중심 == 피격 중심(cruiserPositions).
     if (this.escorts || this.cruisers) {
-      const cSprite = shipSprite(1, this.weapon);   // 순양함 = 인터셉터형
+      const cSprite = shipSprite(1, this.weapon);
       const total = this.cruisers + this.escorts;
       const cMax = BAL.escort.cruiserHp;
       for (let i = 0; i < total; i++) {
         const type = i < this.cruisers ? 'cruiser' : 'escort';
         const slot = this.supportSlot(i, type);
+        const wx = this.x + slot.x, wy = this.y + slot.y + Math.sin(this.t * 3 + i) * 1.5;
         ctx.save();
-        ctx.translate(this.x + slot.x, this.y + slot.y + Math.sin(this.t * 3 + i) * 1.5);
+        const s = place(wx, wy);
         ctx.rotate(this.bank * 0.25);
-        // 고정 표시 폭에서 역산 — 기함 티어가 커져도 호위는 커지지 않아야 위계가 유지된다
-        blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, type === 'cruiser' ? cruiserBlitScale() : droneBlitScale() * 1.4);
-        // 순양함 손상: 피격 플래시(붉은 링) + HP 낮으면 손상 표시
+        blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, (type === 'cruiser' ? cruiserBlitScale() : droneBlitScale() * 1.4) * s);
         if (type === 'cruiser') {
           const hp = this.cruiserHp[i] ?? cMax;
           if ((this.cruiserFlash[i] || 0) > 0) {
             ctx.globalAlpha = Math.min(0.7, this.cruiserFlash[i] * 3);
             ctx.strokeStyle = COLORS.danger; ctx.lineWidth = 2.5;
-            ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, 15 * s, 0, Math.PI * 2); ctx.stroke();
             ctx.globalAlpha = 1;
           }
-          if (hp < cMax) {   // 체력바 (손상 시에만)
-            const bw = 20, f = Math.max(0, hp / cMax);
-            ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-bw / 2, -18, bw, 3);
-            ctx.fillStyle = f > 0.4 ? '#57e0ff' : COLORS.danger; ctx.fillRect(-bw / 2, -18, bw * f, 3);
+          if (hp < cMax) {
+            const bw = 20 * s, f = Math.max(0, hp / cMax);
+            ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-bw / 2, -18 * s, bw, 3 * s);
+            ctx.fillStyle = f > 0.4 ? '#57e0ff' : COLORS.danger; ctx.fillRect(-bw / 2, -18 * s, bw * f, 3 * s);
           }
         }
         ctx.restore();
       }
     }
 
-    // 기함: 뱅킹(회전+가로 압축) + 반동 + 진화 스케일 펀치
+    // 기함: 뱅킹+반동+진화 펀치. 추적에선 화면에 들어오는 fit 배율로 확대(§3.3) — 하단 잘림·HUD 침범 방지.
+    //  Opus5 §9.2: hero 3D 교차 시 기함 "본체"만 alpha 1-t 로 페이드(진짜 교차). 피격핵·플래시·링·라벨·호위는 유지.
+    const fsAlpha = (this._viewOpts && Number.isFinite(this._viewOpts.flagshipAlpha)) ? this._viewOpts.flagshipAlpha : 1;
     ctx.save();
-    ctx.translate(this.x, this.y + this.recoil);
+    let fs = 1;
+    if (projector) {
+      const p = projector.point(this.x, this.y + this.recoil);
+      fs = projector.fitFlagship(p, def.clearR * 1.7);   // halfH ≈ 함체 반경×1.7(화염·날개 여유)
+      ctx.translate(p.x, p.y);
+    } else { ctx.translate(this.x, this.y + this.recoil); }
     ctx.rotate(this.bank * 0.22);
     const punch = this.evolvePunch > 0 ? 1 + 0.5 * (this.evolvePunch / 0.35) : 1;
-    ctx.scale((1 - Math.abs(this.bank) * 0.25) * punch, punch);
-    drawFlames(ctx, this.tier, this.t);
-    // 중립 함체 + 금빛 지휘 프레임 + 현재 무기 장착물을 분리해, 성장 변화가 실루엣에 남도록 한다.
-    blit(ctx, shipBaseSprite(this.tier), 0, 0);
-    drawHullFrame(ctx, this.tier, this.weapon, this.previousFrameWeapon, this.frameBlend);
-    drawCommandFrame(ctx, this.tier, this.t);
-    drawWeaponRig(
-      ctx, this.tier, this.weapon, this.weaponLv, this.t,
-      this.weaponEvolutions[this.weapon], this.weaponEvolutions2[this.weapon],
-    );
-    drawDeckLights(ctx, this.tier, this.t);
-    // 주포 마운트에 현재 무기 색 표시 — 어떤 무기인지 기체만 봐도 알 수 있게
-    ctx.fillStyle = WEAPON_COLORS[this.weapon];
-    for (const m of SHIP_DEFS[this.tier].mounts) {
-      ctx.beginPath();
-      ctx.arc(m.x, m.y, 2.2, 0, Math.PI * 2);
-      ctx.fill();
+    ctx.scale((1 - Math.abs(this.bank) * 0.25) * punch * fs, punch * fs);
+    if (fsAlpha > 0.02) {
+      ctx.globalAlpha = fsAlpha;
+      drawFlames(ctx, this.tier, this.t);
+      blit(ctx, shipBaseSprite(this.tier), 0, 0);
+      drawHullFrame(ctx, this.tier, this.weapon, this.previousFrameWeapon, this.frameBlend);
+      drawCommandFrame(ctx, this.tier, this.t);
+      drawWeaponRig(
+        ctx, this.tier, this.weapon, this.weaponLv, this.t,
+        this.weaponEvolutions[this.weapon], this.weaponEvolutions2[this.weapon],
+      );
+      drawDeckLights(ctx, this.tier, this.t);
+      ctx.fillStyle = WEAPON_COLORS[this.weapon];
+      for (const m of SHIP_DEFS[this.tier].mounts) {
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
     this.drawHitCore(ctx);
     drawUpgradeSequence(ctx, this.tier, this.upgradeFx);
@@ -1202,7 +1289,7 @@ export class Squad {
     }
     ctx.restore();
 
-    // T4 커리어부터: 궤도 호위 (티어가 오를수록 증가)
+    // T4 커리어부터: 궤도 호위
     if (this.tier >= 3) {
       const orbiters = 4 + (this.tier - 3) * 2;
       for (let k = 0; k < orbiters; k++) {
@@ -1211,70 +1298,82 @@ export class Squad {
         const x = this.x + Math.cos(a) * orbitR;
         const y = this.y + Math.sin(a) * orbitR * 0.7;
         ctx.save();
-        ctx.translate(x, y);
+        const s = place(x, y);
         ctx.rotate(Math.cos(a) * 0.4);
-        blit(ctx, scout, 0, 0, 0.55);
+        blit(ctx, scout, 0, 0, 0.55 * s);
         ctx.restore();
       }
     }
 
-    // 편대 수 라벨
+    // ── 오버레이(편대수·충전·링): 추적에선 투영된 기함점 기준 + 고정 글꼴 + 캡 반경(§3.2.6/7) — 기함 디테일을 안 가림.
+    const ov = projector ? projector.point(this.x, this.y) : { x: this.x, y: this.y, scale: 1 };
+    const ringS = projector ? Math.min(ov.scale, 2.2) : 1;   // 링은 캡 배율(화면 과점유 방지)
+
     if (this.count > 1) {
-      ctx.font = 'bold 16px Pretendard, sans-serif';
+      ctx.font = 'bold 16px Pretendard, sans-serif';   // 고정 14~20px 범위(투영 배율 미적용)
       ctx.textAlign = 'center';
-      glow(ctx, color, 8, (c) => { c.fillStyle = COLORS.text; c.fillText(`x${this.count}`, this.x, this.y - w * 0.8 - 14); });
+      let lx = this.x, ly = this.y - w * 0.8 - 14;
+      if (projector) {
+        const W = projector.projection.logicalW, H = projector.projection.logicalH;
+        lx = Math.min(W - 24, Math.max(24, ov.x));
+        ly = Math.min(H - 40, Math.max(58, ov.y - Math.max(46, def.clearR * fs + 20)));   // 기함 위·화면 안·HUD 아래
+      }
+      glow(ctx, color, 8, (c) => { c.fillStyle = COLORS.text; c.fillText(`x${this.count}`, lx, ly); });
     }
 
-    // 차지 랜스 충전 표시 (홀드 중 에너지가 모이는 게 보이게 — 단계·진행 아크)
+    // 차지 랜스 충전 표시
     if (this.charge > 0) {
       const ch = BAL.charge;
       const stg = this.chargeStage;
       const col = stg >= 3 ? COLORS.reward : COLORS.ally;
       const frac = Math.min(1, (this.charge % ch.stageTime) / ch.stageTime);
-      const rr = w + 14 + stg * 7;
+      const rr = (w + 14 + stg * 7) * ringS;
       ctx.save();
       ctx.globalAlpha = 0.15 + 0.1 * stg + 0.08 * Math.sin(this.t * 22);
       ctx.fillStyle = col;
-      ctx.beginPath(); ctx.arc(this.x, this.y, rr * 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ov.x, ov.y, rr * 0.7, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 0.9;
       ctx.strokeStyle = col; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(this.x, this.y, rr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(ov.x, ov.y, rr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
       if (stg > 0) {
         ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.font = 'bold 15px Pretendard, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('⚡' + stg, this.x, this.y - rr - 6);
+        ctx.fillText('⚡' + stg, ov.x, ov.y - rr - 6);
       }
       ctx.globalAlpha = 1;
       ctx.restore();
     }
 
-    // 파워/실드 링
+    // 파워/실드/무적 링 — 기함(투영)점 + 캡 반경
     if (this.powerT > 0) {
       ctx.strokeStyle = COLORS.reward;
       ctx.globalAlpha = 0.5;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, w + 12, 0, Math.PI * 2);
+      ctx.arc(ov.x, ov.y, (w + 12) * ringS, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    if (this.shield || (this.surv && this.surv.shield > 0)) {   // 레거시 shield + surv.shield(경로 보호막 등) 둘 다 시각 표시(Codex G2-D P2)
+    if (this.shield || (this.surv && this.surv.shield > 0)) {
       ctx.strokeStyle = COLORS.gateGood;
       ctx.globalAlpha = 0.45 + 0.2 * Math.sin(this.t * 5);
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, w + 20, 0, Math.PI * 2);
+      ctx.arc(ov.x, ov.y, (w + 20) * ringS, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    if (this.invulnT > 0) {   // 진화 무적 표시 (A3)
+    if (this.invulnT > 0) {
       ctx.strokeStyle = '#ffffff';
       ctx.globalAlpha = 0.25 + 0.3 * Math.abs(Math.sin(this.t * 26));
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, w + 26, 0, Math.PI * 2);
+      ctx.arc(ov.x, ov.y, (w + 26) * ringS, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
   }
+
+  /** 추적 시점 편대 렌더(chase-render가 위임 호출). draw()에 projector를 넘겨 개체별 투영. */
+  drawProjected(ctx, projector, viewOpts = null) { this._viewOpts = viewOpts; try { this.draw(ctx, projector); } finally { this._viewOpts = null; } }
 }
 
 // ───────────────────────── 차지 랜스 비주얼 (피해는 발사 시점에 이미 적용됨 — 이건 연출)
@@ -1303,6 +1402,46 @@ export class ChargeLance {
     ctx.globalAlpha = 1;
     ctx.restore();
   }
+  // 추적 시점 투영(RC2 §3.1): baseY 발사구·화면상단 빔 종점을 각각 투영해 원근 quad로 그린다.
+  //  일반 drawProjected는 y가 없어 NaN → 미렌더였음. 여기서 빔 시작·끝점을 직접 투영해 연출을 살린다.
+  drawProjected(ctx, projector) {
+    const p = Math.max(0, 1 - this.t / this.life);
+    const w = this.halfW * (0.7 + 0.5 * p);
+    const col = this.stage >= 3 ? COLORS.reward : COLORS.ally;
+    const P = projector.point;
+    // 빔 외곽 quad(발사구=baseY 넓음, 종점=y0 소실점 좁음)
+    const tl = P(this.x - w, 0), tr = P(this.x + w, 0), br = P(this.x + w, this.baseY), bl = P(this.x - w, this.baseY);
+    const cw = w * 0.4;
+    const ctl = P(this.x - cw, 0), ctr = P(this.x + cw, 0), cbr = P(this.x + cw, this.baseY), cbl = P(this.x - cw, this.baseY);
+    const muz = P(this.x, this.baseY);
+    ctx.save();
+    glow(ctx, col, 26, (c) => {
+      c.globalAlpha = 0.5 * p; c.fillStyle = col;
+      c.beginPath(); c.moveTo(tl.x, tl.y); c.lineTo(tr.x, tr.y); c.lineTo(br.x, br.y); c.lineTo(bl.x, bl.y); c.closePath(); c.fill();
+    });
+    ctx.globalAlpha = 0.85 * p; ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.moveTo(ctl.x, ctl.y); ctx.lineTo(ctr.x, ctr.y); ctx.lineTo(cbr.x, cbr.y); ctx.lineTo(cbl.x, cbl.y); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = p; ctx.strokeStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(muz.x, muz.y, Math.max(2, w * 1.4 * (1.3 - p) * muz.scale), 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+}
+
+// 게이트 레인 상자를 원근 quad로 투영 렌더(RC2 §3.4): 네 모서리를 각각 projectPoint → 표시 레인 == 입력/판정 매핑.
+//  라벨은 고정 글꼴(13~20px, 배율 미적용)로 뒤집힘·찌그러짐 방지.
+function drawProjectedGateBox(ctx, projector, rect, color, label, opts = {}) {
+  const P = projector.point;
+  const tl = P(rect.x, rect.y), tr = P(rect.x + rect.w, rect.y), br = P(rect.x + rect.w, rect.y + rect.h), bl = P(rect.x, rect.y + rect.h);
+  const dim = !!opts.dim, hi = !!opts.highlight;
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(tl.x, tl.y); ctx.lineTo(tr.x, tr.y); ctx.lineTo(br.x, br.y); ctx.lineTo(bl.x, bl.y); ctx.closePath();
+  ctx.globalAlpha = dim ? 0.12 : (hi ? 0.28 : 0.16); ctx.fillStyle = color; ctx.fill();
+  ctx.globalAlpha = dim ? 0.35 : (hi ? 0.95 : 0.7); ctx.strokeStyle = color; ctx.lineWidth = hi ? 3 : 2; ctx.stroke();
+  ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.textAlign = 'center';
+  ctx.font = `bold ${Math.max(13, Math.min(20, opts.fontSize || 16))}px Pretendard, sans-serif`;
+  ctx.fillText(label, (bl.x + br.x) / 2, (bl.y + br.y) / 2 - 6);   // 근거리(하단) 모서리 중앙 위
+  ctx.restore();
 }
 
 // ───────────────────────── 아군 탄 (발칸/레이저 겸용)
@@ -1887,7 +2026,7 @@ export class DronePod extends Scrolling {
       this.dead = true;
       world.effects.burst(this.x, this.y, COLORS.ally, 18, 200);
       world.effects.ring(this.x, this.y, COLORS.ally);
-      world.squad.applyDelta(this.payout, world, '보급 획득!');
+      world.squad.applyDelta(this.payout, world, ek('Supply collected!', '보급 획득!'));
       sfx('crystal');
     }
   }
@@ -1963,7 +2102,7 @@ export class GatePair extends Scrolling {
       if (Math.abs(squad.y - this.y) < this.h / 2 + 8) {
         const side = squad.x < this.logicalW / 2 ? 'left' : 'right';
         let gate = this[side];
-        if (this.corruptSide === side) { gate = invertGateOp(gate); world.effects.text(squad.x, this.y - 20, '감염! 게이트 효과 반전', COLORS.gateBad, 14); }
+        if (this.corruptSide === side) { gate = invertGateOp(gate); world.effects.text(squad.x, this.y - 20, ek('Infected! Gate effect reversed', '감염! 게이트 효과 반전'), COLORS.gateBad, 14); }
         const next = applyGate(squad.count, gate);
         squad.setCount(next, world, GatePair.label(gate));
         this.applied = true;
@@ -1992,6 +2131,15 @@ export class GatePair extends Scrolling {
     this.drawOne(ctx, r.left, this.left, this.flashT > 0 && this.appliedSide === 'left');
     this.drawOne(ctx, r.right, this.right, this.flashT > 0 && this.appliedSide === 'right');
   }
+  // 추적: 좌/우 레인 rect의 네 모서리를 투영해 원근 사다리꼴로(표시 레인 == 통과 판정 위치, RC2 §3.4).
+  drawProjected(ctx, projector) {
+    const r = this.rects();
+    for (const [rect, gate, side] of [[r.left, this.left, 'left'], [r.right, this.right, 'right']]) {
+      const color = GatePair.isGood(gate) ? COLORS.gateGood : COLORS.gateBad;
+      const hi = this.flashT > 0 && this.appliedSide === side;
+      drawProjectedGateBox(ctx, projector, rect, color, GatePair.label(gate), { highlight: hi, dim: this.applied && !hi, fontSize: 20 });
+    }
+  }
 }
 
 // ───────────────────────── 3레인 선택 게이트 (무기 선택 / 보너스)
@@ -2015,9 +2163,9 @@ export class TriGate extends Scrolling {
 
   laneStyle(opt) {
     if (opt.kind === 'weapon') return { color: WEAPON_COLORS[opt.weapon], label: WEAPON_LABELS[opt.weapon] };
-    if (opt.kind === 'drones') return { color: COLORS.ally, label: `드론 +${opt.value}` };
+    if (opt.kind === 'drones') return { color: COLORS.ally, label: ek(`Drones +${opt.value}`, `드론 +${opt.value}`) };
     if (opt.kind === 'weaponLv') return { color: COLORS.reward, label: 'Lv UP' };
-    return { color: COLORS.gateGood, label: '실드' };
+    return { color: COLORS.gateGood, label: ek('Shield', '실드') };
   }
 
   apply(opt, world) {
@@ -2027,7 +2175,7 @@ export class TriGate extends Scrolling {
     else if (opt.kind === 'weaponLv') sq.levelUp(world);
     else if (opt.kind === 'shield') {
       sq.shield = true;
-      world.effects.text(sq.x, sq.y - 64, '보호막 획득!', COLORS.gateGood);
+      world.effects.text(sq.x, sq.y - 64, ek('Shield gained!', '보호막 획득!'), COLORS.gateGood);
       sfx('shield_on');
     }
   }
@@ -2048,7 +2196,7 @@ export class TriGate extends Scrolling {
           const centerX = (lane + 0.5) * laneW;
           if (Math.abs(squad.x - centerX) > laneW * 0.34) {
             this.applied = true; this.appliedLane = -1; this.flashT = BAL.gate.passFlashTime;
-            world.effects.text(squad.x, squad.y - 64, `${WEAPON_LABELS[squad.weapon]} 유지!`, WEAPON_COLORS[squad.weapon], 13);
+            world.effects.text(squad.x, squad.y - 64, ek(`${wl(squad.weapon)} kept!`, `${WEAPON_LABELS[squad.weapon]} 유지!`), WEAPON_COLORS[squad.weapon], 13);
             if (this.offscreen(world)) this.dead = true;
             return;
           }
@@ -2073,6 +2221,15 @@ export class TriGate extends Scrolling {
         dim: this.applied && !highlight,
         fontSize: 17,
       });
+    }
+  }
+  // 추적: 3레인 rect 모서리를 투영 → 보이는 레인 경계 == 선택 판정 위치(RC2 §3.4·RC2-05).
+  drawProjected(ctx, projector) {
+    for (let i = 0; i < 3; i++) {
+      const rect = this.laneRect(i);
+      const { color, label } = this.laneStyle(this.options[i]);
+      const highlight = this.flashT > 0 && this.appliedLane === i;
+      drawProjectedGateBox(ctx, projector, rect, color, label, { highlight, dim: this.applied && !highlight, fontSize: 17 });
     }
   }
 }
@@ -2527,7 +2684,7 @@ export class PowerModule extends Scrolling {
     this.spin += dt * 4;
     if (circleHit(this.x, this.y, this.r + 6, world.squad.x, world.squad.y, world.squad.hitRadius)) {
       world.squad.powerT = BAL.powerModule.duration;
-      world.effects.text(world.squad.x, world.squad.y - 40, `⚡ 공격력 2배! · ${BAL.powerModule.duration}초`, '#4cc9ff');
+      world.effects.text(world.squad.x, world.squad.y - 40, ek(`⚡ Double damage! · ${BAL.powerModule.duration}s`, `⚡ 공격력 2배! · ${BAL.powerModule.duration}초`), '#4cc9ff');
       world.effects.burst(this.x, this.y, '#4cc9ff', 18);
       sfx('pickup');
       this.dead = true;
@@ -2568,8 +2725,8 @@ export class PowerModule extends Scrolling {
     ctx.fillStyle = '#ffffff'; ctx.fill();
     // "×2 10초" 라벨 (아래) — 일시적임을 명시
     ctx.font = 'bold 11px Pretendard, sans-serif'; ctx.textAlign = 'center';
-    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,14,28,0.85)'; ctx.strokeText('×2 · 10초', 0, R + 13);
-    ctx.fillStyle = C; ctx.fillText('×2 · 10초', 0, R + 13);
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,14,28,0.85)'; ctx.strokeText(ek('×2 · 10s', '×2 · 10초'), 0, R + 13);
+    ctx.fillStyle = C; ctx.fillText(ek('×2 · 10s', '×2 · 10초'), 0, R + 13);
     ctx.restore();
   }
 }
@@ -3239,7 +3396,7 @@ export class MidBoss extends Scrolling {
     world.effects.ring(this.x, this.y, COLORS.reward);
     world.effects.flash(0.25);
     const drones = M.rewardDrones + M.rewardDronesPerStage * (this.stage - 1);
-    world.squad.applyDelta(drones, world, `${this.def.korName} 격파!`);
+    world.squad.applyDelta(drones, world, ek(`${this.def.name} defeated!`, `${this.def.korName} 격파!`));
     dropCoin(world, this.x, this.y, BAL.coin.miniboss);
     sfx('explode_l');
   }
@@ -3272,9 +3429,9 @@ export class MidBoss extends Scrolling {
     ctx.textAlign = 'center';
     ctx.strokeStyle = 'rgba(5,6,15,0.85)';
     ctx.lineWidth = 3;
-    ctx.strokeText(this.def.korName, this.x, by - 4);
+    ctx.strokeText(ek(this.def.name, this.def.korName), this.x, by - 4);
     ctx.fillStyle = COLORS.enemyHigh;
-    ctx.fillText(this.def.korName, this.x, by - 4);
+    ctx.fillText(ek(this.def.name, this.def.korName), this.x, by - 4);
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.fillRect(this.x - w / 2, by, w, 4);
     ctx.fillStyle = COLORS.danger;

@@ -1,8 +1,8 @@
 // 진입점: 캔버스 관리 + 게임 루프 + 상태 머신 + 트랙 생성
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
-import { createStarfield, drawHUD, drawCoreLoopHud, drawSectorLoadoutHud, COLORS, glow, WEAPON_LABELS, WEAPON_COLORS } from './render.js';
-import { Squad, Crystal, Coin, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile } from './entities.js';
+import { createStarfield, drawHUD, drawCoreLoopHud, drawSectorLoadoutHud, COLORS, glow, WEAPON_LABELS, WEAPON_LABELS_EN, WEAPON_COLORS } from './render.js';
+import { Squad, Crystal, Coin, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile, setEntityLang } from './entities.js';
 import { bossDefById, preloadBossArt, preloadSprites } from './sprites.js';
 import { createCutscene, tickCutscene, drawCutscene, drawCutsceneBackdrop, cutsceneReady, CUT } from './cutscene.js';
 import { maybeAffix, applyAffixes } from './affixes.js';
@@ -17,10 +17,22 @@ import { stageMods, hangarCost, scaleGate, generateSectorMap, failureReward, cop
 import { preloadStyle, setArtStyle, getArtStyle, STYLE_NAMES, SPRITE_SIZES, invalidateSpriteCache } from './sprites.js';
 import { loadPatch, applyFlat, subscribePatch } from './tuning.js';
 import { createSave } from './save.js';
-import { ui } from './ui.js';
+import { ui, DOCTRINE_EN, KEYSTONE_EN } from './ui.js';
 import { initAudio, unlockAudio, playBgm, playBgmForSector, playBgmForBoss, setBgmIntensity, sfx, toggleMute, isMuted, setBgmVolume, setSfxVolume, getSettings } from './audio.js';
 import { playIntro } from './intro.js';
 import { createZoneBackdrop } from './zone-backdrop.js';
+// 전투 카메라 줌(작업지시서). 렌더·입력 좌표에만 쓰는 시각 배율 — 게임 규칙 불변.
+import { createCamera, advanceZoom, stepZoom, safeZoom, screenToWorldX, DEFAULT_ZOOM, MAX_ZOOM } from './camera-zoom.js';
+// 휠 입력 정규화·누적(RC1 보정): 가로 휠 오인·정밀 터치패드 과민 방지. 순수 모듈로 분리해 실이벤트 테스트.
+import { createWheelStepAccumulator, resolveWheelZoom } from './wheel-input.js';
+// 2.5D 함미 추적 시점(작업지시서): 순수 투영 + 개체별 렌더. 렌더·입력 좌표에만 적용, 게임 규칙 불변.
+import { createChaseProjection, chaseBlendForZoom, advanceChaseBlend, screenToWorldXAtPlayer, projectPoint, projectObject, CHASE_FULL_ZOOM } from './chase-camera.js';
+import { drawWorldProjected, collectEdgeWarnings } from './chase-render.js';
+import { drawWarpField } from './chase-backdrop.js';
+import { PROP_KEYS, PROP_CAPS } from './chase3d-props.js';   // 상수만(THREE 비의존 순수) — 지오메트리는 renderer 가 플래그 뒤에서 생성
+// 실제 3D 함미 추적(Phase 0, ?chase3d=1 전용). config/mapping은 순수(Three.js 미의존)라 정적 import 안전.
+//  renderer(Three.js 로드)는 플래그가 있을 때만 아래에서 동적 import 한다(§3.2: 플래그 없으면 three 미로드).
+import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, chase3dPropsEnabled, transitionT } from './chase3d-config.js';
 // ── Gate 1: 8분 핵심 재미 (전면개편 §5). ?coreLoopTest=1 하네스에서 전체 스택을 구동. ──
 import { createRunMetrics } from './run-metrics.js';
 import { createRunDirector, tickDirector, elapsed, nextEvent } from './run-director.js';
@@ -32,12 +44,80 @@ import { createFrameState, setFrame as frameSet, frameOnKill, tickFrame, frameHu
 import { createLoadout, equip as loadoutEquip } from './weapon-loadout.js';
 import { CORE_LOOP_BUILDS, coreLoopBuild, eventAction, frameForBuild } from './core-loop.js';
 import { regionAt as c25RegionAt, regionByIndex as c25Region, buildCampaign25Schedule, eventAction25, pathChoicePair } from './campaign25.js';
+// ── Stage 1 행동 계측(작업지시서). 벤더 독립 코어 + 동의 + 선택형 GA4 어댑터 + 게임 파사드. ──
+import { ANALYTICS_CONFIG, SCHEMA, shouldOfferConsent, isDevUrl, isDebugUrl, viewportGroup } from './analytics-config.js';
+import { createAnalytics, installDebugGlobal } from './analytics.js';
+import { createConsent } from './analytics-consent.js';
+import { createGa4Adapter, ga4Sink } from './analytics-ga4.js';
+import { createGameAnalytics } from './analytics-events.js';
+// ── Prolific 첫인상 테스트(작업지시서). 전용 모드 흐름·타이머·설문. PID/Study/Session은 읽지 않는다. ──
+import { isPlaytestUrl, playtestCohort, playtestConfigStatus, PLAYTEST_CONFIG, PLAYTEST_TIME_LIMIT_SEC } from './playtest-config.js';
+import { createPlaytestTimer, createPlaytestSubmission } from './playtest.js';
+// ── CrazyGames 포털 배포 분리(지시서). 순수 판정 + no-op 플랫폼 이음매(광고 SDK는 이번 단계 미구현). ──
+import { detectDistribution, isPortalMode, analyticsAllowedForDistribution } from './distribution-config.js';
+import { platform } from './platform.js';
 
 const _clParams = new URLSearchParams(location.search);
 const CORE_LOOP = _clParams.has('coreLoopTest');        // 사람 플레이(H0·내구도100·무기1·조작 가능)
 const CORE_MEASURE = _clParams.has('coreLoopMeasure');  // 자동 측정 재생(autopilot+auto-select, 헤드리스 시뮬)
 const CAMPAIGN25 = _clParams.has('campaign25');         // Gate 2: 25분 6지역 시간 캠페인(측정·개발용 진입)
 const BOSSLAB = _clParams.has('bosslab');               // 보스 패턴 프리뷰: ?bosslab=1&boss=B14 (개발/테스트용)
+// CrazyGames 포털 배포(?distribution=crazygames 또는 crazygames.com 호스트). Prolific·개발보다 우선(§3.2).
+const DIST = detectDistribution({ hostname: location.hostname, search: location.search });
+const PORTAL_MODE = isPortalMode(DIST);                 // 포털: 영어·빠른 시작·GA4/동의/Prolific UI 없음(§3)
+// Prolific 전용 흐름: ?playtest=prolific 이고 개발·포털 URL이 아닐 때만. 포털이 이기면 Prolific 비활성(§3.2).
+const PLAYTEST = isPlaytestUrl(location.search) && !CORE_LOOP && !CORE_MEASURE && !CAMPAIGN25 && !BOSSLAB && !PORTAL_MODE;
+const PLAYTEST_COHORT = PLAYTEST ? playtestCohort(location.search) : 'unknown';
+// 영어 런타임 경로: Prolific과 포털이 공유한다(중복 사전 없이 같은 EN/LANG 분기 재사용, §P0-2).
+const EN = PLAYTEST || PORTAL_MODE;
+const LANG = EN ? 'en' : 'ko';
+const tx = (en, ko) => (EN ? en : ko);   // 런타임 토스트/문구용 간이 선택자(영어=포털·Prolific, 한국어=일반)
+let lastWeapon = null;   // P0-4: 직전 출격 주무기(같은 무기 즉시 재도전용, sectorStartWeaponPick/newExpedition에서 기록)
+setEntityLang(EN);   // 캔버스 라벨(entities.js) 언어 1회 설정 — 포털·Prolific=영어
+// Prolific 참가자에게만 쓰는 표시용 번역. ID·수치·적용 로직은 기존 데이터를 그대로 사용한다.
+const PLAYTEST_SHIP_TRAITS_EN = [
+  'EMBER · Balanced', 'FLARE · Rapid Fire', 'ARCLIGHT · Focused Fire',
+  'AURORA · Wide Barrage', 'ZENITH · Piercing Artillery', 'QUASAR · Maximum Pierce',
+];
+const PLAYTEST_RESONANCE_EN = {
+  railStorm: 'Rail Storm',
+  microMissile: 'Micro-Missile Barrage',
+  seekerBeam: 'Seeker Beam',
+};
+const PLAYTEST_EVOLUTION_EN = {
+  vulcan_storm: ['Storm Vulcan', 'Wide shots ricochet to nearby enemies'],
+  vulcan_needle: ['Needle Gatling', 'Rapid piercing shots in a tight line'],
+  laser_prism: ['Prism Array', 'The piercing beam splits sideways'],
+  laser_cutter: ['Null Cutter', 'Occasional heavy beams clear enemy shots'],
+  homing_wasp: ['Wasp Swarm', 'Launches five small homing missiles'],
+  homing_siege: ['Siege Torpedo', 'A slow torpedo creates a huge explosion'],
+  vulcan_tempest: ['Tempest', 'Faster barrages cover a wider area'],
+  vulcan_lance: ['Lance Vulcan', 'Piercing shots focus on one point'],
+  laser_nova: ['Nova Beam', 'A thicker, stronger piercing beam'],
+  laser_reaper: ['Reaper Beam', 'Rapid cutting beams with lower damage per hit'],
+  homing_legion: ['Legion', 'Continuously launches many homing missiles'],
+  homing_nova: ['Nova Torpedo', 'A decisive torpedo with a massive blast'],
+};
+
+function playtestWeaponStepLabel(step, sq) {
+  if (!EN) return step;
+  const slot = step.id.endsWith('-wing') ? 'wing' : 'main';
+  const weapon = step.id.includes('vulcan') ? 'vulcan'
+    : step.id.includes('laser') ? 'laser'
+      : step.id.includes('homing') ? 'homing'
+        : slot === 'wing' ? sq.wing.weaponId : sq.weapon;
+  const weaponLabel = WEAPON_LABELS_EN[weapon] || weapon || 'Weapon';
+  const level = step.label.match(/Lv(\d+)/)?.[1];
+  if (step.id.startsWith('lv-')) return { ...step, label: `${weaponLabel} Lv${level || ''}`, desc: 'More projectiles, spread, and piercing' };
+  if (step.id.startsWith('evo-') || step.id.startsWith('super-')) {
+    const evoId = step.id.replace(/^(evo|super)-/, '');
+    const en = PLAYTEST_EVOLUTION_EN[evoId];
+    return en ? { ...step, label: `${weaponLabel}: ${en[0]}`, desc: en[1] } : { ...step, label: `${weaponLabel} evolution`, desc: 'Changes the attack pattern' };
+  }
+  if (step.id.startsWith('evolv-')) return { ...step, label: `${weaponLabel} Evolution Lv${level || ''}`, desc: 'Evolution power increased' };
+  if (step.id.startsWith('superlv-')) return { ...step, label: `${weaponLabel} Super Evolution Lv${level || ''}`, desc: 'Super-evolution power increased' };
+  return step;
+}
 
 // 타이틀에 25분 캠페인 진입 버튼을 노출할지. 섹터 원정으로 일원화하며 숨김(이사 결정).
 //  ⚠️ 기능을 지운 게 아니라 '입구'만 닫았다 — campaign25 코드·데이터·테스트는 전부 그대로다.
@@ -48,6 +128,10 @@ const SHOW_CAMPAIGN25_ENTRY = false;
 const LOGICAL_W = BAL.logicalW;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+// 실제 3D 계층(§6). 플래그가 있을 때만 아래에서 생성 — 없으면 null(RC2와 동일한 화면).
+let canvas3d = null, hudCanvas = null, hudCtx = null, chase3dOverlay = null;
+let chase3d = null;      // renderer 컨트롤러(동적 import 성공 시). 실패·미지원이면 계속 null → RC2 유지(§3.3).
+let chase3dT = 0;        // 현재 전환 t(0~1). draw가 2D 월드 표시/HUD 계층 라우팅에 사용.
 
 // Pretendard 즉시 로드 → 캔버스 텍스트가 폴백(Segoe UI) 대신 Pretendard로 렌더되게. 로드되면 매 프레임 재렌더가 반영.
 try { document.fonts?.load('700 16px Pretendard').then(() => document.fonts.load('400 16px Pretendard')); } catch { /* 폰트 API 미지원 시 CSS 폴백 */ }
@@ -69,14 +153,392 @@ function resize() {
   canvas.height = vh;
   canvas.style.width = canvas.width + 'px';
   canvas.style.height = canvas.height + 'px';
+  sizeChase3DCanvases();   // 3캔버스 동일 CSS 크기·논리 viewport 유지(§6). canvas3d 없으면 no-op.
+}
+// #game3d·#game-hud 를 #game 과 정확히 같은 크기·위치로 맞춘다(§6). 함수 선언(호이스팅)이라 resize에서 먼저 호출돼도 안전.
+function sizeChase3DCanvases() {
+  if (!canvas3d) return;
+  // #game 은 flex 로 #stage 가운데 정렬 → 오버레이도 #game 의 실제 위치·크기에 정확히 맞춘다(§6 동일 viewport).
+  for (const c of [canvas3d, hudCanvas]) {
+    c.width = canvas.width; c.height = canvas.height;
+    c.style.width = canvas.style.width; c.style.height = canvas.style.height;
+    c.style.left = canvas.offsetLeft + 'px'; c.style.top = canvas.offsetTop + 'px';
+  }
+  chase3d && (chase3d._lastW = 0);   // 다음 프레임 renderer가 setViewport 다시 하도록
 }
 window.addEventListener('resize', resize);
 resize();
 
-const input = createInput(canvas, LOGICAL_W);
 const starfield = createStarfield(LOGICAL_W);
 const zoneBackdrop = createZoneBackdrop(LOGICAL_W);
 const save = createSave();
+
+// 전투 카메라(시각 배율). 저장된 view.zoom을 안전하게 백필해 시작. anchor는 매 프레임 함대 위치로 갱신(draw).
+const camera = createCamera(save.get().view?.zoom);
+// 2.5D 추적 시점 blend(0=전술 .. 1=완전 추적). 줌과 별도로 350~500ms ease-out 보간(§3.3).
+const chase = { current: chaseBlendForZoom(camera.current), target: chaseBlendForZoom(camera.current) };
+let chaseProjection = null;   // 매 프레임(update) 최신 함대·줌·blend로 재생성. 입력 역변환·렌더가 공유.
+const prefersReducedMotion = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch { return false; } };
+/** 현재 프레임 투영 기준 마우스 화면 X → 플레이어 근거리 월드 X. blend=0이면 기존 전술 역변환과 완전 동일.
+ *  Opus5 §9.3: hero 하이브리드에선 월드가 RC2 투영이므로 입력도 "항상" 기존 RC2 역변환 — 3D는 표시 전용. */
+function currentScreenToWorldX(sx) {
+  return chaseProjection ? screenToWorldXAtPlayer(sx, chaseProjection) : screenToWorldX(sx, camera);
+}
+/** update()에서 input.tick 직전 호출: 최신 함대·줌·blend로 투영을 만든다(§3 anchor 동기화와 같은 프레임). */
+function rebuildChaseProjection() {
+  if (state !== 'play' || !run || !run.squad) { chaseProjection = null; return; }
+  chaseProjection = createChaseProjection({
+    zoom: camera.current, chaseBlend: chase.current,
+    squadX: run.squad.x, squadY: run.squad.y, logicalW: LOGICAL_W, logicalH,
+  });
+}
+// 입력: 마우스/터치 화면 X를 카메라로 역변환해 월드 목표 X를 얻는다(§6). input이 카메라 모듈을 직접 import하지 않도록 콜백 주입.
+const input = createInput(canvas, LOGICAL_W, { screenToWorldX: (sx) => currentScreenToWorldX(sx) });
+
+// ── 실제 3D 함미 추적(Phase 0) 부트스트랩 — ?chase3d=1 전용, 폴백 안전(§3·§6) ──
+const CHASE3D_ON = chase3dEnabled(location.search);
+const CHASE3D_TEST = chase3dTestEnabled(location.search);
+const CHASE3D_LAB = chase3dLabTarget(location.search);   // 'aurora' = 모델 검사실(Opus5 §8)
+// 소품(탄·픽업) 3D 는 기본 OFF(이사 실기 "엉망" + Codex 가독성 판정) — 기존 2D 스트릭·스프라이트가 기본.
+//  ?chase3d=1&chase3dProps=1 로만 켜서 가독성 A/B 비교에 사용한다. 크리처(B1/B2/B4)·기함 3D 는 영향 없음.
+const CHASE3D_PROPS = chase3dPropsEnabled(location.search);
+if (CHASE3D_ON) {
+  const stage = document.getElementById('stage');
+  canvas3d = document.createElement('canvas'); canvas3d.id = 'game3d';
+  hudCanvas = document.createElement('canvas'); hudCanvas.id = 'game-hud';
+  // #game 위에 얹되 입력은 #game이 계속 처리(§6: pointer-events:none). 크기·위치는 sizeChase3DCanvases가 #game과 동일하게.
+  canvas3d.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:2;opacity:0;visibility:hidden';
+  hudCanvas.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:3';
+  canvas.style.zIndex = '1';   // ⚠️ #stage 는 flex — flex 자식은 static 이어도 z-index 가 적용된다(불투명 캔버스가 메뉴를 가릴 수 있음)
+  const _ovz = document.getElementById('overlay'); if (_ovz) _ovz.style.zIndex = '5';   // §6: DOM 메뉴·선택창은 항상 캔버스 계층 위
+  if (stage) { canvas.after(canvas3d); canvas3d.after(hudCanvas); }
+  hudCtx = hudCanvas.getContext('2d');
+  sizeChase3DCanvases();
+  if (['aurora', 'b1', 'b2', 'b4', 'swarm'].includes(CHASE3D_LAB)) {
+    // ── 모델 검사실(Opus5 §8: aurora / B1 단독 / swarm=기함+B1 12) — 게임 렌더 대신 스튜디오. 기본 URL 미로드. ──
+    canvas.style.visibility = 'hidden';
+    const _ov = document.getElementById('overlay'); if (_ov) _ov.style.display = 'none';
+    canvas3d.style.opacity = '1'; canvas3d.style.visibility = 'visible';
+    import('./chase3d-lab.js').then((m) => {
+      const lab = m.createAuroraLab(canvas3d, { target: CHASE3D_LAB });
+      const fit = () => { sizeChase3DCanvases(); lab.setSize(canvas3d.width, canvas3d.height, Math.min(window.devicePixelRatio || 1, 1.5)); };
+      fit(); window.addEventListener('resize', fit);
+      buildAuroraLabUI(lab);
+      window.__NF3D = window.__NF3D || {}; window.__NF3D.lab = lab;
+      const loop = () => { lab.step(1); requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+      console.info('[chase3d-lab] AURORA 검사실 시작');
+    }).catch((e) => console.warn('[chase3d-lab] 로드 실패:', e));
+  } else {
+    // 동적 import — 여기서만 Three.js가 로드된다(§3.2). 실패/미지원이면 chase3d=null 유지 → RC2 화면 그대로.
+    //  Opus5 hero(기본): 3D 는 AURORA 기함만(§9.1). chase3dTest 레거시 장면만 구 전체-3D dev fallback.
+    import('./chase3d-renderer.js').then((m) => {
+      try {
+        const c = m.createChase3D(canvas3d, { hero: !CHASE3D_TEST });
+        if (c && c.available) {
+          chase3d = c;
+          if (c.prewarmRun) c.prewarmRun(LOGICAL_W, logicalH, canvas.width, canvas.height).then((p) => console.info('[chase3d] 프리웜', p));   // §10.2 셰이더 사전 준비
+          if (CHASE3D_TEST) buildChase3DOverlay();
+          console.info('[chase3d] 실제 3D 사용 가능(hero=' + !CHASE3D_TEST + ')');
+        } else { console.warn('[chase3d] 사용 불가 → RC2 유지:', c && c.reason); }
+      } catch (e) { console.warn('[chase3d] 초기화 예외 → RC2 유지:', e); }
+    }).catch((e) => console.warn('[chase3d] 모듈 로드 실패 → RC2 유지:', e));
+  }
+}
+
+// 검사실 UI(§8): 시점·모드·LOD·조명·글로우·프리즈 + 통계. chase3dLab 에서만 생성.
+function buildAuroraLabUI(lab) {
+  const bar = document.createElement('div');
+  bar.id = 'aurora-lab-controls';
+  bar.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:60;display:flex;gap:5px;flex-wrap:wrap;max-width:96vw;pointer-events:auto';
+  const stats = document.createElement('div');
+  stats.id = 'aurora-lab-stats';
+  stats.style.cssText = 'position:fixed;left:8px;top:8px;z-index:60;font:12px/1.5 monospace;color:#9ffdf0;background:rgba(4,8,16,0.85);border:1px solid #1c6;border-radius:6px;padding:8px 10px;white-space:pre;user-select:none';
+  document.body.appendChild(stats);
+  const mk = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = 'font:11px monospace;padding:5px 8px;background:#0c2030;color:#3ff5e0;border:1px solid #2a8;border-radius:5px;cursor:pointer'; b.onclick = () => { fn(); refresh(); }; bar.appendChild(b); return b; };
+  for (const v of Object.keys(lab.VIEWS)) mk(v, () => lab.set({ view: v }));
+  mk('와이어', () => lab.set({ mode: lab.state.mode === 'wireframe' ? 'lit' : 'wireframe' }));
+  for (const m of ['albedo', 'normal', 'orm', 'emissive']) mk(m, () => lab.set({ mode: lab.state.mode === m ? 'lit' : m }));
+  mk('LOD', () => lab.set({ lod: (lab.state.lod + 1) % 3 }));
+  mk('조명', () => lab.set({ light: !lab.state.light }));
+  mk('글로우', () => lab.set({ glow: !lab.state.glow }));
+  mk('⏸', () => lab.set({ freeze: !lab.state.freeze }));
+  mk('회전', () => lab.set({ rotate: !lab.state.rotate }));
+  document.body.appendChild(bar);
+  function refresh() {
+    const i = lab.info();
+    stats.textContent = `AURORA lab  ${i.view}  [${i.mode}]  LOD${i.stats.lod}\n` +
+      `tris ${i.triangles}  draws ${i.calls}  progs ${i.programs}\n` +
+      `geo ${i.geometries}  tex ${i.textures}  texMB ${(i.stats.textureBytes / 1048576).toFixed(1)}\n` +
+      `build ${i.buildMs}ms  freeze ${i.freeze ? 'ON' : 'off'}`;
+  }
+  lab._refreshUI = refresh; refresh();
+  setInterval(refresh, 800);
+}
+
+// ── chase3dTest=1 결정적 검증 장면(§11) — 실캠페인 없이 모든 필수 대상을 한 화면에 고정 배치 ──
+let _t3dZoom = 2.2, _t3dPaused = false, _t3dTime = 0, _t3dRun = null, _t3dLastFps = 0, _t3dFrameEwma = 16.7;
+function buildChase3DTestRun() {   // 난수 없음 → 결정적. worldX/worldY 는 기존 좌표계 그대로. §5 수정 후: 실게임 필드 형태(isEnemy·_offsets·spriteId).
+  const sx = LOGICAL_W / 2, sy = 660;
+  const ents = [];
+  for (let i = 0; i < 5; i++) ents.push({ constructor: { name: 'Creature' }, isEnemy: true, x: 96 + i * 68, y: 380 - (i % 2) * 44, r: 14, dead: false });
+  for (let i = 0; i < 3; i++) ents.push({ constructor: { name: 'Sniper' }, isEnemy: true, spriteId: 'B4', x: 150 + i * 95, y: 250 - i * 16, r: 16, dead: false });
+  ents.push({ constructor: { name: 'TriGate' }, y: 300, dead: false, laneRect: (i) => ({ x: i * (LOGICAL_W / 3), y: 290, w: LOGICAL_W / 3, h: 24 }) });
+  ents.push({ constructor: { name: 'Crystal' }, x: sx, y: 470, r: 10, dead: false });
+  return {
+    // 드론은 §5.1 실공식(_offsets·width·t)이 만든다 — count 60 × width 93 이면 clearR(48) 밖 다수 표시.
+    squad: { x: sx, y: sy, tier: 3, count: 60, cruisers: 2, vx: -70, bank: -0.3, dead: false, charging: true, chargeFrac: 0.6, t: 0.6, width: 93, _offsets: Squad.formationOffsets(60) },
+    bosses: [{ spriteId: 'B8', x: sx, y: 120, hp: 640, maxHp: 1000, r: 64, dead: false }],
+    world: {
+      entities: ents,
+      bullets: [{ x: sx - 24, y: 520, prevY: 600, r: 3, dead: false }, { x: sx + 24, y: 510, prevY: 590, r: 3, dead: false },
+        { constructor: { name: 'ChargeLance' }, x: sx, y: 430, prevY: 640, r: 14, dead: false }],
+      enemyBullets: [{ x: 320, y: 280, r: 6, dead: false }, { x: 150, y: 240, r: 6, dead: false }, { x: 360, y: 190, r: 6, dead: false }],
+    },
+  };
+}
+function buildChase3DOverlay() {
+  _t3dRun = buildChase3DTestRun();
+  canvas.style.visibility = 'hidden';   // 검증 장면은 3D만 본다(2D 게임 캔버스 숨김)
+  const _ov = document.getElementById('overlay'); if (_ov) _ov.style.display = 'none';   // 타이틀·메뉴 DOM 도 숨김(3D 위 겹침 방지)
+  canvas3d.style.opacity = '1'; canvas3d.style.visibility = 'visible';
+  const ov = document.createElement('div'); ov.id = 'chase3d-overlay';
+  ov.style.cssText = 'position:fixed;left:8px;top:8px;z-index:50;font:12px/1.5 monospace;color:#9ffdf0;background:rgba(4,8,16,0.82);border:1px solid #1c6;border-radius:6px;padding:8px 10px;pointer-events:auto;white-space:pre;user-select:none';
+  document.body.appendChild(ov); chase3dOverlay = ov;
+  const ctr = document.createElement('div'); ctr.id = 'chase3d-controls';
+  ctr.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:50;display:flex;gap:6px;flex-wrap:wrap;pointer-events:auto';
+  const mk = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = 'font:12px monospace;padding:6px 9px;background:#0c2030;color:#3ff5e0;border:1px solid #2a8;border-radius:5px;cursor:pointer'; b.onclick = fn; ctr.appendChild(b); return b; };
+  mk('100%', () => { _t3dZoom = 1.0; }); mk('180%', () => { _t3dZoom = 1.8; }); mk('220%', () => { _t3dZoom = 2.2; });
+  mk('⏸/▶', () => { _t3dPaused = !_t3dPaused; }); mk('▶|', () => { _t3dPaused = true; _t3dTime += 0.016; });
+  mk('A/B', () => { const on = canvas3d.style.opacity !== '0'; canvas3d.style.opacity = on ? '0' : String(transitionT(_t3dZoom)); });
+  mk('ctx-loss', () => { chase3d && chase3d.forceContextLoss(); });
+  document.body.appendChild(ctr);
+  requestAnimationFrame(chase3dTestFrame);
+}
+function chase3dTestFrame(ts) {
+  if (chase3d && _t3dRun) {
+    if (!_t3dPaused) _t3dTime += 0.016;
+    const t = chase3d.frame(_t3dRun, _t3dZoom, LOGICAL_W, logicalH, canvas.width, canvas.height, _t3dTime);
+    if (canvas3d.style.opacity !== '0') { canvas3d.style.opacity = String(t); canvas3d.style.visibility = 'visible'; }
+    if (chase3dOverlay) { const now = ts || 0; if (_t3dPrevTs) { const dt = now - _t3dPrevTs; _t3dFrameEwma = _t3dFrameEwma * 0.9 + dt * 0.1; _t3dLastFps = 1000 / Math.max(1, _t3dFrameEwma); } _t3dPrevTs = now; updateChase3DOverlay(); }
+  }
+  requestAnimationFrame(chase3dTestFrame);
+}
+let _t3dPrevTs = 0;
+function updateChase3DOverlay() {
+  if (!chase3dOverlay || !chase3d) return;
+  const i = chase3d.info();
+  chase3dOverlay.textContent =
+    `chase3d  ${i.available ? (i.degraded ? 'DEGRADED(RC2)' : 'ON') : 'OFF'}\n` +
+    `zoom ${(_t3dZoom * 100).toFixed(0)}%   t ${i.t}\n` +
+    `fps ~${_t3dLastFps.toFixed(0)}   frame ~${_t3dFrameEwma.toFixed(1)}ms\n` +
+    `draws ${i.calls}   tris ${i.triangles}\n` +
+    `models ${i.models}   drones ${i.instances}\n` +
+    `geo ${i.geometries}  tex ${i.textures}` + (i.reason ? `\n${i.reason}` : '');
+}
+
+// 테스트/QA 훅 — 헤드리스에서 프레임을 수동 구동·측정(§9.5는 실측, rAF 정지 환경 대비).
+if (CHASE3D_ON) window.__NF3D = {
+  ctl: () => chase3d,
+  info: () => chase3d && chase3d.info(),
+  setZoom: (z) => { _t3dZoom = z; },
+  run: () => _t3dRun || (_t3dRun = buildChase3DTestRun()),
+  step: (n = 1, zoom) => { const z = zoom ?? _t3dZoom; const r = _t3dRun || (_t3dRun = buildChase3DTestRun()); for (let k = 0; k < n; k++) chase3d && chase3d.frame(r, z, LOGICAL_W, logicalH, canvas.width, canvas.height, _t3dTime += 0.016); return chase3d && chase3d.info(); },
+  bench: (n = 120, zoom) => {   // 렌더 비용 마이크로벤치: frame n회 시간 측정(실 GPU 비용). 실 rAF FPS와 구분해 보고.
+    const z = zoom ?? 2.2; const r = _t3dRun || (_t3dRun = buildChase3DTestRun()); const times = [];
+    for (let k = 0; k < n; k++) { const a = performance.now(); chase3d.frame(r, z, LOGICAL_W, logicalH, canvas.width, canvas.height, _t3dTime += 0.016); times.push(performance.now() - a); }
+    times.sort((a, b) => a - b); const mean = times.reduce((s, x) => s + x, 0) / n;
+    return { n, meanMs: +mean.toFixed(3), p50Ms: +times[Math.floor(n * 0.5)].toFixed(3), p95Ms: +times[Math.floor(n * 0.95)].toFixed(3), maxMs: +times[n - 1].toFixed(3), info: chase3d.info() };
+  },
+  forceLoss: () => chase3d && chase3d.forceContextLoss(),
+  capture: (name) => { canvas3d && fetch('http://localhost:9099/save?name=' + encodeURIComponent(name), { method: 'POST', body: canvas3d.toDataURL('image/jpeg', 0.85) }); },
+};
+
+// ── 전투 카메라 줌 컨트롤(휠·키보드·일시정지 버튼 공용) ──────────
+let _zoomSaveTimer = null;
+function persistZoom() {   // 연속 입력마다 저장하지 않고 300ms debounce 후 '목표값'만 저장(§7). 진행도·코인·해금·사운드는 불변.
+  if (_zoomSaveTimer) clearTimeout(_zoomSaveTimer);
+  _zoomSaveTimer = setTimeout(() => { save.set({ view: { ...(save.get().view || {}), zoom: safeZoom(camera.target) } }); }, 300);
+}
+let _zoomIndEl = null, _zoomIndTimer = null;
+function showZoomIndicator() {   // 하단 안전영역에 'Zoom N% / 확대 N%'를 700~900ms(§3.4). pointer-events:none·레이아웃 불변, 빠른 휠에도 마지막 값만.
+  const stage = document.getElementById('stage');
+  if (!stage) return;
+  if (!_zoomIndEl) { _zoomIndEl = document.createElement('div'); _zoomIndEl.id = 'zoom-indicator'; _zoomIndEl.setAttribute('aria-live', 'polite'); stage.appendChild(_zoomIndEl); }
+  const pct = Math.round(camera.target * 100);
+  _zoomIndEl.textContent = EN ? `Zoom ${pct}%` : `확대 ${pct}%`;
+  _zoomIndEl.style.opacity = '1';
+  if (_zoomIndTimer) clearTimeout(_zoomIndTimer);
+  _zoomIndTimer = setTimeout(() => { if (_zoomIndEl) _zoomIndEl.style.opacity = '0'; }, 800);
+}
+let _pursuitEl = null, _pursuitTimer = null;
+/** 함미 추적 시점에 처음 완전히 진입할 때 700~900ms 안내(§3.3). pointer-events:none·레이아웃 불변. */
+function showPursuitIndicator() {
+  const stage = document.getElementById('stage');
+  if (!stage) return;
+  if (!_pursuitEl) { _pursuitEl = document.createElement('div'); _pursuitEl.id = 'pursuit-indicator'; _pursuitEl.setAttribute('aria-live', 'polite'); stage.appendChild(_pursuitEl); }
+  _pursuitEl.textContent = EN ? 'Pursuit View' : '함미 추적 시점';
+  _pursuitEl.style.opacity = '1';
+  if (_pursuitTimer) clearTimeout(_pursuitTimer);
+  _pursuitTimer = setTimeout(() => { if (_pursuitEl) _pursuitEl.style.opacity = '0'; }, 850);
+}
+let updatePauseCameraUI = () => {};   // showPause가 열려 있으면 퍼센트를 갱신하는 함수로 대체(P0-4)
+/** 카메라 목표 배율 변경. dir: +1 확대 / -1 축소 / 0 초기화(100%). 휠·키보드·일시정지 버튼이 공용으로 호출. */
+function applyZoom(dir) {
+  camera.target = dir === 0 ? DEFAULT_ZOOM : stepZoom(camera.target, dir);
+  showZoomIndicator();
+  persistZoom();
+  updatePauseCameraUI();
+}
+/** 전술 시점(100%) ↔ 완전 함미 추적 시점(220%) 토글. C키·일시정지 버튼·모바일 버튼 공용(§8.2). */
+function toggleChaseView() {
+  camera.target = camera.target >= CHASE_FULL_ZOOM ? DEFAULT_ZOOM : MAX_ZOOM;
+  showZoomIndicator();
+  persistZoom();
+  updatePauseCameraUI();
+}
+/** 현재 목표가 추적 시점(≥200%)인가 — 버튼 문구 전환용. */
+function isChaseTargetView() { return camera.target >= CHASE_FULL_ZOOM; }
+/** 휠/키보드로 줌을 바꿀 수 있는 상태인가(§3.2): 실제 전투 + 일시정지·드래프트·요약 오버레이가 아님. */
+function canWheelZoom() { return state === 'play' && !paused && !drafting && !betweenStages; }
+
+/** 현재 프레임의 함대 좌표를 카메라 기준점에 반영(RC1 §3). 입력 역변환(input.tick)과 렌더(draw)가
+ *  같은 최신 anchor를 쓰게 해 고배율·빠른 이동·전투 첫 프레임에서 1프레임 어긋남을 없앤다.
+ *  전투가 아니거나 run/squad가 없으면 아무것도 하지 않는다(예외 방지). 이 값은 렌더/좌표 변환 전용이며 게임 규칙 계산에 쓰이지 않는다. */
+function syncCameraAnchor() {
+  if (state !== 'play' || !run || !run.squad) return;
+  camera.anchorX = run.squad.x;
+  camera.anchorY = run.squad.y;
+}
+
+// 마우스 휠(§3.2 + RC1 보정): 결정은 순수 resolveWheelZoom에 위임한다.
+//  - Ctrl/Cmd 휠(브라우저 확대)·전투 밖·수평 우세 입력은 손대지 않음(preventDefault 안 함).
+//  - 정밀 터치패드의 작은 delta는 픽셀 임계(≈60px)까지 누적해 한 단계씩만. 전통 휠 한 칸(≈100px)은 한 단계.
+const wheelAccumulator = createWheelStepAccumulator({ viewportHeight: () => (typeof window !== 'undefined' && window.innerHeight) || 800 });
+const _wheelNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : 0);
+canvas.addEventListener('wheel', (e) => {
+  const { step, preventDefault } = resolveWheelZoom(e, {
+    canZoom: canWheelZoom(),
+    accumulator: wheelAccumulator,
+    now: _wheelNow(),
+    viewportHeight: (typeof window !== 'undefined' && window.innerHeight) || 800,
+  });
+  if (preventDefault) e.preventDefault();   // 유효 수직 입력이면 임계 미도달이라도 페이지 스크롤 차단
+  if (step !== 0) applyZoom(step);          // 위로=확대(+1) / 아래로=축소(-1)
+}, { passive: false });
+
+// 키보드(§3.3): -=축소 / +,= =확대 / 0=초기화. 입력창 포커스·Ctrl/Cmd·전투 아님·키반복이면 무시(과도한 연속 변경 방지).
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  const el = document.activeElement, tag = (el && el.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || (el && el.isContentEditable)) return;
+  if (!canWheelZoom()) return;
+  if (e.key === '-' || e.key === '_') { applyZoom(-1); e.preventDefault(); }
+  else if (e.key === '+' || e.key === '=') { applyZoom(+1); e.preventDefault(); }
+  else if (e.key === '0') { applyZoom(0); e.preventDefault(); }
+  else if (e.key === 'c' || e.key === 'C') { toggleChaseView(); e.preventDefault(); }   // §8.2: 100% ↔ 220% 함미 추적 토글
+});
+
+// ── Stage 1 분석 스택 ─────────────────────────────────────────
+// 개발/측정 진입(coreLoopTest·campaign25·bosslab 등)이면 GA4 전송 0(어댑터 dev 게이트). analyticsDebug면 로컬 디버그.
+const ANALYTICS_DEV = isDevUrl(location.search);
+const ANALYTICS_DEBUG = isDebugUrl(location.search);
+let _analyticsSession = null;
+try { _analyticsSession = window.sessionStorage; } catch { _analyticsSession = null; }
+const analyticsConsent = createConsent();
+const ga4Adapter = createGa4Adapter({
+  config: ANALYTICS_CONFIG, consent: analyticsConsent, win: window, doc: document,
+  // 포털 배포는 GA4를 dev처럼 완전 억제한다 — 측정 ID가 미래에 채워져도 포털에선 전송 0(§P0-1).
+  isDevMode: () => ANALYTICS_DEV || !analyticsAllowedForDistribution(DIST), isDebug: () => ANALYTICS_DEBUG,
+});
+const analyticsCore = createAnalytics({ schema: SCHEMA, sink: ga4Sink(ga4Adapter), debug: ANALYTICS_DEBUG });
+installDebugGlobal(analyticsCore, { enabled: ANALYTICS_DEBUG, globalObj: window });   // ?analyticsDebug=1일 때만 window.__NFAnalytics
+const track = createGameAnalytics({
+  analytics: analyticsCore, save, sessionStorage: _analyticsSession, viewport: () => viewportGroup(window),
+});
+/** 공개 사용자 런에서만 계측(개발/측정 하네스·devDirect 제외). GA4 어댑터도 dev를 막지만 파사드 단계에서 한 번 더 거른다. */
+function isPublicRun() { return !!run && !run.devDirect && !run.coreLoop && !run.campaign25; }
+
+// 동의 흐름(작업지시서 §9). 설정에 유효 측정 ID가 있을 때만 UI를 띄운다. 없으면 로컬 디버그만.
+let updateAnalyticsSettingsUI = () => {};
+function analyticsAllow() {
+  const already = analyticsConsent.get() === 'granted';
+  analyticsConsent.set('granted');
+  ga4Adapter.grant();                  // 이전 거부(revoke) 상태를 해제 — 같은 페이지에서 재허용 시 전송 재개
+  ui.hideConsentBanner(); ui.hideConsentDetails();
+  updateAnalyticsSettingsUI();
+  if (!already && !ANALYTICS_DEV) track.consentUpdated();   // 허용이 저장되고 GA4가 활성화된 뒤 1회
+}
+function analyticsDeny() {
+  analyticsConsent.set('denied');
+  ga4Adapter.revoke();                 // 이미 로드됐다면 analytics_storage denied 업데이트 + 미래 전송 중단
+  ui.hideConsentBanner(); ui.hideConsentDetails();
+  updateAnalyticsSettingsUI();
+}
+function analyticsDetails() {
+  ui.showConsentDetails({ onAllow: analyticsAllow, onDeny: analyticsDeny, onClose: () => ui.hideConsentDetails() });
+}
+function maybeShowConsentBanner() {
+  if (!analyticsAllowedForDistribution(DIST)) return;   // 포털: 게임 내 GA4·동의 UI 없음(자체 대시보드 사용, §P0-1)
+  if (!shouldOfferConsent(ANALYTICS_CONFIG)) return;   // 측정 ID 없음 → 동의 UI 미표시
+  if (analyticsConsent.isDecided()) return;            // 이미 선택함
+  ui.showConsentBanner({ onAllow: analyticsAllow, onDeny: analyticsDeny, onDetails: analyticsDetails });
+}
+function hideConsentUI() { ui.hideConsentBanner(); ui.hideConsentDetails(); }
+
+// ── Prolific 첫인상 테스트 흐름(작업지시서 §4·§5) ──────────────
+// 전용 런타임 상태. 전투 시작 후 240초 타이머 + 첫 사망 시 설문. 분석 실패가 게임·완료를 막지 않는다.
+let playtest = null;   // { timer, done }
+const playtestSubmission = createPlaytestSubmission({
+  track,
+  completionUrl: PLAYTEST_CONFIG.completionUrl,
+  transmitWindowMs: PLAYTEST_CONFIG.transmitWindowMs,
+  redirect: (url) => { try { location.assign(url); } catch { /* 이동 실패해도 완료 안내는 유지 */ } },
+  showManualComplete: () => ui.showPlaytestComplete(),
+});
+
+/** 전용 영어 시작(동의) 화면. 동의 여부를 여기서 결정한다(§4.1). */
+function startPlaytestFlow() {
+  resetToTitleState();
+  document.documentElement.lang = 'en';
+  document.title = 'NEON FLEET — 4-Minute Playtest';
+  ui.showPlaytestIntro({ onAgree: playtestAgree, onDecline: playtestDecline });
+}
+function playtestAgree() {
+  const already = analyticsConsent.get() === 'granted';
+  analyticsConsent.set('granted');
+  ga4Adapter.grant();
+  if (!already) track.consentUpdated();          // GA4 활성·동의 뒤 1회(측정 ID 없으면 어댑터가 no-op)
+  track.expeditionStartSelected('campaign');     // 퍼널 일관성(캠페인 시작 의도)
+  track.playtestStarted(PLAYTEST_COHORT);        // 전용 흐름 시작(provider=prolific·cohort)
+  playtest = { timer: createPlaytestTimer(PLAYTEST_TIME_LIMIT_SEC), done: false };
+  newExpedition('campaign', { pickWeapon: true });   // 일반 게임 영어 핵심 경로(스토리 인트로 없이 영어 가이드→무기→전투)
+}
+function playtestDecline() {
+  analyticsConsent.set('denied');
+  ga4Adapter.revoke();                            // 전송 중단(거부해도 일반 게임·저장은 손상시키지 않음)
+  const st = playtestConfigStatus();
+  if (st.hasNoConsentUrl) { try { location.assign(st.noConsentUrl); } catch { /* 이동 실패 시 안내로 폴백 */ ui.showPlaytestComplete({ message: 'You chose not to share anonymous data. You can close this tab.' }); } }
+  else ui.showPlaytestComplete({ message: 'You chose not to share anonymous data. You can close this tab. No data was collected.' });
+}
+/** Prolific 전투시간 누적(§4.2): 실제 전투(state='play') 중에만 dt를 타이머에 넣고, 상한(240초) 최초 도달 시 1회 설문. 타이머 오류가 프레임 루프를 멈추지 않게 방어한다. */
+function playtestTick(dt) {
+  if (!PLAYTEST || !playtest || playtest.done) return;
+  if (state !== 'play' || paused || drafting || betweenStages) return;
+  try { if (playtest.timer.tick(dt)) triggerPlaytestSurvey('time_limit'); } catch { /* 삼킴: 게임·완료를 막지 않는다 */ }
+}
+
+/** 4분 종료(시간 제한 또는 첫 사망) → 게임 안전 정지 + 영어 설문(§4.2·§5). 원정당 1회. */
+function triggerPlaytestSurvey(endReason) {
+  if (!playtest || playtest.done) return;
+  playtest.done = true;
+  playtest.timer.markReached();
+  track.playtestLimitReached(endReason, playtest.timer.elapsed());
+  state = 'done'; drafting = false; betweenStages = false; paused = false;
+  if (input) { input.active = false; input.charging = false; }
+  setBgmIntensity(0.2); playBgm('title');
+  ui.showPlaytestSurvey({ onSubmit: (answers) => playtestSubmission.submit(answers) });
+}
 
 // 오디오: 첫 사용자 제스처(탭/클릭/키)에서 AudioContext 잠금 해제 후 타이틀 BGM 시작
 initAudio(save);
@@ -94,12 +556,15 @@ window.addEventListener('keydown', firstGestureUnlock);
   const snd = save.get().snd;
   const wrap = document.createElement('div');
   wrap.id = 'snd-settings';
+  const soundText = EN
+    ? { music: '🎵 Music', sfx: '🔊 Sound effects', mute: '🔇 Mute', unmute: '🔊 Unmute' }
+    : { music: '🎵 배경음악', sfx: '🔊 효과음', mute: '🔇 음소거', unmute: '🔊 음소거 해제' };
   wrap.innerHTML = `
-    <button id="snd-gear" title="사운드 설정">${snd.mute ? '🔇' : '🔊'}</button>
+    <button id="snd-gear" title="${EN ? 'Sound settings' : '사운드 설정'}" aria-label="${EN ? 'Sound settings' : '사운드 설정'}">${snd.mute ? '🔇' : '🔊'}</button>
     <div id="snd-panel" class="hidden">
-      <label>🎵 배경음악 <input id="snd-bgm" type="range" min="0" max="100" value="${Math.round(snd.bgm * 100)}"></label>
-      <label>🔊 효과음 <input id="snd-sfx" type="range" min="0" max="100" value="${Math.round(snd.sfx * 100)}"></label>
-      <button id="snd-mute">${snd.mute ? '🔊 음소거 해제' : '🔇 음소거'}</button>
+      <label>${soundText.music} <input id="snd-bgm" type="range" min="0" max="100" value="${Math.round(snd.bgm * 100)}"></label>
+      <label>${soundText.sfx} <input id="snd-sfx" type="range" min="0" max="100" value="${Math.round(snd.sfx * 100)}"></label>
+      <button id="snd-mute" aria-label="${snd.mute ? (EN ? 'Unmute' : '음소거 해제') : (EN ? 'Mute' : '음소거')}">${snd.mute ? soundText.unmute : soundText.mute}</button>
     </div>`;
   document.getElementById('stage').appendChild(wrap);
 
@@ -121,13 +586,42 @@ window.addEventListener('keydown', firstGestureUnlock);
     e.stopPropagation();
     const muted = toggleMute();
     gear.textContent = muted ? '🔇' : '🔊';
-    muteToggle.textContent = muted ? '🔊 음소거 해제' : '🔇 음소거';
+    muteToggle.textContent = muted ? soundText.unmute : soundText.mute;
+    muteToggle.setAttribute('aria-label', EN ? (muted ? 'Unmute' : 'Mute') : (muted ? '음소거 해제' : '음소거'));
   });
   // 패널 밖 클릭 시 닫기
   document.addEventListener('click', (e) => {
     if (!wrap.contains(e.target)) panel.classList.add('hidden');
   });
 })();
+
+// 분석 설정(작업지시서 §9.3): 사운드 패널에 동의 상태 표시 + 허용/거부·철회/수집 항목 보기.
+//  측정 ID가 없으면(shouldOfferConsent=false) 아예 추가하지 않는다.
+if (shouldOfferConsent(ANALYTICS_CONFIG)) {
+  const sndPanel = document.getElementById('snd-panel');
+  if (sndPanel) {
+    const sec = document.createElement('div');
+    sec.id = 'analytics-settings';
+    sec.innerHTML = `
+      <hr>
+      <div class="an-state">익명 데이터: <b id="an-state-val">—</b></div>
+      <div class="an-btns">
+        <button id="an-allow">허용</button>
+        <button id="an-deny">거부·철회</button>
+      </div>
+      <button id="an-details" class="an-link">수집 항목 보기</button>`;
+    sndPanel.appendChild(sec);
+    const val = sec.querySelector('#an-state-val');
+    updateAnalyticsSettingsUI = () => {
+      const s = analyticsConsent.get();
+      val.textContent = s === 'granted' ? '허용됨' : s === 'denied' ? '거부됨' : '미선택';
+    };
+    sec.querySelector('#an-allow').addEventListener('click', (e) => { e.stopPropagation(); analyticsAllow(); });
+    sec.querySelector('#an-deny').addEventListener('click', (e) => { e.stopPropagation(); analyticsDeny(); });
+    sec.querySelector('#an-details').addEventListener('click', (e) => { e.stopPropagation(); analyticsDetails(); });
+    updateAnalyticsSettingsUI();
+  }
+}
 
 // ───────────────────────── 판(run) 상태
 let state = 'title'; // title | play | done(오버레이 표시 중)
@@ -153,6 +647,7 @@ function newExpedition(mode = 'campaign', opts = {}) {
   const effects = createEffects();
   const world = {
     bal: BAL, input, squad, effects,
+    en: EN,   // 캔버스 라벨/토스트 언어(포털·Prolific=영어). entities.js 등 world를 받는 렌더가 이 값으로 분기(§P0-2).
     bullets: [], enemyBullets: [], entities: [],
     scrollSpeed: BAL.scrollSpeed,
     logicalW: LOGICAL_W,
@@ -180,6 +675,7 @@ function newExpedition(mode = 'campaign', opts = {}) {
       if (!sq.surv) return;
       survTierUp(sq.surv, BAL.gate1.survivability);
       sq.surv.hull = sq.surv.hullMax;
+      if (isPublicRun()) track.milestone({ milestoneType: 'flagship_tier', milestoneValue: sq.tier, sector: run.sector });   // 분석: 첫 기함 승급 1회
     },
   };
   run = {
@@ -197,13 +693,23 @@ function newExpedition(mode = 'campaign', opts = {}) {
     devDirect: !!opts.devDirect,
   };
   // 엔드리스는 캠페인 이후 섹터(7)부터 시작 → 보스 순환·변주·다중 보스가 자연히 강해진다.
-  const begin = () => startSector(mode === 'endless' ? BAL.campaign.sectors + 1 : 1);
+  // 분석: 필수 시작 선택을 마치고 첫 섹터로 넘어가기 직전 expedition_started 1회(공개 런만). run 할당 직후엔 보내지 않는다.
+  const begin = () => {
+    if (isPublicRun()) track.expeditionStarted(mode);
+    startSector(mode === 'endless' ? BAL.campaign.sectors + 1 : 1);
+  };
   if (opts.pickWeapon) {
     // 섹터 무기 조합 이식(S2~): 공명 + **기함 내구도**(25분과 동일 모델, 이사 요청) 동시 설치.
     // installGate1이 wing 슬롯도 비워 초기화하므로, 시작 무기 선택 전에 한 번만 부른다.
     squad.installGate1({ surv: createSurvivability(BAL.gate1.survivability), reson: createResonanceState(), mainWeapon: squad.weapon });
     world.reson = squad.reson;
-    sectorStartWeaponPick(begin);
+    if (opts.weapon) {
+      // P0-4: 같은 무기 즉시 재출격 — 선택창(첫 화면) 재노출 없이 주무기 지정 후 시작.
+      squad.weapon = opts.weapon; squad.weaponLv = 1; lastWeapon = opts.weapon;
+      if (squad.reson) resonSetLoadout(squad.reson, [opts.weapon, null]);
+      if (isPublicRun()) track.buildChoice({ choiceType: 'start_weapon', choiceId: opts.weapon, weaponId: opts.weapon, sector: 1 });
+      begin();
+    } else sectorStartWeaponPick(begin);
   } else begin();
 }
 
@@ -218,6 +724,7 @@ function startSector(sector) {
   // 최고 도달 섹터 기록 — 캠페인은 stage, 엔드리스는 endlessBest에만 (기록 완전 분리)
   const p = progressPatch(r.mode, sector, save.get());
   if (Object.keys(p).length) save.set(p);
+  if (isPublicRun()) track.sectorStarted(sector, r.mode);   // 분석: 공개 런 섹터 시작 1회
   enterSectorMap();
 }
 
@@ -235,9 +742,27 @@ function enterSectorMap() {
     && r.map.cols[0] && r.map.cols[0].length === 1;
   if (soloRoot) {
     const root = r.map.cols[0][0];
+    // 분석: 루트가 하나뿐인 첫 항로는 확정 순간(자동)에 route_selected(auto_root) 1회. enterNode 호출은 그대로 둔다.
+    trackRoute(root, 'auto_root');
+    if (PORTAL_MODE) {
+      // P0-3: 포털은 무기 카드 클릭(유일한 시작 클릭) 뒤 곧바로 전투로 — 전체화면 차단 가이드 없이
+      //  전투 위에 비차단 조작 힌트만 띄우고(실제 입력 또는 8초 후 사라짐) 즉시 진입한다.
+      enterNode(root);
+      showPortalHint();
+      return;
+    }
+    if (PLAYTEST) {
+      // Prolific: 스토리 인트로 없이 영어 간이 가이드 → 같은 루트로 진입. 일반 게임 저장(firstGuideSeen)은 건드리지 않는다.
+      const guideType = r.squad.reson ? 'combo' : 'standard';
+      track.guideViewed(guideType);
+      ui.showFirstGuide({ lang: 'en', combo: !!r.squad.reson, onStart: () => { track.guideCompleted(guideType); enterNode(root); } });
+      return;
+    }
     if (!d.firstGuideSeen) {
       // 최초 사용자: 조작 안내를 1회 보여주고, 안내의 '전투 시작'에서 같은 루트로 진입.
-      ui.showFirstGuide({ combo: !!r.squad.reson, onStart: () => { save.set({ firstGuideSeen: true }); enterNode(root); } });
+      const guideType = r.squad.reson ? 'combo' : 'standard';
+      if (isPublicRun()) track.guideViewed(guideType);
+      ui.showFirstGuide({ combo: !!r.squad.reson, onStart: () => { if (isPublicRun()) track.guideCompleted(guideType); save.set({ firstGuideSeen: true }); enterNode(root); } });
     } else {
       enterNode(root);   // 안내를 이미 본 사용자: 선택지 하나뿐인 첫 항로 클릭 없이 즉시 진입
     }
@@ -245,8 +770,18 @@ function enterSectorMap() {
   }
   ui.showSectorMap({
     map: r.map, currentId: r.node ? r.node.id : null, doneIds: r.done,
-    sector: r.sector, coins: r.world.coins, onPick: enterNode,
+    sector: r.sector, coins: r.world.coins,
+    lang: LANG,   // Prolific: 항로 선택 화면도 영어(§4.3)
+    // 입력 수단별 확정: showSectorMap이 pointer_confirm / touch_confirm / keyboard_confirm을 실제 입력에서 전달한다.
+    onPick: (node, method) => { trackRoute(node, method || 'pointer_confirm'); enterNode(node); },
   });
+}
+
+/** 항로 확정 → route_selected(auto_root / pointer_confirm·touch_confirm·keyboard_confirm) 1회(공개 런만). enterNode 호출과 분리해 기존 배선을 보존. */
+function trackRoute(node, selectionMethod) {
+  if (node && isPublicRun()) {
+    track.routeSelected({ sector: run.sector, nodeType: node.type, nodeCol: node.col, selectionMethod, nodeKey: node.id });
+  }
 }
 
 /** 노드 진입: 타입별 인카운터로 분기 */
@@ -259,10 +794,15 @@ function enterNode(node) {
   if (node.type === 'repair') { enterRepair(node); return; }
   buildEncounter(node);
   state = 'play'; drafting = false; ui.hide();
+  platform.gameplayStart();   // 플랫폼 수명주기(no-op — 향후 Full Launch SDK 광고 타이밍용, 이번 단계 미연결)
+  if (isPublicRun()) track.combatStarted(r.sector);   // 분석: 해당 원정 첫 실제 전투 진입 1회(time_to_combat)
+  if (PLAYTEST && playtest) playtest.timer.startCombat();   // Prolific: 전투 진입 시점부터 240초 타이머 시작(§4.2)
   // 섹터별 전투 BGM(없으면 battle1 폴백). r.bgmRestart는 보통 enterSectorMap이 소비하지만, 개발/측정 부트스트랩은
   // 그 화면을 건너뛰므로(devDirect) 여기서 소비한다 — 개발 런 재시작 시 전투곡이 처음부터 재생되도록(Codex P3 후속).
   setBgmIntensity(0.3); playBgmForSector(r.sector, { restart: !!r.bgmRestart }); r.bgmRestart = false; sfx('start');
-  const label = { combat: '교전', elite: '정예 교전', hazard: '위험 지대', supply: '보급', boss: '섹터 보스' }[node.type] || '교전';
+  const label = (EN
+    ? { combat: 'ENGAGEMENT', elite: 'ELITE ENCOUNTER', hazard: 'HAZARD ZONE', supply: 'SUPPLY RUN', boss: 'SECTOR BOSS' }
+    : { combat: '교전', elite: '정예 교전', hazard: '위험 지대', supply: '보급', boss: '섹터 보스' })[node.type] || (EN ? 'ENGAGEMENT' : '교전');
   r.effects.text(LOGICAL_W / 2, logicalH * 0.4, label, node.type === 'boss' ? COLORS.danger : COLORS.reward);
   r.effects.flash(0.3);
 }
@@ -275,8 +815,8 @@ function enterRepair(node) {
   const heal = Math.max(BAL.nodeReward.repairHealMin, Math.round(r.squad.count * BAL.nodeReward.repairHealPct));  // max(12, count×0.35)
   const surv = r.squad.surv;
   const hullDamaged = () => surv && surv.hull < surv.hullMax;                    // 기함 내구도 손상 여부
-  const doDrone = () => { r.squad.applyDelta(heal, r.world); sfx('pickup'); completeNode(node); };
-  const doHull = () => { surv.hull = surv.hullMax; sfx('pickup'); completeNode(node); };   // 내구도 완전 수리
+  const doDrone = () => { r.squad.applyDelta(heal, r.world); sfx('pickup'); if (isPublicRun()) track.buildChoice({ choiceType: 'repair', choiceId: 'drone', sector: r.sector }); completeNode(node); };
+  const doHull = () => { surv.hull = surv.hullMax; sfx('pickup'); if (isPublicRun()) track.buildChoice({ choiceType: 'repair', choiceId: 'hull', sector: r.sector }); completeNode(node); };   // 내구도 완전 수리
   const doModule = () => {
     if (r.world.coins < cost) return;   // 방어: 부족 시 무시(버튼도 비활성)
     r.world.addCoins(-cost);
@@ -284,17 +824,17 @@ function enterRepair(node) {
     if (opts.length) {
       drafting = true;
       ui.showDraft({
-        options: opts, owned: moduleSummary(r.modules),
-        onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); completeNode(node); },
+        options: opts, owned: moduleSummary(r.modules), lang: LANG,
+        onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); if (isPublicRun()) track.buildChoice({ choiceType: 'module', choiceId: id, sector: r.sector }); completeNode(node); },
       });
     } else { completeNode(node); }
   };
   function openMenu() {
     ui.showRepair({
-      cost, coins: r.world.coins, canAfford: r.world.coins >= cost,
+      cost, coins: r.world.coins, canAfford: r.world.coins >= cost, lang: LANG,
       onHeal() {
         // 긴급 수리: 내구도가 손상됐으면 [내구도 수리] vs [드론 보충] 재선택, 온전하면 바로 드론 보충
-        if (hullDamaged()) ui.showEmergencyRepair({ hullPct: Math.round(hullFrac(surv) * 100), drones: heal, onHull: doHull, onDrone: doDrone, onBack: openMenu });
+        if (hullDamaged()) ui.showEmergencyRepair({ hullPct: Math.round(hullFrac(surv) * 100), drones: heal, onHull: doHull, onDrone: doDrone, onBack: openMenu, lang: LANG });
         else doDrone();
       },
       onModule: doModule,
@@ -392,14 +932,22 @@ function buildEncounter(node) {
 function sectorWingPick(done) {
   const r = run, sq = r.squad;
   const opts = ['vulcan', 'laser', 'homing'].filter((w) => w !== sq.weapon).map((w) => ({
-    id: w, label: WEAPON_LABELS[w], desc: `공명: ${RESONANCES[buildForPair(sq.weapon, w).resonance]?.name || ''}`, color: WEAPON_COLORS[w], icon: WEAPON_ICON[w],
+    id: w,
+    label: EN ? WEAPON_LABELS_EN[w] : WEAPON_LABELS[w],
+    desc: EN
+      ? `Resonance: ${PLAYTEST_RESONANCE_EN[buildForPair(sq.weapon, w).resonance] || ''}`
+      : `공명: ${RESONANCES[buildForPair(sq.weapon, w).resonance]?.name || ''}`,
+    color: WEAPON_COLORS[w], icon: WEAPON_ICON[w],
   }));
   pickCard({
-    title: '보조 무기 선택', subtitle: '주무기와 짝지어 공명이 결정됩니다.', autoId: opts[0].id, options: opts,
+    title: EN ? 'Choose a wing weapon' : '보조 무기 선택',
+    subtitle: EN ? 'Pair it with your main weapon to unlock a resonance.' : '주무기와 짝지어 공명이 결정됩니다.',
+    autoId: opts[0].id, options: opts,
     onPick: (id) => {
       sq.wing.weaponId = id; sq.wing.level = 1; sq._wingAcc = 0;
       resonSetLoadout(sq.reson, [sq.weapon, id]);   // 조합 → 공명 활성(update가 tick/발동)
-      r.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[id]} · 공명 ${RESONANCES[sq.reson.activeId]?.name || ''}`, WEAPON_COLORS[id], 15);
+      r.effects.text(sq.x, sq.y - 60, tx(`Wing: ${WEAPON_LABELS_EN[id]} · Resonance ${PLAYTEST_RESONANCE_EN[sq.reson.activeId] || ''}`, `보조 무기: ${WEAPON_LABELS[id]} · 공명 ${RESONANCES[sq.reson.activeId]?.name || ''}`), WEAPON_COLORS[id], 15);
+      if (isPublicRun()) { track.milestone({ milestoneType: 'second_weapon', sector: r.sector }); track.milestone({ milestoneType: 'first_resonance', sector: r.sector }); }
       done && done();
     },
   });
@@ -411,14 +959,22 @@ function sectorWeaponUpgrade() {
   let steps = coreLoopWeaponSteps(sq);
   if (!sq.wing.weaponId) {   // 보조 무기 없음 → 이번 POW에 보조 무기 장착 선택지(주무기와 조합→공명) 우선 노출
     const wingOpts = ['vulcan', 'laser', 'homing'].filter((w) => w !== sq.weapon).map((w) => ({
-      id: `wing-${w}`, label: `보조: ${WEAPON_LABELS[w]}`, desc: `공명 ${RESONANCES[buildForPair(sq.weapon, w).resonance]?.name || ''}`, color: WEAPON_COLORS[w], icon: WEAPON_ICON[w],
-      apply: () => { sq.wing.weaponId = w; sq.wing.level = 1; sq._wingAcc = 0; resonSetLoadout(sq.reson, [sq.weapon, w]); r.effects.text(sq.x, sq.y - 60, `보조 무기: ${WEAPON_LABELS[w]} · 공명 ${RESONANCES[sq.reson.activeId]?.name || ''}`, WEAPON_COLORS[w], 15); },
+      id: `wing-${w}`,
+      label: EN ? `Wing: ${WEAPON_LABELS_EN[w]}` : `보조: ${WEAPON_LABELS[w]}`,
+      desc: EN
+        ? `Resonance: ${PLAYTEST_RESONANCE_EN[buildForPair(sq.weapon, w).resonance] || ''}`
+        : `공명 ${RESONANCES[buildForPair(sq.weapon, w).resonance]?.name || ''}`,
+      color: WEAPON_COLORS[w], icon: WEAPON_ICON[w],
+      apply: () => { sq.wing.weaponId = w; sq.wing.level = 1; sq._wingAcc = 0; resonSetLoadout(sq.reson, [sq.weapon, w]); r.effects.text(sq.x, sq.y - 60, tx(`Wing: ${WEAPON_LABELS_EN[w]} · Resonance ${PLAYTEST_RESONANCE_EN[sq.reson.activeId] || ''}`, `보조 무기: ${WEAPON_LABELS[w]} · 공명 ${RESONANCES[sq.reson.activeId]?.name || ''}`), WEAPON_COLORS[w], 15); if (isPublicRun()) { track.milestone({ milestoneType: 'second_weapon', sector: r.sector }); track.milestone({ milestoneType: 'first_resonance', sector: r.sector }); } },
     }));
     steps = [...wingOpts, ...steps];
   }
-  if (!steps.length) { sq.banked = (sq.banked || 0) + 55; r.effects.text(sq.x, sq.y - 60, '화력 강화 +', COLORS.reward, 15); return; }
-  const opts = steps.slice(0, 3).map((s) => ({ id: s.id, label: s.label, desc: s.desc, color: s.color || '#ffd93d', icon: s.icon || '🔧' }));
-  pickCard({ title: '무기 강화 선택', subtitle: '정예 격파 보상', autoId: steps[0].id, options: opts,
+  if (!steps.length) { sq.banked = (sq.banked || 0) + 55; r.effects.text(sq.x, sq.y - 60, tx('Firepower +', '화력 강화 +'), COLORS.reward, 15); return; }
+  const opts = steps.slice(0, 3).map((s) => {
+    const shown = playtestWeaponStepLabel(s, sq);
+    return { id: s.id, label: shown.label, desc: shown.desc, color: s.color || '#ffd93d', icon: s.icon || '🔧' };
+  });
+  pickCard({ title: EN ? 'Choose a weapon upgrade' : '무기 강화 선택', subtitle: EN ? 'Elite defeat reward' : '정예 격파 보상', autoId: steps[0].id, options: opts,
     onPick: (id) => { const s = steps.find((x) => x.id === id); if (s) s.apply(); } });
 }
 
@@ -432,12 +988,15 @@ function onEncounterClear() {
 /** 노드 완료 → 맵 복귀, 보스 노드면 다음 섹터 */
 function completeNode(node) {
   const r = run;
-  if (node && !r.done.includes(node.id)) r.done.push(node.id);
+  if (node && !r.done.includes(node.id)) {
+    r.done.push(node.id);
+    if (isPublicRun()) track.nodeCompleted({ sector: r.sector, nodeType: node.type, nodeKey: node.id });   // 분석: 노드 정산 뒤 1회
+  }
   const proceed = () => {
     if (node && node.type === 'boss') {
       // 캠페인 최종 보스(섹터 6 하이브 퀸) 격파 → 승리 화면(자동 섹터 7 진행 안 함, §6.2/6.3)
       if (r.mode !== 'endless' && r.sector >= BAL.campaign.sectors) { winCampaign(); return; }
-      r.effects.text(LOGICAL_W / 2, logicalH * 0.4, `섹터 ${r.sector} 클리어!`, COLORS.reward);
+      r.effects.text(LOGICAL_W / 2, logicalH * 0.4, tx(`SECTOR ${r.sector} CLEAR!`, `섹터 ${r.sector} 클리어!`), COLORS.reward);
       const nextSector = () => startSector(r.sector + 1);
       // 첫 섹터 보스 격파 후 다음 섹터 맵 전에 키스톤 3택 (원정당 1개)
       if (r.sector === 1 && !r.squad.keystone) openKeystone(nextSector);
@@ -455,8 +1014,8 @@ function completeNode(node) {
     if (opts.length) {
       drafting = true; state = 'map';
       ui.showDraft({
-        options: opts, owned: moduleSummary(r.modules),
-        onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); proceed(); },
+        options: opts, owned: moduleSummary(r.modules), lang: LANG,
+        onPick(id) { r.modules.push(id); recomputeMfx(); drafting = false; sfx('buy'); if (isPublicRun()) track.buildChoice({ choiceType: 'module', choiceId: id, sector: r.sector }); proceed(); },
       });
       return;
     }
@@ -466,15 +1025,16 @@ function completeNode(node) {
 
 // (구 advanceStage 제거 — 섹터 맵의 onEncounterClear/completeNode가 진행을 담당)
 
-function startPlay() {
+function startPlay(sameWeapon) {
   drafting = false;
   betweenStages = false;
+  hideConsentUI();
   sfx('start');
   if (BOSSLAB) { startBossLab(_clParams.get('boss') || 'B14'); return; }   // ?bosslab=1&boss=B14: 보스 패턴 프리뷰
   if (CAMPAIGN25) { const play = _clParams.has('play'); startCampaign25({ mode: play ? 'play' : 'measure', buildId: 'railStorm', pick: play }); return; }  // ?campaign25=1 자동시연 / &play=1 사람 조작(무기 완전 선택제)
   if (CORE_MEASURE) { startCoreLoop({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?coreLoopMeasure=1: 자동 측정
   if (CORE_LOOP) { startCoreLoop({ mode: 'play' }); return; }   // ?coreLoopTest=1: 사람 플레이 8분 슬라이스
-  newExpedition('campaign', { pickWeapon: true });   // 섹터 원정: 출격 시 시작 무기 선택 → 섹터 맵. 노드 선택 시 전투.
+  newExpedition('campaign', { pickWeapon: true, weapon: sameWeapon });   // 섹터 원정: 시작 무기 선택(또는 P0-4 같은 무기 재도전) → 섹터 맵 → 전투.
 }
 
 /** 보스 패턴 프리뷰(개발/테스트): 지정 보스를 즉시 등장시켜 패턴만 관찰·연습. 처치 시 재소환. */
@@ -1035,18 +1595,28 @@ function pickCard({ title, subtitle, options, autoId, onPick, auto = false }) {
 /** 섹터 원정 출격 시 시작 무기 선택(사람). pickCard 공용 사용 → 완료 후 done()으로 섹터 시작. */
 function sectorStartWeaponPick(done) {
   const r = run, sq = r.squad;
+  // 포털·Prolific(EN)에서는 무기 이름·설명·안내를 영어로(§4.3·§P0-2). 일반 모드는 한국어 그대로.
+  const en = EN;
+  const options = en ? [
+    { id: 'vulcan', label: WEAPON_LABELS_EN.vulcan, desc: 'Wide rapid fire', color: WEAPON_COLORS.vulcan, icon: WEAPON_ICON.vulcan },
+    { id: 'laser', label: WEAPON_LABELS_EN.laser, desc: 'Piercing beam', color: WEAPON_COLORS.laser, icon: WEAPON_ICON.laser },
+    { id: 'homing', label: WEAPON_LABELS_EN.homing, desc: 'Auto-tracking missiles', color: WEAPON_COLORS.homing, icon: WEAPON_ICON.homing },
+  ] : [
+    { id: 'vulcan', label: WEAPON_LABELS.vulcan, desc: '넓게 퍼지는 연사', color: WEAPON_COLORS.vulcan, icon: WEAPON_ICON.vulcan },
+    { id: 'laser', label: WEAPON_LABELS.laser, desc: '적을 관통하는 빔', color: WEAPON_COLORS.laser, icon: WEAPON_ICON.laser },
+    { id: 'homing', label: WEAPON_LABELS.homing, desc: '흩어진 적 자동 추적', color: WEAPON_COLORS.homing, icon: WEAPON_ICON.homing },
+  ];
   pickCard({
-    title: '시작 무기 선택', subtitle: '이번 원정의 주무기를 고르세요.',
+    title: en ? 'Choose your starting weapon' : '시작 무기 선택',
+    subtitle: en ? 'Pick the main weapon for this run.' : '이번 원정의 주무기를 고르세요.',
     autoId: sq.weapon,
-    options: [
-      { id: 'vulcan', label: WEAPON_LABELS.vulcan, desc: '넓게 퍼지는 연사', color: WEAPON_COLORS.vulcan, icon: WEAPON_ICON.vulcan },
-      { id: 'laser', label: WEAPON_LABELS.laser, desc: '적을 관통하는 빔', color: WEAPON_COLORS.laser, icon: WEAPON_ICON.laser },
-      { id: 'homing', label: WEAPON_LABELS.homing, desc: '흩어진 적 자동 추적', color: WEAPON_COLORS.homing, icon: WEAPON_ICON.homing },
-    ],
+    options,
     onPick: (id) => {
-      sq.weapon = id; sq.weaponLv = 1;
+      sq.weapon = id; sq.weaponLv = 1; lastWeapon = id;   // P0-4: 같은 무기 재도전용 기록
       if (sq.reson) resonSetLoadout(sq.reson, [id, null]);
-      r.effects.text(sq.x, sq.y - 60, `시작 무기: ${WEAPON_LABELS[id]}`, WEAPON_COLORS[id], 15);
+      const label = en ? WEAPON_LABELS_EN[id] : WEAPON_LABELS[id];
+      r.effects.text(sq.x, sq.y - 60, `${en ? 'Weapon' : '시작 무기'}: ${label}`, WEAPON_COLORS[id], 15);
+      if (isPublicRun()) track.buildChoice({ choiceType: 'start_weapon', choiceId: id, weaponId: id, sector: r.sector });
       done && done();
     },
   });
@@ -1621,6 +2191,8 @@ function update(dt) {
   const r = run;
   const w = r.world;
 
+  syncCameraAnchor();          // §3: input.tick 직전에 현재 함대 좌표를 카메라 anchor에 반영(1프레임 지연 제거)
+  rebuildChaseProjection();    // 2.5D: 같은 프레임의 함대·줌·blend로 투영 갱신 → 마우스 역변환이 현재 시점 기준
   input.tick(dt);
   w.phase = r.phase;
   w.boss = r.boss; w.bosses = r.bosses;
@@ -1802,7 +2374,9 @@ function update(dt) {
         // 보스 아트 id: Boss 클래스는 spriteId, MidBoss는 def.id를 쓴다.
         // 예전엔 def.id만 읽어 섹터 보스에서 undefined가 되면서 컷신에 보스가 아예 안 그려졌다(이사 지적).
         r.cut = createCutscene({
-          sector: r.sector, bossId: lead?.spriteId || lead?.def?.id, bossName: lead?.korName,
+          sector: r.sector, bossId: lead?.spriteId || lead?.def?.id, en: EN,
+          // 포털·Prolific(EN)=영문 보스명, 그 외=한국어. lead(Boss)는 spriteId로 def 조회.
+          bossName: EN ? (bossDefById(lead?.spriteId || lead?.def?.id)?.name || 'Enemy flagship') : lead?.korName,
           tier: r.squad.tier, weapon: r.squad.weapon,
         });
         r.phase = 'cutscene';
@@ -1869,9 +2443,9 @@ function update(dt) {
     // 보스 위치를 지나는 순간 배너 (섹터 보스면 섹터 돌파 컷신 문구)
     if (!r.clearShown && r.boss && r.squad.y < r.boss.y + 30) {
       r.clearShown = true;
-      const label = r.isBossNode ? `섹터 ${r.sector} 돌파` : '전투 완료!';
+      const label = r.isBossNode ? tx(`SECTOR ${r.sector} BREACH`, `섹터 ${r.sector} 돌파`) : tx('COMBAT COMPLETE!', '전투 완료!');
       r.effects.text(LOGICAL_W / 2, logicalH * 0.42, label, COLORS.ally, r.isBossNode ? 26 : 18);
-      if (r.isBossNode) r.effects.text(LOGICAL_W / 2, logicalH * 0.42 + 30, '적 기함 격침 확인', COLORS.reward, 13);
+      if (r.isBossNode) r.effects.text(LOGICAL_W / 2, logicalH * 0.42 + 30, tx('Enemy flagship destroyed', '적 기함 격침 확인'), COLORS.reward, 13);
       r.effects.ring(LOGICAL_W / 2, logicalH * 0.42, COLORS.ally);
       r.effects.flash(0.4);
       sfx('evolve');
@@ -1952,6 +2526,7 @@ function update(dt) {
   if (r.phase === 'lose' && (r.endT -= dt) <= 0) {
     if (r.coreLoop) { finishCoreLoop('hull'); return; }        // Gate 1 하네스: 내구도 소진 → 결과 화면
     if (r.campaign25) { finishCampaign25('hull'); return; }    // Gate 2: 내구도 소진 → 25분 결과(regionResults 첨부)
+    if (PLAYTEST && playtest && !playtest.done) { triggerPlaytestSurvey('first_death'); return; }   // Prolific: 첫 사망이 먼저면 즉시 설문(§4.2)
     endExpedition('death');
   }
 
@@ -1968,7 +2543,7 @@ function openDoctrine() {
   drafting = true;
   sfx('evolve');
   ui.showDoctrineDraft({
-    options: DOCTRINES,
+    options: DOCTRINES, lang: LANG,
     onPick(id) {
       r.squad.doctrine = id;
       r.squad.pendingDoctrine = false;
@@ -1976,7 +2551,8 @@ function openDoctrine() {
       ui.hide();
       sfx('buy');
       r.effects.flash(0.7);
-      r.effects.text(r.squad.x, r.squad.y - 60, `전투 스타일 선택: ${DOCTRINE_BY_ID[id].icon} ${DOCTRINE_BY_ID[id].name}`, COLORS.reward, 18);
+      r.effects.text(r.squad.x, r.squad.y - 60, tx(`Combat style: ${DOCTRINE_BY_ID[id].icon} ${DOCTRINE_EN[id]?.[0] || DOCTRINE_BY_ID[id].name}`, `전투 스타일 선택: ${DOCTRINE_BY_ID[id].icon} ${DOCTRINE_BY_ID[id].name}`), COLORS.reward, 18);
+      if (isPublicRun()) track.buildChoice({ choiceType: 'doctrine', choiceId: id, sector: r.sector });   // 분석: 적용 뒤 1회
     },
   });
 }
@@ -1989,7 +2565,7 @@ function openKeystone(after) {
   paused = false;
   sfx('evolve');
   ui.showKeystoneDraft({
-    options: KEYSTONES, sector: r.sector,
+    options: KEYSTONES, sector: r.sector, lang: LANG,
     onPick(id) {
       r.squad.keystone = id;
       r.squad.keystoneState = freshKeystoneState();   // 누적 카운터 0에서 시작
@@ -1997,6 +2573,7 @@ function openKeystone(after) {
       ui.hide();
       sfx('buy');
       r.effects.flash(0.7);
+      if (isPublicRun()) track.buildChoice({ choiceType: 'keystone', choiceId: id, sector: r.sector });   // 분석: 적용 뒤 1회
       after();
     },
   });
@@ -2012,7 +2589,7 @@ function openWeaponEvolution(weapon) {
   drafting = true;
   sfx('evolve');
   ui.showWeaponEvolution({
-    weapon, options: opts, tier: isSuper ? 2 : 1, repick: stage === 're',
+    weapon, options: opts, tier: isSuper ? 2 : 1, repick: stage === 're', lang: LANG,
     onPick(id) {
       if (isSuper) {
         r.squad.weaponEvolutions2[weapon] = id;              // 2단계 초진화(재선택 포함)
@@ -2027,7 +2604,8 @@ function openWeaponEvolution(weapon) {
       ui.hide();
       sfx('buy');
       r.effects.flash(0.6);
-      r.effects.text(r.squad.x, r.squad.y - 60, `${opts.find((o) => o.id === id).name}!`, COLORS.reward, 18);
+      r.effects.text(r.squad.x, r.squad.y - 60, tx(`${PLAYTEST_EVOLUTION_EN[id]?.[0] || opts.find((o) => o.id === id).name}!`, `${opts.find((o) => o.id === id).name}!`), COLORS.reward, 18);
+      if (isPublicRun()) track.buildChoice({ choiceType: isSuper ? 'weapon_super_evolution' : 'weapon_evolution', choiceId: id, weaponId: weapon, sector: r.sector });   // 분석: 진화/초진화 구분
       r.squad.triggerUpgradeFx(r.world, isSuper ? 'super' : 'evolution');
     },
   });
@@ -2040,6 +2618,7 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
   state = 'done';
   drafting = false;
   betweenStages = false;
+  platform.gameplayStop();   // 플랫폼 수명주기(no-op)
   setBgmIntensity(0.2); playBgm('title');
   const r = run;
   const data = save.get();
@@ -2057,12 +2636,25 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
     // 진행 기록은 모드별로 분리 저장(캠페인=stage, 엔드리스=endlessBest). 코인·최고화력은 공용.
     save.set({ best, coins: data.coins + total, ...progressPatch(r.mode, r.sector, data) });
   }
-  if (toTitle) { showTitleScreen(); return; }
   // P0-A: 첫 실제 사망(death)에서만 무료 긴급 개조 자격을 계산한다. quit·캠페인 완료·개발 종료는 제외.
-  //  정산은 위에서 r.settled로 이미 1회 끝났다 — 아래는 결과 화면만 그린다(개조 선택 후에도 endExpedition 재호출 없음).
   const freeKeys = reason === 'death' && !r.bossLab
     ? firstDefeatUpgradeOptions(save.get(), BAL.hangar.upgrades, BAL.hangar.maxLv)
     : [];
+  const isDeath = reason === 'death';
+  // 분석: 정산 1회 뒤 expedition_ended(공개 런). 파사드가 원정당 1회 보장 → 결과 재렌더에도 재발생 없음.
+  if (isPublicRun()) {
+    const d2 = save.get();
+    const upgradeState = !isDeath ? 'not_eligible'
+      : (freeKeys.length ? 'available' : (d2.firstDefeatUpgrade != null ? 'already_owned' : 'not_eligible'));
+    track.expeditionEnded({
+      outcome: isDeath ? 'death' : 'quit',
+      sectorReached: r.sector, nodeProgress: r.done.length,
+      primaryWeapon: r.squad.weapon, doctrineId: r.squad.doctrine, keystoneId: r.squad.keystone,
+      maxTier: r.squad.tier, maxCruisers: r.squad.cruisers || 0,
+      firstDefeatUpgradeState: upgradeState,
+    });
+  }
+  if (toTitle) { showTitleScreen(); return; }
   const resultSnap = { stage: r.sector, maxPower: r.maxPower, coins: earned, bonus, best, isRecord, modules: moduleSummary(r.modules) };
   showLoseResult(resultSnap, freeKeys);
 }
@@ -2074,9 +2666,10 @@ function endExpedition(reason = 'death', { toTitle = false } = {}) {
  *  '완료' 문구가 반복 노출되지 않게(그 death엔 카드도 문구도 없이 일반 결과 화면).
  */
 function showLoseResult(snap, freeKeys, justClaimed = false) {
+  const FREE_EN = { drones: 'Drones', hull: 'Hull', dmg: 'Damage' };   // P0-2: 무료 개조 카드 영어명(포털·Prolific). 단위 '기'는 영어에서 생략.
   const options = freeKeys.map((k) => {
     const def = BAL.hangar.upgrades[k];
-    return { key: k, name: def.name, delta: `+${def.step}${def.unit || ''}`, desc: def.desc };
+    return { key: k, name: EN ? (FREE_EN[k] || def.name) : def.name, delta: `+${def.step}${EN ? '' : (def.unit || '')}`, desc: def.desc };
   });
   let freeUpgrade = null;
   if (options.length) {
@@ -2091,6 +2684,7 @@ function showLoseResult(snap, freeKeys, justClaimed = false) {
         if (!def || lv >= BAL.hangar.maxLv) return;            // 최대 레벨 방어
         // 코인 차감 없음. 강화 레벨 +1과 지급 완료 상태를 한 번의 set으로(어긋남 방지).
         save.set({ up: { ...d.up, [key]: lv + 1 }, firstDefeatUpgrade: key });
+        if (isPublicRun()) track.freeUpgrade(key);             // 분석: 저장 성공 뒤 1회
         sfx('buy');
         showLoseResult(snap, [], true);                        // 완료 상태로 다시 그림(카드 사라지고 완료 문구)
       },
@@ -2099,13 +2693,21 @@ function showLoseResult(snap, freeKeys, justClaimed = false) {
     const chosenKey = save.get().firstDefeatUpgrade;
     freeUpgrade = chosenKey ? { chosenName: BAL.hangar.upgrades[chosenKey]?.name || '' } : null;
   }
-  ui.showLose({ ...snap, onRetry: startPlay, onHangar: showHangar, freeUpgrade });
+  ui.showLose({
+    ...snap,
+    lang: LANG,
+    // P0-4 빠른 재도전: 포털은 PLAY AGAIN이 '같은 무기' 즉시 재출격(선택창 없이). 일반 모드는 기존대로 startPlay()=무기 재선택.
+    onRetry: () => { if (isPublicRun()) track.retrySelected('death'); startPlay(PORTAL_MODE ? lastWeapon : undefined); },
+    onChangeWeapon: PORTAL_MODE ? () => { if (isPublicRun()) track.retrySelected('death'); startPlay(); } : null,   // 포털 보조 선택지: 무기 변경 재출격
+    onHangar: () => showHangar('result'),
+    freeUpgrade,
+  });
 }
 
 /** 캠페인 최종 보스(하이브 퀸) 격파 → 정산 + 무한 원정 해금 + 승리 화면 (§6.3). */
 function winCampaign() {
   const r = run;
-  state = 'done'; drafting = false; betweenStages = false; setBgmIntensity(0.2); playBgm('title');
+  state = 'done'; drafting = false; betweenStages = false; platform.gameplayStop(); setBgmIntensity(0.2); playBgm('title');
   const data = save.get();
   const best = Math.max(data.best, r.maxPower);
   const earned = Math.round(r.world.coins * r.world.stats.coinMult * BAL.economy.coinBankMult);
@@ -2114,21 +2716,34 @@ function winCampaign() {
     // 캠페인 완주 정산 (이 경로는 캠페인 전용) → stage 갱신 + 완주·해금 플래그
     save.set({ best, coins: data.coins + earned, ...progressPatch('campaign', r.sector, data), campaignCleared: true, endlessUnlocked: true });
   }
-  ui.showVictory({ coins: earned, best, onTitle: showTitleScreen, onEndless: startEndless, onRestart: startPlay });
+  if (isPublicRun()) {   // 분석: 캠페인 완주 = campaign_clear(일반 사망과 구분)
+    track.expeditionEnded({
+      outcome: 'campaign_clear', sectorReached: r.sector, nodeProgress: r.done.length,
+      primaryWeapon: r.squad.weapon, doctrineId: r.squad.doctrine, keystoneId: r.squad.keystone,
+      maxTier: r.squad.tier, maxCruisers: r.squad.cruisers || 0, firstDefeatUpgradeState: 'not_eligible',
+    });
+  }
+  ui.showVictory({
+    coins: earned, best, onTitle: showTitleScreen, onEndless: startEndless, lang: LANG,
+    onRestart: () => { if (isPublicRun()) track.retrySelected('campaign_clear'); startPlay(); },
+  });
 }
 
 /** 무한 원정 시작(캠페인 클리어 후 해금). 캠페인 이후 섹터부터 보스 순환·변주가 강해진다. */
 function startEndless() {
-  drafting = false; betweenStages = false; sfx('start');
+  drafting = false; betweenStages = false; hideConsentUI(); sfx('start');
   newExpedition('endless');
 }
 
 // ───────────────────────── 격납고 (영구 강화 상점)
-function showHangar() {
+// entryPoint('title'|'result')가 있을 때만 hangar_viewed 발생 — 구매 후 재렌더(showHangar())는 재발생 안 함.
+function showHangar(entryPoint) {
+  if (entryPoint && !ANALYTICS_DEV) track.hangarViewed(entryPoint);
   ui.showHangar({
     data: save.get(),
     hangar: BAL.hangar,
     squadBase: BAL.squad,
+    lang: LANG,
     onBuy(key) {
       const d = save.get();
       const def = BAL.hangar.upgrades[key];
@@ -2145,10 +2760,232 @@ function showHangar() {
 }
 
 // ───────────────────────── 그리기
+// 상단 진입 페이드(전술·추적 공용): y≈0 경계로 들어오는 개체가 딱딱하게 잘려 보이지 않게.
+function drawEntityFaded(ctx, e) {
+  const fz = (e.r || 24) * 2;
+  if (e.y < fz) { const a = e.y / fz; if (a <= 0.02) return; ctx.save(); ctx.globalAlpha = a; e.draw(ctx); ctx.restore(); }
+  else e.draw(ctx);
+}
+function drawBossFaded(ctx, b) {
+  const fz = (b.r || 40) * 2;
+  if (b.y > 0 && b.y < fz) { ctx.save(); ctx.globalAlpha = Math.max(0.05, b.y / fz); b.draw(ctx); ctx.restore(); }
+  else b.draw(ctx);
+}
+// 추적 시점 배경 전진감(§7): 소실점 글로우 + 항로선. chaseBlend 비례로만 강해지고 랜덤 없음(고정 레인 → 매 프레임 객체 생성 없음).
+const CHASE_LANES = [0.14, 0.32, 0.5, 0.68, 0.86];
+function drawChaseBackdrop(ctx, proj, intensity) {
+  if (intensity <= 0.01) return;
+  const cx = proj.centerX, hy = proj.horizonY, ny = proj.nearY, R = proj.logicalW * 0.6;
+  ctx.save();
+  ctx.globalAlpha = 0.22 * intensity;
+  const g = ctx.createRadialGradient(cx, hy, 4, cx, hy, R);
+  g.addColorStop(0, 'rgba(120,180,255,0.85)'); g.addColorStop(1, 'rgba(120,180,255,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, hy, R, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 0.12 * intensity;
+  ctx.strokeStyle = 'rgba(150,200,255,0.7)'; ctx.lineWidth = 1;
+  for (const f of CHASE_LANES) { ctx.beginPath(); ctx.moveTo(cx, hy); ctx.lineTo(f * proj.logicalW, ny); ctx.stroke(); }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+// 화면 밖 위험 경고(§9): 색+모양 둘 다로 구분(색맹 배려). HUD 아래·월드 위. 개체 위치·충돌은 불변.
+function drawEdgeWarnings(ctx, r, proj) {
+  const warns = collectEdgeWarnings(r, proj, { w: LOGICAL_W, h: logicalH });
+  for (const w of warns) {
+    const color = w.danger === 'boss' ? '#ff5a6a' : w.danger === 'enemyBullet' ? '#ff8a3c' : '#ffb020';
+    ctx.save();
+    ctx.globalAlpha = 0.92; ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.translate(w.edgeX, w.edgeY);
+    ctx.beginPath();
+    if (w.danger === 'boss') { ctx.moveTo(0, -8); ctx.lineTo(7, 6); ctx.lineTo(-7, 6); ctx.closePath(); ctx.fill(); }        // 삼각형
+    else if (w.danger === 'enemyBullet') { ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.stroke(); }                                 // 원
+    else { ctx.rect(-5, -5, 10, 10); ctx.stroke(); }                                                                         // 사각
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── B1 실전 스웜 수집 버퍼(이사 승인) — 프레임 중 할당 0(고정 슬롯 재사용). ──
+//  *_SCREEN_LEN = 100% 배율에서 한 마리의 화면 전장(논리px) — 3D 크기 기준.
+//  B1 보정 이력(이사 실기): 138(2D 1:1)=과대 → 95=과소 → 125 → **163(+30% "3D 모드에서 30% 정도 크게")**. 상한 325.
+//  B2(중형): 2D 스프라이트 논리 165px × 같은 배율감(1.09) ≈ 180, 상한 360(중형은 기함의 ~70%까지 허용).
+const B1_SCREEN_LEN = 163;
+const B1_SCREEN_MAX = 325;
+const B2_SCREEN_LEN = 180;
+const B2_SCREEN_MAX = 360;
+//  B4(저격수): 2D 스프라이트 논리 96px × 배율감 1.09 ≈ 105, 상한 210.
+const B4_SCREEN_LEN = 105;
+const B4_SCREEN_MAX = 210;
+const _b1Buf = Array.from({ length: 28 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
+const _b2Buf = Array.from({ length: 8 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
+const _b4Buf = Array.from({ length: 8 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
+let _b1n = 0, _b2n = 0, _b4n = 0, _b1Stamp = 0;
+// 3D 포함 여부는 게임 객체에 쓰지 않고 sidecar(WeakMap)로 관리(Codex P2) — 저장·직렬화·디버깅과의 결합 원천 차단.
+const _in3dMap = new WeakMap();
+// ── 소품 3D(이사: "무기·배지") — 종별 화면 전장(논리px)·상한과 수집 버퍼. 레이저 빔·공명은 2D 스트릭 유지. ──
+const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], crystal: [88, 200], coin: [22, 56], pow: [40, 92], pod: [64, 160], capsule: [44, 110] };
+const _sw = {
+  b1: { buf: _b1Buf, n: 0 }, b2: { buf: _b2Buf, n: 0 }, b4: { buf: _b4Buf, n: 0 },
+  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1 })), n: 0 }])),
+};
+// 픽업 정보 라벨(+N·▲N·무기명·POW)은 3D 위 HUD 계층에 유지 — 시각만 3D 로 바꾸고 게임 정보는 잃지 않는다.
+const _propLabels = Array.from({ length: 24 }, () => ({ x: 0, y: 0, str: '', col: '#eaf6ff', size: 15 }));
+let _propLabelN = 0;
+const _colCache = new Map();   // '#rrggbb' → int (탄 진화색 instanceColor)
+function colInt(hex, fallback) {
+  if (!hex || typeof hex !== 'string') return fallback;
+  let v = _colCache.get(hex);
+  if (v === undefined) { v = parseInt(hex.replace('#', ''), 16); if (!Number.isFinite(v)) v = fallback; _colCache.set(hex, v); }
+  return v;
+}
+// 이번 프레임 3D 로 올라간 바로 그 개체만 2D 스킵(초과·변이 개체는 2D 유지) — 개체에 프레임 스탬프를 찍어 집합을 정확히 일치.
+//  sidecar 라 게임 객체·저장·직렬화에 절대 나타나지 않는다(§0.2 규칙 불변).
+const _isB13D = (e) => _in3dMap.get(e) === _b1Stamp;
+
+// ── 기함 2D↔3D 스왑 워프 플래시(이사 3회 지적의 마감): 하드 컷의 형태 교체 순간을 "위상 전환" 섬광으로 가린다. ──
+//  규칙·판정·저장 불변 — 화면 연출 전용. reduced-motion 이면 발화하지 않는다(즉시 컷만).
+let _swapSide = -1, _swapFxAt = 0, _swapFxX = 0, _swapFxY = 0;
+function noteSwap(t3d, r, proj) {
+  const side = t3d >= 0.5 ? 1 : 0;
+  if (_swapSide === -1) { _swapSide = side; return; }   // 첫 관측은 기준만 잡고 발화 없음
+  if (side === _swapSide) return;
+  _swapSide = side;
+  if (!proj || !r || !r.squad || r.squad.dead || prefersReducedMotion()) return;
+  const p = projectPoint({ x: r.squad.x, y: r.squad.y }, proj);
+  _swapFxAt = performance.now(); _swapFxX = p.x; _swapFxY = p.y;
+}
+/** 픽업 정보 라벨(+N·▲N·무기명·POW) — 본체는 3D, 숫자·이름은 HUD 계층(3D 위)에 그대로. 2D draw 와 같은 윤곽 스타일. */
+function drawPropLabels(c) {
+  if (!_propLabelN) return;
+  c.save();
+  c.textAlign = 'center';
+  for (let i = 0; i < _propLabelN; i++) {
+    const L = _propLabels[i];
+    c.font = `bold ${L.size}px Pretendard, sans-serif`;
+    c.lineWidth = 3; c.strokeStyle = 'rgba(5,6,15,0.85)';
+    c.strokeText(L.str, L.x, L.y + 5);
+    c.fillStyle = L.col;
+    c.fillText(L.str, L.x, L.y + 5);
+  }
+  c.restore();
+}
+
+function drawSwapFlash(c) {
+  if (!_swapFxAt) return;
+  const el = (performance.now() - _swapFxAt) / 300;   // 0.3초
+  if (el >= 1) { _swapFxAt = 0; return; }
+  const a = (1 - el) * (1 - el);                       // 빠른 감쇠(섬광답게)
+  const R = 30 + el * 120;
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  const g = c.createRadialGradient(_swapFxX, _swapFxY, 2, _swapFxX, _swapFxY, R);
+  g.addColorStop(0, `rgba(215,246,255,${0.85 * a})`);
+  g.addColorStop(0.35, `rgba(125,220,255,${0.5 * a})`);
+  g.addColorStop(1, 'rgba(80,180,255,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(_swapFxX, _swapFxY, R, 0, Math.PI * 2); c.fill();
+  c.globalAlpha = 0.9 * a; c.strokeStyle = '#bfeaff'; c.lineWidth = 2.5;
+  c.beginPath(); c.arc(_swapFxX, _swapFxY, R * 0.72, 0, Math.PI * 2); c.stroke();
+  c.globalAlpha = 0.55 * a; c.lineWidth = 1.5;        // 수평 섬광선(워프 감)
+  c.beginPath(); c.moveTo(_swapFxX - R * 1.6, _swapFxY); c.lineTo(_swapFxX + R * 1.6, _swapFxY); c.stroke();
+  c.restore();
+  c.globalAlpha = 1;
+}
+
 function draw() {
   syncPlayButtons();   // 상태에 따라 일시정지·차지 버튼 표시/숨김 (draw는 headless step에서도 호출됨)
   // 방어: 치수가 비정상(NaN·0·음수)이면 렌더를 건너뛴다 — createLinearGradient 등이 비유한값에 예외를 던져 프리즈되는 것을 차단.
   if (!Number.isFinite(logicalH) || logicalH <= 0 || !Number.isFinite(scale) || scale <= 0) return;
+  // 실제 3D(선택): 살아있는 상태를 읽어 #game3d에 렌더하고 전환 t를 얻는다(§7·§8). 미지원/휴면/실패면 0 → RC2 화면 그대로.
+  let t3d = 0;
+  if (CHASE3D_ON && !CHASE3D_TEST && !CHASE3D_LAB) {   // 검증 장면·검사실은 별도 루프가 #game3d를 직접 구동 → 메인 draw가 캔버스를 만지면 안 됨(실 rAF에서 매 프레임 숨김 충돌)
+    // followX = 2D 기함의 화면 중앙 이탈(논리 px, 부분 추종) → 3D 카메라 트럭 이동으로 2D·3D 기함 화면 X 정합
+    const followX = chaseProjection ? chaseProjection.C0 - chaseProjection.centerX : 0;
+    // 실전 3D 스웜 수집(이사 승인): 크리처(B1·B2) + 소품(탄·픽업·배지) — 2.5D 투영 화면좌표·크기로 3D 인스턴스와 정합.
+    //  변이(엘리트) 크리처는 제외(링·표식 유지), large(B3)·레이저 빔·공명 탄은 2D 유지. 버퍼 초과분도 2D 폴백.
+    _b1n = 0; _b2n = 0; _b4n = 0; _propLabelN = 0; _b1Stamp++;
+    for (const k of PROP_KEYS) _sw.props[k].n = 0;
+    if (chase3d && state === 'play' && run && chaseProjection) {
+      const passGate = (e, p) => {   // 기함 통과: 투영이 아래로 외삽(depth 1.6 공통) — 화면 밖이면 어디에도 안 그림
+        if (e.y > chaseProjection.squadY) { _in3dMap.set(e, _b1Stamp); if (p.y > logicalH + 60) return false; }
+        return true;
+      };
+      const putProp = (key, e, p, col, wob) => {
+        const s = _sw.props[key];
+        if (s.n >= s.buf.length) return false;
+        const [len, max] = PROP_LEN[key];
+        const o = s.buf[s.n++];
+        o.sx = p.x; o.sy = p.y; o.px = Math.min(max, len * p.scale); o.wob = wob; o.col = col;
+        _in3dMap.set(e, _b1Stamp);
+        return true;
+      };
+      const putLabel = (p, str, col, size) => {
+        if (_propLabelN >= _propLabels.length || !str) return;
+        const L = _propLabels[_propLabelN++];
+        L.x = p.x; L.y = p.y; L.str = str; L.col = col; L.size = size;
+      };
+      for (const e of run.world.entities) {
+        if (e.dead) continue;
+        if (e instanceof Creature) {
+          if (e.affixes && e.affixes.length) continue;
+          const small = e.size === 'small';
+          if (!small && e.size !== 'mid') continue;
+          if (small ? _b1n >= _b1Buf.length : _b2n >= _b2Buf.length) continue;
+          const p = projectObject(e, 'enemy', chaseProjection);
+          if (!passGate(e, p)) continue;
+          const o = small ? _b1Buf[_b1n++] : _b2Buf[_b2n++];
+          o.sx = p.x; o.sy = p.y;
+          o.px = small ? Math.min(B1_SCREEN_MAX, B1_SCREEN_LEN * p.scale) : Math.min(B2_SCREEN_MAX, B2_SCREEN_LEN * p.scale);
+          o.wob = e.wob || 0;
+          _in3dMap.set(e, _b1Stamp);
+          continue;
+        }
+        if (e instanceof Sniper) {   // B4 저격수(이사 "저격수부터") — 비변이만, 초과분 2D 폴백
+          if ((e.affixes && e.affixes.length) || _b4n >= _b4Buf.length) continue;
+          const p = projectObject(e, 'enemy', chaseProjection);
+          if (!passGate(e, p)) continue;
+          const o = _b4Buf[_b4n++];
+          o.sx = p.x; o.sy = p.y; o.px = Math.min(B4_SCREEN_MAX, B4_SCREEN_LEN * p.scale); o.wob = e.wob || 0;
+          _in3dMap.set(e, _b1Stamp);
+          continue;
+        }
+        // 픽업·배지: 소품 3D 는 개발 플래그(chase3dProps=1) 전용 — 기본은 기존 2D(이사 "엉망" 판정, Codex A/B 권고)
+        if (!CHASE3D_PROPS) continue;
+        let key = null, label = '', lcol = '#eaf6ff';
+        if (e instanceof Crystal) { key = 'crystal'; label = `+${e.payout}`; }
+        else if (e instanceof Coin) key = 'coin';
+        else if (e instanceof Pow) { key = 'pow'; label = 'POW'; lcol = '#ffe066'; }
+        else if (e instanceof DronePod) { key = 'pod'; label = `▲${e.payout}`; lcol = '#8ff5e0'; }
+        else if (e instanceof Capsule) { key = 'capsule'; label = WEAPON_LABELS[e.weapon] || ''; lcol = WEAPON_COLORS[e.weapon] || '#9fd4ff'; }
+        else if (e instanceof PowerModule) key = 'capsule';
+        if (!key) continue;
+        const p = projectObject(e, 'pickup', chaseProjection);
+        if (!passGate(e, p)) continue;
+        if (putProp(key, e, p, -1, 0) && label) putLabel(p, label, lcol, key === 'crystal' ? 16 : 13);
+      }
+      // 탄환 3D 도 같은 개발 플래그 뒤 — 기본은 기존 2D 탄·스트릭.
+      if (CHASE3D_PROPS) {
+        for (const b of run.world.bullets) {
+          if (b.dead || b.kind === 'laser' || b.resonanceId) continue;
+          const p = projectObject(b, 'playerBullet', chaseProjection);
+          if (!passGate(b, p)) continue;
+          putProp(b instanceof HomingMissile ? 'missile' : 'pbullet', b, p, colInt(b.color, 0xffd34d), Math.atan2(b.vx || 0, -(b.vy || -1)));
+        }
+        for (const b of run.world.enemyBullets) {
+          if (b.dead || b.kind === 'laser' || b.resonanceId) continue;
+          const p = projectObject(b, 'enemyBullet', chaseProjection);
+          if (!passGate(b, p)) continue;
+          putProp('ebullet', b, p, colInt(b.color, 0xff7a5a), Math.atan2(b.vx || 0, -(b.vy || 1)));
+        }
+      }
+      _sw.b1.n = _b1n; _sw.b2.n = _b2n; _sw.b4.n = _b4n;
+    }
+    if (chase3d && state === 'play' && run) t3d = chase3d.frame(run, camera.current, LOGICAL_W, logicalH, canvas.width, canvas.height, performance.now() * 0.001, followX, _sw);
+    else if (canvas3d) { canvas3d.style.opacity = '0'; canvas3d.style.visibility = 'hidden'; }
+  }
+  chase3dT = t3d;
+  if (state === 'play' && run) noteSwap(t3d, run, chaseProjection);   // 기함 2D↔3D 스왑 교차 감지 → 워프 플래시
+  // HUD 계층(§6): 3D 활성 시 #game-hud(3D 위)로, 아니면 #game(ctx). 매 프레임 #game-hud를 지워 잔상 방지.
+  const hctx = (t3d > 0 && hudCtx) ? hudCtx : ctx;
+  if (hudCtx) { hudCtx.setTransform(1, 0, 0, 1, 0, 0); hudCtx.clearRect(0, 0, hudCanvas.width, hudCanvas.height); if (hctx !== ctx) hudCtx.setTransform(scale, 0, 0, scale, 0, 0); }
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
@@ -2166,8 +3003,15 @@ function draw() {
 
   // 6구역 × 3층 절차적 배경: 해상도·화면비에 무관하고 이미지 타일 이음새가 없다.
   const scroll = run ? run.scrollY : performance.now() * 0.02;
-  zoneBackdrop.draw(ctx, logicalH, scroll, run ? run.sector : save.get().stage);
-  starfield.draw(ctx, logicalH, scroll);
+  // 추적 시점 전진감(이사): "아래로 흐르는" 층(세로 별 + 배경 먼지·삼각 파편·항적)은 blend 비례로 소등하고
+  //  소실점 방사 워프 별로 교체(drawChaseBackdrop 옆). 성운 플레이트는 원경이라 유지.
+  const warpB = state === 'play' && run ? chase.current : 0;
+  zoneBackdrop.draw(ctx, logicalH, scroll, run ? run.sector : save.get().stage, 1 - warpB);
+  if (warpB < 0.999) {
+    if (warpB > 0.001) ctx.globalAlpha = 1 - warpB * 0.9;
+    starfield.draw(ctx, logicalH, scroll);
+    if (warpB > 0.001) ctx.globalAlpha = 1;
+  }
 
   // 트랙 레인 가이드 (희미한 세로선)
   ctx.strokeStyle = 'rgba(63,245,224,0.08)';
@@ -2179,48 +3023,73 @@ function draw() {
 
   if (run) {
     const r = run;
-    // 상단 진입 페이드: 개체가 화면 위 경계(y=0)를 넘어 들어올 때 딱딱하게 '잘려' 보이지 않도록
-    // 경계에서 투명 → 스프라이트가 완전히 들어오면 불투명. (스프라이트 자체는 정상, 경계 클리핑이 원인)
-    for (const e of r.world.entities) {
-      const fz = (e.r || 24) * 2;                 // 페이드 구간 ≈ 스프라이트 상단이 경계를 통과할 때까지
-      if (e.y < fz) {
-        const a = e.y / fz;                       // y=0 → 0, y=fz → 1
-        if (a <= 0.02) continue;                  // 아직 화면 밖 → 그리지 않음
-        ctx.save(); ctx.globalAlpha = a; e.draw(ctx); ctx.restore();
-      } else e.draw(ctx);
-    }
-    if (r.bosses && r.bosses.length && r.phase !== 'track') {
-      for (const b of r.bosses) {
-        const fz = (b.r || 40) * 2;
-        if (b.y > 0 && b.y < fz) { ctx.save(); ctx.globalAlpha = Math.max(0.05, b.y / fz); b.draw(ctx); ctx.restore(); }
-        else b.draw(ctx);
+    // ── 전투 카메라 변환 시작 ──: state==='play'일 때만 함대(anchor)를 중심으로 확대/축소한다.
+    //  배경·HUD·컷신·시네마 띠·전체 화면 플래시는 이 변환 밖(고정). 게임 좌표·규칙은 그대로.
+    const camActive = state === 'play' && camera.current !== 1;
+    syncCameraAnchor();   // §3: 그릴 시점의 최신 함대 좌표로 카메라 기준점 재동기화(방어적)
+    // 2.5D: chaseBlend>0이면 개체별 원근 투영 경로, 아니면 기존 전술(global transform) 경로(100%~160% 픽셀 동일).
+    const useChase = state === 'play' && chase.current > 0.001;
+    let chaseProj = null;
+    // Opus5 하이브리드(§9): 적·보스·게이트·픽업·총알·이펙트·드론은 "전 구간" RC2 로 계속 그린다.
+    //  3D 는 AURORA 기함 1척만 — 기함 본체는 2D alpha 1-t ↔ 3D alpha t 로 진짜 교차(§9.2). t=0 이면 기존 RC2 와 동일.
+    if (useChase) {
+      chaseProj = createChaseProjection({ zoom: camera.current, chaseBlend: chase.current, squadX: r.squad.x, squadY: r.squad.y, logicalW: LOGICAL_W, logicalH });
+      // 소실점 방사 워프 별(전진 3D 감, 이사) — 항로선·글로우(drawChaseBackdrop)보다 아래 층에.
+      drawWarpField(ctx, { W: LOGICAL_W, H: logicalH, cx: chaseProj.centerX, cy: chaseProj.horizonY, blend: chase.current, travel: scroll * 0.00115 });
+      drawChaseBackdrop(ctx, chaseProj, chase.current);   // 배경 전진감(chaseBlend 비례)
+      // 기함 스왑 최종형(이사 3회 지적): "겹침 0·공백 0" 하드 컷 — 2D 는 t<0.5 에서 완전 불투명, t≥0.5 에서 완전 소등.
+      //  페이드 금지: 중간 반투명이 "함선 소멸 계곡"과 "반투명 두 척"을 만들었다. 스왑 팝은 워프 플래시(noteSwap)가 가린다.
+      //  B1 실전(이사 승인): 3D 로 올라간 소형 B1(비변이)은 같은 하드 컷 규칙으로 2D 를 스킵 — 변이·초과분은 2D 유지.
+      drawWorldProjected(ctx, r, chaseProj, {
+        drawEntity: drawEntityFaded, drawBoss: drawBossFaded, drawCampaignFleet,
+        flagshipAlpha: t3d < 0.5 ? 1 : 0,
+        skipEntity: t3d >= 0.5 ? _isB13D : null,   // 크리처·픽업·탄 — 이번 프레임 3D 로 올라간 개체만 스킵(스탬프)
+      });
+    } else {
+      if (camActive) {
+        ctx.save();
+        ctx.translate(camera.anchorX, camera.anchorY);
+        ctx.scale(camera.current, camera.current);
+        ctx.translate(-camera.anchorX, -camera.anchorY);
       }
+      // 상단 진입 페이드: 개체가 화면 위 경계(y=0)를 넘어 들어올 때 딱딱하게 '잘려' 보이지 않도록(전술 경로).
+      for (const e of r.world.entities) drawEntityFaded(ctx, e);
+      if (r.bosses && r.bosses.length && r.phase !== 'track') {
+        for (const b of r.bosses) drawBossFaded(ctx, b);
+      }
+      for (const b of r.world.bullets) b.draw(ctx);
+      for (const b of r.world.enemyBullets) b.draw(ctx);
+      if (!r.squad.dead) r.squad.draw(ctx);
+      if (r.campaign25) drawCampaignFleet(ctx);   // §7.2 전투기 편대(기함 위에 렌더)
+      r.effects.drawWorld(ctx);                   // 월드 이펙트(파티클·텍스트·링·섬광·후광)는 카메라 안에서 함께 확대
+      if (camActive) ctx.restore();               // ── 전투 카메라 변환 종료 ──
     }
-    for (const b of r.world.bullets) b.draw(ctx);
-    for (const b of r.world.enemyBullets) b.draw(ctx);
-    if (!r.squad.dead) r.squad.draw(ctx);
-    if (r.campaign25) drawCampaignFleet(ctx);   // §7.2 전투기 편대(기함 위에 렌더)
-    r.effects.draw(ctx, LOGICAL_W, logicalH);
+    r.effects.drawScreen(hctx, LOGICAL_W, logicalH);   // 전체 화면 흰색 플래시는 카메라 '밖'(고정). 3D 활성 시 HUD 계층(#game-hud)로.
+    if (chaseProj) drawEdgeWarnings(hctx, r, chaseProj);   // §9: 화면 밖 위험 경고(월드 위·HUD 아래)
+    drawSwapFlash(hctx);   // 기함 2D↔3D 스왑 워프 플래시(월드 위·HUD 아래) — 형태 교체 순간을 섬광으로 은폐
+    if (t3d >= 0.5) drawPropLabels(hctx);   // 3D 픽업의 정보 라벨(+N·▲N·무기명) — 게임 정보는 잃지 않는다
 
     // 섹터 클리어 컷신: 위아래 시네마 띠. 격침되는 보스를 두고 기함이 빠져나가는 구간을
     // 전투 화면과 다르게 보이게 한다(이사 요청). HUD보다 먼저 그려 HUD가 띠 위에 남게.
     if (r.cinemaT > 0) {
       const bh = logicalH * BAL.bossDeath.letterbox * Math.min(1, r.cinemaT);
-      ctx.save(); ctx.fillStyle = 'rgba(2,4,10,0.92)';
-      ctx.fillRect(0, 0, LOGICAL_W, bh);
-      ctx.fillRect(0, logicalH - bh, LOGICAL_W, bh);
-      ctx.restore();
+      hctx.save(); hctx.fillStyle = 'rgba(2,4,10,0.92)';
+      hctx.fillRect(0, 0, LOGICAL_W, bh);
+      hctx.fillRect(0, logicalH - bh, LOGICAL_W, bh);
+      hctx.restore();
     }
 
     const evc = r.world.mfx?.evolveCostMult ?? 1;
     const maxTier = BAL.evolution.names.length - 1;
     const needCruisers = r.squad.tier < maxTier ? Math.max(1, Math.round(cruisersNeededForTier(r.squad.tier, BAL.escort) * evc)) : 0;   // 등급별 필요 순양함(초반 저렴)
-    drawHUD(ctx, LOGICAL_W, {
+    drawHUD(hctx, LOGICAL_W, {
       progress: Math.min(1, r.traveled / r.totalTrack),
-      bosses: r.phase === 'boss' ? r.bosses.map((b) => ({ hp: Math.max(0, b.hp), maxHp: b.maxHp, name: b.korName, dead: b.dead, stagger: b.stagger, staggerMax: BAL.neonArbiter.staggerMax, breakT: b.breakT })) : [],
+      bosses: r.phase === 'boss' ? r.bosses.map((b) => ({ hp: Math.max(0, b.hp), maxHp: b.maxHp, name: EN ? (bossDefById(b.spriteId)?.name || b.korName) : b.korName, dead: b.dead, stagger: b.stagger, staggerMax: BAL.neonArbiter.staggerMax, breakT: b.breakT })) : [],
       count: r.squad.count,
       cruisers: r.squad.cruisers || 0,
-      tierName: BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,
+      tierName: EN
+        ? PLAYTEST_SHIP_TRAITS_EN[Math.min(r.squad.tier, PLAYTEST_SHIP_TRAITS_EN.length - 1)]
+        : BAL.shipTraits[Math.min(r.squad.tier, BAL.shipTraits.length - 1)].tag,
       shipName: BAL.evolution.names[Math.min(r.squad.tier, BAL.evolution.names.length - 1)],
       doctrine: doctrineIcon(r.squad.doctrine),
       tierPower: Math.round(r.squad.banked || 0),
@@ -2240,12 +3109,13 @@ function draw() {
       rushT: r.squad.rushT || 0,
       keystoneIcon: keystoneIcon(r.squad.keystone),
       loadoutHud: !!r.squad.surv,   // 좌측 무기 2슬롯이 뜨는 모드 = 우상단 무기 표기 중복 → 생략(이사)
+      en: EN,                 // Prolific: HUD 핵심 정보를 영어로(§4.3). 일반 모드는 false → 한국어 그대로.
     });
     // 섹터 원정 적재 HUD — 25분과 같은 내구도 바 + 무기 2슬롯(빈 보조 슬롯 표시) + 공명(이사 요청).
     //  섹터엔 디렉터 타이머·함대·프레임이 없으므로 전용 함수로 그 셋만 뺀다.
     if (!r.coreLoop && !r.campaign25 && r.squad.surv) {
       const sq = r.squad;
-      drawSectorLoadoutHud(ctx, LOGICAL_W, logicalH, {
+      drawSectorLoadoutHud(hctx, LOGICAL_W, logicalH, {
         hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
         mainWeapon: sq.weapon, mainLv: sq.weaponLv, wingWeapon: sq.wing.weaponId, wingLv: sq.wing.level,
         mainEvo: weaponEvoLabelFor(sq, sq.weapon), wingEvo: weaponEvoLabelFor(sq, sq.wing.weaponId),
@@ -2253,6 +3123,7 @@ function draw() {
         resonanceHint: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].hint : '',
         markType: sq.reson?.activeId ? RESONANCES[sq.reson.activeId].trigger === 'mark' : false,
         resonanceFrac: sq.reson ? resonChargeFrac(sq.reson, BAL.gate1.resonance) : 0,
+        en: EN,   // Prolific: 섹터 적재 HUD(내구도·무기 슬롯·공명)를 영어로(§4.3)
       });
     }
     // Gate 1 코어루프 / Gate 2 25분 캠페인 HUD (내구도·두 무기·공명·프레임·타이머). 둘 다 surv·director를 가진다.
@@ -2263,7 +3134,7 @@ function draw() {
       const evLabel = { behaviorUpgrade: '무기 강화', secondWeapon: '보조 무기', hullTier: '함체 승급', resonanceTelegraph: '공명 예고', firstResonance: '공명 완성', framePick: '지휘 프레임', eliteWave: '정예 웨이브', bossStart: '지역 보스', result: '결과',
         regionEnter: '지역 진입', fleetTelegraph: '슬롯 예고', fleetSlot: '함대 슬롯', secondResonance: '두번째 공명', finalWeaponEvo: '최종 진화', apex: 'Apex', pathChoice: '경로 선택' };
       const fh = sq.frameId ? frameHud(BAL.gate1.frames, sq.frameId) : null;
-      drawCoreLoopHud(ctx, LOGICAL_W, logicalH, {
+      drawCoreLoopHud(hctx, LOGICAL_W, logicalH, {
         hullFrac: hullFrac(sq.surv), hull: sq.surv.hull, hullMax: sq.surv.hullMax,
         mainWeapon: sq.weapon, mainLv: sq.weaponLv, wingWeapon: sq.wing.weaponId, wingLv: sq.wing.level,
         mainEvo: weaponEvoLabelFor(sq, sq.weapon), wingEvo: weaponEvoLabelFor(sq, sq.wing.weaponId),
@@ -2290,8 +3161,21 @@ let paused = false;
 function togglePause() {
   if (state !== 'play' || drafting || betweenStages) return;   // 플레이 중 + 드래프트·요약 아닐 때만
   paused = !paused;
-  if (paused) ui.showPause({ onResume: togglePause, onQuit: quitRun });
-  else ui.hide();
+  if (paused) {
+    ui.showPause({
+      onResume: togglePause, onQuit: PLAYTEST ? null : quitRun, lang: LANG,
+      cameraZoom: camera.target,                          // §8: 카메라 배율 행(−[100%]+)
+      onZoomOut: () => applyZoom(-1), onZoomReset: () => applyZoom(0), onZoomIn: () => applyZoom(+1),
+      chaseView: isChaseTargetView(),                     // §8.2: 함미 추적 시점 토글 버튼(모바일 진입/복귀)
+      onToggleChase: () => toggleChaseView(),
+    });
+    // 일시정지 열려 있는 동안 배율%·추적 버튼 문구를 즉시 갱신(닫히면 no-op로 복귀).
+    updatePauseCameraUI = () => {
+      const el = document.getElementById('btn-zoom-reset'); if (el) el.textContent = `${Math.round(camera.target * 100)}%`;
+      const cb = document.getElementById('btn-chase-view');
+      if (cb) { const on = isChaseTargetView(); cb.textContent = on ? (EN ? 'Tactical View' : '전술 시점') : (EN ? 'Pursuit View' : '함미 추적 시점'); cb.setAttribute('aria-label', on ? (EN ? 'Switch to tactical view' : '전술 시점으로 전환') : (EN ? 'Switch to pursuit view' : '함미 추적 시점으로 전환')); }
+    };
+  } else { ui.hide(); updatePauseCameraUI = () => {}; }
 }
 
 /** 일시정지에서 '끝내기': 원정을 포기하고 타이틀로. 모은 코인·최고 기록은 정산해 저장 */
@@ -2306,7 +3190,8 @@ window.addEventListener('keydown', (e) => {
 const pauseBtn = document.createElement('button');
 pauseBtn.id = 'pause-btn';
 pauseBtn.textContent = '⏸';
-pauseBtn.title = '일시정지 (ESC)';
+pauseBtn.title = EN ? 'Pause (ESC)' : '일시정지 (ESC)';
+pauseBtn.setAttribute('aria-label', EN ? 'Pause' : '일시정지');   // 접근 가능 이름(§4.3): 이모지 버튼은 aria-label로 이름을 준다
 pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePause(); });
 document.getElementById('stage').appendChild(pauseBtn);
 
@@ -2314,7 +3199,8 @@ document.getElementById('stage').appendChild(pauseBtn);
 const chargeBtn = document.createElement('button');
 chargeBtn.id = 'charge-btn';
 chargeBtn.textContent = '⚡';
-chargeBtn.title = '차지 샷 (길게 누르기)';
+chargeBtn.title = EN ? 'Charge shot (hold)' : '차지 샷 (길게 누르기)';
+chargeBtn.setAttribute('aria-label', EN ? 'Charge shot (hold)' : '차지 샷');   // 모바일 전용 버튼 접근 가능 이름(§4.3)
 chargeBtn.style.cssText = 'position:fixed;right:18px;bottom:26px;width:66px;height:66px;border-radius:50%;font-size:30px;background:rgba(63,245,224,0.15);border:2px solid #3ff5e0;color:#3ff5e0;z-index:15;touch-action:none;user-select:none;cursor:pointer';
 const setCharge = (v) => (e) => { e.preventDefault(); e.stopPropagation(); input.charging = v; };
 chargeBtn.addEventListener('pointerdown', setCharge(true));
@@ -2336,6 +3222,14 @@ let _frameErrLogged = false;
 function frame(t) {
   const dt = Math.min((t - last) / 1000, 0.05);
   last = t;
+  // 카메라 배율 보간(매 프레임 — 일시정지 중에도 애니메이션되어 뒤 월드가 미리보기됨). reduced-motion이면 즉시.
+  camera.current = advanceZoom(camera.current, camera.target, dt, prefersReducedMotion());
+  // 2.5D 추적 blend는 현재 줌 기준으로 별도 ease-out(§3.3). 줌과 정렬돼 튀지 않음. 처음 완전 진입 시 안내.
+  chase.target = chaseBlendForZoom(camera.current);
+  const _prevChase = chase.current;
+  chase.current = advanceChaseBlend(chase.current, chase.target, dt, prefersReducedMotion());
+  if (_prevChase < 0.99 && chase.current >= 0.99) showPursuitIndicator();
+  playtestTick(dt);   // Prolific 240초 전투시간(§4.2)
   // update/draw에서 예외가 나도 rAF 재예약은 반드시 한다 → 한 프레임 오류가 게임을 영구 정지시키지 않게(회복형 루프).
   try {
     if (!paused && !drafting && !betweenStages) update(dt);   // 일시정지·드래프트·요약 중엔 화면만 유지
@@ -2388,7 +3282,64 @@ function resetToTitleState() {
   if (input) { input.active = false; input.charging = false; input.clearSkip?.(); }
 }
 
+/** 프롤로그 재생 + 분석 배선(intro_started·intro_skipped/completed). intro.js는 콜백만 받는다. */
+function playIntroTracked(after) {
+  playIntro(
+    (reason, meta) => { track.introEnded(reason, meta); after(); },
+    { onStart: () => track.introStarted() },
+  );
+}
+
+/** P0-3: 포털 전투 진입 시 비차단 조작 힌트(전투 위 오버레이). 실제 입력(키/클릭/탭) 또는 8초 후 사라진다.
+ *  전체화면 차단 가이드를 대체 — 포털 방문자는 즉시 플레이하러 온다. */
+let _portalHintShown = false;
+function showPortalHint() {
+  if (_portalHintShown) return;   // 원정당 1회(재도전마다 반복 표시 안 함)
+  _portalHintShown = true;
+  const stage = document.getElementById('stage');
+  if (!stage) return;
+  const el = document.createElement('div');
+  el.id = 'portal-hint';
+  el.setAttribute('role', 'status');
+  el.textContent = 'Move: Mouse · ◀ ▶ · A / D      Fire: Auto      Charge: Hold Click / Space';
+  el.style.cssText = 'position:absolute;left:50%;bottom:12%;transform:translateX(-50%);'
+    + 'padding:8px 16px;border-radius:8px;z-index:40;pointer-events:none;white-space:nowrap;'
+    + 'font:600 14px Pretendard,sans-serif;color:#dbeafe;background:rgba(8,12,24,0.72);'
+    + 'border:1px solid rgba(120,180,255,0.35);box-shadow:0 2px 18px rgba(0,0,0,0.5);'
+    + 'transition:opacity .5s;opacity:1;max-width:92vw;overflow:hidden;text-overflow:ellipsis;';
+  stage.appendChild(el);
+  let done = false;
+  const remove = () => {
+    if (done) return; done = true;
+    clearTimeout(timer);
+    window.removeEventListener('keydown', remove, true);
+    window.removeEventListener('pointerdown', remove, true);
+    window.removeEventListener('touchstart', remove, true);
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 520);
+  };
+  const timer = setTimeout(remove, 8000);   // 실제 입력이 없어도 8초 후 사라짐
+  // 힌트를 띄운 그 클릭/탭이 곧바로 힌트를 지우지 않도록 잠깐(250ms) 뒤부터 입력을 감지 → 다음 실제 입력에 소거.
+  setTimeout(() => {
+    if (done) return;
+    window.addEventListener('keydown', remove, true);
+    window.addEventListener('pointerdown', remove, true);
+    window.addEventListener('touchstart', remove, true);
+  }, 250);
+}
+
+/** P0-3: 포털 시작 흐름 — 타이틀·스토리 인트로 없이 곧바로 시작 무기 3택(첫 화면). 카드 클릭 하나가
+ *  '선택 + 출격'이고 enterSectorMap 포털 분기가 즉시 전투로 넣는다. 포털의 '홈'은 이 무기 선택 화면이다. */
+function startPortalPlay() {
+  resetToTitleState();
+  _portalHintShown = false;   // 새 출격(첫 진입·이탈 복귀)마다 힌트 자격 초기화 — 재도전엔 재노출 안 함
+  document.documentElement.lang = 'en';
+  document.title = 'Neon Fleet';
+  startPlay();
+}
+
 function showTitleScreen() {
+  if (PORTAL_MODE) { startPortalPlay(); return; }   // 포털엔 한국어 타이틀 없음 — 모든 '타이틀 복귀'는 포털 홈(무기 선택)으로
   resetToTitleState();
   const d = save.get();
   ui.showTitle({
@@ -2398,25 +3349,32 @@ function showTitleScreen() {
     saveOk: save.available,
     endlessUnlocked: d.endlessUnlocked,      // 무한 원정 해금 시에만 버튼 표시(§6.5)
     endlessBest: d.endlessBest,
-    onStart: startPlay,
+    onStart: () => { if (!ANALYTICS_DEV) track.expeditionStartSelected('campaign'); startPlay(); },
     // 이 값만 true로 되돌리면 25분 캠페인 버튼이 다시 나온다(아래 SHOW_CAMPAIGN25_ENTRY 참고).
     onCampaign25: SHOW_CAMPAIGN25_ENTRY ? () => startCampaign25({ mode: 'play', pick: true }) : null,
-    onEndless: d.endlessUnlocked ? startEndless : null,
-    onHangar: showHangar,
-    onIntro: () => playIntro(showTitleScreen),
+    onEndless: d.endlessUnlocked ? () => { if (!ANALYTICS_DEV) track.expeditionStartSelected('endless'); startEndless(); } : null,
+    onHangar: () => showHangar('title'),
+    onIntro: () => playIntroTracked(showTitleScreen),
     onReset: () => ui.showResetConfirm({
       onConfirm: () => { save.reset(); showTitleScreen(); },
       onCancel: showTitleScreen,
     }),
   });
+  track.titleViewed();          // 분석: 타이틀 전환당 1회
+  maybeShowConsentBanner();     // 미결정이고 측정 ID가 있으면 동의 배너(비차단)
 }
 
-// 첫 접속이면 인트로 크롤 재생 후 타이틀, 그 외엔 바로 타이틀
-if (save.get().introSeen) {
+// 포털이면 곧바로 무기 선택(첫 화면). Prolific이면 영어 동의 화면. 그 외 일반 게임은 첫 접속 인트로/저장 그대로(§3·§4.1).
+if (PORTAL_MODE) {
+  startPortalPlay();
+} else if (PLAYTEST) {
+  startPlaytestFlow();
+} else if (save.get().introSeen) {
+  // 첫 접속이면 인트로 크롤 재생 후 타이틀, 그 외엔 바로 타이틀
   showTitleScreen();
 } else {
   save.set({ introSeen: true });
-  playIntro(showTitleScreen);
+  playIntroTracked(showTitleScreen);
 }
 
 // 개발/검증용 훅 (게임 동작에는 영향 없음)
@@ -2425,10 +3383,24 @@ window.__NF = {
   get run() { return run; },
   input,
   startPlay,
+  camera,                                   // 카메라 상태(current/target/anchor) — QA 관측용
+  chase,                                     // 2.5D 추적 blend 상태(current/target) — QA 관측용
+  get chaseProjection() { return chaseProjection; },   // 현재 프레임 투영(입력 역변환·렌더 공유)
+  zoom: applyZoom,                          // dir: +1 확대 / -1 축소 / 0 초기화
+  toggleChase: toggleChaseView,             // QA: 100% ↔ 220% 함미 추적 토글
+  setZoomTarget(v) { camera.target = safeZoom(v); },   // QA: 목표 배율 직접 지정(보간은 frame이 진행)
   // 헤드리스 검증용: rAF 없이 시뮬레이션을 n프레임 전진 (탭이 hidden이어도 동작)
   step(frames = 1, dt = 1 / 60) {
     for (let i = 0; i < frames; i++) update(dt);
     draw();
+  },
+  // QA: 카메라·chaseBlend 보간을 rAF 없이 n프레임 전진(frame 루프 재현)
+  stepCamera(frames = 1, dt = 1 / 60) {
+    for (let i = 0; i < frames; i++) {
+      camera.current = advanceZoom(camera.current, camera.target, dt, prefersReducedMotion());
+      chase.target = chaseBlendForZoom(camera.current);
+      chase.current = advanceChaseBlend(chase.current, chase.target, dt, prefersReducedMotion());
+    }
   },
 };
 

@@ -20,6 +20,8 @@ export const WEAPON_COLORS = {
   homing: '#ffd93d',
 };
 export const WEAPON_LABELS = { vulcan: '발칸', laser: '레이저', homing: '유도 미사일' };
+// 영어 라벨(Prolific 첫인상 테스트 전용 표기). 게임 데이터·로직을 복제하지 않는 단순 표시 라벨이다.
+export const WEAPON_LABELS_EN = { vulcan: 'Vulcan', laser: 'Laser', homing: 'Homing Missiles' };
 
 /** 글로우 상태를 감싸서 그리기 (shadowBlur 설정/복원) */
 export function glow(ctx, color, blur, fn) {
@@ -163,7 +165,7 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '', loadoutHud = false, coins = 0 }) {
+export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '', loadoutHud = false, coins = 0, en = false }) {
   ctx.save();
   // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
@@ -194,7 +196,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillText(`${Math.ceil(bosses[0].hp).toLocaleString()} / ${bosses[0].maxHp.toLocaleString()}`, logicalW - 60, 51);
     } else {
       ctx.textAlign = 'center';
-      ctx.fillText(`보스 ×${n} · ${bosses[0].name}`, logicalW / 2, 51);
+      ctx.fillText(`${en ? 'Boss' : '보스'} ×${n} · ${bosses[0].name}`, logicalW / 2, 51);
     }
     // 네온 아비터 전용 STAGGER/BREAK 보조 바 (다른 보스엔 표시 안 함)
     // 보스 이름·HP(y=51)와 모듈 줄(y=83) 사이에 배치 — 라벨 y=64, 바 y=68~73, BREAK y=70 (중첩 방지)
@@ -205,12 +207,12 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
         ctx.textAlign = 'center';
         ctx.font = 'bold 11px Pretendard, sans-serif';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(`무방비 ${bo.breakT.toFixed(1)}초 · 받는 피해 +25%`, logicalW / 2, 70);
+        ctx.fillText(en ? `Vulnerable ${bo.breakT.toFixed(1)}s · +25% damage taken` : `무방비 ${bo.breakT.toFixed(1)}초 · 받는 피해 +25%`, logicalW / 2, 70);
       } else {
         ctx.textAlign = 'left';
         ctx.font = 'bold 10px Pretendard, sans-serif';
         ctx.fillStyle = '#8affff';
-        ctx.fillText(`무력화 게이지 ${bo.stagger}/${bo.staggerMax}`, 60, 64);
+        ctx.fillText(en ? `Stagger ${bo.stagger}/${bo.staggerMax}` : `무력화 게이지 ${bo.stagger}/${bo.staggerMax}`, 60, 64);
         ctx.fillStyle = 'rgba(138,255,255,0.18)';
         ctx.fillRect(60, 68, sbw, 5);
         ctx.fillStyle = '#8affff';
@@ -225,15 +227,18 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   ctx.font = 'bold 14px Pretendard, sans-serif';
   ctx.textAlign = 'left';
   // 보스전에는 기함 상세줄이 보스 HP바·이름과 겹치므로, 함대 줄(보스 HP바보다 위)에 기함 이름만 짧게 붙인다.
-  const bossShip = bosses.length && shipName ? ` · 기함 ${shipName}${doctrine ? ' ' + doctrine : ''}` : '';
-  ctx.fillText(`드론 ${count}기 · 순양함 ${cruisers}척${bossShip}`, 12, 28);
+  const bossShip = bosses.length && shipName ? ` · ${en ? 'Flagship' : '기함'} ${shipName}${doctrine ? ' ' + doctrine : ''}` : '';
+  ctx.fillText(en ? `Drones ${count} · Cruisers ${cruisers}${bossShip}` : `드론 ${count}기 · 순양함 ${cruisers}척${bossShip}`, 12, 28);
   // 상세줄(트레잇·화력·게이지·섹터)은 보스전엔 숨김 (겹침 방지)
   if (!bosses.length) {
     if (tierName) {
       ctx.font = 'bold 11px Pretendard, sans-serif';
       ctx.fillStyle = COLORS.ally;
       const dTag = doctrine ? ` ${doctrine}` : '';
-    ctx.fillText((tierPower > 0 ? `기함 ${tierName} · 함대 화력 ${tierPower}` : `기함 ${tierName}`) + dTag, 12, 42);
+    const tierText = en
+      ? (tierPower > 0 ? `Flagship ${tierName} · Fleet power ${tierPower}` : `Flagship ${tierName}`)
+      : (tierPower > 0 ? `기함 ${tierName} · 함대 화력 ${tierPower}` : `기함 ${tierName}`);
+    ctx.fillText(tierText + dTag, 12, 42);
     }
     // 기함 업그레이드 게이지: 순양함을 모아 임계치를 채우면 기함 1단계 업그레이드
     // ※ 25분 캠페인은 승급이 '시간 스케줄'로만 일어난다(유기 진화 비활성 → 순양함을 채워도 승급 안 함).
@@ -248,16 +253,16 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.fillStyle = COLORS.reward;
       ctx.fillRect(12, 48, gw * Math.min(1, upgradeCur / upgradeMax), 5);
       ctx.font = 'bold 10px Pretendard, sans-serif';
-      ctx.fillText(`다음 기함 등급까지: 순양함 ${upgradeCur}/${upgradeMax}`, 12 + gw + 6, 53);
+      ctx.fillText(en ? `Next flagship rank: cruisers ${upgradeCur}/${upgradeMax}` : `다음 기함 등급까지: 순양함 ${upgradeCur}/${upgradeMax}`, 12 + gw + 6, 53);
     } else if (tierName) {
       ctx.font = 'bold 10px Pretendard, sans-serif';
       ctx.fillStyle = COLORS.reward;
-      ctx.fillText('기함 최고 등급 (MAX)', 12, 53);
+      ctx.fillText(en ? 'Flagship max rank (MAX)' : '기함 최고 등급 (MAX)', 12, 53);
     }
     if (stage) {
       ctx.font = 'bold 11px Pretendard, sans-serif';
       ctx.fillStyle = COLORS.reward;
-      ctx.fillText(`섹터 ${stage}`, 12, 67);
+      ctx.fillText(en ? `Sector ${stage}` : `섹터 ${stage}`, 12, 67);
     }
   }
   // 코인(이번 출격에서 수거한 액수) — 항상 표시(보스전 포함), 우상단
@@ -290,7 +295,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
     ctx.font = 'bold 12px Pretendard, sans-serif';
     ctx.fillStyle = color;
     const evoTag = weaponEvo ? ` · ${weaponEvo}` : '';
-    ctx.fillText(WEAPON_LABELS[weapon] + evoTag + (shield ? ' ⛨' : ''), logicalW - 12, 34);
+    ctx.fillText(((en ? WEAPON_LABELS_EN[weapon] : WEAPON_LABELS[weapon]) || weapon) + evoTag + (shield ? ' ⛨' : ''), logicalW - 12, 34);
     for (let i = 0; i < 3; i++) {
       ctx.globalAlpha = i < weaponLv ? 1 : 0.25;
       ctx.fillStyle = color;
@@ -314,7 +319,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       // RUSH: 텍스트 + 청록/자홍 게이지 (색상만이 아니라 RUSH 텍스트 병행)
       ctx.font = 'bold 13px Pretendard, sans-serif';
       ctx.fillStyle = '#ff4cd2';
-      ctx.fillText(`폭주 ${rushT.toFixed(1)}초`, logicalW / 2, by - 4);
+      ctx.fillText(en ? `Overdrive ${rushT.toFixed(1)}s` : `폭주 ${rushT.toFixed(1)}초`, logicalW / 2, by - 4);
       ctx.fillStyle = 'rgba(87,224,255,0.18)';
       ctx.fillRect(bx, by, bw, bh);
       ctx.fillStyle = '#57e0ff';
@@ -325,7 +330,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
       ctx.globalAlpha = flow > 0 ? 1 : 0.4;
       ctx.font = 'bold 11px Pretendard, sans-serif';
       ctx.fillStyle = COLORS.gateGood;
-      ctx.fillText(`집중 게이지 ${Math.round(flow)}`, logicalW / 2, by - 3);
+      ctx.fillText(en ? `Focus ${Math.round(flow)}` : `집중 게이지 ${Math.round(flow)}`, logicalW / 2, by - 3);
       ctx.fillStyle = 'rgba(255,255,255,0.12)';
       ctx.fillRect(bx, by, bw, bh);
       ctx.fillStyle = COLORS.gateGood;
@@ -352,7 +357,7 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
 // 25분 캠페인(drawCoreLoopHud)과 섹터 원정(drawSectorLoadoutHud)이 같은 표기를 쓰도록 분리(이사: 섹터에도 포함).
 function hudHullBar(ctx, x, y, d) {
   ctx.font = 'bold 11px Pretendard, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#dff0ff';
-  ctx.fillText(`기함 내구도 ${Math.round(d.hull)}/${d.hullMax}`, x, y);
+  ctx.fillText(d.en ? `Hull ${Math.round(d.hull)}/${d.hullMax}` : `기함 내구도 ${Math.round(d.hull)}/${d.hullMax}`, x, y);
   y += 4;
   const hw = 150, hh = 11, hf = Math.max(0, Math.min(1, d.hullFrac));
   ctx.fillStyle = 'rgba(255,80,80,0.16)'; ctx.fillRect(x, y, hw, hh);
@@ -363,6 +368,8 @@ function hudHullBar(ctx, x, y, d) {
 /** 두 무기 슬롯(진화명 + 레벨 점 3개). 보조가 비면 '빈 슬롯'을 흐리게 남겨 아직 조합이 안 됐음을 보여준다.
  *  진화명(커터3 등)은 예전엔 우상단에만 떠서 좌측 슬롯과 정보가 갈렸다 → 여기로 합쳤다(이사). */
 function hudWeaponSlots(ctx, x, y, d, emptyLabel = '보조 무기 슬롯 (미해금)') {
+  const en = !!d.en;
+  const wlabel = (id) => (en ? WEAPON_LABELS_EN[id] : WEAPON_LABELS[id]) || id;
   const chip = (label, evo, lv, color) => {
     ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = color; ctx.textAlign = 'left';
     const text = label + (evo ? ` · ${evo}` : '');
@@ -371,8 +378,8 @@ function hudWeaponSlots(ctx, x, y, d, emptyLabel = '보조 무기 슬롯 (미해
     for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < lv ? 1 : 0.25; ctx.fillRect(x + tw + 6 + i * 9, y - 8, 6, 3); }
     ctx.globalAlpha = 1; y += 17;
   };
-  chip('주무기 ' + (WEAPON_LABELS[d.mainWeapon] || d.mainWeapon), d.mainEvo, d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff');
-  if (d.wingWeapon) chip('보조 ' + (WEAPON_LABELS[d.wingWeapon] || d.wingWeapon), d.wingEvo, d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff');
+  chip((en ? 'Main ' : '주무기 ') + wlabel(d.mainWeapon), d.mainEvo, d.mainLv, WEAPON_COLORS[d.mainWeapon] || '#fff');
+  if (d.wingWeapon) chip((en ? 'Sub ' : '보조 ') + wlabel(d.wingWeapon), d.wingEvo, d.wingLv, WEAPON_COLORS[d.wingWeapon] || '#fff');
   else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText(emptyLabel, x, y); ctx.globalAlpha = 1; y += 17; }
   return y;
 }
@@ -385,8 +392,11 @@ function hudResonanceBar(ctx, x, y, d) {
   const ready = frac >= 1;
   ctx.font = 'bold 10px Pretendard, sans-serif'; ctx.textAlign = 'left';
   ctx.fillStyle = ready ? '#ffd93d' : '#9fe8ff';
-  const state = d.pending ? '곧 해금' : d.markType ? (ready ? '표적 지정됨' : '표적 대기') : `${Math.round(frac * 100)}%`;
-  ctx.fillText(`공명 ${d.resonanceName} · ${state}`, x, y); y += 4;
+  const en = !!d.en;
+  const state = d.pending ? (en ? 'soon' : '곧 해금')
+    : d.markType ? (ready ? (en ? 'marked' : '표적 지정됨') : (en ? 'target' : '표적 대기'))
+    : `${Math.round(frac * 100)}%`;
+  ctx.fillText(`${en ? 'Resonance' : '공명'} ${d.resonanceName} · ${state}`, x, y); y += 4;
   ctx.fillStyle = 'rgba(159,232,255,0.16)'; ctx.fillRect(x, y, 130, 5);
   ctx.fillStyle = ready ? '#ffd93d' : '#9fe8ff'; ctx.fillRect(x, y, 130 * frac, 5);
   y += 12;
@@ -403,7 +413,7 @@ export function drawSectorLoadoutHud(ctx, logicalW, logicalH, d) {
   ctx.textBaseline = 'alphabetic';
   const x = 12; let y = 92;
   y = hudHullBar(ctx, x, y, d);
-  y = hudWeaponSlots(ctx, x, y, d, '보조 무기 슬롯 (정예 POW로 장착)');
+  y = hudWeaponSlots(ctx, x, y, d, d.en ? 'Sub weapon slot (equip via elite POW)' : '보조 무기 슬롯 (정예 POW로 장착)');
   hudResonanceBar(ctx, x, y, d);
   ctx.restore();
 }
@@ -418,9 +428,9 @@ export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
   y = hudWeaponSlots(ctx, x, y, d);
   // ── 세 번째 슬롯: 함대 시스템(§7.2) — 캠페인(Gate 2)에서만. Gate 1 공유 HUD엔 표시 안 함(Codex P3) ──
   if (d.fleetSupported) {
-    if (d.fleetActive) { ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = d.fleetColor || '#7dffb0'; ctx.textAlign = 'left'; ctx.fillText(`함대 ${d.fleetLabel} ×${d.fleetCount}`, x, y); y += 17; }
-    else if (d.fleetTelegraph) { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.65; ctx.fillStyle = '#ffd93d'; ctx.textAlign = 'left'; ctx.fillText('함대 슬롯 예고 (곧 전개)', x, y); ctx.globalAlpha = 1; y += 17; }
-    else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText('함대 슬롯 (미해금)', x, y); ctx.globalAlpha = 1; y += 17; }
+    if (d.fleetActive) { ctx.font = 'bold 12px Pretendard, sans-serif'; ctx.fillStyle = d.fleetColor || '#7dffb0'; ctx.textAlign = 'left'; ctx.fillText(d.en ? `Fleet ${d.fleetLabel} ×${d.fleetCount}` : `함대 ${d.fleetLabel} ×${d.fleetCount}`, x, y); y += 17; }
+    else if (d.fleetTelegraph) { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.65; ctx.fillStyle = '#ffd93d'; ctx.textAlign = 'left'; ctx.fillText(d.en ? 'Fleet slot incoming (soon)' : '함대 슬롯 예고 (곧 전개)', x, y); ctx.globalAlpha = 1; y += 17; }
+    else { ctx.font = '11px Pretendard, sans-serif'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#8fb4d8'; ctx.textAlign = 'left'; ctx.fillText(d.en ? 'Fleet slot (locked)' : '함대 슬롯 (미해금)', x, y); ctx.globalAlpha = 1; y += 17; }
   }
 
   // ── 공명 진행/예고 ──
@@ -437,6 +447,6 @@ export function drawCoreLoopHud(ctx, logicalW, logicalH, d) {
   const mm = Math.floor(d.dirT / 60), ss = Math.floor(d.dirT % 60);
   const tot = d.totalSec || 480, tmm = Math.floor(tot / 60), tss = Math.floor(tot % 60);   // 총 시간(Gate 1=8:00, Gate 2 캠페인=25:00, Codex 홀리스틱)
   ctx.fillText(`${mm}:${String(ss).padStart(2, '0')} / ${tmm}:${String(tss).padStart(2, '0')}`, logicalW / 2, 20);
-  if (d.nextEventLabel) { ctx.font = '10px Pretendard, sans-serif'; ctx.fillStyle = '#8fb4d8'; ctx.fillText(`다음: ${d.nextEventLabel} (${Math.ceil(d.nextEventIn)}s)`, logicalW / 2, 33); }
+  if (d.nextEventLabel) { ctx.font = '10px Pretendard, sans-serif'; ctx.fillStyle = '#8fb4d8'; ctx.fillText(d.en ? `Next: ${d.nextEventLabel} (${Math.ceil(d.nextEventIn)}s)` : `다음: ${d.nextEventLabel} (${Math.ceil(d.nextEventIn)}s)`, logicalW / 2, 33); }
   ctx.restore();
 }

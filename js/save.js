@@ -1,4 +1,5 @@
 // 저장 래퍼 — storage 주입식이라 테스트 가능, 실패 시 메모리 폴백
+import { DEFAULT_ZOOM } from './camera-zoom.js';   // 카메라 배율 기본값(보기 설정)
 const KEY = 'neonFleet.v1';
 export const SAVE_VERSION = 3;                   // P0 리텐션: 첫 사망 무료 긴급 개조(firstDefeatUpgrade) 도입
 const DEFAULTS = {
@@ -22,10 +23,11 @@ const DEFAULTS = {
   discoveredEnemies: [],                        // 도감(발견 적 id)
   bossMemories: [],                             // 보스 기억(처치 보스 id)
   runHistorySummary: [],                        // 최근 런 요약(최대 N개)
+  view: { zoom: DEFAULT_ZOOM },                 // 보기 설정: 전투 카메라 배율(진행도 아님 — reset에도 유지, 사운드처럼)
 };
 
 // 중첩 객체 필드(구 저장에 없을 때 깊은 백필 대상). 얕은 spread로는 병합 안 되므로 개별 처리.
-const NESTED_KEYS = ['up', 'snd', 'unlocks', 'blueprints'];
+const NESTED_KEYS = ['up', 'snd', 'unlocks', 'blueprints', 'view'];
 
 const SECTOR_SPAN = 6; // 옛 stage = (sector-1)×(depth+1) + col + 1, depth 5 → 6
 
@@ -81,6 +83,7 @@ export function createSave(storage = globalThis.localStorage) {
           snd: { ...DEFAULTS.snd, ...(data.snd || {}) },
           unlocks: { ...structuredClone(DEFAULTS.unlocks), ...(data.unlocks || {}) },  // 새 필드 깊은 백필
           blueprints: { ...(data.blueprints || {}) },
+          view: { ...DEFAULTS.view, ...(data.view || {}) },   // 카메라 배율 등 보기 설정 백필(구 저장에 없으면 100%)
         };
       } catch {
         return structuredClone(DEFAULTS);
@@ -100,8 +103,8 @@ export function createSave(storage = globalThis.localStorage) {
     },
     /** 전체 진행 초기화 (사운드 설정 + 인트로 시청 여부는 유지) */
     reset() {
-      const { snd, introSeen } = this.get();
-      const fresh = { ...structuredClone(DEFAULTS), snd, introSeen };
+      const { snd, introSeen, view } = this.get();   // 사운드·인트로·카메라 배율은 진행도가 아니라 보기/설정 → 유지
+      const fresh = { ...structuredClone(DEFAULTS), snd, introSeen, view };
       memory = fresh;
       if (available) {
         try { storage.setItem(KEY, JSON.stringify(fresh)); } catch {}

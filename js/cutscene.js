@@ -19,8 +19,8 @@ export const CUT = Object.freeze({
 });
 
 /** 컷신 상태 생성. bossId=격침된 보스 아트, tier/weapon=기함 아트 선택용. */
-export function createCutscene({ sector, bossId, bossName, tier, weapon }) {
-  return { t: 0, sector, bossId, bossName, tier, weapon, burstT: 0, done: false, skipped: false };
+export function createCutscene({ sector, bossId, bossName, tier, weapon, en = false }) {
+  return { t: 0, sector, bossId, bossName, tier, weapon, en, burstT: 0, done: false, skipped: false };
 }
 
 /** 배경 일러스트가 준비됐는지(없으면 호출부가 인게임 연출로 폴백). */
@@ -148,9 +148,9 @@ export function drawCutscene(ctx, c, logicalW, logicalH, effects) {
     ctx.fillStyle = COLORS.reward;
     ctx.fillText(`SECTOR ${c.sector} CLEAR`, logicalW / 2, ty);
     ctx.font = 'bold 13px Pretendard, sans-serif';
-    ctx.strokeText(`${c.bossName || '적 기함'} 격침 확인`, logicalW / 2, ty + 24);
+    ctx.strokeText((c.en ? `${c.bossName || 'Enemy flagship'} destroyed` : `${c.bossName || '적 기함'} 격침 확인`), logicalW / 2, ty + 24);
     ctx.fillStyle = '#dbe8ff';
-    ctx.fillText(`${c.bossName || '적 기함'} 격침 확인`, logicalW / 2, ty + 24);
+    ctx.fillText((c.en ? `${c.bossName || 'Enemy flagship'} destroyed` : `${c.bossName || '적 기함'} 격침 확인`), logicalW / 2, ty + 24);
     ctx.globalAlpha = 1;
   }
 
@@ -165,7 +165,7 @@ export function drawCutscene(ctx, c, logicalW, logicalH, effects) {
     ctx.textAlign = 'center'; ctx.font = '11px Pretendard, sans-serif';
     ctx.fillStyle = 'rgba(220,235,255,0.5)';
     // 이동키·스페이스는 건너뛰기로 안 잡는다(전투 중 눌린 채 넘어와 즉시 스킵되므로) → 안내도 정확히.
-    ctx.fillText('Enter 키로 건너뛰기', logicalW / 2, logicalH - 22);
+    ctx.fillText(c.en ? 'Press Enter to skip' : 'Enter 키로 건너뛰기', logicalW / 2, logicalH - 22);
   }
   ctx.restore();
   return true;
