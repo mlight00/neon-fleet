@@ -23,7 +23,7 @@ test('FZ-2: draw가 치수 비정상 시 렌더를 건너뛴다(방어)', () => 
 });
 
 test('FZ-3: 프레임 루프가 예외 후에도 rAF를 계속한다(영구 프리즈 방지)', () => {
-  const block = mainSrc.slice(mainSrc.indexOf('function frame(t)'), mainSrc.indexOf('function frame(t)') + 500);
+  const block = mainSrc.slice(mainSrc.indexOf('function frame(t)'), mainSrc.indexOf('function frame(t)') + 1100);
   assert.ok(/try \{/.test(block) && /catch/.test(block), 'update/draw try-catch');
   // catch 블록 뒤에도 requestAnimationFrame(frame)가 호출된다
   assert.ok(/catch[\s\S]*requestAnimationFrame\(frame\)/.test(block), '예외 시에도 rAF 재예약');

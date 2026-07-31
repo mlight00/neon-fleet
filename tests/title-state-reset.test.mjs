@@ -27,9 +27,12 @@ test('TS-17: 전투 개체·보스·HUD 렌더가 run 가드 안에 있다(run=n
   assert.ok(hud > guard, 'HUD 렌더가 if(run) 뒤');
 });
 
-test('TS-18: showTitleScreen이 진입 즉시 resetToTitleState를 호출한다', () => {
-  const fn = mainSrc.slice(mainSrc.indexOf('function showTitleScreen'), mainSrc.indexOf('function showTitleScreen') + 120);
+test('TS-18: showTitleScreen이 (일반 모드) resetToTitleState로 전투 상태를 정리한다', () => {
+  const start = mainSrc.indexOf('function showTitleScreen');
+  const fn = mainSrc.slice(start, start + 1400);   // 함수 본문 전체(포털 가드 + resetToTitleState 포함)
   assert.match(fn, /resetToTitleState\(\);/);
+  // 포털은 한국어 타이틀 대신 startPortalPlay로 라우팅(그 안에서 resetToTitleState 호출) — 이른 반환 허용.
+  assert.match(fn, /if \(PORTAL_MODE\) \{ startPortalPlay\(\); return; \}/);
   // quit→타이틀 경로가 정산을 다시 하지 않는다(이미 r.settled): resetToTitleState엔 save.set/coins 없음
   assert.ok(!/save\.set|coins/.test(resetFn), '타이틀 정리에 코인 재정산 없음');
 });

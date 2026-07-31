@@ -75,6 +75,6 @@ test('SP-07: 섹터 HUD가 내구도 바 + 빈 보조 슬롯을 표시한다', (
   assert.ok(renderSrc.includes('export function drawSectorLoadoutHud'), '섹터 전용 HUD');
   assert.ok(renderSrc.includes('function hudHullBar') && renderSrc.includes('function hudWeaponSlots'), '25분 HUD와 공용 조각');
   assert.ok(renderSrc.includes("'보조 무기 슬롯 (정예 POW로 장착)'"), '섹터는 POW 안내로 빈 슬롯 표기');
-  assert.ok(mainSrc.includes('drawSectorLoadoutHud(ctx, LOGICAL_W, logicalH, {'), 'draw 루프 배선');
+  assert.ok(mainSrc.includes('drawSectorLoadoutHud(hctx, LOGICAL_W, logicalH, {'), 'draw 루프 배선');   // hctx=base에선 ctx
   assert.ok(/if \(!r\.coreLoop && !r\.campaign25 && r\.squad\.surv\)/.test(mainSrc), '섹터에서만(25분은 자체 HUD)');
 });

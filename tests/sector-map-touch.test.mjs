@@ -7,13 +7,13 @@ import { readFileSync } from 'node:fs';
 const uiSrc = readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8');
 const map = uiSrc.slice(uiSrc.indexOf('showSectorMap({'), uiSrc.indexOf('showStageClear({'));
 
-test('SM-19: 터치 첫 탭은 선택만, 같은 노드 두 번째 탭은 확정', () => {
-  assert.match(map, /if \(touch\) \{ if \(selectedId === node\.id\) confirmPick\(node\); else selectNode\(node\); \}/);
+test('SM-19: 터치 첫 탭은 선택만, 같은 노드 두 번째 탭은 확정(touch_confirm)', () => {
+  assert.match(map, /if \(touch\) \{ if \(selectedId === node\.id\) confirmPick\(node, 'touch_confirm'\); else selectNode\(node\); \}/);
 });
 
-test('SM-20: onPick은 로컬 가드로 정확히 한 번만 (두 번째 탭·확정 버튼 동시 방어)', () => {
-  assert.match(map, /confirmPick = \(node\) => \{ if \(confirmed \|\| !node\) return; confirmed = true; onPick\(node\); \}/);
-  assert.match(map, /confirmBtn\.addEventListener\('click', \(\) => \{ if \(selectedId != null\) confirmPick/);
+test('SM-20: onPick은 로컬 가드로 정확히 한 번만, 입력 수단을 method로 전달', () => {
+  assert.match(map, /confirmPick = \(node, method\) => \{ if \(confirmed \|\| !node\) return; confirmed = true; onPick\(node, method\); \}/);
+  assert.match(map, /confirmBtn\.addEventListener\('click', \(\) => \{ if \(selectedId != null\) confirmPick\(idToNode\[selectedId\], 'touch_confirm'\)/);
 });
 
 test('SM-21: 다른 노드 첫 탭은 선택 상태만 바꾼다(selectNode)', () => {
@@ -21,10 +21,10 @@ test('SM-21: 다른 노드 첫 탭은 선택 상태만 바꾼다(selectNode)', (
   assert.match(map, /b\.setAttribute\('aria-pressed', on \? 'true' : 'false'\)/);
 });
 
-test('SM-22: 마우스 1클릭·키보드 Enter는 즉시 확정, 키보드발 click은 무시', () => {
-  assert.match(map, /else confirmPick\(node\);/);                       // 마우스 즉시 확정
+test('SM-22: 마우스 1클릭(pointer_confirm)·키보드 Enter(keyboard_confirm)는 즉시 확정, 키보드발 click은 무시', () => {
+  assert.match(map, /else confirmPick\(node, 'pointer_confirm'\);/);    // 마우스 즉시 확정
   assert.match(map, /if \(e\.detail === 0\) return;/);                  // 키보드 유발 click 무시
-  assert.match(map, /attachKeyNav\(overlay\.querySelectorAll\('\[data-node\]'\), \(b\) => confirmPick/); // 키보드 확정
+  assert.match(map, /attachKeyNav\(overlay\.querySelectorAll\('\[data-node\]'\), \(b\) => confirmPick\(idToNode\[\+b\.dataset\.node\], 'keyboard_confirm'\)\)/); // 키보드 확정
   assert.match(map, /const touch = lastPT === 'touch' \|\| \(lastPT === '' && coarse\)/); // pointer 종류 판별
 });
 
