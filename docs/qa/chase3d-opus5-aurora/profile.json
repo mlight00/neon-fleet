@@ -1,0 +1,36 @@
+{
+  "date": "2026-07-30",
+  "note": "Opus5 §10.3 실전 프로파일 — ?chase3d=1&coreLoopTest=1 measure(railStorm: 오토파일럿 이동+자동사격+적·투사체), zoom 220%(t=1), __NF.step(1,1/60)=update+draw(2D+3D) 프레임당 performance.now 실측. 600프레임 전투성립 후 웜업 120 → 측정 900. GPU: NVIDIA GTX 1060 3GB (ANGLE D3D11, WebGL2). rAF 지속 FPS 아님(수동 펌프) — 프레임 '비용' 분포임을 명시.",
+  "desktop_800x450": {
+    "frames": 900, "lod": 0, "triangles3d": 18264, "drawCalls3d": 8,
+    "frameMs": { "mean": 2.313, "p50": 1.6, "p95": 6.9, "p99": 10.7, "worst": 21.5 },
+    "target": { "p50Max": 16.7, "p95Max": 22 }, "pass": true,
+    "programs": { "beforeWarm": 3, "afterWarm": 3, "afterPlay": 3, "grewDuringPlay": 0 },
+    "gpuMemory": { "geometries": 16, "textures": 19 },
+    "combatAvgPerSample": { "enemies": 9.8, "projectiles": 54.9 }
+  },
+  "mobile_390x844": {
+    "frames": 900, "lod": 1, "triangles3d": 8832, "drawCalls3d": 8, "devicePixelRatio": 2, "dprCapApplied": 1.0,
+    "frameMs": { "mean": 2.292, "p50": 1.5, "p95": 7.1, "p99": 12.6, "worst": 18.2 },
+    "target": { "p50Max": 20, "p95Max": 33 }, "pass": true,
+    "programs": { "afterWarm": 3, "afterPlay": 3, "grewDuringPlay": 0 },
+    "combatAvgPerSample": { "enemies": 8.5, "projectiles": 71.5 }
+  },
+  "determinism600": {
+    "method": "실게임 coreLoopTest, Math.random=mulberry32(123)+호출카운터, 동일 입력(targetX 사인), zoom 1.95(양쪽 동일 draw 경로). A=chase3d 없음 / B=chase3d hero 600프레임 전부 렌더",
+    "framesCompared": 600, "firstDiff": -1, "identical": true,
+    "chainHashA": "8fcdde31", "chainHashB": "8fcdde31", "rngCallsA": 602, "rngCallsB": 602, "rendered3dFramesB": 600
+  },
+  "lifecycle": {
+    "cycles100to220": 20,
+    "before": { "geometries": 16, "textures": 19, "programs": 3 },
+    "after": { "geometries": 16, "textures": 19, "programs": 3 }, "stable": true,
+    "contextLoss": { "triggered": true, "degraded": true, "canvasHidden": true, "gameContinuedRC2": true }
+  },
+  "prewarm": { "compileAsync": true, "programsBefore": 0, "programsAfter": 3, "ms": 196 },
+  "aurora": {
+    "triByLod": { "lod0": 18264, "lod1": 8832, "lod2": 4512 }, "budgets": "18k-45k / 6k-15k / 1.5k-5k 전부 충족",
+    "buildMsDesktop": "291-324(브라우저)/71(Node)", "textureBytesApprox": 2620785,
+    "topSilhouetteIoU": 0.8666, "iouTarget": 0.82, "iouPass": true
+  }
+}

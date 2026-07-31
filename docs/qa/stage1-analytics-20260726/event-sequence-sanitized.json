@@ -1,0 +1,238 @@
+{
+  "note": "Scenario C(granted) 공개 캠페인 원정 1회 — 파사드가 코어를 통해 정제한 이벤트 순서. 값은 enum·정수·짧은 id뿐(PII 없음).",
+  "count": 21,
+  "events": [
+    {
+      "name": "title_viewed",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop"
+      }
+    },
+    {
+      "name": "analytics_consent_updated",
+      "properties": {
+        "analytics_schema_version": "1",
+        "viewport_group": "desktop",
+        "consent_state": "granted"
+      }
+    },
+    {
+      "name": "expedition_start_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign"
+      }
+    },
+    {
+      "name": "build_choice_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "choice_type": "start_weapon",
+        "choice_id": "vulcan",
+        "weapon_id": "vulcan",
+        "sector": 1
+      }
+    },
+    {
+      "name": "expedition_started",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "run_index_session": 1
+      }
+    },
+    {
+      "name": "sector_started",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1
+      }
+    },
+    {
+      "name": "guide_viewed",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "guide_type": "combo"
+      }
+    },
+    {
+      "name": "guide_completed",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "guide_type": "combo",
+        "duration_sec": 2.5
+      }
+    },
+    {
+      "name": "route_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1,
+        "node_type": "combat",
+        "node_col": 0,
+        "selection_method": "auto_root"
+      }
+    },
+    {
+      "name": "combat_started",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1,
+        "time_to_combat_sec": 10
+      }
+    },
+    {
+      "name": "progression_milestone_reached",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1,
+        "milestone_type": "second_weapon",
+        "elapsed_sec": 12.5
+      }
+    },
+    {
+      "name": "progression_milestone_reached",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1,
+        "milestone_type": "first_resonance",
+        "elapsed_sec": 15
+      }
+    },
+    {
+      "name": "route_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1,
+        "node_type": "elite",
+        "node_col": 1,
+        "selection_method": "pointer_confirm"
+      }
+    },
+    {
+      "name": "build_choice_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1,
+        "choice_type": "doctrine",
+        "choice_id": "swarm"
+      }
+    },
+    {
+      "name": "node_completed",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1,
+        "node_type": "combat",
+        "elapsed_sec": 2.5
+      }
+    },
+    {
+      "name": "expedition_ended",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "outcome": "death",
+        "duration_sec": 22.5,
+        "sector_reached": 1,
+        "node_progress": 1,
+        "primary_weapon": "vulcan",
+        "doctrine_id": "swarm",
+        "keystone_id": "lance_echo",
+        "max_tier": 0,
+        "max_cruisers": 0,
+        "first_defeat_upgrade_state": "available"
+      }
+    },
+    {
+      "name": "free_upgrade_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "upgrade_key": "hull"
+      }
+    },
+    {
+      "name": "retry_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "result_type": "death"
+      }
+    },
+    {
+      "name": "expedition_start_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign"
+      }
+    },
+    {
+      "name": "build_choice_selected",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "sector": 1,
+        "choice_type": "start_weapon",
+        "choice_id": "laser",
+        "weapon_id": "laser"
+      }
+    },
+    {
+      "name": "expedition_started",
+      "properties": {
+        "analytics_schema_version": "1",
+        "player_type": "new",
+        "viewport_group": "desktop",
+        "game_mode": "campaign",
+        "run_index_session": 2
+      }
+    }
+  ]
+}

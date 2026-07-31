@@ -1,0 +1,82 @@
+{
+  "date": "2026-07-26",
+  "runner": "Codex in-app browser",
+  "production_config": {
+    "enabled": false,
+    "measurement_id": "",
+    "consent_ui_count": 0,
+    "ga_script_count": 0,
+    "console_error_count": 0,
+    "result": "PASS"
+  },
+  "local_mock": {
+    "measurement_id": "G-BROWSERQA1",
+    "external_google_network_used": false,
+    "note": "The browser-only copy replaced the Google script URL with a local stub. Repository configuration remained unchanged."
+  },
+  "scenarios": [
+    {
+      "name": "desktop_unknown",
+      "viewport": "1280x720",
+      "consent_ui_count": 1,
+      "ga_script_count": 0,
+      "start_button_count": 1,
+      "result": "PASS"
+    },
+    {
+      "name": "consent_details",
+      "dialog_count": 1,
+      "result": "PASS"
+    },
+    {
+      "name": "deny_and_reload",
+      "consent_ui_count_after_reload": 0,
+      "ga_script_count_after_reload": 0,
+      "settings_state": "denied",
+      "result": "PASS"
+    },
+    {
+      "name": "deny_revoke_reallow",
+      "settings_state": "granted",
+      "ga_script_count": 1,
+      "duplicate_script_count": 0,
+      "result": "PASS"
+    },
+    {
+      "name": "mobile_unknown_non_blocking",
+      "viewport": "390x844",
+      "ga_script_count": 0,
+      "start_button_click_reached": "start_weapon_selection",
+      "result": "PASS"
+    },
+    {
+      "name": "development_urls",
+      "paths_checked": [
+        "coreLoopTest",
+        "coreLoopMeasure",
+        "campaign25",
+        "campaign25_play",
+        "bosslab"
+      ],
+      "ga_script_count_each": 0,
+      "console_error_count_each": 0,
+      "result": "PASS"
+    },
+    {
+      "name": "analytics_script_404",
+      "script_status": 404,
+      "start_button_count": 1,
+      "console_error_count": 0,
+      "result": "PASS"
+    }
+  ],
+  "screenshots": [
+    "desktop-consent-unknown-1280x720.png",
+    "desktop-consent-details-1280x720.png",
+    "mobile-consent-unknown-390x844.png"
+  ],
+  "live_ga4_debugview": {
+    "status": "BLOCKED",
+    "reason": "A dedicated NEON FLEET GA4 measurement ID has not been provided."
+  }
+}
