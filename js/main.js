@@ -329,6 +329,7 @@ function updateChase3DOverlay() {
   if (!chase3dOverlay || !chase3d) return;
   const i = chase3d.info();
   chase3dOverlay.textContent =
+    `⚠ LEGACY 장면 — 최신 hero(AURORA/B1/B2/B4) 아님. 최신 QA 는 ?chase3d=1 실게임으로.\n` +   // Codex P1: 잘못된 장면 기준 QA 방지
     `chase3d  ${i.available ? (i.degraded ? 'DEGRADED(RC2)' : 'ON') : 'OFF'}\n` +
     `zoom ${(_t3dZoom * 100).toFixed(0)}%   t ${i.t}\n` +
     `fps ~${_t3dLastFps.toFixed(0)}   frame ~${_t3dFrameEwma.toFixed(1)}ms\n` +
@@ -3394,6 +3395,7 @@ window.__NF = {
     for (let i = 0; i < frames; i++) update(dt);
     draw();
   },
+  chase3dInfo: () => (chase3d && chase3d.info ? chase3d.info() : null),   // Codex 4단계: 최신 통합 계측용(실게임 hero 진단)
   // QA: 카메라·chaseBlend 보간을 rAF 없이 n프레임 전진(frame 루프 재현)
   stepCamera(frames = 1, dt = 1 / 60) {
     for (let i = 0; i < frames; i++) {
