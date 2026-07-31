@@ -21,6 +21,9 @@ node_modules/
 # 로컬 no-cache 개발 서버 (배포 무관)
 dev-server.py
 
+# CrazyGames Basic 업로드 빌드 산출물(대용량, 스크립트로 재생성) — 추적 안 함
+dist/
+
 # 스프라이트 중앙정렬 백업(로컬)
 assets/styleC/_backup_offcenter/
 
@@ -34,3 +37,6 @@ source/
 assets/art2/
 작업중_크리스탈/
 작업중_수송선/
+
+# 세션 QA 스크래치 서버/프로브(재생성 가능, 리포 미포함)
+scratch_*.mjs
