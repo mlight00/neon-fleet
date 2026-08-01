@@ -39,9 +39,9 @@ test('FR-16: newExpedition이 opts.devDirect를 run에 기록하고, enterSector
   assert.match(mainSrc, /function enterSectorMap\(\)\s*\{\s*\n\s*const r = run;\s*\n\s*if \(r\.devDirect\) return;/);
 });
 
-test('FR-17: 개발 3진입(bosslab·coreLoop·campaign25)이 devDirect:true로 호출한다', () => {
+test('FR-17: 개발 4진입(bosslab·fleetlab·coreLoop·campaign25)이 devDirect:true로 호출한다', () => {
   const calls = mainSrc.match(/newExpedition\('campaign', \{ devDirect: true \}\)/g) || [];
-  assert.equal(calls.length, 3, '개발 부트스트랩 3곳만 devDirect');
+  assert.equal(calls.length, 4, '개발 부트스트랩 4곳만 devDirect(§G-1 fleetlab 추가)');
   // 정상 사용자 진입(startPlay)은 devDirect가 아니다 → 자동 루트 진입 유지
   assert.match(mainSrc, /newExpedition\('campaign', \{ pickWeapon: true \}\)/);
 });

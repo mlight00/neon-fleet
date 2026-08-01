@@ -62,6 +62,7 @@ const CORE_LOOP = _clParams.has('coreLoopTest');        // 사람 플레이(H0·
 const CORE_MEASURE = _clParams.has('coreLoopMeasure');  // 자동 측정 재생(autopilot+auto-select, 헤드리스 시뮬)
 const CAMPAIGN25 = _clParams.has('campaign25');         // Gate 2: 25분 6지역 시간 캠페인(측정·개발용 진입)
 const BOSSLAB = _clParams.has('bosslab');               // 보스 패턴 프리뷰: ?bosslab=1&boss=B14 (개발/테스트용)
+const FLEETLAB = _clParams.has('fleetlab') && !BOSSLAB; // 함대 프리뷰: ?fleetlab=1 — 드론·순양함을 갖춘 채 즉시 전투(§G-1 아군 3D 확인용, 개발/테스트 전용)
 // CrazyGames 포털 배포(?distribution=crazygames 또는 crazygames.com 호스트). Prolific·개발보다 우선(§3.2).
 const DIST = detectDistribution({ hostname: location.hostname, search: location.search });
 const PORTAL_MODE = isPortalMode(DIST);                 // 포털: 영어·빠른 시작·GA4/동의/Prolific UI 없음(§3)
@@ -1036,6 +1037,7 @@ function startPlay(sameWeapon) {
   hideConsentUI();
   sfx('start');
   if (BOSSLAB) { startBossLab(_clParams.get('boss') || 'B14'); return; }   // ?bosslab=1&boss=B14: 보스 패턴 프리뷰
+  if (FLEETLAB) { startFleetLab(); return; }   // ?fleetlab=1: 함대 프리뷰(§G-1)
   if (CAMPAIGN25) { const play = _clParams.has('play'); startCampaign25({ mode: play ? 'play' : 'measure', buildId: 'railStorm', pick: play }); return; }  // ?campaign25=1 자동시연 / &play=1 사람 조작(무기 완전 선택제)
   if (CORE_MEASURE) { startCoreLoop({ mode: 'measure', buildId: 'railStorm' }); return; }  // ?coreLoopMeasure=1: 자동 측정
   if (CORE_LOOP) { startCoreLoop({ mode: 'play' }); return; }   // ?coreLoopTest=1: 사람 플레이 8분 슬라이스
@@ -1054,6 +1056,18 @@ function startBossLab(bossId = 'B14') {
   r.totalTrack = 1e12; r.pending = [];
   r.bossLab = bossId;
   spawnBossLabBoss(bossId);
+}
+
+/** 함대 프리뷰(개발/테스트): 드론·순양함을 갖춘 상태로 즉시 일반 전투 — §G-1 아군 3D 를 기다림 없이 확인. */
+function startFleetLab() {
+  drafting = false; betweenStages = false;
+  newExpedition('campaign', { devDirect: true });
+  const r = run, sq = r.squad;
+  sq.tier = 2; sq.count = 60; sq.cruisers = 2; sq.banked = 120;   // 관찰용: 드론 링이 기함 밖까지 + 순양함 2척
+  sq.weapon = 'vulcan'; sq.weaponLv = 2;
+  r.maxPower = sq.power;
+  enterNode(r.map.cols[0][0]);
+  sq._syncCruiserHp();   // 순양함 체력·피탄 배열을 척수에 동기(만피 보충) — enterNode 초기화 뒤에
 }
 
 /** 보스랩용 보스 즉시 등장(정상 HP — 패턴을 충분히 관찰하도록 클램프 없음). */
