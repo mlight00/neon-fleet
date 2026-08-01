@@ -9,14 +9,16 @@ import { mergeGeos } from './chase3d-aurora-geometry.js';
 export const DRONE_INSTANCE_MAX = 60;    // BAL.squad.drawCap 과 동일(초과분은 기존 2D 무리 표기)
 export const CRUISER_INSTANCE_MAX = 10;  // 순양함+호위기 슬롯 상한
 
-// 원본 A1.png(123×123, 콘텐츠 60×67, aspect 0.8955) 64행 주 런 반폭 — 위 뾰족 코쿤 → 델타 날개(최대 행 43~46) → 테일.
-export const A1_HALF = [0.134, 0.134, 0.217, 0.233, 0.266, 0.283, 0.3, 0.317, 0.334, 0.35, 0.366, 0.383, 0.4, 0.417, 0.417, 0.433, 0.433, 0.45, 0.45, 0.483, 0.517, 0.55, 0.567, 0.567, 0.567, 0.567, 0.567, 0.567, 0.567, 0.534, 0.55, 0.6, 0.65, 0.7, 0.734, 0.766, 0.8, 0.85, 0.883, 0.917, 0.95, 0.95, 0.966, 0.983, 0.983, 0.983, 0.983, 0.966, 0.966, 0.966, 0.966, 0.95, 0.933, 0.917, 0.633, 0.334, 0.317, 0.3, 0.283, 0.266, 0.233, 0.233, 0.183, 0.084];
-export const A1_ASPECT = 0.8955;
+// ⚠️ 원본 = 게임 2D 가 실제 로드하는 art2-webp/styleC/A1.webp·A2.webp(신세대 아트 — 구 styleC png 와 다른 그림).
+// A1.webp(257×512, aspect 0.492) 64행 반폭 — 규칙: 행 전체 런의 최외곽(|x| 최대) = 델타 날개 외곽선 유지.
+//  노즈 뾰족 → 행 53 최대 델타 → 행 58 날개 종료 급감 → 쌍발 노즐 꼬리.
+export const A1_HALF = [0.037, 0.061, 0.085, 0.102, 0.118, 0.134, 0.159, 0.175, 0.191, 0.215, 0.232, 0.248, 0.264, 0.28, 0.305, 0.321, 0.337, 0.354, 0.37, 0.386, 0.411, 0.427, 0.443, 0.451, 0.443, 0.476, 0.492, 0.508, 0.524, 0.541, 0.557, 0.573, 0.589, 0.606, 0.622, 0.638, 0.654, 0.671, 0.687, 0.703, 0.711, 0.728, 0.736, 0.785, 0.809, 0.825, 0.85, 0.874, 0.898, 0.923, 0.947, 0.963, 0.988, 0.996, 0.988, 0.98, 0.98, 0.972, 0.443, 0.435, 0.419, 0.402, 0.394, 0.378];
+export const A1_ASPECT = 0.492;
 
-// 원본 A2.png(104×122, 콘텐츠 89×106, aspect 0.8396) 64행 주 런 반폭 — 노즈 → 어깨(행 20~22) → 포드 합류 구간은 0.70 캡(포드는 별도 지오).
-export const A2_HALF = [0.168, 0.202, 0.247, 0.281, 0.292, 0.315, 0.349, 0.36, 0.382, 0.404, 0.404, 0.427, 0.517, 0.539, 0.562, 0.584, 0.584, 0.607, 0.607, 0.629, 0.629, 0.641, 0.641, 0.607, 0.573, 0.562, 0.562, 0.573, 0.584, 0.595, 0.629, 0.641, 0.674, 0.742, 0.921, 0.932, 0.944, 0.921, 0.921, 0.944, 0.944, 0.944, 0.932, 0.932, 0.932, 0.921, 0.786, 0.764, 0.73, 0.697, 0.663, 0.674, 0.415, 0.404, 0.404, 0.371, 0.337, 0.315, 0.292, 0.27, 0.259, 0.225, 0.157, 0.034];
-export const A2_ASPECT = 0.8396;
-export const A2_BODY_CAP = 0.70;   // 포드 합류 행(34~45)의 병합 런 과대 반폭 캡(B2 합류 캡과 동일 기법)
+// A2.webp(478×512, aspect 0.9341) 64행 반폭 — 규칙: A1 과 동일한 최외곽(날개+측면 나셀을 한 장으로,
+//  나셀 사이 틈·음영은 텍스처가 표현). 노즈 → 어깨 → 나셀 최대(행 53) → 행 56 종료 급감 → 쌍발 꼬리.
+export const A2_HALF = [0.036, 0.049, 0.066, 0.079, 0.092, 0.109, 0.122, 0.135, 0.152, 0.165, 0.177, 0.182, 0.186, 0.203, 0.216, 0.224, 0.229, 0.237, 0.246, 0.25, 0.246, 0.263, 0.284, 0.314, 0.34, 0.365, 0.391, 0.417, 0.442, 0.472, 0.498, 0.524, 0.549, 0.575, 0.6, 0.626, 0.656, 0.682, 0.703, 0.729, 0.754, 0.78, 0.806, 0.835, 0.857, 0.882, 0.908, 0.938, 0.947, 0.955, 0.968, 0.976, 0.985, 0.994, 0.985, 0.968, 0.374, 0.37, 0.357, 0.353, 0.344, 0.34, 0.331, 0.288];
+export const A2_ASPECT = 0.9341;
 
 /** t∈[0,1](0=노즈) → 반폭. 64행 3점 가중 스무딩(디지타이즈 3자리 반올림 지그재그가 표면 밴딩이 되는 것 방지) 후 선형 보간. */
 const sampleHalf = (arr, t, cap = 1) => {
@@ -27,7 +29,7 @@ const sampleHalf = (arr, t, cap = 1) => {
   return Math.min(cap, v);
 };
 export const a1Half = (t) => sampleHalf(A1_HALF, t);
-export const a2Half = (t) => sampleHalf(A2_HALF, t, A2_BODY_CAP);
+export const a2Half = (t) => sampleHalf(A2_HALF, t);
 
 /**
  * planform 로프트 — 노즈 -z·테일 +z(크리처 컨벤션: placeSwarm 아군 yaw 0 = 노즈가 소실점).
@@ -50,48 +52,41 @@ function loftPlanform(THREE, halfAt, aspect, segs, thMax, secPts) {
   return loftClosed(THREE, secs);
 }
 
-/** 드론(A1): 원본 코쿤+델타 실루엣 그대로 — 디테일 0(단순화 계약), 콕핏·엔진만 발광. */
+/** 드론(A1): 원본 델타 인터셉터 실루엣 그대로 — 디테일 0(단순화 계약), 콕핏·쌍발 노즐만 발광. */
 export function createDroneGeometry(THREE) {
   const secPts = (hw, th) => [ [hw, 0], [hw * 0.5, th * 0.9], [0, th], [-hw * 0.5, th * 0.9], [-hw, 0], [0, -th * 0.75] ];   // 6점: 상면 볼록·하면 킬·날개 끝 칼날
-  const hull = loftPlanform(THREE, a1Half, A1_ASPECT, 12, 0.10, secPts);
-  // glow: 콕핏(상면, 원본 밝은 창 행 12~25 → z≈-0.21) + 쌍발 엔진(행 55~60 분리 런 → z≈+0.42, x±0.10) — 옥타 8tri 경량
-  const cock = new THREE.OctahedronGeometry(0.05, 0); cock.scale(0.85, 0.4, 1.5); cock.translate(0, 0.032, -0.21);
-  const eng = new THREE.OctahedronGeometry(0.04, 0); eng.scale(1, 0.6, 1.4);
-  const eL = eng.clone(); eL.translate(-0.10, 0, 0.38);
-  const eR = eng.clone(); eR.translate(0.10, 0, 0.38);
+  const hull = loftPlanform(THREE, a1Half, A1_ASPECT, 13, 0.09, secPts);
+  // glow: 콕핏(행 ~18-26 상면 → 생성좌표 z −0.15) + 쌍발 노즐(행 59-63 분리 런 → z +0.47, x ±0.062) — 옥타 8tri 경량
+  const cock = new THREE.OctahedronGeometry(0.045, 0); cock.scale(0.8, 0.4, 1.6); cock.translate(0, 0.03, -0.15);
+  const eng = new THREE.OctahedronGeometry(0.034, 0); eng.scale(1, 0.6, 1.4);
+  const eL = eng.clone(); eL.translate(-0.062, 0, 0.47);
+  const eR = eng.clone(); eR.translate(0.062, 0, 0.47);
   eng.dispose();
   const buckets = { hull, glow: mergeGeos(THREE, [cock, eL, eR]) };
   let triangles = 0;
   for (const k in buckets) triangles += buckets[k].index.count / 3;
-  return normalize(THREE, buckets, triangles);
+  return normalize(THREE, buckets, triangles, A1_ASPECT);
 }
 
-/** 순양함(A2): 원본 장갑함 실루엣 로프트 + 측면 포드 + 함교 + 은 패널(trim) + 콕핏 세로창·쌍발 엔진(glow). */
+/** 순양함(A2): 원본 실루엣 외곽 로프트(날개+나셀 한 장) + 함교 + 갑판 스트립(trim) + 콕핏 창·쌍발 엔진(glow). */
 export function createCruiserGeometry(THREE) {
   const secPts = (hw, th) => [ [hw, 0], [hw * 0.62, th * 0.85], [hw * 0.22, th], [-hw * 0.22, th], [-hw * 0.62, th * 0.85], [-hw, 0], [-hw * 0.5, -th * 0.7], [hw * 0.5, -th * 0.7] ];   // 8점: 평평한 등판(장갑) + 하면 이중 킬
-  const body = loftPlanform(THREE, a2Half, A2_ASPECT, 20, 0.15, secPts);
-  // 측면 포드(원본 분리 런 행 29~56, x중심 ±0.866×aspect/2≈±0.364, 폭 0.427×aspect/2) — 납작 박스 + 후미 컷
-  const podW = 0.427 * A2_ASPECT * 0.5 * 0.62, podH = 0.055, podL = (56 - 29) / 63 * 0.72;
-  const podZ = -0.5 + ((29 + 56) / 2 / 63);
-  const pL = new THREE.BoxGeometry(podW, podH, podL); pL.translate(-0.866 * A2_ASPECT * 0.5 * 0.94, -0.005, podZ);
-  const pR = new THREE.BoxGeometry(podW, podH, podL); pR.translate(0.866 * A2_ASPECT * 0.5 * 0.94, -0.005, podZ);
-  // 함교(상부 후방 — 원본 상단 중앙 구조물)
-  const bridge = new THREE.BoxGeometry(0.10, 0.05, 0.14); bridge.translate(0, 0.085, 0.08);
-  const hull = mergeGeos(THREE, [body, pL, pR, bridge]);
-  // trim: 은 패널(위계 — 금은 기함 전용) — 노즈 갑판 스트립 + 어깨 패널 2
-  const deck = new THREE.BoxGeometry(0.05, 0.014, 0.30); deck.translate(0, 0.062, -0.30);
-  const shL = new THREE.BoxGeometry(0.10, 0.012, 0.16); shL.translate(-0.155, 0.055, -0.10);
-  const shR = new THREE.BoxGeometry(0.10, 0.012, 0.16); shR.translate(0.155, 0.055, -0.10);
-  // glow: 콕핏 세로창(원본 중앙 파란 창 행 12~30 → z≈-0.17) + 쌍발 엔진(행 52~58 → z≈+0.37, x±0.13)
-  const win = new THREE.BoxGeometry(0.046, 0.02, 0.24); win.translate(0, 0.052, -0.17);
-  const eng = new THREE.SphereGeometry(0.05, 7, 5); eng.scale(1, 0.7, 1.4);
-  const eL = eng.clone(); eL.translate(-0.13, -0.01, 0.37);
-  const eR = eng.clone(); eR.translate(0.13, -0.01, 0.37);
+  const body = loftPlanform(THREE, a2Half, A2_ASPECT, 20, 0.13, secPts);
+  // 함교(상부 전방 — 원본 행 12~20 중앙 구조물 → z −0.246)
+  const bridge = new THREE.BoxGeometry(0.08, 0.045, 0.12); bridge.translate(0, 0.075, -0.246);
+  const hull = mergeGeos(THREE, [body, bridge]);
+  // trim: 중앙 갑판 스트립(원본 중앙 스파인 행 20~45) — 텍스처가 이어지는 살짝 돌출 갑판
+  const deck = new THREE.BoxGeometry(0.05, 0.012, 0.40); deck.translate(0, 0.058, 0.0);
+  // glow: 콕핏 창(행 8~16 → z −0.31) + 쌍발 엔진(행 56~63 → z +0.444, x ±0.104)
+  const win = new THREE.BoxGeometry(0.042, 0.018, 0.14); win.translate(0, 0.05, -0.31);
+  const eng = new THREE.SphereGeometry(0.048, 7, 5); eng.scale(1, 0.7, 1.4);
+  const eL = eng.clone(); eL.translate(-0.104, -0.01, 0.444);
+  const eR = eng.clone(); eR.translate(0.104, -0.01, 0.444);
   eng.dispose();
-  const buckets = { hull, trim: mergeGeos(THREE, [deck, shL, shR]), glow: mergeGeos(THREE, [win, eL, eR]) };
+  const buckets = { hull, trim: deck, glow: mergeGeos(THREE, [win, eL, eR]) };
   let triangles = 0;
   for (const k in buckets) triangles += buckets[k].index.count / 3;
-  return normalize(THREE, buckets, triangles);
+  return normalize(THREE, buckets, triangles, A2_ASPECT);
 }
 
 function loftClosed(THREE, secs) {
@@ -115,7 +110,7 @@ function loftClosed(THREE, secs) {
   g.setIndex(idx); g.computeVertexNormals();
   return g;
 }
-function normalize(THREE, buckets, triangles) {
+function normalize(THREE, buckets, triangles, aspect = 1) {
   // 전장(최대 치수) 1.0 정규화 — hull 기준 배율을 전 버킷에 동일 적용(상대 위치 보존)
   const hull = buckets.hull;
   hull.computeBoundingBox();
@@ -132,26 +127,68 @@ function normalize(THREE, buckets, triangles) {
     for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
     g.attributes.position.needsUpdate = true; g.index.needsUpdate = true;
     g.computeVertexNormals(); g.computeBoundingBox(); g.computeBoundingSphere();
+    // 원본 스프라이트 투영 UV(이사: "2D 드론과 너무 다르다") — 최종 좌표 (x,z) 를 A1/A2 그림 (u,v) 로.
+    //  노즈(+z)=이미지 상단(v=1, three flipY 기본). u 는 중심 기준 3% 수축(실루엣 밖 투명 픽셀 새어들기 방지).
+    //  glow 는 발광 단색이라 제외.
+    if (key !== 'glow') {
+      const uv = g.attributes.uv.array;
+      for (let i = 0, p = 0; i < uv.length; i += 2, p += 3) {
+        uv[i] = Math.min(1, Math.max(0, (pos[p] / aspect) * 0.97 + 0.5));
+        uv[i + 1] = Math.min(1, Math.max(0, (pos[p + 2]) * 0.97 + 0.5));
+      }
+      g.attributes.uv.needsUpdate = true;
+    }
   }
   return { buckets, triangles: Math.round(triangles) };
 }
 
-/** 아군 공용 재질 — 원본 A1/A2 팔레트(짙은 회청 금속 + 청록 발광). flatShading 으로 패널 각. */
-export function createAlliesMaterials(THREE) {
+/**
+ * 아군 재질 — 원본 스프라이트(A1/A2 webp)를 albedo 로 그대로 입힌다(이사: "2D 드론과 너무 다르다·기함 대비 단순").
+ * UV 는 normalize 가 planform (x,z)→그림 (u,v) 로 매핑 → 상면에서 2D 그림과 같은 패널·창·명암.
+ * 브라우저 전용 로드(TextureLoader) — Node/실패 시 단색 폴백(형상·테스트는 텍스처와 무관).
+ */
+const ALLIES_TEX_URL = { drone: 'assets/art2-webp/styleC/A1.webp', cruiser: 'assets/art2-webp/styleC/A2.webp' };
+function baseAlliesMaterials(THREE, kind) {
+  let map = null;
+  if (typeof document !== 'undefined') {
+    try {
+      // 투명부(실루엣 밖·나셀 틈)를 어두운 헐 색으로 채워 굽는다 — UV 경계 검은 띠·틈 새어보임 방지.
+      const cv = document.createElement('canvas'); cv.width = 8; cv.height = 8;
+      const cx = cv.getContext('2d'); cx.fillStyle = '#2a3542'; cx.fillRect(0, 0, 8, 8);
+      map = new THREE.CanvasTexture(cv);
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+      map.anisotropy = 4;
+      const img = new Image();
+      img.onload = () => {
+        cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+        const c2 = cv.getContext('2d');
+        c2.fillStyle = '#2a3542'; c2.fillRect(0, 0, cv.width, cv.height);
+        c2.drawImage(img, 0, 0);
+        map.needsUpdate = true;
+      };
+      img.src = ALLIES_TEX_URL[kind] || ALLIES_TEX_URL.drone;
+    } catch (e) { map = null; }
+  }
   const mats = {
-    // 실전 hero 조명은 검사실보다 어둡다 — 미광(emissive)으로 아군 식별성 보장(원본 스프라이트도 자발광톤)
-    hull: new THREE.MeshStandardMaterial({ color: 0x5f7086, metalness: 0.55, roughness: 0.5, envMapIntensity: 0.45, flatShading: true, emissive: 0x232e3d, emissiveIntensity: 0.55 }),
-    trim: new THREE.MeshStandardMaterial({ color: 0xa8bccd, metalness: 0.8, roughness: 0.34, envMapIntensity: 0.6, flatShading: true, emissive: 0x2c3947, emissiveIntensity: 0.4 }),
+    // 텍스처가 명암·패널을 제공 → color 는 백색(원색 유지), 미광은 실전 어둠 보정용으로 낮게.
+    hull: new THREE.MeshStandardMaterial({ map, color: map ? 0xffffff : 0x5f7086, metalness: 0.45, roughness: 0.55, envMapIntensity: 0.4, flatShading: true, emissive: 0x39434f, emissiveIntensity: map ? 0.32 : 0.55 }),
+    trim: new THREE.MeshStandardMaterial({ map, color: map ? 0xdfe8f0 : 0xa8bccd, metalness: 0.75, roughness: 0.36, envMapIntensity: 0.55, flatShading: true, emissive: 0x39434f, emissiveIntensity: 0.28 }),
     glow: new THREE.MeshStandardMaterial({ color: 0x0a2530, emissive: 0x6ee7ff, emissiveIntensity: 2.4, metalness: 0.1, roughness: 0.4 }),
   };
-  return { mats, dispose() { for (const k in mats) mats[k].dispose(); } };
+  return { mats, dispose() { if (map) map.dispose(); for (const k in mats) mats[k].dispose(); } };
 }
+export function createDroneMaterials(THREE) { return baseAlliesMaterials(THREE, 'drone'); }
+export function createCruiserMaterials(THREE) { return baseAlliesMaterials(THREE, 'cruiser'); }
+/** (하위 호환) 종 미지정 공용 — 드론 텍스처 기준. */
+export function createAlliesMaterials(THREE) { return baseAlliesMaterials(THREE, 'drone'); }
 
-/** 검사실 전시용(위계 비교): 순양함 1 + 드론 3 나란히. */
+/** 검사실 전시용(위계 비교): 순양함 1 + 드론 3 나란히 — 종별 원본 텍스처 재질. */
 export function createAlliesModel(THREE) {
-  const matlib = createAlliesMaterials(THREE);
+  const droneMat = createDroneMaterials(THREE);
+  const cruMat = createCruiserMaterials(THREE);
   const group = new THREE.Group(); group.name = 'ALLIES';
-  const addAt = (geo, x, z, s) => {
+  const addAt = (geo, matlib, x, z, s) => {
     const g = new THREE.Group();
     for (const k in geo.buckets) g.add(new THREE.Mesh(geo.buckets[k], matlib.mats[k]));
     g.position.set(x, 0, z); g.scale.setScalar(s);
@@ -161,13 +198,13 @@ export function createAlliesModel(THREE) {
   const cru = createCruiserGeometry(THREE);
   const dro = createDroneGeometry(THREE);
   // 위계 비교 배치: 같은 깊이 평면에 가로 나란히(원근 착시 없는 정직한 크기 비교) — 실전 화면비 22/42≈0.52
-  addAt(cru, -0.55, 0, 1.9);
-  addAt(dro, 0.75, -0.65, 1.0); addAt(dro, 0.75, 0.65, 1.0); addAt(dro, 1.45, 0, 1.0);
+  addAt(cru, cruMat, -0.55, 0, 1.9);
+  addAt(dro, droneMat, 0.75, -0.65, 1.0); addAt(dro, droneMat, 0.75, 0.65, 1.0); addAt(dro, droneMat, 1.45, 0, 1.0);
   let tris = cru.triangles + dro.triangles * 3;
   function setLOD() { return 0; }
-  function update(time) { matlib.mats.glow.emissiveIntensity = 2.2 + Math.sin(time * 4.3) * 0.4; }
+  function update(time) { const e = 2.2 + Math.sin(time * 4.3) * 0.4; droneMat.mats.glow.emissiveIntensity = e; cruMat.mats.glow.emissiveIntensity = e; }
   function stats() { return { lod: 0, triangles: tris, cruiser: cru.triangles, drone: dro.triangles }; }
-  function dispose() { for (const k in cru.buckets) cru.buckets[k].dispose(); for (const k in dro.buckets) dro.buckets[k].dispose(); matlib.dispose(); }
-  return { group, setLOD, update, stats, dispose, matlib, get lod() { return 0; } };
+  function dispose() { for (const k in cru.buckets) cru.buckets[k].dispose(); for (const k in dro.buckets) dro.buckets[k].dispose(); droneMat.dispose(); cruMat.dispose(); }
+  return { group, setLOD, update, stats, dispose, matlib: droneMat, get lod() { return 0; } };
 }
-export default { createDroneGeometry, createCruiserGeometry, createAlliesMaterials, createAlliesModel, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX };
+export default { createDroneGeometry, createCruiserGeometry, createAlliesMaterials, createDroneMaterials, createCruiserMaterials, createAlliesModel, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX };
