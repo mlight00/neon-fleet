@@ -64,9 +64,13 @@ test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배�
 });
 
 test('HW-11: 소품 3D(§G-2 갱신) — 발사체 3종 원본 텍스처 재질 + 정보 라벨 유지 + 공명만 2D 예외', () => {
-  assert.match(renderer, /import \{ PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial \} from '\.\/chase3d-props\.js'/);
-  // §G-2: 무기 발사체(발칸·유도·레이저)는 종별 원본 그림 재질, 나머지는 공용 자발광
-  assert.match(renderer, /\(k === 'pbullet' \|\| k === 'missile' \|\| k === 'laser'\) \? createProjMaterial\(THREE, k\) : pm/);
+  assert.match(renderer, /import \{ PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupMaterial \} from '\.\/chase3d-props\.js'/);
+  // §G-2/3: 발사체 3종=원본 가산 재질, 픽업 5종=원본 컷아웃 재질 — ebullet 만 공용 자발광
+  assert.match(renderer, /isProj \? createProjMaterial\(THREE, k\) : isPickup \? createPickupMaterial\(THREE, k\) : pm/);
+  const props3 = readFileSync(new URL('../js/chase3d-props.js', import.meta.url), 'utf8');
+  assert.match(props3, /crystal: \{ url: 'assets\/styleC\/C1\.png', additive: true \}/);
+  assert.match(props3, /pod: \{ url: 'assets\/styleC\/C5\.png'/); assert.match(props3, /capsule: \{ url: 'assets\/styleC\/C2\.png'/);
+  assert.match(props3, /pow: \{ bake: 'pow'/); assert.match(props3, /coin: \{ bake: 'coin'/);   // 절차 벡터 2종은 2D draw 동일 모양 굽기
   assert.match(renderer, /new THREE\.InstancedMesh\(createPropGeometry\(THREE, k\), mat, PROP_CAPS\[k\]\)/);
   assert.match(renderer, /im\.setColorAt\(i, _sCol\)/);                                    // instanceColor(적탄·픽업)
   assert.match(renderer, /\(k === 'pbullet' \|\| k === 'ebullet' \|\| k === 'missile' \|\| k === 'laser'\) \? 'direct' : 'spin'/);   // 탄=진행각, 픽업=스핀

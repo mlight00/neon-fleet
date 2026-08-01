@@ -49,6 +49,62 @@ function loftProjectile(THREE, aspect, half, segs = 8, thRel = 0.30) {
   return g;
 }
 
+// ── §G-3(이사 승인 "같은 방식"): 픽업류(크리스탈·보급선·캡슐·배지·코인)도 원본 그림을 그대로 ──
+//  파일이 있는 3종(C1/C5/C2)은 그 파일, 절차 벡터 2종(POW·코인)은 2D draw 와 동일한 모양·색을
+//  오프스크린 캔버스에 구워 텍스처로. 지오=세로 카드 프리즘(placeSwarm 'spin'이 y 축 회전) + 알파 컷아웃.
+export const PICKUP_TEX = {
+  crystal: { url: 'assets/styleC/C1.png', additive: true },    // 발광 보석 — 가산(부드러운 halo 보존)
+  pod: { url: 'assets/styleC/C5.png', additive: false },       // 팔각 장갑 보급 컨테이너
+  capsule: { url: 'assets/styleC/C2.png', additive: false },   // 무기·전력 캡슐 묶음
+  pow: { bake: 'pow', additive: false },                       // 절차: 노랑 육각 배지(원본 Pow.draw 동일)
+  coin: { bake: 'coin', additive: false },                     // 절차: 노랑 동전(원본 Coin.draw 동일)
+};
+
+/** 절차 픽업 굽기 — entities 의 2D draw 와 같은 모양·색(글로우 여백 포함 128px). */
+function bakePickup(kind) {
+  const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const c = cv.getContext('2d'), cx = S / 2, cy = S / 2;
+  if (kind === 'pow') {
+    const r = S * 0.36;
+    c.shadowColor = '#ffd93d'; c.shadowBlur = S * 0.09;
+    c.fillStyle = 'rgba(255,217,61,0.92)'; c.strokeStyle = '#fff4c6'; c.lineWidth = S * 0.03;
+    c.beginPath();
+    for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 - Math.PI / 2; const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r; i ? c.lineTo(px, py) : c.moveTo(px, py); }
+    c.closePath(); c.fill(); c.stroke();
+    c.shadowBlur = 0;
+    c.fillStyle = '#2a2000'; c.font = `bold ${Math.round(S * 0.22)}px Pretendard, sans-serif`; c.textAlign = 'center';
+    c.fillText('POW', cx, cy + S * 0.08);
+  } else {   // coin
+    const r = S * 0.34;
+    c.shadowColor = '#ffd93d'; c.shadowBlur = S * 0.07;
+    c.fillStyle = '#ffd93d';
+    c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+    c.shadowBlur = 0;
+    c.fillStyle = '#fff4b0';
+    c.beginPath(); c.arc(cx - r * 0.28, cy - r * 0.3, r * 0.34, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(150,105,15,0.9)'; c.lineWidth = S * 0.02;
+    c.beginPath(); c.arc(cx, cy, r * 0.6, 0, Math.PI * 2); c.stroke();
+  }
+  return cv;
+}
+
+/** 픽업 재질 — 원본 그림(파일 또는 절차 굽기) + 알파 컷아웃(크리스탈만 가산). Node 폴백=단색. */
+export function createPickupMaterial(THREE, key) {
+  const def = PICKUP_TEX[key];
+  let map = null;
+  if (def && typeof document !== 'undefined') {
+    try {
+      if (def.bake) { map = new THREE.CanvasTexture(bakePickup(def.bake)); }
+      else if (THREE.TextureLoader) { map = new THREE.TextureLoader().load(def.url); }
+      if (map) { map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping; }
+    } catch (e) { map = null; }
+  }
+  if (def && def.additive) {
+    return new THREE.MeshBasicMaterial({ map, color: 0xffffff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false });
+  }
+  return new THREE.MeshBasicMaterial({ map, color: 0xffffff, transparent: true, alphaTest: map ? 0.35 : 0, toneMapped: false });
+}
+
 /** 발사체 전용 재질 — 원본 webp albedo + 가산 발광(instanceColor 로 진화색 틴트). Node/실패 시 단색 폴백. */
 export function createProjMaterial(THREE, key) {
   let map = null;
@@ -81,29 +137,11 @@ export function createPropGeometry(THREE, key) {
       case 'missile': {   // 유도 미사일(원본: 은색 4핀 미사일) — 방추(탄두·금띠·핀 벌어짐은 그림이 전달)
         return loftProjectile(THREE, PROJ_TEX.missile.aspect, (t) => (t < 0.30 ? 0.18 + 0.82 * Math.pow(t / 0.30, 0.85) : t < 0.66 ? 0.92 : 1.0), 8, 0.34);
       }
-      case 'crystal': {   // 크리스탈(+N 보석): 겹 옥타 — 겉(색) + 속(밝은 심)
-        const outer = new THREE.OctahedronGeometry(0.5, 0); outer.scale(0.52, 0.52, 1.0);
-        const inner = new THREE.OctahedronGeometry(0.5, 0); inner.scale(0.26, 0.26, 0.55);
-        return mergeGeos(THREE, [outer, inner]);
-      }
-      case 'coin': {      // 코인: 도톰한 원반(위에서 원이 보이게 눕힘)
-        const c = new THREE.CylinderGeometry(0.5, 0.5, 0.14, 12);
-        return c;
-      }
-      case 'pow': {       // POW 배지: 팔각 프리즘 + 상단 링
-        const base = new THREE.CylinderGeometry(0.5, 0.5, 0.18, 8);
-        const ring = new THREE.TorusGeometry(0.30, 0.06, 6, 8); ring.rotateX(Math.PI / 2); ring.translate(0, 0.14, 0);
-        return mergeGeos(THREE, [base, ring]);
-      }
-      case 'pod': {       // 보급선(드론 포드): 세로 캡슐 + 허리 링
-        const body = new THREE.CapsuleGeometry(0.24, 0.46, 2, 7);
-        const ring = new THREE.TorusGeometry(0.30, 0.05, 4, 8); ring.rotateX(Math.PI / 2);
-        return mergeGeos(THREE, [body, ring]);
-      }
-      case 'capsule':     // 무기 캡슐·전력 모듈: 가로 캡슐(알약)
+      // §G-3 픽업 5종: 세로 카드 프리즘(y=그림 세로) — 앞·뒤면에 원본 그림(BoxGeometry 면별 UV 0..1),
+      //  알파 컷아웃이 실루엣대로 뚫어 "두께 있는 원본 아이콘"이 y 축으로 회전(spin).
+      case 'crystal': case 'coin': case 'pow': case 'pod': case 'capsule':
       default: {
-        const body = new THREE.CapsuleGeometry(0.22, 0.5, 2, 8); body.rotateZ(Math.PI / 2);
-        return body;
+        return new THREE.BoxGeometry(1, 1, 0.14);
       }
     }
   })();
