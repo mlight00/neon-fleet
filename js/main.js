@@ -1007,6 +1007,11 @@ function completeNode(node) {
       // 첫 섹터 보스 격파 후 다음 섹터 맵 전에 키스톤 3택 (원정당 1개)
       if (r.sector === 1 && !r.squad.keystone) openKeystone(nextSector);
       else nextSector();
+    } else if (r.devDirect) {
+      // 개발 직행(fleetlab·bosslab): 항로 맵 화면이 없다(enterSectorMap 은 devDirect 조기 반환, FR-16).
+      //  그대로 두면 flythrough 가 매 프레임 완료 처리를 재시도하는 무한 정지(이사 "못 넘어감") — 다음 열 노드로 계속 전투.
+      const nextCol = node ? Math.min(node.col + 1, r.map.cols.length - 1) : 0;
+      enterNode(r.map.cols[nextCol][0]);
     } else {
       enterSectorMap();
     }
@@ -1063,9 +1068,16 @@ function startFleetLab() {
   drafting = false; betweenStages = false;
   newExpedition('campaign', { devDirect: true });
   const r = run, sq = r.squad;
+  // 정상 플레이(pickWeapon 경로)와 동일한 현행 상태를 설치 — 공명(섹터 무기 조합)+내구도.
+  //  이게 없으면 구형 규칙이 부활한다: 막대 게이트·무기 캡슐 스폰(이사 "게이트가 다시 생겼네"),
+  //  노드 클리어 후 구형 모듈 드래프트가 떠서 진행 불능(이사 제보). installGate1 은 wing 슬롯을
+  //  초기화하므로 무기 지정보다 먼저 부른다(정상 경로와 같은 순서).
+  sq.installGate1({ surv: createSurvivability(BAL.gate1.survivability), reson: createResonanceState(), mainWeapon: sq.weapon });
+  r.world.reson = sq.reson;
   sq.tier = 2; sq.count = 60; sq.cruisers = 2; sq.banked = 120;   // 관찰용: 드론 링이 기함 밖까지 + 순양함 2척
   const w = _clParams.get('weapon');   // &weapon=laser|homing 으로 무기 3D 관찰 대상 선택(기본 vulcan)
   sq.weapon = (w === 'laser' || w === 'homing') ? w : 'vulcan'; sq.weaponLv = 2;
+  if (sq.reson) resonSetLoadout(sq.reson, [sq.weapon, null]);
   r.maxPower = sq.power;
   enterNode(r.map.cols[0][0]);
   sq._syncCruiserHp();   // 순양함 체력·피탄 배열을 척수에 동기(만피 보충) — enterNode 초기화 뒤에
