@@ -1064,7 +1064,8 @@ function startFleetLab() {
   newExpedition('campaign', { devDirect: true });
   const r = run, sq = r.squad;
   sq.tier = 2; sq.count = 60; sq.cruisers = 2; sq.banked = 120;   // 관찰용: 드론 링이 기함 밖까지 + 순양함 2척
-  sq.weapon = 'vulcan'; sq.weaponLv = 2;
+  const w = _clParams.get('weapon');   // &weapon=laser|homing 으로 무기 3D 관찰 대상 선택(기본 vulcan)
+  sq.weapon = (w === 'laser' || w === 'homing') ? w : 'vulcan'; sq.weaponLv = 2;
   r.maxPower = sq.power;
   enterNode(r.map.cols[0][0]);
   sq._syncCruiserHp();   // 순양함 체력·피탄 배열을 척수에 동기(만피 보충) — enterNode 초기화 뒤에
