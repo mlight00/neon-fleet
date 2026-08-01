@@ -13,7 +13,7 @@ import { createB1Geometry, createB1Materials } from './chase3d-b1.js';
 import { createB2Geometry, createB2Materials } from './chase3d-b2.js';
 import { createB4Geometry, createB4Materials } from './chase3d-b4.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
-import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial } from './chase3d-props.js';
+import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial } from './chase3d-props.js';
 
 export const B1_INSTANCE_MAX = 28;   // 실전 B1 동시 표시 상한(스폰 상한보다 넉넉, 초과분은 2D 폴백)
 export const B2_INSTANCE_MAX = 8;    // 실전 B2(중형) 동시 표시 상한
@@ -99,7 +99,9 @@ function createHero3D(canvas3d, opts = {}) {
       const pm = createPropMaterial(THREE);
       props = {};
       for (const k of PROP_KEYS) {
-        const im = new THREE.InstancedMesh(createPropGeometry(THREE, k), pm, PROP_CAPS[k]);
+        // §G-2: 무기 발사체(발칸·유도·레이저)는 원본 그림 albedo 가산 재질(종별) — 나머지는 공용 자발광
+        const mat = (k === 'pbullet' || k === 'missile' || k === 'laser') ? createProjMaterial(THREE, k) : pm;
+        const im = new THREE.InstancedMesh(createPropGeometry(THREE, k), mat, PROP_CAPS[k]);
         im.count = 0; im.frustumCulled = false;
         _sCol.setHex(PROP_BASE_COLOR[k]);
         for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol);   // instanceColor 버퍼 생성 + 기본색
@@ -224,7 +226,7 @@ function createHero3D(canvas3d, opts = {}) {
         if (swarms.cruiser) placeSwarm(cruiser, swarms.cruiser.buf, swarms.cruiser.n, CRUISER_INSTANCE_MAX, 'direct', 0, 0);   // 실측: hero 카메라 기준 yaw 0 = 지오 +z 가 소실점 → 지오를 노즈 +z 로 로프트
         if (props && swarms.props) for (const k of PROP_KEYS) {
           const s = swarms.props[k];
-          if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], (k === 'pbullet' || k === 'ebullet' || k === 'missile') ? 'direct' : 'spin', time);
+          if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], (k === 'pbullet' || k === 'ebullet' || k === 'missile' || k === 'laser') ? 'direct' : 'spin', time);
         }
       } else {
         placeSwarm(b1, null, 0, B1_INSTANCE_MAX); placeSwarm(b2, null, 0, B2_INSTANCE_MAX); placeSwarm(b4, null, 0, B4_INSTANCE_MAX);

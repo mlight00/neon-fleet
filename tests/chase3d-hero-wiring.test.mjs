@@ -63,20 +63,27 @@ test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배�
   assert.ok(!/new THREE\./.test(pb), 'placeSwarm 안 new THREE 없음');
 });
 
-test('HW-11: 소품 3D(이사 "무기·배지") — 종별 인스턴스 + 공용 재질 + 정보 라벨 유지 + 레이저 2D 예외', () => {
-  assert.match(renderer, /import \{ PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial \} from '\.\/chase3d-props\.js'/);
-  assert.match(renderer, /new THREE\.InstancedMesh\(createPropGeometry\(THREE, k\), pm, PROP_CAPS\[k\]\)/);
-  assert.match(renderer, /im\.setColorAt\(i, _sCol\)/);                                    // instanceColor(탄 진화색)
-  assert.match(renderer, /\(k === 'pbullet' \|\| k === 'ebullet' \|\| k === 'missile'\) \? 'direct' : 'spin'/);   // 탄=진행각, 픽업=스핀
-  // main: 픽업 5종 + 탄 수집, 레이저 빔·공명은 2D 스트릭 유지, 정보 라벨(+N·▲N·무기명)은 HUD 계층 유지
-  assert.match(main, /if \(b\.dead \|\| b\.kind === 'laser' \|\| b\.resonanceId\) continue/);
-  assert.match(main, /b instanceof HomingMissile \? 'missile' : 'pbullet'/);
+test('HW-11: 소품 3D(§G-2 갱신) — 발사체 3종 원본 텍스처 재질 + 정보 라벨 유지 + 공명만 2D 예외', () => {
+  assert.match(renderer, /import \{ PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial \} from '\.\/chase3d-props\.js'/);
+  // §G-2: 무기 발사체(발칸·유도·레이저)는 종별 원본 그림 재질, 나머지는 공용 자발광
+  assert.match(renderer, /\(k === 'pbullet' \|\| k === 'missile' \|\| k === 'laser'\) \? createProjMaterial\(THREE, k\) : pm/);
+  assert.match(renderer, /new THREE\.InstancedMesh\(createPropGeometry\(THREE, k\), mat, PROP_CAPS\[k\]\)/);
+  assert.match(renderer, /im\.setColorAt\(i, _sCol\)/);                                    // instanceColor(적탄·픽업)
+  assert.match(renderer, /\(k === 'pbullet' \|\| k === 'ebullet' \|\| k === 'missile' \|\| k === 'laser'\) \? 'direct' : 'spin'/);   // 탄=진행각, 픽업=스핀
+  // main: 레이저 랜스도 3D 수집(공명 레일만 2D 전용 렌더 유지), 발사체는 원본색(흰색 — 2D 도 원색 blit)
+  assert.match(main, /if \(b\.dead \|\| b\.resonanceId\) continue;/);
+  assert.match(main, /b\.kind === 'laser' \? 'laser' : b instanceof HomingMissile \? 'missile' : 'pbullet'/);
+  assert.match(main, /putProp\(key, b, p, 0xffffff/);
   assert.match(main, /e instanceof Crystal\) \{ key = 'crystal'; label = `\+\$\{e\.payout\}`/);
   assert.match(main, /e instanceof DronePod\) \{ key = 'pod'; label = `▲\$\{e\.payout\}`/);
   assert.match(main, /function drawPropLabels\(c\)/);
   assert.match(main, /if \(t3d >= 0\.5\) drawPropLabels\(hctx\)/);
-  // 색 캐시(프레임 중 파싱 최소화) + 탄 진행각 롤
-  assert.match(main, /colInt\(b\.color, 0xffd34d\), Math\.atan2\(b\.vx \|\| 0, -\(b\.vy \|\| -1\)\)/);
+  // 적탄은 색 캐시+진행각 유지
+  assert.match(main, /colInt\(b\.color, 0xff7a5a\), Math\.atan2\(b\.vx \|\| 0, -\(b\.vy \|\| 1\)\)/);
+  // §G-2 발사체 텍스처 원본 = 게임 2D 와 같은 파일
+  const props = readFileSync(new URL('../js/chase3d-props.js', import.meta.url), 'utf8');
+  assert.match(props, /nf2_proj_vulcan_base\.webp/); assert.match(props, /nf2_proj_homing_base\.webp/); assert.match(props, /nf2_proj_laser_base\.webp/);
+  assert.match(props, /blending: THREE\.AdditiveBlending/);
 });
 
 test('HW-12: Codex 검토 반영 — 소품 3D 기본 OFF 게이트 + sidecar 무오염 + 진단 확장', () => {

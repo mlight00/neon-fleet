@@ -7,7 +7,7 @@ import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMa
 // 소품 3D(이사 "무기·배지") — 초경량·결정적·전장 1.0 계약.
 
 test('PR-01: 키·상한·기본색 정의 일치 + Math.random() 미사용', () => {
-  assert.deepEqual(PROP_KEYS, ['pbullet', 'ebullet', 'missile', 'crystal', 'coin', 'pow', 'pod', 'capsule']);
+  assert.deepEqual(PROP_KEYS, ['pbullet', 'ebullet', 'missile', 'laser', 'crystal', 'coin', 'pow', 'pod', 'capsule']);   // §G-2: 레이저 랜스 추가
   for (const k of PROP_KEYS) {
     assert.ok(Number.isInteger(PROP_CAPS[k]) && PROP_CAPS[k] > 0, `cap ${k}`);
     assert.ok(Number.isInteger(PROP_BASE_COLOR[k]), `color ${k}`);

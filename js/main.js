@@ -202,7 +202,7 @@ const CHASE3D_TEST = chase3dTestEnabled(location.search);
 const CHASE3D_LAB = chase3dLabTarget(location.search);   // 'aurora' = 모델 검사실(Opus5 §8)
 // 소품(탄·픽업) 3D 는 기본 OFF(이사 실기 "엉망" + Codex 가독성 판정) — 기존 2D 스트릭·스프라이트가 기본.
 //  ?chase3d=1&chase3dProps=1 로만 켜서 가독성 A/B 비교에 사용한다. 크리처(B1/B2/B4)·기함 3D 는 영향 없음.
-const CHASE3D_PROPS = chase3dPropsEnabled(location.search);
+const CHASE3D_PROPS = chase3dPropsEnabled(location.search) || FLEETLAB;   // §G-2: 함대 프리뷰는 무기 3D 까지 켠 관찰 장면
 if (CHASE3D_ON) {
   const stage = document.getElementById('stage');
   canvas3d = document.createElement('canvas'); canvas3d.id = 'game3d';
@@ -2847,7 +2847,7 @@ let _b1n = 0, _b2n = 0, _b4n = 0, _b1Stamp = 0;
 // 3D 포함 여부는 게임 객체에 쓰지 않고 sidecar(WeakMap)로 관리(Codex P2) — 저장·직렬화·디버깅과의 결합 원천 차단.
 const _in3dMap = new WeakMap();
 // ── 소품 3D(이사: "무기·배지") — 종별 화면 전장(논리px)·상한과 수집 버퍼. 레이저 빔·공명은 2D 스트릭 유지. ──
-const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], crystal: [88, 200], coin: [22, 56], pow: [40, 92], pod: [64, 160], capsule: [44, 110] };
+const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], laser: [64, 150], crystal: [88, 200], coin: [22, 56], pow: [40, 92], pod: [64, 160], capsule: [44, 110] };
 const _sw = {
   b1: { buf: _b1Buf, n: 0 }, b2: { buf: _b2Buf, n: 0 }, b4: { buf: _b4Buf, n: 0 },
   drone: { buf: _droneBuf, n: 0 }, cruiser: { buf: _cruBuf, n: 0 },
@@ -2990,10 +2990,12 @@ function draw() {
       // 탄환 3D 도 같은 개발 플래그 뒤 — 기본은 기존 2D 탄·스트릭.
       if (CHASE3D_PROPS) {
         for (const b of run.world.bullets) {
-          if (b.dead || b.kind === 'laser' || b.resonanceId) continue;
+          if (b.dead || b.resonanceId) continue;   // §G-2: 레이저 랜스도 3D(공명 레일만 2D 전용 렌더 유지)
           const p = projectObject(b, 'playerBullet', chaseProjection);
           if (!passGate(b, p)) continue;
-          putProp(b instanceof HomingMissile ? 'missile' : 'pbullet', b, p, colInt(b.color, 0xffd34d), Math.atan2(b.vx || 0, -(b.vy || -1)));
+          const key = b.kind === 'laser' ? 'laser' : b instanceof HomingMissile ? 'missile' : 'pbullet';
+          // §G-2: 원본 그림 자체가 색을 가짐(2D 도 원색 blit) — 틴트 없이 흰색(진화 구분은 후속: 진화별 텍스처)
+          putProp(key, b, p, 0xffffff, Math.atan2(b.vx || 0, -(b.vy || -1)));
         }
         for (const b of run.world.enemyBullets) {
           if (b.dead || b.kind === 'laser' || b.resonanceId) continue;
