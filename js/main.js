@@ -214,10 +214,14 @@ if (CHASE3D_ON) {
   if (stage) { canvas.after(canvas3d); canvas3d.after(hudCanvas); }
   hudCtx = hudCanvas.getContext('2d');
   sizeChase3DCanvases();
-  if (['aurora', 'b1', 'b2', 'b4', 'swarm'].includes(CHASE3D_LAB)) {
+  if (['aurora', 'b1', 'b2', 'b4', 'allies', 'swarm'].includes(CHASE3D_LAB)) {
     // ── 모델 검사실(Opus5 §8: aurora / B1 단독 / swarm=기함+B1 12) — 게임 렌더 대신 스튜디오. 기본 URL 미로드. ──
     canvas.style.visibility = 'hidden';
     const _ov = document.getElementById('overlay'); if (_ov) _ov.style.display = 'none';
+    // 타이틀 state 진입이 overlay·title-screen 패널을 되살려 검사 대상을 덮는다 → 3D 캔버스 외 전부 고정 숨김(검사실 전용 경로)
+    const _labSt = document.createElement('style');
+    _labSt.textContent = '#stage>*:not(#game3d){display:none!important}';
+    document.head.appendChild(_labSt);
     canvas3d.style.opacity = '1'; canvas3d.style.visibility = 'visible';
     import('./chase3d-lab.js').then((m) => {
       const lab = m.createAuroraLab(canvas3d, { target: CHASE3D_LAB });
@@ -2819,6 +2823,12 @@ const B4_SCREEN_MAX = 210;
 const _b1Buf = Array.from({ length: 28 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
 const _b2Buf = Array.from({ length: 8 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
 const _b4Buf = Array.from({ length: 8 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
+//  아군 호위(§G-1): 드론=단순 다트(2D 시각 18px 계승), 순양함=미니 전함(2D 30px — 위계상 드론보다 확실히 큼).
+const DRONE_SCREEN_LEN = 22, DRONE_SCREEN_MAX = 44;
+const CRUISER_SCREEN_LEN = 42, CRUISER_SCREEN_MAX = 84;
+const _droneBuf = Array.from({ length: 60 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
+const _cruBuf = Array.from({ length: 10 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
+const _escBuf = Array.from({ length: 72 }, () => ({ x: 0, y: 0, kind: 0, roll: 0 }));   // escortsFor3D 작업 버퍼
 let _b1n = 0, _b2n = 0, _b4n = 0, _b1Stamp = 0;
 // 3D 포함 여부는 게임 객체에 쓰지 않고 sidecar(WeakMap)로 관리(Codex P2) — 저장·직렬화·디버깅과의 결합 원천 차단.
 const _in3dMap = new WeakMap();
@@ -2826,6 +2836,7 @@ const _in3dMap = new WeakMap();
 const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], crystal: [88, 200], coin: [22, 56], pow: [40, 92], pod: [64, 160], capsule: [44, 110] };
 const _sw = {
   b1: { buf: _b1Buf, n: 0 }, b2: { buf: _b2Buf, n: 0 }, b4: { buf: _b4Buf, n: 0 },
+  drone: { buf: _droneBuf, n: 0 }, cruiser: { buf: _cruBuf, n: 0 },
   props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1 })), n: 0 }])),
 };
 // 픽업 정보 라벨(+N·▲N·무기명·POW)은 3D 위 HUD 계층에 유지 — 시각만 3D 로 바꾸고 게임 정보는 잃지 않는다.
@@ -2978,6 +2989,23 @@ function draw() {
         }
       }
       _sw.b1.n = _b1n; _sw.b2.n = _b2n; _sw.b4.n = _b4n;
+      // 아군 호위(§G-1): Squad 의 드론·순양함·호위기 위치(draw 와 동일 수식의 escortsFor3D)를 3D 인스턴스로.
+      //  피격핵·HP바·플래시 링은 2D 유지(정보 보존) — 함선 본체만 3D 대체.
+      _sw.drone.n = 0; _sw.cruiser.n = 0;
+      if (!run.squad.dead && typeof run.squad.escortsFor3D === 'function') {
+        const en = run.squad.escortsFor3D(_escBuf);
+        for (let i = 0; i < en; i++) {
+          const e = _escBuf[i];
+          const cru = e.kind === 1;
+          const s = cru ? _sw.cruiser : _sw.drone;
+          if (s.n >= s.buf.length) continue;
+          const p = projectPoint({ x: e.x, y: e.y }, chaseProjection);
+          const o = s.buf[s.n++];
+          o.sx = p.x; o.sy = p.y;
+          o.px = cru ? Math.min(CRUISER_SCREEN_MAX, CRUISER_SCREEN_LEN * p.scale) : Math.min(DRONE_SCREEN_MAX, DRONE_SCREEN_LEN * p.scale);
+          o.wob = e.roll;
+        }
+      }
     }
     if (chase3d && state === 'play' && run) t3d = chase3d.frame(run, camera.current, LOGICAL_W, logicalH, canvas.width, canvas.height, performance.now() * 0.001, followX, _sw);
     else if (canvas3d) { canvas3d.style.opacity = '0'; canvas3d.style.visibility = 'hidden'; }
@@ -3044,6 +3072,7 @@ function draw() {
       drawWorldProjected(ctx, r, chaseProj, {
         drawEntity: drawEntityFaded, drawBoss: drawBossFaded, drawCampaignFleet,
         flagshipAlpha: t3d < 0.5 ? 1 : 0,
+        hideEscorts: t3d >= 0.5,                   // §G-1: 드론·순양함 본체는 3D 로(HP바·플래시 링은 2D 유지)
         skipEntity: t3d >= 0.5 ? _isB13D : null,   // 크리처·픽업·탄 — 이번 프레임 3D 로 올라간 개체만 스킵(스탬프)
       });
     } else {

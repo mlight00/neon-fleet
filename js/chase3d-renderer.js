@@ -12,6 +12,7 @@ import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
 import { createB1Geometry, createB1Materials } from './chase3d-b1.js';
 import { createB2Geometry, createB2Materials } from './chase3d-b2.js';
 import { createB4Geometry, createB4Materials } from './chase3d-b4.js';
+import { createDroneGeometry, createCruiserGeometry, createAlliesMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial } from './chase3d-props.js';
 
 export const B1_INSTANCE_MAX = 28;   // 실전 B1 동시 표시 상한(스폰 상한보다 넉넉, 초과분은 2D 폴백)
@@ -64,14 +65,15 @@ function createHero3D(canvas3d, opts = {}) {
   } catch (e) { ctl.reason = 'hero-scene-exception:' + String(e && e.message || e); try { renderer.dispose(); } catch {} return ctl; }
   ctl.available = true;
 
-  // ── 실전 크리처 스웜(이사 승인): 종별 버킷 3(hull/glow/core) InstancedMesh — 마리 수와 무관하게 종당 +3 draw.
+  // ── 실전 스웜(크리처·아군 공용): 종별 버킷 InstancedMesh — 마리 수와 무관하게 종당 +버킷수 draw.
+  //  버킷 키는 지오메트리가 정의(크리처 hull/glow/core, 드론 hull/glow, 순양함 hull/trim/glow) — 재질 키와 1:1.
   //  배치는 "2.5D 투영 화면 좌표·크기"에 정합(main 이 계산해 전달) — 2D 세계(탄·드론·다른 적)와 같은 자리·같은 원근.
   function makeSwarm(makeGeo, makeMats, seed, cap) {
     try {
       const geo = makeGeo(THREE, { lod: ctl._mobile ? 1 : 0 });
       const bmat = makeMats(THREE, { seed, mobile: ctl._mobile });
       const sw = { meshes: [], count: 0 };
-      for (const k of ['hull', 'glow', 'core']) {
+      for (const k of Object.keys(geo.buckets)) {
         const im = new THREE.InstancedMesh(geo.buckets[k], bmat.mats[k], cap);
         im.count = 0; im.frustumCulled = false;   // 화면 정합 배치라 항상 시야 안 — 컬링 계산 생략
         scene.add(im); sw.meshes.push(im);
@@ -82,6 +84,9 @@ function createHero3D(canvas3d, opts = {}) {
   let b1 = makeSwarm(createB1Geometry, createB1Materials, 7, B1_INSTANCE_MAX);
   let b2 = makeSwarm(createB2Geometry, createB2Materials, 11, B2_INSTANCE_MAX);
   let b4 = makeSwarm(createB4Geometry, createB4Materials, 13, B4_INSTANCE_MAX);
+  // 아군 호위(§G-1 위계: 기함 > 순양함 > 드론) — 노즈가 +Z(소실점 쪽) = yawBase 0 으로 배치
+  let drone = makeSwarm(createDroneGeometry, createAlliesMaterials, 0, DRONE_INSTANCE_MAX);
+  let cruiser = makeSwarm(createCruiserGeometry, createAlliesMaterials, 0, CRUISER_INSTANCE_MAX);
   // 프레임 중 할당 금지(§10.1): 배치 수학용 스크래치는 여기서 1회 생성해 재사용.
   const _sV = new THREE.Vector3(), _sDir = new THREE.Vector3(), _sFwd = new THREE.Vector3(),
         _sPos = new THREE.Vector3(), _sScl = new THREE.Vector3(), _sEul = new THREE.Euler(),
@@ -154,8 +159,9 @@ function createHero3D(canvas3d, opts = {}) {
   /** 스웜 인스턴스 배치(크리처·소품 공용): buf[i] = { sx, sy(2.5D 투영 화면좌표, 논리px), px(화면 전장 논리px), wob, col? }.
    *  화면점을 카메라 광선으로 되쏘아 "그 화면 크기가 나오는 깊이"에 놓는다 → 위치·크기 모두 2D 와 정합.
    *  깊이는 [6,60] 클램프(near/far·조명 안전권) — 클램프 시 스케일이 보정해 화면 크기는 항상 정확. 모델은 전장 1.0 공통.
-   *  mode: 'wob'(크리처 — sin 감쇠 롤) | 'direct'(탄 — wob 을 진행각 롤로 그대로) | 'spin'(픽업 — 시간 스핀). */
-  function placeSwarm(sw, buf, n, cap, mode = 'wob', time = 0) {
+   *  mode: 'wob'(크리처 — sin 감쇠 롤) | 'direct'(탄·아군 — wob 을 롤로 그대로) | 'spin'(픽업 — 시간 스핀).
+   *  yawBase: π=전면이 카메라(적·소품 기본) / 0=노즈가 소실점 쪽(아군 — 위로 비행). */
+  function placeSwarm(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math.PI) {
     if (!sw) return;
     const count = Math.min(n | 0, cap);
     const fpx = (ctl._lastLogH * 0.5) / Math.tan(camera.fov * Math.PI / 360);   // 논리px 초점거리
@@ -167,9 +173,9 @@ function createHero3D(canvas3d, opts = {}) {
       const depth = Math.min(60, Math.max(6, fpx / Math.max(1e-3, o.px)));      // 전장 1.0 모델 기준
       const scl = (o.px * depth) / fpx;                                         // 클램프 보정 → 화면 전장 = o.px 유지
       _sPos.copy(camera.position).addScaledVector(_sDir, depth / Math.max(1e-4, _sDir.dot(_sFwd)));
-      if (mode === 'spin') _sEul.set(-0.12, Math.PI + time * 1.4 + i * 0.73, 0);
-      else if (mode === 'direct') _sEul.set(-0.12, Math.PI, o.wob);
-      else _sEul.set(-0.12, Math.PI, Math.sin(o.wob) * 0.15);
+      if (mode === 'spin') _sEul.set(-0.12, yawBase + time * 1.4 + i * 0.73, 0);
+      else if (mode === 'direct') _sEul.set(-0.12, yawBase, o.wob);
+      else _sEul.set(-0.12, yawBase, Math.sin(o.wob) * 0.15);
       _sQ.setFromEuler(_sEul);
       _sM.compose(_sPos, _sQ, _sScl.setScalar(scl));
       for (const im of sw.meshes) {
@@ -214,12 +220,15 @@ function createHero3D(canvas3d, opts = {}) {
         placeSwarm(b1, swarms.b1.buf, swarms.b1.n, B1_INSTANCE_MAX, 'wob', 0);
         placeSwarm(b2, swarms.b2.buf, swarms.b2.n, B2_INSTANCE_MAX, 'wob', 0);
         if (swarms.b4) placeSwarm(b4, swarms.b4.buf, swarms.b4.n, B4_INSTANCE_MAX, 'wob', 0);
+        if (swarms.drone) placeSwarm(drone, swarms.drone.buf, swarms.drone.n, DRONE_INSTANCE_MAX, 'direct', 0, 0);     // 아군: 노즈가 소실점(전진 방향)
+        if (swarms.cruiser) placeSwarm(cruiser, swarms.cruiser.buf, swarms.cruiser.n, CRUISER_INSTANCE_MAX, 'direct', 0, 0);   // 실측: hero 카메라 기준 yaw 0 = 지오 +z 가 소실점 → 지오를 노즈 +z 로 로프트
         if (props && swarms.props) for (const k of PROP_KEYS) {
           const s = swarms.props[k];
           if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], (k === 'pbullet' || k === 'ebullet' || k === 'missile') ? 'direct' : 'spin', time);
         }
       } else {
         placeSwarm(b1, null, 0, B1_INSTANCE_MAX); placeSwarm(b2, null, 0, B2_INSTANCE_MAX); placeSwarm(b4, null, 0, B4_INSTANCE_MAX);
+        placeSwarm(drone, null, 0, DRONE_INSTANCE_MAX); placeSwarm(cruiser, null, 0, CRUISER_INSTANCE_MAX);
         if (props) for (const k of PROP_KEYS) placeSwarm(props[k], null, 0, PROP_CAPS[k]);
       }
       renderer.render(scene, camera);
@@ -240,6 +249,7 @@ function createHero3D(canvas3d, opts = {}) {
       calls: r.render.calls, triangles: r.render.triangles, programs: r.programs ? r.programs.length : -1,
       geometries: r.memory.geometries, textures: r.memory.textures, aurora: model ? model.stats() : null,
       b1Count: b1 ? b1.count : -1, b2Count: b2 ? b2.count : -1, b4Count: b4 ? b4.count : -1,
+      droneCount: drone ? drone.count : -1, cruiserCount: cruiser ? cruiser.count : -1,
       propCounts: props ? Object.fromEntries(PROP_KEYS.map((k) => [k, props[k].count])) : null,   // Codex P2: 진단이 확장 범위를 따라가게
       prewarm: { ...ctl.prewarm },
     };
@@ -247,9 +257,9 @@ function createHero3D(canvas3d, opts = {}) {
   function dispose() {
     try { canvas3d.removeEventListener('webglcontextlost', onLost); canvas3d.removeEventListener('webglcontextrestored', onRestored); } catch {}
     if (model) model.dispose();
-    for (const sw of [b1, b2, b4]) if (sw) for (const im of sw.meshes) { im.geometry.dispose(); im.material.dispose(); im.dispose && im.dispose(); }
+    for (const sw of [b1, b2, b4, drone, cruiser]) if (sw) for (const im of sw.meshes) { im.geometry.dispose(); im.material.dispose(); im.dispose && im.dispose(); }
     if (props) { let matDone = false; for (const k of PROP_KEYS) { const im = props[k].meshes[0]; im.geometry.dispose(); if (!matDone) { im.material.dispose(); matDone = true; } im.dispose && im.dispose(); } }
-    b1 = null; b2 = null; b4 = null; props = null;
+    b1 = null; b2 = null; b4 = null; drone = null; cruiser = null; props = null;
     if (envRT) envRT.dispose();
     renderer.dispose();
     ctl.available = false;

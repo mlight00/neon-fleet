@@ -83,7 +83,7 @@ export function drawWorldProjected(ctx, r, projection, opts = {}) {
     else one(b, (c) => b.draw(c), 'enemyBullet');
   }
   // 편대: 기함·드론·순양함·궤도기를 개별 투영(Squad.drawProjected). hero 3D 교차 시 기함 본체 alpha=1-t(Opus5 §9.2).
-  if (!r.squad.dead) r.squad.drawProjected(ctx, projector, { flagshipAlpha: opts.flagshipAlpha ?? 1 });
+  if (!r.squad.dead) r.squad.drawProjected(ctx, projector, { flagshipAlpha: opts.flagshipAlpha ?? 1, hideEscorts: !!opts.hideEscorts });
   if (r.campaign25 && drawCampaignFleet) drawProjected(ctx, r.squad, projection, (c) => drawCampaignFleet(c), 'squad');
   if (r.effects.drawWorldProjected) {
     r.effects.drawWorldProjected(ctx, (x, y) => projectPoint({ x, y }, projection), MIN_SCREEN_PX.damageText);

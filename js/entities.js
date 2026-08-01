@@ -1175,6 +1175,31 @@ export class Squad {
   // draw(ctx) 전술 경로 = projector 없음(기존 global transform 안에서 기존과 픽셀 동일).
   // draw(ctx, projector) 추적 경로 = 각 드론·순양함·궤도기·기함을 자기 월드 중심으로 개별 투영(RC2 §3.2).
   //  projector = { point(wx,wy)->{x,y,scale}, fitFlagship(p,halfH)->scale, projection }. 게임 규칙·좌표는 불변.
+  /** hero 3D 호위 수집(§G-1) — draw 의 위치 수식과 반드시 동일(아래 draw 루프 주석 참조).
+   *  out[i] = { x, y, kind(0 드론|1 순양함|2 호위기), roll } 로 채우고 개수 반환. 판정·규칙 무관(표시 전용). */
+  escortsFor3D(out) {
+    const w = this.width, def = SHIP_DEFS[this.tier];
+    let n = 0;
+    const cap = Math.min(this.count, BAL.squad.drawCap);
+    for (let i = 0; i < cap && n < out.length; i++) {
+      const o = this._offsets[i];
+      const ox = o.x * w;
+      if (Math.hypot(ox, o.y * w * 0.8) < def.clearR) continue;
+      const e = out[n++];
+      e.x = this.x + ox; e.y = this.y + o.y * w * 0.8 + Math.sin(this.t * 3 + o.phase) * 2;
+      e.kind = 0; e.roll = this.bank * 0.3;
+    }
+    const total = (this.cruisers || 0) + (this.escorts || 0);
+    for (let i = 0; i < total && n < out.length; i++) {
+      const type = i < this.cruisers ? 'cruiser' : 'escort';
+      const slot = this.supportSlot(i, type);
+      const e = out[n++];
+      e.x = this.x + slot.x; e.y = this.y + slot.y + Math.sin(this.t * 3 + i) * 1.5;
+      e.kind = type === 'cruiser' ? 1 : 2; e.roll = this.bank * 0.25;
+    }
+    return n;
+  }
+
   draw(ctx, projector = null) {
     const w = this.width;
     const def = SHIP_DEFS[this.tier];
@@ -1186,9 +1211,11 @@ export class Squad {
     };
 
     // 호위 드론 무리 (기함 반경 안쪽은 비움). 추적: Y가 위쪽인 드론일수록 작고 소실점으로 수렴.
+    //  ⚠️ 위치 수식 변경 시 escortsFor3D 와 동기화(§G-1). hero 3D 가 호위를 그리는 프레임엔 2D 스킵(hideEscorts).
+    const hideEsc = !!(this._viewOpts && this._viewOpts.hideEscorts);
     const n = Math.min(this.count, BAL.squad.drawCap);
     const scout = shipSprite(0, this.weapon);
-    for (let i = 0; i < n; i++) {
+    if (!hideEsc) for (let i = 0; i < n; i++) {
       const o = this._offsets[i];
       const ox = o.x * w;
       if (Math.hypot(ox, o.y * w * 0.8) < def.clearR) continue;
@@ -1222,11 +1249,11 @@ export class Squad {
       for (let i = 0; i < total; i++) {
         const type = i < this.cruisers ? 'cruiser' : 'escort';
         const slot = this.supportSlot(i, type);
-        const wx = this.x + slot.x, wy = this.y + slot.y + Math.sin(this.t * 3 + i) * 1.5;
+        const wx = this.x + slot.x, wy = this.y + slot.y + Math.sin(this.t * 3 + i) * 1.5;   // escortsFor3D 와 동기(§G-1)
         ctx.save();
         const s = place(wx, wy);
         ctx.rotate(this.bank * 0.25);
-        blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, (type === 'cruiser' ? cruiserBlitScale() : droneBlitScale() * 1.4) * s);
+        if (!hideEsc) blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, (type === 'cruiser' ? cruiserBlitScale() : droneBlitScale() * 1.4) * s);   // 본체만 3D 대체 — HP바·플래시는 아래 유지
         if (type === 'cruiser') {
           const hp = this.cruiserHp[i] ?? cMax;
           if ((this.cruiserFlash[i] || 0) > 0) {

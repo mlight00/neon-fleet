@@ -46,7 +46,7 @@ test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배�
   assert.match(renderer, /new THREE\.InstancedMesh\(geo\.buckets\[k\], bmat\.mats\[k\], cap\)/);
   assert.match(renderer, /let b1 = makeSwarm\(createB1Geometry, createB1Materials, 7, B1_INSTANCE_MAX\)/);
   assert.match(renderer, /let b2 = makeSwarm\(createB2Geometry, createB2Materials, 11, B2_INSTANCE_MAX\)/);
-  assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0\)/);
+  assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI\)/);
   assert.match(renderer, /\.unproject\(camera\)/);
   assert.match(renderer, /placeSwarm\(b1, swarms\.b1\.buf, swarms\.b1\.n, B1_INSTANCE_MAX, 'wob', 0\)/);   // t≥0.5 도달 지점에서만 = 하드 컷 공유
   assert.match(renderer, /placeSwarm\(b2, swarms\.b2\.buf, swarms\.b2\.n, B2_INSTANCE_MAX, 'wob', 0\)/);
@@ -141,8 +141,8 @@ test('HW-06: lab 플래그 정책 — chase3d=1 없으면 검사실 불가(§8)'
   assert.equal(chase3dLabTarget(''), '');
   // 기본 URL 에서 lab 모듈 미로드: 동적 import 는 CHASE3D_LAB 타깃 가드 안
   const i = main.indexOf("import('./chase3d-lab.js')");
-  const guard = main.lastIndexOf("if (['aurora', 'b1', 'b2', 'b4', 'swarm'].includes(CHASE3D_LAB))", i);
-  assert.ok(guard > 0 && guard < i, 'lab import 는 5타깃 플래그 가드 안');
+  const guard = main.lastIndexOf("if (['aurora', 'b1', 'b2', 'b4', 'allies', 'swarm'].includes(CHASE3D_LAB))", i);
+  assert.ok(guard > 0 && guard < i, 'lab import 는 6타깃 플래그 가드 안');
 });
 
 test('HW-08: DOM 메뉴는 캔버스 계층 위(§6) — #stage flex 자식 z-index 함정 재발 방지', () => {
