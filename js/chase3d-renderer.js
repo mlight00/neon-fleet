@@ -13,7 +13,7 @@ import { createB1Geometry, createB1Materials } from './chase3d-b1.js';
 import { createB2Geometry, createB2Materials } from './chase3d-b2.js';
 import { createB4Geometry, createB4Materials } from './chase3d-b4.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
-import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupMaterial } from './chase3d-props.js';
+import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts } from './chase3d-props.js';
 
 export const B1_INSTANCE_MAX = 28;   // 실전 B1 동시 표시 상한(스폰 상한보다 넉넉, 초과분은 2D 폴백)
 export const B2_INSTANCE_MAX = 8;    // 실전 B2(중형) 동시 표시 상한
@@ -99,14 +99,25 @@ function createHero3D(canvas3d, opts = {}) {
       const pm = createPropMaterial(THREE);
       props = {};
       for (const k of PROP_KEYS) {
-        // §G-2/3: 발사체 3종=원본 가산 재질, 픽업 5종=원본 컷아웃 재질(절차 벡터는 캔버스 굽기) — ebullet 만 공용 자발광
+        // §G-2 발사체 3종=원본 가산 재질(이사 승인) / §G-3 픽업 5종=순수 조형 멀티 파트(이사 "2D 이어붙이기 금지")
+        //  / ebullet 은 §G-4 순수 조형 예정 — 임시로 공용 자발광 유지.
         const isProj = (k === 'pbullet' || k === 'missile' || k === 'laser');
         const isPickup = (k === 'crystal' || k === 'coin' || k === 'pow' || k === 'pod' || k === 'capsule');
-        const mat = isProj ? createProjMaterial(THREE, k) : isPickup ? createPickupMaterial(THREE, k) : pm;
+        if (isPickup) {
+          const meshes = [];
+          for (const part of createPickupParts(THREE, k)) {
+            const im = new THREE.InstancedMesh(part.geo, part.mat, PROP_CAPS[k]);
+            im.count = 0; im.frustumCulled = false;
+            scene.add(im); meshes.push(im);
+          }
+          props[k] = { meshes, count: 0, colored: false };   // 파트 재질이 자체 색 — instanceColor 미사용
+          continue;
+        }
+        const mat = isProj ? createProjMaterial(THREE, k) : pm;
         const im = new THREE.InstancedMesh(createPropGeometry(THREE, k), mat, PROP_CAPS[k]);
         im.count = 0; im.frustumCulled = false;
-        _sCol.setHex((isProj || isPickup) ? 0xffffff : PROP_BASE_COLOR[k]);   // 텍스처 재질=원색(틴트 왜곡 방지)
-        for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol);       // instanceColor 버퍼 생성
+        _sCol.setHex(isProj ? 0xffffff : PROP_BASE_COLOR[k]);   // 발사체=원색(그림이 색을 가짐), ebullet=기본색
+        for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol);
         scene.add(im);
         props[k] = { meshes: [im], count: 0, colored: true };
       }
