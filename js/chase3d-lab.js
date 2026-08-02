@@ -6,6 +6,8 @@ import { createAuroraModel } from './chase3d-aurora-model.js';
 import { createB1Model, createB1Geometry, createB1Materials } from './chase3d-b1.js';
 import { createB2Model } from './chase3d-b2.js';
 import { createB4Model } from './chase3d-b4.js';
+import { createTurretModel } from './chase3d-b5.js';
+import { createWeaverModel } from './chase3d-b6.js';
 import { createAlliesModel } from './chase3d-allies.js';
 import { createPickupsShowcase } from './chase3d-props.js';
 import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
@@ -69,6 +71,12 @@ export function createAuroraLab(canvas, opts = {}) {
   } else if (target === 'b4') {
     model = createB4Model(THREE, { seed: 13, mobile, lods: [0, 1, 2] });
     model.group.scale.setScalar(4.2);
+  } else if (target === 'b5') {
+    model = createTurretModel(THREE, { seed: 5, mobile, lods: [0, 1, 2] });   // §G-4 터렛
+    model.group.scale.setScalar(2.8);   // 정면 폭이 넓은 조형 — 세장형(4.2)보다 낮춰야 전체가 보인다
+  } else if (target === 'b6') {
+    model = createWeaverModel(THREE, { seed: 6, mobile, lods: [0, 1, 2] });   // §G-4 위버
+    model.group.scale.setScalar(2.8);
   } else if (target === 'allies') {
     model = createAlliesModel(THREE);   // §G-1 위계 비교: 순양함 1 + 드론 3
     model.group.scale.setScalar(1.15);

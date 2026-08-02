@@ -12,12 +12,16 @@ import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
 import { createB1Geometry, createB1Materials } from './chase3d-b1.js';
 import { createB2Geometry, createB2Materials } from './chase3d-b2.js';
 import { createB4Geometry, createB4Materials } from './chase3d-b4.js';
+import { createTurretGeometry, createTurretMaterials } from './chase3d-b5.js';
+import { createWeaverGeometry, createWeaverMaterials } from './chase3d-b6.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
 
 export const B1_INSTANCE_MAX = 28;   // 실전 B1 동시 표시 상한(스폰 상한보다 넉넉, 초과분은 2D 폴백)
 export const B2_INSTANCE_MAX = 8;    // 실전 B2(중형) 동시 표시 상한
 export const B4_INSTANCE_MAX = 8;    // 실전 B4(저격수) 동시 표시 상한
+export const B5_INSTANCE_MAX = 8;    // 실전 B5(터렛) 동시 표시 상한(§G-4)
+export const B6_INSTANCE_MAX = 8;    // 실전 B6(위버) 동시 표시 상한(§G-4)
 
 export function createChase3D(canvas3d, opts = {}) {
   if (opts.hero) return createHero3D(canvas3d, opts);
@@ -84,6 +88,8 @@ function createHero3D(canvas3d, opts = {}) {
   let b1 = makeSwarm(createB1Geometry, createB1Materials, 7, B1_INSTANCE_MAX);
   let b2 = makeSwarm(createB2Geometry, createB2Materials, 11, B2_INSTANCE_MAX);
   let b4 = makeSwarm(createB4Geometry, createB4Materials, 13, B4_INSTANCE_MAX);
+  let b5 = makeSwarm(createTurretGeometry, createTurretMaterials, 5, B5_INSTANCE_MAX);
+  let b6 = makeSwarm(createWeaverGeometry, createWeaverMaterials, 6, B6_INSTANCE_MAX);
   // 아군 호위(§G-1 위계: 기함 > 순양함 > 드론) — 노즈가 +Z(소실점 쪽) = yawBase 0 으로 배치
   let drone = makeSwarm(createDroneGeometry, createDroneMaterials, 0, DRONE_INSTANCE_MAX);
   let cruiser = makeSwarm(createCruiserGeometry, createCruiserMaterials, 0, CRUISER_INSTANCE_MAX);
@@ -238,6 +244,8 @@ function createHero3D(canvas3d, opts = {}) {
         placeSwarm(b1, swarms.b1.buf, swarms.b1.n, B1_INSTANCE_MAX, 'wob', 0);
         placeSwarm(b2, swarms.b2.buf, swarms.b2.n, B2_INSTANCE_MAX, 'wob', 0);
         if (swarms.b4) placeSwarm(b4, swarms.b4.buf, swarms.b4.n, B4_INSTANCE_MAX, 'wob', 0);
+        if (swarms.b5) placeSwarm(b5, swarms.b5.buf, swarms.b5.n, B5_INSTANCE_MAX, 'wob', 0);
+        if (swarms.b6) placeSwarm(b6, swarms.b6.buf, swarms.b6.n, B6_INSTANCE_MAX, 'wob', 0);
         if (swarms.drone) placeSwarm(drone, swarms.drone.buf, swarms.drone.n, DRONE_INSTANCE_MAX, 'direct', 0, 0);     // 아군: 노즈가 소실점(전진 방향)
         if (swarms.cruiser) placeSwarm(cruiser, swarms.cruiser.buf, swarms.cruiser.n, CRUISER_INSTANCE_MAX, 'direct', 0, 0);   // 실측: hero 카메라 기준 yaw 0 = 지오 +z 가 소실점 → 지오를 노즈 +z 로 로프트
         if (props && swarms.props) for (const k of PROP_KEYS) {
@@ -246,6 +254,7 @@ function createHero3D(canvas3d, opts = {}) {
         }
       } else {
         placeSwarm(b1, null, 0, B1_INSTANCE_MAX); placeSwarm(b2, null, 0, B2_INSTANCE_MAX); placeSwarm(b4, null, 0, B4_INSTANCE_MAX);
+        placeSwarm(b5, null, 0, B5_INSTANCE_MAX); placeSwarm(b6, null, 0, B6_INSTANCE_MAX);
         placeSwarm(drone, null, 0, DRONE_INSTANCE_MAX); placeSwarm(cruiser, null, 0, CRUISER_INSTANCE_MAX);
         if (props) for (const k of PROP_KEYS) placeSwarm(props[k], null, 0, PROP_CAPS[k]);
       }
@@ -267,6 +276,7 @@ function createHero3D(canvas3d, opts = {}) {
       calls: r.render.calls, triangles: r.render.triangles, programs: r.programs ? r.programs.length : -1,
       geometries: r.memory.geometries, textures: r.memory.textures, aurora: model ? model.stats() : null,
       b1Count: b1 ? b1.count : -1, b2Count: b2 ? b2.count : -1, b4Count: b4 ? b4.count : -1,
+      b5Count: b5 ? b5.count : -1, b6Count: b6 ? b6.count : -1,
       droneCount: drone ? drone.count : -1, cruiserCount: cruiser ? cruiser.count : -1,
       propCounts: props ? Object.fromEntries(PROP_KEYS.map((k) => [k, props[k].count])) : null,   // Codex P2: 진단이 확장 범위를 따라가게
       prewarm: { ...ctl.prewarm },
