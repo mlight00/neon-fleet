@@ -13,7 +13,7 @@ import { createB1Geometry, createB1Materials } from './chase3d-b1.js';
 import { createB2Geometry, createB2Materials } from './chase3d-b2.js';
 import { createB4Geometry, createB4Materials } from './chase3d-b4.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
-import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts } from './chase3d-props.js';
+import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
 
 export const B1_INSTANCE_MAX = 28;   // 실전 B1 동시 표시 상한(스폰 상한보다 넉넉, 초과분은 2D 폴백)
 export const B2_INSTANCE_MAX = 8;    // 실전 B2(중형) 동시 표시 상한
@@ -103,14 +103,17 @@ function createHero3D(canvas3d, opts = {}) {
         //  / ebullet 은 §G-4 순수 조형 예정 — 임시로 공용 자발광 유지.
         const isProj = (k === 'pbullet' || k === 'missile' || k === 'laser');
         const isPickup = (k === 'crystal' || k === 'coin' || k === 'pow' || k === 'pod' || k === 'capsule');
-        if (isPickup) {
+        if (isPickup || k === 'ebullet') {
+          // §G-3 픽업 / §G-4 적탄(플라즈마 3파트) — 파트별 InstancedMesh, placeSwarm 이 한 몸으로 구동
+          const maker = k === 'ebullet' ? createEnemyBulletParts : createPickupParts;
           const meshes = [];
-          for (const part of createPickupParts(THREE, k)) {
+          for (const part of maker(THREE, k)) {
             const im = new THREE.InstancedMesh(part.geo, part.mat, PROP_CAPS[k]);
             im.count = 0; im.frustumCulled = false;
+            if (k === 'ebullet') { _sCol.setHex(PROP_BASE_COLOR.ebullet); for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol); }
             scene.add(im); meshes.push(im);
           }
-          props[k] = { meshes, count: 0, colored: false };   // 파트 재질이 자체 색 — instanceColor 미사용
+          props[k] = { meshes, count: 0, colored: k === 'ebullet' };   // 적탄만 instanceColor(적 종별 탄색 틴트)
           continue;
         }
         const mat = isProj ? createProjMaterial(THREE, k) : pm;

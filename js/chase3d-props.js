@@ -170,6 +170,26 @@ function texOf(THREE, data, S, srgb = true) {
  * 픽업 파트 팩토리 — [{ geo, mat }...]. 전 파트 통합 bbox 로 전장 1.0 정규화(상대 위치 보존).
  * 전부 flatShading 조형 + 발광 코어 — 그림 텍스처 없음.
  */
+/**
+ * §G-4 적 발사체(이사 승인 자유 디자인) — 플라즈마 탄 3파트: 백열 코어 + 반투명 화염 외피 + 꼬리 불꽃.
+ * 전 파트 color 흰색 — placeSwarm 의 instanceColor(적 종별 탄색 틴트)가 그대로 물든다.
+ */
+export function createEnemyBulletParts(THREE) {
+  const parts = [];
+  const core = new THREE.SphereGeometry(0.22, 8, 6);
+  parts.push({ geo: core, mat: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }) });
+  const shell = new THREE.SphereGeometry(0.34, 10, 7); shell.scale(1, 1, 1.35);
+  parts.push({ geo: shell, mat: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }) });
+  const tail = new THREE.ConeGeometry(0.18, 0.55, 7); tail.rotateX(-Math.PI / 2); tail.translate(0, 0, 0.46);
+  parts.push({ geo: tail, mat: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }) });
+  // 전장 1.0 정규화(파트 통합 bbox)
+  let span = 0;
+  for (const p of parts) { p.geo.computeBoundingBox(); const bb = p.geo.boundingBox; span = Math.max(span, bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z); }
+  const k = 1 / (span || 1);
+  for (const p of parts) p.geo.scale(k, k, k);
+  return parts;
+}
+
 /** POW 텍스트 굽기(이사: 'POW' 가 잘 보이도록) — 밝은 노랑 바탕에 두꺼운 진갈색 글자+흰 테두리. */
 function bakePowFace() {
   const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
