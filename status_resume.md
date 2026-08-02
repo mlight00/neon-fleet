@@ -6,7 +6,7 @@
 - 실전 배선: 220% 이상에서 기함 옆 호위가 3D 로 교체(HP바·라벨은 2D 유지), 150% 이하는 기존 2D.
 - 검증: 855/855 테스트, 실전 실측 droneCount 2·cruiserCount 1, dist 재빌드. 커밋 d57e0e2·6321d26(로컬만, 푸시 금지).
 - **확인 방법(권장): `http://localhost:8346/?chase3d=1&fleetlab=1`** — 드론 60기·순양함 2척을 갖춘 채 즉시 전투 시작(220% 확대). 정상 플레이 초반은 드론이 적어 호위가 xN 라벨로만 표기되는 기존 규칙 때문에 아군 3D 를 볼 수 없음(회귀 아님, A/B 재현으로 확인).
-  검사실: `?chase3d=1&chase3dLab=allies&labView=top`
+  검사실(아군): `?chase3d=1&chase3dLab=allies&labView=top` / **검사실(픽업 5종 진열): `?chase3d=1&chase3dLab=pickups&labView=front`** — 수송선·크리스탈을 파괴 없이 회전 관찰
 - 캡처: docs/qa/chase3d-opus5-aurora/allies-lab-top.png · allies-play-final.png
 
 ## 다음(이사 승인 순서)
