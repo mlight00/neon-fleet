@@ -137,11 +137,46 @@ export function createPropGeometry(THREE, key) {
       case 'missile': {   // 유도 미사일(원본: 은색 4핀 미사일) — 방추(탄두·금띠·핀 벌어짐은 그림이 전달)
         return loftProjectile(THREE, PROJ_TEX.missile.aspect, (t) => (t < 0.30 ? 0.18 + 0.82 * Math.pow(t / 0.30, 0.85) : t < 0.66 ? 0.92 : 1.0), 8, 0.34);
       }
-      // §G-3 픽업 5종: 세로 카드 프리즘(y=그림 세로) — 앞·뒤면에 원본 그림(BoxGeometry 면별 UV 0..1),
-      //  알파 컷아웃이 실루엣대로 뚫어 "두께 있는 원본 아이콘"이 y 축으로 회전(spin).
-      case 'crystal': case 'coin': case 'pow': case 'pod': case 'capsule':
+      // §G-3 재조형(이사: "2D 이미지 회전은 3D 가 아니다") — 픽업도 진짜 입체.
+      case 'crystal': {   // 크리스탈: 팔각 쌍뿔 보석 커트(위 첨점→어깨→몸통→아래 첨점), 원본 발광 그림을 원통 UV 로 감음
+        const prof = [[0, 0.02], [0.20, 0.14], [0.33, 0.32], [0.36, 0.52], [0.30, 0.72], [0.16, 0.90], [0, 0.99]];   // [반경, y(0=위)] — 원본 C1 처럼 세로 길쭉한 랜스형 커트
+        const N = 8, pos = [], uv = [], idx = [];
+        for (const [r, t] of prof) {
+          for (let i = 0; i <= N; i++) {
+            const a = (i / N) * Math.PI * 2;
+            pos.push(Math.cos(a) * r, 0.5 - t, Math.sin(a) * r);
+            uv.push(i / N, 1 - t);   // u=둘레(그림 가로 감기), v=높이(그림 세로)
+          }
+        }
+        const C = N + 1;
+        for (let s = 0; s < prof.length - 1; s++) for (let i = 0; i < N; i++) { const a = s * C + i, b = a + 1, d = a + C, e = d + 1; idx.push(a, b, d, b, e, d); }
+        const g2 = new THREE.BufferGeometry();
+        g2.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+        g2.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
+        g2.setIndex(idx); g2.computeVertexNormals();
+        return g2;
+      }
+      case 'pod': {       // 수송/보급 컨테이너: 두툼한 팔각 프리즘(앞뒤 팔각면=원본 그림, 옆 8면=장갑 테두리 톤)
+        const c = new THREE.CylinderGeometry(0.5, 0.5, 0.55, 8, 1, false);
+        c.rotateZ(Math.PI / 8);    // 팔각 평변이 위로(원본 그림 방향)
+        c.rotateX(Math.PI / 2);    // 앞뒤 캡이 ±z(카메라 쪽) — spin(y 회전)에서 그림면↔옆 장갑 순환
+        return c;
+      }
+      case 'coin': {      // 코인: 도톰한 원반(앞뒤=동전 그림, 옆=금색 테)
+        const c = new THREE.CylinderGeometry(0.5, 0.5, 0.16, 14, 1, false);
+        c.rotateX(Math.PI / 2);
+        return c;
+      }
+      case 'pow': {       // POW 배지: 육각 프리즘(원본 draw 와 같은 육각)
+        const c = new THREE.CylinderGeometry(0.5, 0.5, 0.20, 6, 1, false);
+        c.rotateZ(Math.PI / 2); c.rotateX(Math.PI / 2);
+        return c;
+      }
+      case 'capsule':     // 무기·전력 캡슐: 낮은 팔각 프리즘(원본 캡슐 묶음 그림 + 두께)
       default: {
-        return new THREE.BoxGeometry(1, 1, 0.14);
+        const c = new THREE.CylinderGeometry(0.5, 0.5, 0.30, 8, 1, false);
+        c.rotateX(Math.PI / 2);
+        return c;
       }
     }
   })();
