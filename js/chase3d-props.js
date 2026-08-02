@@ -58,24 +58,99 @@ function loftProjectile(THREE, aspect, half, segs = 8, thRel = 0.30) {
 /** 결정적 의사난수(시드 격자) — Math.random 금지 계약 준수. */
 const jr = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
 
-/** 세로(y) 회전체 로프트 — prof=[[반경, t(0=위)]...], 팔각 단면 + 정점 지터(결정면). */
-function latheY(THREE, prof, N = 8, jitter = 0) {
-  const pos = [], idx = [];
+/** 세로(y) 회전체 로프트 — prof=[[반경, t(0=위)]...], N각 단면 + 정점 지터(결정면) + 원통 UV(u=둘레, v=t). */
+function latheY(THREE, prof, N = 8, jitter = 0, twist = 0) {
+  const pos = [], uv = [], idx = [];
   for (let s = 0; s < prof.length; s++) {
     const [r, t] = prof[s];
     for (let i = 0; i <= N; i++) {
-      const a = (i / N) * Math.PI * 2;
+      const a = (i / N) * Math.PI * 2 + s * twist;
       const j = jitter && r > 0.01 ? 1 + (jr(s, i % N) - 0.5) * jitter : 1;
       pos.push(Math.cos(a) * r * j, 0.5 - t, Math.sin(a) * r * j);
+      uv.push(i / N, 1 - t);
     }
   }
   const C = N + 1;
   for (let s = 0; s < prof.length - 1; s++) for (let i = 0; i < N; i++) { const a = s * C + i, b = a + 1, d = a + C, e = d + 1; idx.push(a, b, d, b, e, d); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
-  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((pos.length / 3) * 2).fill(0.5), 2));
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
   g.setIndex(idx); g.computeVertexNormals();
   return g;
+}
+
+// ── 소품용 절차 텍스처 포지(크리처 파이프라인 축소판 — 표면 디테일이 "2000년대 초반 룩" 탈출의 핵심) ──
+function mul32(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function propNoise(seed) {
+  const rnd = mul32(seed); const p = new Uint8Array(512);
+  const b = new Uint8Array(256); for (let i = 0; i < 256; i++) b[i] = i;
+  for (let i = 255; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; const t = b[i]; b[i] = b[j]; b[j] = t; }
+  for (let i = 0; i < 512; i++) p[i] = b[i & 255];
+  const sm = (t) => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    const h = (X, Y) => p[(p[X & 255] + Y) & 255] / 255;
+    const a = h(xi, yi), c = h(xi + 1, yi), d = h(xi, yi + 1), e = h(xi + 1, yi + 1);
+    const u = sm(xf), v = sm(yf);
+    return a + (c - a) * u + (d - a) * v + (a - c - d + e) * u * v;
+  };
+}
+const propFbm = (nz, x, y, oct = 4, f0 = 3) => { let s = 0, amp = 0.5, f = f0; for (let o = 0; o < oct; o++) { s += amp * nz(x * f, y * f); amp *= 0.5; f *= 2; } return s; };
+function heightToNormal(h, S, k) {
+  const n = new Uint8Array(S * S * 4);
+  const at = (x, y) => h[((y + S) % S) * S + ((x + S) % S)];
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const dx = (at(x + 1, y) - at(x - 1, y)) * k, dy = (at(x, y + 1) - at(x, y - 1)) * k;
+    const inv = 1 / Math.hypot(dx, dy, 1), i4 = (y * S + x) * 4;
+    n[i4] = (-dx * inv * 0.5 + 0.5) * 255; n[i4 + 1] = (dy * inv * 0.5 + 0.5) * 255; n[i4 + 2] = (inv * 0.5 + 0.5) * 255; n[i4 + 3] = 255;
+  }
+  return n;
+}
+/** 소품 텍스처 3종 세트(64×64, 결정적). kind: 'crystal' | 'armor' | 'coin' */
+export function forgePropTex(kind, seed = 7, S = 64) {
+  const nz = propNoise(seed + (kind === 'crystal' ? 11 : kind === 'coin' ? 23 : 5));
+  const albedo = new Uint8Array(S * S * 4), emissive = new Uint8Array(S * S * 4), height = new Float32Array(S * S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S, v = y / S, i4 = (y * S + x) * 4;
+    if (kind === 'crystal') {
+      // 내부 결(세로 스트레치 fbm) + 중심 백열 그라데이션 — emissiveMap 이 보석의 심장
+      const vein = propFbm(nz, u * 2.2, v * 0.7, 4, 3);
+      const centerGlow = Math.pow(Math.max(0, 1 - Math.abs(v - 0.5) * 2.1), 1.6);
+      const g = Math.min(1, centerGlow * 0.95 + vein * 0.28);
+      albedo[i4] = 16 + vein * 30; albedo[i4 + 1] = 70 + vein * 60; albedo[i4 + 2] = 96 + vein * 70; albedo[i4 + 3] = 255;
+      emissive[i4] = 18 + g * 150; emissive[i4 + 1] = 70 + g * 140; emissive[i4 + 2] = 95 + g * 120; emissive[i4 + 3] = 255;
+      height[y * S + x] = vein;
+    } else if (kind === 'armor') {
+      // 팔각 패널 그리드(u 8분할·v 3밴드 홈) + 마모 노이즈 + 리벳 점
+      const pu = Math.abs(((u * 8) % 1) - 0.5), pv = Math.abs(((v * 3) % 1) - 0.5);
+      const seam = Math.min(1, Math.max(0, (0.5 - Math.min(pu, pv)) * 14));   // 패널 경계 어두운 홈
+      const wear = propFbm(nz, u, v, 4, 5);
+      const rivet = (pu < 0.06 && ((v * 24) % 1) < 0.14) ? 1 : 0;
+      const base = 74 + wear * 34 - seam * 26 + rivet * 40;
+      albedo[i4] = base * 0.82; albedo[i4 + 1] = base * 0.92; albedo[i4 + 2] = base * 1.04; albedo[i4 + 3] = 255;
+      emissive[i4] = 8; emissive[i4 + 1] = 14; emissive[i4 + 2] = 18; emissive[i4 + 3] = 255;
+      height[y * S + x] = wear * 0.5 - seam * 0.8 + rivet * 0.9;
+    } else {
+      // 금화: 테두리 세레이션 링 + 중앙 원 문양 양각 + 브러시드 결
+      const dx = u - 0.5, dy = v - 0.5, r = Math.hypot(dx, dy) * 2;
+      const ang = Math.atan2(dy, dx);
+      const serr = r > 0.86 && r < 1.0 ? (Math.sin(ang * 24) * 0.5 + 0.5) : 0;
+      const emblem = r < 0.46 ? Math.pow(Math.max(0, Math.cos(r * 6.8)), 0.7) : 0;
+      const ring = (r > 0.55 && r < 0.64) ? 1 : 0;
+      const brush = propFbm(nz, u * 0.6, v * 6, 3, 4) * 0.3;
+      const lum = 160 + emblem * 55 + ring * 22 + serr * 30 + brush * 30;
+      albedo[i4] = Math.min(255, lum * 1.02); albedo[i4 + 1] = Math.min(255, lum * 0.82); albedo[i4 + 2] = lum * 0.34; albedo[i4 + 3] = 255;
+      emissive[i4] = 30 + emblem * 40; emissive[i4 + 1] = 22 + emblem * 30; emissive[i4 + 2] = 6; emissive[i4 + 3] = 255;
+      height[y * S + x] = emblem * 0.9 + ring * 0.6 + serr * 0.7 + brush * 0.2;
+    }
+  }
+  return { albedo, emissive, normal: heightToNormal(height, S, kind === 'crystal' ? 1.4 : 2.4), w: S, h: S };
+}
+function texOf(THREE, data, S, srgb = true) {
+  const t = new THREE.DataTexture(data, S, S, THREE.RGBAFormat, THREE.UnsignedByteType);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true;
+  return t;
 }
 
 /**
@@ -83,45 +158,74 @@ function latheY(THREE, prof, N = 8, jitter = 0) {
  * 전부 flatShading 조형 + 발광 코어 — 그림 텍스처 없음.
  */
 export function createPickupParts(THREE, key) {
-  const M = (o) => new THREE.MeshStandardMaterial(Object.assign({ flatShading: true }, o));
   const parts = [];
   if (key === 'crystal') {
-    // 결정면이 살아있는 청록 보석: 팔각 쌍뿔(지터 결정면) + 백열 코어(원본 "중심이 빛나는" 정체성)
-    const outer = latheY(THREE, [[0, 0.02], [0.16, 0.15], [0.24, 0.34], [0.26, 0.52], [0.22, 0.72], [0.11, 0.90], [0, 0.99]], 8, 0.16);   // 원본 C1 비율의 세로 랜스
-    parts.push({ geo: outer, mat: M({ color: 0x0e3c4e, emissive: 0x2fd4ff, emissiveIntensity: 1.15, transparent: true, opacity: 0.9 }) });
-    const core = new THREE.OctahedronGeometry(0.16, 0); core.scale(0.75, 1.9, 0.75);
-    parts.push({ geo: core, mat: new THREE.MeshBasicMaterial({ color: 0xeaffff, toneMapped: false }) });
+    // 보석 렌더: 다단 결정면(지터+나선 트위스트) + 절차 emissive(내부 결·중심 백열) + 강한 IBL 반사 + 내부 코어
+    const fx = forgePropTex('crystal');
+    const outer = latheY(THREE, [[0, 0.02], [0.13, 0.12], [0.21, 0.26], [0.26, 0.42], [0.26, 0.56], [0.21, 0.72], [0.12, 0.88], [0, 0.99]], 8, 0.14, 0.33);
+    parts.push({
+      geo: outer, mat: new THREE.MeshStandardMaterial({
+        map: texOf(THREE, fx.albedo, fx.w), emissiveMap: texOf(THREE, fx.emissive, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false),
+        color: 0x7fc8e8, emissive: 0xffffff, emissiveIntensity: 0.8, metalness: 0.15, roughness: 0.22, envMapIntensity: 1.6,
+        transparent: true, opacity: 0.92, flatShading: true,
+      }),
+    });
+    const core = latheY(THREE, [[0, 0.14], [0.07, 0.32], [0.09, 0.52], [0.06, 0.72], [0, 0.88]], 6, 0.22, 0.5);
+    parts.push({ geo: core, mat: new THREE.MeshBasicMaterial({ color: 0xbef4ff, toneMapped: false }) });
   } else if (key === 'pod') {
-    // 장갑 보급 컨테이너: 팔각 드럼 + 세로 리브 8 + 중앙 발광 창(관통 원기둥이 앞뒤로 노출)
-    const drum = new THREE.CylinderGeometry(0.46, 0.46, 0.5, 8, 1, false); drum.rotateX(Math.PI / 2);
+    // 장갑 보급 컨테이너: 챔퍼 팔각 셸(절차 패널 텍스처+노멀) + 리브 8 + 전후 프레임 링 + 상부 해치 + 관통 발광 창
+    const fx = forgePropTex('armor');
+    const shell = latheY(THREE, [[0.30, 0.02], [0.44, 0.12], [0.47, 0.32], [0.47, 0.68], [0.44, 0.88], [0.30, 0.98]], 8, 0, 0);
+    shell.rotateX(Math.PI / 2);   // 프로파일 축을 z 로 — 앞뒤 챔퍼 팔각
     const ribs = [];
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-      const rb = new THREE.BoxGeometry(0.10, 0.07, 0.58);
-      rb.rotateZ(a); rb.translate(Math.cos(a) * 0.46, Math.sin(a) * 0.46, 0);
+      const rb = new THREE.BoxGeometry(0.07, 0.05, 0.66);
+      rb.rotateZ(a); rb.translate(Math.cos(a) * 0.465, Math.sin(a) * 0.465, 0);
       ribs.push(rb);
     }
-    parts.push({ geo: mergeGeos(THREE, [drum, ...ribs]), mat: M({ color: 0x46525e, metalness: 0.72, roughness: 0.45, emissive: 0x1a2430, emissiveIntensity: 0.5 }) });
-    const win = new THREE.CylinderGeometry(0.24, 0.24, 0.56, 8, 1, false); win.rotateX(Math.PI / 2);
-    parts.push({ geo: win, mat: new THREE.MeshBasicMaterial({ color: 0x35e0d8, toneMapped: false }) });
+    const frF = new THREE.CylinderGeometry(0.40, 0.40, 0.045, 8, 1, false); frF.rotateX(Math.PI / 2); frF.translate(0, 0, 0.34);
+    const frB = frF.clone(); frB.translate(0, 0, -0.68);
+    const hatch = new THREE.BoxGeometry(0.16, 0.05, 0.20); hatch.translate(0, 0.44, 0.10);
+    const hull = mergeGeos(THREE, [shell, ...ribs, frF, frB, hatch]);
+    parts.push({
+      geo: hull, mat: new THREE.MeshStandardMaterial({
+        map: texOf(THREE, fx.albedo, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false), emissiveMap: texOf(THREE, fx.emissive, fx.w),
+        color: 0xffffff, emissive: 0x86d8e8, emissiveIntensity: 0.5, metalness: 0.72, roughness: 0.5, envMapIntensity: 0.9,
+      }),
+    });
+    const winFrame = new THREE.CylinderGeometry(0.27, 0.27, 0.60, 8, 1, false); winFrame.rotateX(Math.PI / 2);
+    parts.push({ geo: winFrame, mat: new THREE.MeshStandardMaterial({ color: 0x2a333c, metalness: 0.8, roughness: 0.4, flatShading: true }) });
+    const w2 = new THREE.CylinderGeometry(0.21, 0.21, 0.62, 8, 1, false); w2.rotateX(Math.PI / 2);
+    parts.push({ geo: w2, mat: new THREE.MeshBasicMaterial({ color: 0x49f2e4, toneMapped: false }) });
   } else if (key === 'coin') {
-    // 금화: 도톰한 원반(금속) + 중앙 돌출 코어(밝은 금)
-    const body = new THREE.CylinderGeometry(0.5, 0.5, 0.14, 14, 1, false); body.rotateX(Math.PI / 2);
-    parts.push({ geo: body, mat: M({ color: 0xd9a92c, metalness: 0.85, roughness: 0.3, emissive: 0x6a4c08, emissiveIntensity: 0.55 }) });
-    const inner = new THREE.CylinderGeometry(0.30, 0.30, 0.17, 12, 1, false); inner.rotateX(Math.PI / 2);
-    parts.push({ geo: inner, mat: new THREE.MeshBasicMaterial({ color: 0xffe98a, toneMapped: false }) });
+    // 금화: 24각 원반 + 절차 문양(중앙 양각·링·세레이션 노멀) + 강반사 금 PBR
+    const fx = forgePropTex('coin');
+    const body = new THREE.CylinderGeometry(0.5, 0.5, 0.15, 24, 1, false); body.rotateX(Math.PI / 2);
+    parts.push({
+      geo: body, mat: new THREE.MeshStandardMaterial({
+        map: texOf(THREE, fx.albedo, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false), emissiveMap: texOf(THREE, fx.emissive, fx.w),
+        color: 0xffffff, emissive: 0xffd76a, emissiveIntensity: 0.5, metalness: 0.9, roughness: 0.24, envMapIntensity: 1.6,
+      }),
+    });
   } else if (key === 'pow') {
-    // POW 배지: 노랑 육각 프리즘 + 중앙 버튼 돌출(글자는 HUD 라벨 'POW' 가 담당)
-    const hexa = new THREE.CylinderGeometry(0.5, 0.5, 0.18, 6, 1, false); hexa.rotateZ(Math.PI / 2); hexa.rotateX(Math.PI / 2);
-    parts.push({ geo: hexa, mat: M({ color: 0xd9b32c, metalness: 0.5, roughness: 0.4, emissive: 0xaa7d10, emissiveIntensity: 0.7 }) });
-    const btn = new THREE.CylinderGeometry(0.26, 0.26, 0.22, 6, 1, false); btn.rotateZ(Math.PI / 2); btn.rotateX(Math.PI / 2);
+    // POW 배지: 챔퍼 육각(양면 베벨) + 중앙 버튼 — 노랑 금속 PBR(글자는 HUD 라벨)
+    const hexa = latheY(THREE, [[0.34, 0.05], [0.50, 0.22], [0.50, 0.78], [0.34, 0.95]], 6, 0, 0);
+    hexa.rotateZ(Math.PI / 2); hexa.rotateX(Math.PI / 2);
+    parts.push({ geo: hexa, mat: new THREE.MeshStandardMaterial({ color: 0xe8b62e, metalness: 0.75, roughness: 0.3, envMapIntensity: 1.4, emissive: 0x7a5c0c, emissiveIntensity: 0.6, flatShading: true }) });
+    const btn = new THREE.CylinderGeometry(0.24, 0.27, 0.30, 6, 1, false); btn.rotateZ(Math.PI / 2); btn.rotateX(Math.PI / 2);
     parts.push({ geo: btn, mat: new THREE.MeshBasicMaterial({ color: 0xfff0a8, toneMapped: false }) });
   } else {
-    // 캡슐(무기·전력): 가로 알약(몸통+반구 캡) + 중앙 발광 밴드
-    const body = new THREE.CapsuleGeometry(0.20, 0.52, 2, 7); body.rotateZ(Math.PI / 2);
-    parts.push({ geo: body, mat: M({ color: 0x77879a, metalness: 0.65, roughness: 0.4, emissive: 0x222d3a, emissiveIntensity: 0.5 }) });
-    const band = new THREE.CylinderGeometry(0.225, 0.225, 0.14, 10, 1, false); band.rotateZ(Math.PI / 2);
-    parts.push({ geo: band, mat: new THREE.MeshBasicMaterial({ color: 0x9fe8ff, toneMapped: false }) });
+    // 캡슐: 금속 캡 2 + 반투명 유리 몸통 + 내부 발광 코어(전력/무기 코어가 비쳐 보이는 앰플)
+    const capL = new THREE.SphereGeometry(0.20, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2); capL.rotateZ(Math.PI / 2); capL.translate(-0.26, 0, 0);
+    const capR = new THREE.SphereGeometry(0.20, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2); capR.rotateZ(-Math.PI / 2); capR.translate(0.26, 0, 0);
+    const collarL = new THREE.CylinderGeometry(0.205, 0.205, 0.06, 10, 1, false); collarL.rotateZ(Math.PI / 2); collarL.translate(-0.24, 0, 0);
+    const collarR = collarL.clone(); collarR.translate(0.48, 0, 0);
+    parts.push({ geo: mergeGeos(THREE, [capL, capR, collarL, collarR]), mat: new THREE.MeshStandardMaterial({ color: 0x8a97a6, metalness: 0.85, roughness: 0.3, envMapIntensity: 1.2 }) });
+    const glass = new THREE.CylinderGeometry(0.19, 0.19, 0.50, 12, 1, true); glass.rotateZ(Math.PI / 2);
+    parts.push({ geo: glass, mat: new THREE.MeshStandardMaterial({ color: 0xbfe4ff, metalness: 0.05, roughness: 0.1, envMapIntensity: 1.5, transparent: true, opacity: 0.4, side: THREE.DoubleSide }) });
+    const core = new THREE.CylinderGeometry(0.10, 0.10, 0.44, 8, 1, false); core.rotateZ(Math.PI / 2);
+    parts.push({ geo: core, mat: new THREE.MeshBasicMaterial({ color: 0x9fe8ff, toneMapped: false }) });
   }
   // 전 파트 통합 bbox → 전장 1.0 정규화(상대 위치 보존)
   let span = 0;
