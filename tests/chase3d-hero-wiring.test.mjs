@@ -64,10 +64,12 @@ test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배�
 });
 
 test('HW-11: 소품 3D(§G-2 갱신) — 발사체 3종 원본 텍스처 재질 + 정보 라벨 유지 + 공명만 2D 예외', () => {
-  assert.match(renderer, /import \{ PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts \} from '\.\/chase3d-props\.js'/);
+  assert.match(renderer, /import \{ PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts \} from '\.\/chase3d-props\.js'/);
   // §G-3 재설계(이사 "2D 이어붙이기 금지"): 픽업 5종=순수 조형 멀티 파트(파트별 InstancedMesh, instanceColor 미사용)
-  assert.match(renderer, /for \(const part of createPickupParts\(THREE, k\)\)/);
-  assert.match(renderer, /props\[k\] = \{ meshes, count: 0, colored: false \}/);
+  assert.match(renderer, /const maker = k === 'ebullet' \? createEnemyBulletParts : createPickupParts/);
+  assert.match(renderer, /props\[k\] = \{ meshes, count: 0, colored: k === 'ebullet' \}/);   // §G-4: 적탄만 탄색 틴트
+  const propsSrc = readFileSync(new URL('../js/chase3d-props.js', import.meta.url), 'utf8');
+  assert.match(propsSrc, /export function createEnemyBulletParts/);
   const props3 = readFileSync(new URL('../js/chase3d-props.js', import.meta.url), 'utf8');
   assert.match(props3, /export function createPickupParts/);
   assert.ok(!/PICKUP_TEX/.test(props3), '픽업 그림 텍스처는 폐기(순수 조형)');
