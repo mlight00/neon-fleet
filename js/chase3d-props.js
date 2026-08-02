@@ -131,6 +131,18 @@ export function forgePropTex(kind, seed = 7, S = 64) {
       albedo[i4] = base * 0.92; albedo[i4 + 1] = base * 0.98; albedo[i4 + 2] = base * 1.02; albedo[i4 + 3] = 255;
       emissive[i4] = 16; emissive[i4 + 1] = 26; emissive[i4 + 2] = 34; emissive[i4 + 3] = 255;
       height[y * S + x] = wear * 0.5 - seam * 0.8 + rivet * 0.9;
+    } else if (kind === 'cargo') {
+      // 밝은 우주 화물 컨테이너(이사 "구속구 같다" 재디자인): 흰 패널 + 중앙 주황 스트라이프 + 옅은 seam
+      const pu = Math.abs(((u * 6) % 1) - 0.5);
+      const seam = Math.min(1, Math.max(0, (0.5 - pu) * 10)) * 0.5 + (Math.abs(v - 0.5) > 0.44 ? 0.6 : 0);
+      const wear = propFbm(nz, u, v, 3, 4);
+      const stripe = Math.abs(v - 0.5) < 0.10 ? 1 : 0;   // 중앙 주황 밴드
+      const base = 208 + wear * 26 - seam * 40;
+      if (stripe) { albedo[i4] = 236; albedo[i4 + 1] = 128 + wear * 30; albedo[i4 + 2] = 38; }
+      else { albedo[i4] = base * 0.99; albedo[i4 + 1] = base; albedo[i4 + 2] = base * 1.01; }
+      albedo[i4 + 3] = 255;
+      emissive[i4] = stripe ? 60 : 22; emissive[i4 + 1] = stripe ? 30 : 26; emissive[i4 + 2] = stripe ? 8 : 30; emissive[i4 + 3] = 255;
+      height[y * S + x] = wear * 0.3 - seam * 0.7;
     } else {
       // 금화: 테두리 세레이션 링 + 중앙 원 문양 양각 + 브러시드 결
       const dx = u - 0.5, dy = v - 0.5, r = Math.hypot(dx, dy) * 2;
@@ -139,9 +151,9 @@ export function forgePropTex(kind, seed = 7, S = 64) {
       const emblem = r < 0.46 ? Math.pow(Math.max(0, Math.cos(r * 6.8)), 0.7) : 0;
       const ring = (r > 0.55 && r < 0.64) ? 1 : 0;
       const brush = propFbm(nz, u * 0.6, v * 6, 3, 4) * 0.3;
-      const lum = 160 + emblem * 55 + ring * 22 + serr * 30 + brush * 30;
-      albedo[i4] = Math.min(255, lum * 1.02); albedo[i4 + 1] = Math.min(255, lum * 0.82); albedo[i4 + 2] = lum * 0.34; albedo[i4 + 3] = 255;
-      emissive[i4] = 30 + emblem * 40; emissive[i4 + 1] = 22 + emblem * 30; emissive[i4 + 2] = 6; emissive[i4 + 3] = 255;
+      const lum = 205 + emblem * 40 + ring * 18 + serr * 22 + brush * 22;   // 이사 "너무 어둡다" → 밝은 금
+      albedo[i4] = Math.min(255, lum * 1.04); albedo[i4 + 1] = Math.min(255, lum * 0.86); albedo[i4 + 2] = lum * 0.38; albedo[i4 + 3] = 255;
+      emissive[i4] = 66 + emblem * 60; emissive[i4 + 1] = 48 + emblem * 44; emissive[i4 + 2] = 12; emissive[i4 + 3] = 255;
       height[y * S + x] = emblem * 0.9 + ring * 0.6 + serr * 0.7 + brush * 0.2;
     }
   }
@@ -158,64 +170,87 @@ function texOf(THREE, data, S, srgb = true) {
  * 픽업 파트 팩토리 — [{ geo, mat }...]. 전 파트 통합 bbox 로 전장 1.0 정규화(상대 위치 보존).
  * 전부 flatShading 조형 + 발광 코어 — 그림 텍스처 없음.
  */
+/** POW 텍스트 굽기(이사: 'POW' 가 잘 보이도록) — 밝은 노랑 바탕에 두꺼운 진갈색 글자+흰 테두리. */
+function bakePowFace() {
+  const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const c = cv.getContext('2d');
+  const grd = c.createRadialGradient(S / 2, S / 2, S * 0.05, S / 2, S / 2, S * 0.5);
+  grd.addColorStop(0, '#fff6c8'); grd.addColorStop(0.55, '#ffd23a'); grd.addColorStop(1, '#f59a1a');
+  c.fillStyle = grd; c.fillRect(0, 0, S, S);
+  c.font = `900 ${Math.round(S * 0.34)}px Arial, sans-serif`;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineWidth = S * 0.07; c.strokeStyle = '#ffffff'; c.strokeText('POW', S / 2, S / 2 + S * 0.02);
+  c.fillStyle = '#5a2e00'; c.fillText('POW', S / 2, S / 2 + S * 0.02);
+  return cv;
+}
+
 export function createPickupParts(THREE, key) {
   const parts = [];
   if (key === 'crystal') {
-    // 보석 렌더: 다단 결정면(지터+나선 트위스트) + 절차 emissive(내부 결·중심 백열) + 강한 IBL 반사 + 내부 코어
-    const fx = forgePropTex('crystal');
-    const outer = latheY(THREE, [[0, 0.02], [0.13, 0.12], [0.21, 0.26], [0.26, 0.42], [0.26, 0.56], [0.21, 0.72], [0.12, 0.88], [0, 0.99]], 8, 0.14, 0.33);
+    // 모던 크리스탈(이사 "최근 3D 크리스탈처럼"): 진짜 유리 굴절 — MeshPhysicalMaterial
+    //  transmission(투과)+ior(굴절률 1.9)+attenuation(내부 청록 깊이)+clearcoat. 조사 근거: three 공식
+    //  transmission 문서·Codrops 유리 튜토리얼(§보고서 링크). 셸(굴절)+백열 코어+가장자리 오라 3파트.
+    const shell = latheY(THREE, [[0, 0.02], [0.17, 0.18], [0.23, 0.36], [0.23, 0.64], [0.17, 0.82], [0, 0.98]], 6, 0.10, 0.22);
     parts.push({
-      geo: outer, mat: new THREE.MeshStandardMaterial({
-        map: texOf(THREE, fx.albedo, fx.w), emissiveMap: texOf(THREE, fx.emissive, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false),
-        color: 0x9fd4ec, emissive: 0xffffff, emissiveIntensity: 0.85, metalness: 0.2, roughness: 0.12, envMapIntensity: 2.2,
-        transparent: true, opacity: 0.9, flatShading: true,
+      geo: shell, mat: new THREE.MeshPhysicalMaterial({
+        color: 0xd9f4ff, metalness: 0, roughness: 0.04, transmission: 1, ior: 1.9, thickness: 0.55,
+        attenuationColor: new THREE.Color(0x2fd4ff), attenuationDistance: 0.65,
+        clearcoat: 0.7, clearcoatRoughness: 0.1, envMapIntensity: 2.4, flatShading: true,
       }),
     });
-    const core = latheY(THREE, [[0, 0.14], [0.07, 0.32], [0.09, 0.52], [0.06, 0.72], [0, 0.88]], 6, 0.22, 0.5);
-    parts.push({ geo: core, mat: new THREE.MeshBasicMaterial({ color: 0xbef4ff, toneMapped: false }) });
+    const core = latheY(THREE, [[0, 0.16], [0.06, 0.34], [0.08, 0.52], [0.05, 0.70], [0, 0.86]], 6, 0.2, 0.4);
+    parts.push({ geo: core, mat: new THREE.MeshBasicMaterial({ color: 0xdffaff, toneMapped: false }) });
+    const aura = latheY(THREE, [[0, 0.0], [0.19, 0.18], [0.255, 0.36], [0.255, 0.64], [0.19, 0.82], [0, 1.0]], 6, 0.10, 0.22);
+    parts.push({ geo: aura, mat: new THREE.MeshBasicMaterial({ color: 0x35d8ff, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false, toneMapped: false }) });
   } else if (key === 'pod') {
-    // 장갑 보급 컨테이너: 챔퍼 팔각 셸(절차 패널 텍스처+노멀) + 리브 8 + 전후 프레임 링 + 상부 해치 + 관통 발광 창
-    const fx = forgePropTex('armor');
-    const shell = latheY(THREE, [[0.30, 0.02], [0.44, 0.12], [0.47, 0.32], [0.47, 0.68], [0.44, 0.88], [0.30, 0.98]], 8, 0, 0);
-    shell.rotateX(Math.PI / 2);   // 프로파일 축을 z 로 — 앞뒤 챔퍼 팔각
-    const ribs = [];
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-      const rb = new THREE.BoxGeometry(0.07, 0.05, 0.66);
-      rb.rotateZ(a); rb.translate(Math.cos(a) * 0.465, Math.sin(a) * 0.465, 0);
-      ribs.push(rb);
-    }
-    const frF = new THREE.CylinderGeometry(0.40, 0.40, 0.045, 8, 1, false); frF.rotateX(Math.PI / 2); frF.translate(0, 0, 0.34);
-    const frB = frF.clone(); frB.translate(0, 0, -0.68);
-    const hatch = new THREE.BoxGeometry(0.16, 0.05, 0.20); hatch.translate(0, 0.44, 0.10);
-    const hull = mergeGeos(THREE, [shell, ...ribs, frF, frB, hatch]);
+    // 밝은 우주 화물 컨테이너(이사 "구속구 같다" 재디자인): 흰 캡슐 드럼 + 주황 스트라이프 + 발광 창 + 핸들
+    const fx = forgePropTex('cargo');
+    const shell = latheY(THREE, [[0.26, 0.02], [0.42, 0.10], [0.47, 0.28], [0.47, 0.72], [0.42, 0.90], [0.26, 0.98]], 12, 0, 0);
+    shell.rotateX(Math.PI / 2);   // 부드러운 12각 캡슐 드럼(창살 리브 제거)
+    const handleT = new THREE.BoxGeometry(0.30, 0.05, 0.08); handleT.translate(0, 0.50, 0);
+    const handleB = handleT.clone(); handleB.translate(0, -1.0, 0);
+    const hull = mergeGeos(THREE, [shell, handleT, handleB]);
     parts.push({
       geo: hull, mat: new THREE.MeshStandardMaterial({
         map: texOf(THREE, fx.albedo, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false), emissiveMap: texOf(THREE, fx.emissive, fx.w),
-        color: 0xffffff, emissive: 0x9fdce8, emissiveIntensity: 0.8, metalness: 0.55, roughness: 0.5, envMapIntensity: 0.6,
+        color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.35, metalness: 0.3, roughness: 0.42, envMapIntensity: 0.8,
       }),
     });
-    const winFrame = new THREE.CylinderGeometry(0.27, 0.27, 0.60, 8, 1, false); winFrame.rotateX(Math.PI / 2);
-    parts.push({ geo: winFrame, mat: new THREE.MeshStandardMaterial({ color: 0x2a333c, metalness: 0.8, roughness: 0.4, flatShading: true }) });
-    const w2 = new THREE.CylinderGeometry(0.21, 0.21, 0.62, 8, 1, false); w2.rotateX(Math.PI / 2);
-    parts.push({ geo: w2, mat: new THREE.MeshBasicMaterial({ color: 0x49f2e4, toneMapped: false }) });
+    const winFrame = new THREE.CylinderGeometry(0.26, 0.26, 0.58, 12, 1, false); winFrame.rotateX(Math.PI / 2);
+    parts.push({ geo: winFrame, mat: new THREE.MeshStandardMaterial({ color: 0xdfe8ee, metalness: 0.5, roughness: 0.35 }) });
+    const win = new THREE.CylinderGeometry(0.20, 0.20, 0.60, 12, 1, false); win.rotateX(Math.PI / 2);
+    parts.push({ geo: win, mat: new THREE.MeshBasicMaterial({ color: 0x49f2e4, toneMapped: false }) });
   } else if (key === 'coin') {
-    // 금화: 24각 원반 + 절차 문양(중앙 양각·링·세레이션 노멀) + 강반사 금 PBR
+    // 밝은 금화(이사): 고휘도 금 + 강한 자체발광 — 어두운 환경에서도 반짝
     const fx = forgePropTex('coin');
     const body = new THREE.CylinderGeometry(0.5, 0.5, 0.15, 24, 1, false); body.rotateX(Math.PI / 2);
     parts.push({
       geo: body, mat: new THREE.MeshStandardMaterial({
         map: texOf(THREE, fx.albedo, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false), emissiveMap: texOf(THREE, fx.emissive, fx.w),
-        color: 0xffffff, emissive: 0xffd76a, emissiveIntensity: 0.6, metalness: 0.85, roughness: 0.34, envMapIntensity: 0.8,
+        color: 0xffffff, emissive: 0xffdf7a, emissiveIntensity: 1.0, metalness: 0.75, roughness: 0.28, envMapIntensity: 0.9,
       }),
     });
   } else if (key === 'pow') {
-    // POW 배지: 챔퍼 육각(양면 베벨) + 중앙 버튼 — 노랑 금속 PBR(글자는 HUD 라벨)
-    const hexa = latheY(THREE, [[0.34, 0.05], [0.50, 0.22], [0.50, 0.78], [0.34, 0.95]], 6, 0, 0);
-    hexa.rotateZ(Math.PI / 2); hexa.rotateX(Math.PI / 2);
-    parts.push({ geo: hexa, mat: new THREE.MeshStandardMaterial({ color: 0xe8b62e, metalness: 0.75, roughness: 0.3, envMapIntensity: 1.4, emissive: 0x7a5c0c, emissiveIntensity: 0.6, flatShading: true }) });
-    const btn = new THREE.CylinderGeometry(0.24, 0.27, 0.30, 6, 1, false); btn.rotateZ(Math.PI / 2); btn.rotateX(Math.PI / 2);
-    parts.push({ geo: btn, mat: new THREE.MeshBasicMaterial({ color: 0xfff0a8, toneMapped: false }) });
+    // POW 배지(이사 "먹으면 강해질 느낌 + POW 잘 보이게"): 스타버스트 링 + 텍스트 원판 + 후광
+    const spikes = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const sp = new THREE.ConeGeometry(0.09, 0.30, 4);
+      sp.rotateZ(-Math.PI / 2); sp.rotateZ(a + Math.PI / 2);   // 콘 축을 방사 방향으로
+      sp.translate(Math.cos(a) * 0.42, Math.sin(a) * 0.42, 0);
+      spikes.push(sp);
+    }
+    const ringBase = new THREE.CylinderGeometry(0.36, 0.36, 0.16, 12, 1, false); ringBase.rotateX(Math.PI / 2);
+    parts.push({ geo: mergeGeos(THREE, [ringBase, ...spikes]), mat: new THREE.MeshStandardMaterial({ color: 0xffc21e, metalness: 0.45, roughness: 0.28, envMapIntensity: 1.0, emissive: 0xff8a12, emissiveIntensity: 0.85, flatShading: true }) });
+    let faceMat;
+    if (typeof document !== 'undefined') {
+      const t = new THREE.CanvasTexture(bakePowFace()); t.colorSpace = THREE.SRGBColorSpace;
+      faceMat = new THREE.MeshBasicMaterial({ map: t, toneMapped: false });
+    } else faceMat = new THREE.MeshBasicMaterial({ color: 0xffd23a, toneMapped: false });
+    const face = new THREE.CylinderGeometry(0.30, 0.30, 0.19, 24, 1, false); face.rotateX(Math.PI / 2);
+    parts.push({ geo: face, mat: faceMat });   // 앞뒤 캡의 원형 UV 에 'POW' 텍스트
+    const halo = new THREE.CylinderGeometry(0.52, 0.52, 0.02, 24, 1, false); halo.rotateX(Math.PI / 2);
+    parts.push({ geo: halo, mat: new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }) });
   } else {
     // 캡슐: 금속 캡 2 + 반투명 유리 몸통 + 내부 발광 코어(전력/무기 코어가 비쳐 보이는 앰플)
     const capL = new THREE.SphereGeometry(0.20, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2); capL.rotateZ(Math.PI / 2); capL.translate(-0.26, 0, 0);
