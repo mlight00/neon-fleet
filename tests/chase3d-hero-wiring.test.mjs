@@ -153,7 +153,7 @@ test('HW-06: lab 플래그 정책 — chase3d=1 없으면 검사실 불가(§8)'
   assert.equal(chase3dLabTarget(''), '');
   // 기본 URL 에서 lab 모듈 미로드: 동적 import 는 CHASE3D_LAB 타깃 가드 안
   const i = main.indexOf("import('./chase3d-lab.js')");
-  const guard = main.lastIndexOf("if (['aurora', 'b1', 'b2', 'b4', 'allies', 'swarm'].includes(CHASE3D_LAB))", i);
+  const guard = main.lastIndexOf("if (['aurora', 'b1', 'b2', 'b4', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB))", i);
   assert.ok(guard > 0 && guard < i, 'lab import 는 6타깃 플래그 가드 안');
 });
 

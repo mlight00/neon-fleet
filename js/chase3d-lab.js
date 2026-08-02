@@ -7,6 +7,7 @@ import { createB1Model, createB1Geometry, createB1Materials } from './chase3d-b1
 import { createB2Model } from './chase3d-b2.js';
 import { createB4Model } from './chase3d-b4.js';
 import { createAlliesModel } from './chase3d-allies.js';
+import { createPickupsShowcase } from './chase3d-props.js';
 import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
 import { CAMERA } from './chase3d-mapping.js';
 
@@ -71,6 +72,9 @@ export function createAuroraLab(canvas, opts = {}) {
   } else if (target === 'allies') {
     model = createAlliesModel(THREE);   // §G-1 위계 비교: 순양함 1 + 드론 3
     model.group.scale.setScalar(1.15);
+  } else if (target === 'pickups') {
+    model = createPickupsShowcase(THREE);   // §G-3 평가(이사: 수송선이 빨리 터져 평가 불가) — 5종 회전 진열
+    model.group.scale.setScalar(0.55);
   } else {
     model = createAuroraModel(THREE, { seed: 7, mobile, lods: [0, 1, 2] });
     if (target === 'swarm') {

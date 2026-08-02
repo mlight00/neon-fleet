@@ -113,22 +113,23 @@ export function forgePropTex(kind, seed = 7, S = 64) {
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const u = x / S, v = y / S, i4 = (y * S + x) * 4;
     if (kind === 'crystal') {
-      // 내부 결(세로 스트레치 fbm) + 중심 백열 그라데이션 — emissiveMap 이 보석의 심장
+      // 보석 색 분산(이사): 파셋 u 방향 hue 시프트(아쿠아→틸→연보라) + 내부 결 + 중심 백열 그라데이션
       const vein = propFbm(nz, u * 2.2, v * 0.7, 4, 3);
       const centerGlow = Math.pow(Math.max(0, 1 - Math.abs(v - 0.5) * 2.1), 1.6);
       const g = Math.min(1, centerGlow * 0.95 + vein * 0.28);
-      albedo[i4] = 16 + vein * 30; albedo[i4 + 1] = 70 + vein * 60; albedo[i4 + 2] = 96 + vein * 70; albedo[i4 + 3] = 255;
-      emissive[i4] = 18 + g * 150; emissive[i4 + 1] = 70 + g * 140; emissive[i4 + 2] = 95 + g * 120; emissive[i4 + 3] = 255;
+      const hue = Math.sin(u * Math.PI * 2 + vein * 2.5) * 0.5 + 0.5;   // 0=아쿠아 → 1=연보라(둘레 따라 분산)
+      albedo[i4] = 18 + hue * 36 + vein * 26; albedo[i4 + 1] = 96 - hue * 16 + vein * 56; albedo[i4 + 2] = 122 + hue * 30 + vein * 60; albedo[i4 + 3] = 255;
+      emissive[i4] = 20 + g * 130 + hue * 24; emissive[i4 + 1] = 88 + g * 140 - hue * 14; emissive[i4 + 2] = 112 + g * 122 + hue * 18; emissive[i4 + 3] = 255;
       height[y * S + x] = vein;
     } else if (kind === 'armor') {
       // 팔각 패널 그리드(u 8분할·v 3밴드 홈) + 마모 노이즈 + 리벳 점
       const pu = Math.abs(((u * 8) % 1) - 0.5), pv = Math.abs(((v * 3) % 1) - 0.5);
       const seam = Math.min(1, Math.max(0, (0.5 - Math.min(pu, pv)) * 14));   // 패널 경계 어두운 홈
       const wear = propFbm(nz, u, v, 4, 5);
-      const rivet = (pu < 0.06 && ((v * 24) % 1) < 0.14) ? 1 : 0;
-      const base = 74 + wear * 34 - seam * 26 + rivet * 40;
-      albedo[i4] = base * 0.82; albedo[i4 + 1] = base * 0.92; albedo[i4 + 2] = base * 1.04; albedo[i4 + 3] = 255;
-      emissive[i4] = 8; emissive[i4 + 1] = 14; emissive[i4 + 2] = 18; emissive[i4 + 3] = 255;
+      const rivet = (pu < 0.045 && ((v * 16) % 1) < 0.10) ? 1 : 0;
+      const base = 118 + wear * 44 - seam * 34 + rivet * 48;   // 이사 "너무 어두워 안 보임" → 베이스 상향
+      albedo[i4] = base * 0.92; albedo[i4 + 1] = base * 0.98; albedo[i4 + 2] = base * 1.02; albedo[i4 + 3] = 255;
+      emissive[i4] = 16; emissive[i4 + 1] = 26; emissive[i4 + 2] = 34; emissive[i4 + 3] = 255;
       height[y * S + x] = wear * 0.5 - seam * 0.8 + rivet * 0.9;
     } else {
       // 금화: 테두리 세레이션 링 + 중앙 원 문양 양각 + 브러시드 결
@@ -166,8 +167,8 @@ export function createPickupParts(THREE, key) {
     parts.push({
       geo: outer, mat: new THREE.MeshStandardMaterial({
         map: texOf(THREE, fx.albedo, fx.w), emissiveMap: texOf(THREE, fx.emissive, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false),
-        color: 0x7fc8e8, emissive: 0xffffff, emissiveIntensity: 0.8, metalness: 0.15, roughness: 0.22, envMapIntensity: 1.6,
-        transparent: true, opacity: 0.92, flatShading: true,
+        color: 0x9fd4ec, emissive: 0xffffff, emissiveIntensity: 0.85, metalness: 0.2, roughness: 0.12, envMapIntensity: 2.2,
+        transparent: true, opacity: 0.9, flatShading: true,
       }),
     });
     const core = latheY(THREE, [[0, 0.14], [0.07, 0.32], [0.09, 0.52], [0.06, 0.72], [0, 0.88]], 6, 0.22, 0.5);
@@ -191,7 +192,7 @@ export function createPickupParts(THREE, key) {
     parts.push({
       geo: hull, mat: new THREE.MeshStandardMaterial({
         map: texOf(THREE, fx.albedo, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false), emissiveMap: texOf(THREE, fx.emissive, fx.w),
-        color: 0xffffff, emissive: 0x86d8e8, emissiveIntensity: 0.5, metalness: 0.72, roughness: 0.5, envMapIntensity: 0.9,
+        color: 0xffffff, emissive: 0x9fdce8, emissiveIntensity: 0.8, metalness: 0.55, roughness: 0.5, envMapIntensity: 0.6,
       }),
     });
     const winFrame = new THREE.CylinderGeometry(0.27, 0.27, 0.60, 8, 1, false); winFrame.rotateX(Math.PI / 2);
@@ -205,7 +206,7 @@ export function createPickupParts(THREE, key) {
     parts.push({
       geo: body, mat: new THREE.MeshStandardMaterial({
         map: texOf(THREE, fx.albedo, fx.w), normalMap: texOf(THREE, fx.normal, fx.w, false), emissiveMap: texOf(THREE, fx.emissive, fx.w),
-        color: 0xffffff, emissive: 0xffd76a, emissiveIntensity: 0.5, metalness: 0.9, roughness: 0.24, envMapIntensity: 1.6,
+        color: 0xffffff, emissive: 0xffd76a, emissiveIntensity: 0.6, metalness: 0.85, roughness: 0.34, envMapIntensity: 0.8,
       }),
     });
   } else if (key === 'pow') {
@@ -286,4 +287,27 @@ export function createPropGeometry(THREE, key) {
 /** 공용 자발광 재질 1개 — instanceColor 가 개체별 색을 입힌다(네온 톤 유지 위해 toneMapped 끔). */
 export function createPropMaterial(THREE) {
   return new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+}
+
+/** 검사실 전시(§G-3 평가용, 이사 "수송선이 빨리 터져 평가 불가") — 픽업 5종을 나란히 회전 진열. */
+export function createPickupsShowcase(THREE) {
+  const group = new THREE.Group(); group.name = 'PICKUPS';
+  const keys = ['crystal', 'pod', 'coin', 'pow', 'capsule'];
+  const items = [];
+  let tris = 0;
+  keys.forEach((k, i) => {
+    const item = new THREE.Group();
+    for (const part of createPickupParts(THREE, k)) {
+      item.add(new THREE.Mesh(part.geo, part.mat));
+      tris += (part.geo.index ? part.geo.index.count : part.geo.attributes.position.count) / 3;
+    }
+    item.position.set((i - (keys.length - 1) / 2) * 1.5, 0, 0);
+    item.scale.setScalar(1.35);
+    group.add(item); items.push(item);
+  });
+  function setLOD() { return 0; }
+  function update(time) { for (let i = 0; i < items.length; i++) { items[i].rotation.y = time * 0.9 + i * 0.7; items[i].rotation.x = -0.12; } }
+  function stats() { return { lod: 0, triangles: Math.round(tris) }; }
+  function dispose() { group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
+  return { group, setLOD, update, stats, dispose, matlib: { mats: {}, dispose() {} }, get lod() { return 0; } };
 }
