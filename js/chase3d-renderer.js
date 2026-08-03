@@ -12,8 +12,7 @@ import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
 import { createB1Geometry, createB1Materials } from './chase3d-b1.js';
 import { createB2Geometry, createB2Materials } from './chase3d-b2.js';
 import { createB4Geometry, createB4Materials } from './chase3d-b4.js';
-import { createTurretGeometry, createTurretMaterials } from './chase3d-b5.js';
-import { createWeaverGeometry, createWeaverMaterials } from './chase3d-b6.js';
+import { createBillboardParts } from './chase3d-billboards.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
 
@@ -88,8 +87,20 @@ function createHero3D(canvas3d, opts = {}) {
   let b1 = makeSwarm(createB1Geometry, createB1Materials, 7, B1_INSTANCE_MAX);
   let b2 = makeSwarm(createB2Geometry, createB2Materials, 11, B2_INSTANCE_MAX);
   let b4 = makeSwarm(createB4Geometry, createB4Materials, 13, B4_INSTANCE_MAX);
-  let b5 = makeSwarm(createTurretGeometry, createTurretMaterials, 5, B5_INSTANCE_MAX);
-  let b6 = makeSwarm(createWeaverGeometry, createWeaverMaterials, 6, B6_INSTANCE_MAX);
+  // §G-4-B/C 터렛·위버 = 이사 제작 고품질 렌더 빌보드(조형 모듈 대체 — 회전 없는 개체라 판 티가 없다)
+  function makeBillboardSwarm(key, cap) {
+    try {
+      const sw = { meshes: [], count: 0 };
+      for (const part of createBillboardParts(THREE, key)) {
+        const im = new THREE.InstancedMesh(part.geo, part.mat, cap);
+        im.count = 0; im.frustumCulled = false;
+        scene.add(im); sw.meshes.push(im);
+      }
+      return sw;
+    } catch (e) { return null; /* 비치명 — 초과분은 2D 폴백 */ }
+  }
+  let b5 = makeBillboardSwarm('b5', B5_INSTANCE_MAX);
+  let b6 = makeBillboardSwarm('b6', B6_INSTANCE_MAX);
   // 아군 호위(§G-1 위계: 기함 > 순양함 > 드론) — 노즈가 +Z(소실점 쪽) = yawBase 0 으로 배치
   let drone = makeSwarm(createDroneGeometry, createDroneMaterials, 0, DRONE_INSTANCE_MAX);
   let cruiser = makeSwarm(createCruiserGeometry, createCruiserMaterials, 0, CRUISER_INSTANCE_MAX);

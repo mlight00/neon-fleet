@@ -86,6 +86,10 @@ for (const f of readdirSync(join(ROOT, 'assets', 'sound'))) if (f.endsWith('.ogg
 // (f) 앱 아이콘
 add('assets/art2-webp/branding/app_icon.webp');
 
+// (g) §G-4 이미지 빌보드 텍스처(터렛·위버) — 모듈의 경로 테이블에서 자동 동기
+const billboards = await import(pathToFileURL(join(ROOT, 'js', 'chase3d-billboards.js')).href);
+for (const v of Object.values(billboards.BILLBOARD_TEX)) add(v);
+
 // ── 2. 존재 검증 (§P0-6.7) ────────────────────────────────────
 const missing = [...manifest].filter((p) => !existsSync(join(ROOT, p)));
 if (missing.length) die('매니페스트 참조 파일 없음:\n  ' + missing.join('\n  '));

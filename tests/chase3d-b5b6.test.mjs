@@ -65,15 +65,26 @@ test('B56-04 검사실 모델: LOD 전환·update·stats·dispose 인터페이�
   }
 });
 
-test('B56-05 renderer 배선: import + makeSwarm + placeSwarm + 진단 카운트', () => {
+test('B56-05 renderer 배선: 빌보드 스웜(이사 제작 렌더) + placeSwarm + 진단 카운트', () => {
   const r = read('js/chase3d-renderer.js');
-  assert.match(r, /import { createTurretGeometry, createTurretMaterials } from '\.\/chase3d-b5\.js'/);
-  assert.match(r, /import { createWeaverGeometry, createWeaverMaterials } from '\.\/chase3d-b6\.js'/);
-  assert.match(r, /let b5 = makeSwarm\(createTurretGeometry, createTurretMaterials, 5, B5_INSTANCE_MAX\)/);
-  assert.match(r, /let b6 = makeSwarm\(createWeaverGeometry, createWeaverMaterials, 6, B6_INSTANCE_MAX\)/);
+  assert.match(r, /import { createBillboardParts } from '\.\/chase3d-billboards\.js'/);
+  assert.match(r, /let b5 = makeBillboardSwarm\('b5', B5_INSTANCE_MAX\)/);
+  assert.match(r, /let b6 = makeBillboardSwarm\('b6', B6_INSTANCE_MAX\)/);
   assert.match(r, /if \(swarms\.b5\) placeSwarm\(b5, swarms\.b5\.buf, swarms\.b5\.n, B5_INSTANCE_MAX, 'wob', 0\)/);
   assert.match(r, /if \(swarms\.b6\) placeSwarm\(b6, swarms\.b6\.buf, swarms\.b6\.n, B6_INSTANCE_MAX, 'wob', 0\)/);
   assert.match(r, /b5Count: b5 \? b5\.count : -1, b6Count: b6 \? b6\.count : -1/);
+});
+
+test('B56-07 빌보드 모듈: 텍스처 경로 존재 + 파트 계약 + 좌우 상쇄 회전', () => {
+  const src = read('js/chase3d-billboards.js');
+  assert.match(src, /b5: 'assets\/3d\/b5_gen\.webp'/);
+  assert.match(src, /b6: 'assets\/3d\/b6_gen\.webp'/);
+  assert.match(src, /geo\.rotateY\(Math\.PI\)/);   // yawBase π 와 상쇄 — 이미지 좌우 원본 유지
+  assert.match(src, /transparent: true, depthWrite: false/);
+  // 실제 이미지 파일 존재(전처리 산출물)
+  for (const p of ['assets/3d/b5_gen.webp', 'assets/3d/b6_gen.webp']) {
+    assert.ok(readFileSync(join(root, p)).length > 10_000, p + ' 존재·비어있지 않음');
+  }
 });
 
 test('B56-06 main 수집: Turret/Weaver 분기 — 비변이만·상한·스탬프, 리셋·전달', () => {
