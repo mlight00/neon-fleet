@@ -23,4 +23,20 @@ export function createBillboardParts(THREE, key) {
   return [{ geo, mat }];
 }
 
-export default { BILLBOARD_TEX, createBillboardParts };
+/** 검사실 모델(chase3dLab=b5|b6) — 실전과 같은 빌보드를 단독 진열(lab 인터페이스: group/setLOD/update/stats/dispose). */
+export function createBillboardModel(THREE, key) {
+  const parts = createBillboardParts(THREE, key);
+  const group = new THREE.Group(); group.name = key.toUpperCase() + '_BILLBOARD';
+  for (const p of parts) group.add(new THREE.Mesh(p.geo, p.mat));
+  function update(time) { group.position.y = Math.sin(time * 0.9) * 0.05; }   // 미세 부유(정지 화면 방지)
+  return {
+    group,
+    setLOD() { return 0; },
+    update,
+    stats() { return { lod: 0, triangles: 2, triByLod: { 0: 2 } }; },
+    dispose() { for (const p of parts) { p.geo.dispose(); if (p.mat.map) p.mat.map.dispose(); p.mat.dispose(); } },
+    get lod() { return 0; },
+  };
+}
+
+export default { BILLBOARD_TEX, createBillboardParts, createBillboardModel };
