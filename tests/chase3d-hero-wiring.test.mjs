@@ -41,19 +41,16 @@ test('HW-09: 부분 추종(이사) — 2D C0 이탈을 3D 카메라 트럭 이�
 
 test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배치 + 2D 하드 컷 + 안전 폴백', () => {
   // 3D 레이어 = AURORA + 종별 인스턴스(버킷 3 = 종당 +3 draw). 배치는 2.5D 투영 화면좌표·크기에 정합(unproject).
-  assert.match(renderer, /import \{ createB1Geometry, createB1Materials \} from '\.\/chase3d-b1\.js'/);
-  assert.match(renderer, /import \{ createB2Geometry, createB2Materials \} from '\.\/chase3d-b2\.js'/);
-  assert.match(renderer, /new THREE\.InstancedMesh\(geo\.buckets\[k\], bmat\.mats\[k\], cap\)/);
-  assert.match(renderer, /let b1 = makeSwarm\(createB1Geometry, createB1Materials, 7, B1_INSTANCE_MAX\)/);
-  assert.match(renderer, /let b2 = makeSwarm\(createB2Geometry, createB2Materials, 11, B2_INSTANCE_MAX\)/);
+  // §G-4 이미지 파이프라인(이사): 적 12종 = Gemini 렌더 빌보드 — ENEMY3D 단일 진실 루프
+  assert.match(renderer, /import \{ ENEMY3D \} from '\.\/chase3d-prop-defs\.js'/);
+  assert.match(renderer, /for \(const k of Object\.keys\(ENEMY3D\)\) eswarm\[k\] = makeBillboardSwarm\(k, ENEMY3D\[k\]\.cap\)/);
   assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI\)/);
   assert.match(renderer, /\.unproject\(camera\)/);
-  assert.match(renderer, /placeSwarm\(b1, swarms\.b1\.buf, swarms\.b1\.n, B1_INSTANCE_MAX, 'wob', 0\)/);   // t≥0.5 도달 지점에서만 = 하드 컷 공유
-  assert.match(renderer, /placeSwarm\(b2, swarms\.b2\.buf, swarms\.b2\.n, B2_INSTANCE_MAX, 'wob', 0\)/);
-  assert.match(renderer, /return null; \/\* 스웜 실패는 비치명/);                          // 생성 실패 → AURORA 단독 폴백
-  // main: 소형(B1)·중형(B2)·비변이 Creature 만 수집(변이·large 는 2D 유지), 프레임 스탬프로 수집분만 2D 스킵
-  assert.match(main, /if \(!small && e\.size !== 'mid'\) continue/);
-  assert.match(main, /e\.affixes && e\.affixes\.length\) continue/);
+  assert.match(renderer, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, 'wob', 0\)/);   // t≥0.5 도달 지점에서만 = 하드 컷 공유
+  assert.match(renderer, /return null; \/\* 비치명/);                          // 생성 실패 → AURORA 단독 폴백
+  // main: 비변이만 수집(변이=2D 유지로 링·표식 보존), 크리처는 크기별 b1/b2/b3, 프레임 스탬프로 수집분만 2D 스킵
+  assert.match(main, /if \(e\.affixes && e\.affixes\.length\) return/);
+  assert.match(main, /e\.size === 'small' \? 'b1' : e\.size === 'mid' \? 'b2' : 'b3'/);
   assert.match(main, /_in3dMap\.set\(e, _b1Stamp\)/);   // Codex P2: sidecar(WeakMap) — 게임 객체 무오염
   assert.match(main, /skipEntity: t3d >= 0\.5 \? _isB13D : null/);
   const cr = readFileSync(new URL('../js/chase-render.js', import.meta.url), 'utf8');
@@ -106,7 +103,7 @@ test('HW-12: Codex 검토 반영 — 소품 3D 기본 OFF 게이트 + sidecar �
   assert.ok(!/\._in3d\b/.test(main), 'main 에 게임 객체 _in3d 필드 없음');
   assert.ok(!/_in3d/.test(entities), 'entities 에 _in3d 없음');
   // 진단: 확장 범위를 따라간다(b4·소품 count)
-  assert.match(renderer, /b4Count: b4 \? b4\.count : -1/);
+  assert.match(renderer, /Object\.keys\(ENEMY3D\)\.map\(\(k\) => \[k \+ 'Count', eswarm\[k\] \? eswarm\[k\]\.count : -1\]\)/);
   assert.match(renderer, /propCounts: props \? Object\.fromEntries\(PROP_KEYS\.map/);
   // Codex 재검토 P2-1: 소품 OFF = GPU 자원 생성까지 OFF(표시만 OFF 금지)
   const propBlock = renderer.slice(renderer.indexOf('let props = null;'), renderer.indexOf('/** 셰이더 프리웜'));

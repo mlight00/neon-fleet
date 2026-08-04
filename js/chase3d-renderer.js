@@ -9,18 +9,17 @@ import { makeChaseCamera, buildSnapshot, computeSceneModel, screenXToWorldX as i
 import { transitionT, shouldRender3D, QUALITY } from './chase3d-config.js';
 import { createAuroraModel } from './chase3d-aurora-model.js';
 import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
-import { createB1Geometry, createB1Materials } from './chase3d-b1.js';
-import { createB2Geometry, createB2Materials } from './chase3d-b2.js';
-import { createB4Geometry, createB4Materials } from './chase3d-b4.js';
 import { createBillboardParts } from './chase3d-billboards.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
+import { ENEMY3D } from './chase3d-prop-defs.js';
 
-export const B1_INSTANCE_MAX = 28;   // 실전 B1 동시 표시 상한(스폰 상한보다 넉넉, 초과분은 2D 폴백)
-export const B2_INSTANCE_MAX = 8;    // 실전 B2(중형) 동시 표시 상한
-export const B4_INSTANCE_MAX = 8;    // 실전 B4(저격수) 동시 표시 상한
-export const B5_INSTANCE_MAX = 8;    // 실전 B5(터렛) 동시 표시 상한(§G-4)
-export const B6_INSTANCE_MAX = 8;    // 실전 B6(위버) 동시 표시 상한(§G-4)
+// 적 12종 동시 표시 상한은 ENEMY3D(chase3d-prop-defs) 단일 진실 — 아래는 기존 외부 참조 호환용 파생.
+export const B1_INSTANCE_MAX = ENEMY3D.b1.cap;
+export const B2_INSTANCE_MAX = ENEMY3D.b2.cap;
+export const B4_INSTANCE_MAX = ENEMY3D.b4.cap;
+export const B5_INSTANCE_MAX = ENEMY3D.b5.cap;
+export const B6_INSTANCE_MAX = ENEMY3D.b6.cap;
 
 export function createChase3D(canvas3d, opts = {}) {
   if (opts.hero) return createHero3D(canvas3d, opts);
@@ -84,10 +83,7 @@ function createHero3D(canvas3d, opts = {}) {
       return sw;
     } catch (e) { return null; /* 스웜 실패는 비치명 — AURORA 단독으로 계속 */ }
   }
-  let b1 = makeSwarm(createB1Geometry, createB1Materials, 7, B1_INSTANCE_MAX);
-  let b2 = makeSwarm(createB2Geometry, createB2Materials, 11, B2_INSTANCE_MAX);
-  let b4 = makeSwarm(createB4Geometry, createB4Materials, 13, B4_INSTANCE_MAX);
-  // §G-4-B/C 터렛·위버 = 이사 제작 고품질 렌더 빌보드(조형 모듈 대체 — 회전 없는 개체라 판 티가 없다)
+  // §G-4 적 12종 = 이사 제작(Gemini) 고품질 렌더 빌보드(조형 스웜 전면 대체 — 회전·측면 노출 없는 하강 적이라 판 티가 없다)
   function makeBillboardSwarm(key, cap) {
     try {
       const sw = { meshes: [], count: 0 };
@@ -99,8 +95,8 @@ function createHero3D(canvas3d, opts = {}) {
       return sw;
     } catch (e) { return null; /* 비치명 — 초과분은 2D 폴백 */ }
   }
-  let b5 = makeBillboardSwarm('b5', B5_INSTANCE_MAX);
-  let b6 = makeBillboardSwarm('b6', B6_INSTANCE_MAX);
+  const eswarm = {};
+  for (const k of Object.keys(ENEMY3D)) eswarm[k] = makeBillboardSwarm(k, ENEMY3D[k].cap);
   // 아군 호위(§G-1 위계: 기함 > 순양함 > 드론) — 노즈가 +Z(소실점 쪽) = yawBase 0 으로 배치
   let drone = makeSwarm(createDroneGeometry, createDroneMaterials, 0, DRONE_INSTANCE_MAX);
   let cruiser = makeSwarm(createCruiserGeometry, createCruiserMaterials, 0, CRUISER_INSTANCE_MAX);
@@ -252,11 +248,11 @@ function createHero3D(canvas3d, opts = {}) {
       model.update(time, { bank, charging: !!sq.charging, chargeFrac: sq.chargeFrac || 0 });
       // 실전 스웜(크리처+소품) — t≥0.5 에서만 이 지점에 도달 = 2D 스킵과 같은 하드 컷
       if (swarms) {
-        placeSwarm(b1, swarms.b1.buf, swarms.b1.n, B1_INSTANCE_MAX, 'wob', 0);
-        placeSwarm(b2, swarms.b2.buf, swarms.b2.n, B2_INSTANCE_MAX, 'wob', 0);
-        if (swarms.b4) placeSwarm(b4, swarms.b4.buf, swarms.b4.n, B4_INSTANCE_MAX, 'wob', 0);
-        if (swarms.b5) placeSwarm(b5, swarms.b5.buf, swarms.b5.n, B5_INSTANCE_MAX, 'wob', 0);
-        if (swarms.b6) placeSwarm(b6, swarms.b6.buf, swarms.b6.n, B6_INSTANCE_MAX, 'wob', 0);
+        for (const k of Object.keys(ENEMY3D)) {
+          const sk = swarms[k];
+          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, 'wob', 0);
+          else placeSwarm(eswarm[k], null, 0, ENEMY3D[k].cap);
+        }
         if (swarms.drone) placeSwarm(drone, swarms.drone.buf, swarms.drone.n, DRONE_INSTANCE_MAX, 'direct', 0, 0);     // 아군: 노즈가 소실점(전진 방향)
         if (swarms.cruiser) placeSwarm(cruiser, swarms.cruiser.buf, swarms.cruiser.n, CRUISER_INSTANCE_MAX, 'direct', 0, 0);   // 실측: hero 카메라 기준 yaw 0 = 지오 +z 가 소실점 → 지오를 노즈 +z 로 로프트
         if (props && swarms.props) for (const k of PROP_KEYS) {
@@ -264,8 +260,7 @@ function createHero3D(canvas3d, opts = {}) {
           if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], (k === 'pbullet' || k === 'ebullet' || k === 'missile' || k === 'laser') ? 'direct' : 'spin', time);
         }
       } else {
-        placeSwarm(b1, null, 0, B1_INSTANCE_MAX); placeSwarm(b2, null, 0, B2_INSTANCE_MAX); placeSwarm(b4, null, 0, B4_INSTANCE_MAX);
-        placeSwarm(b5, null, 0, B5_INSTANCE_MAX); placeSwarm(b6, null, 0, B6_INSTANCE_MAX);
+        for (const k of Object.keys(ENEMY3D)) placeSwarm(eswarm[k], null, 0, ENEMY3D[k].cap);
         placeSwarm(drone, null, 0, DRONE_INSTANCE_MAX); placeSwarm(cruiser, null, 0, CRUISER_INSTANCE_MAX);
         if (props) for (const k of PROP_KEYS) placeSwarm(props[k], null, 0, PROP_CAPS[k]);
       }
@@ -286,8 +281,7 @@ function createHero3D(canvas3d, opts = {}) {
       hero: true, t: +ctl._t.toFixed(3), zoom: +ctl._zoom.toFixed(3), available: ctl.available, degraded: ctl.degraded, reason: ctl.reason, rendered: ctl._rendered,
       calls: r.render.calls, triangles: r.render.triangles, programs: r.programs ? r.programs.length : -1,
       geometries: r.memory.geometries, textures: r.memory.textures, aurora: model ? model.stats() : null,
-      b1Count: b1 ? b1.count : -1, b2Count: b2 ? b2.count : -1, b4Count: b4 ? b4.count : -1,
-      b5Count: b5 ? b5.count : -1, b6Count: b6 ? b6.count : -1,
+      ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k + 'Count', eswarm[k] ? eswarm[k].count : -1])),
       droneCount: drone ? drone.count : -1, cruiserCount: cruiser ? cruiser.count : -1,
       propCounts: props ? Object.fromEntries(PROP_KEYS.map((k) => [k, props[k].count])) : null,   // Codex P2: 진단이 확장 범위를 따라가게
       prewarm: { ...ctl.prewarm },
@@ -296,9 +290,10 @@ function createHero3D(canvas3d, opts = {}) {
   function dispose() {
     try { canvas3d.removeEventListener('webglcontextlost', onLost); canvas3d.removeEventListener('webglcontextrestored', onRestored); } catch {}
     if (model) model.dispose();
-    for (const sw of [b1, b2, b4, drone, cruiser]) if (sw) for (const im of sw.meshes) { im.geometry.dispose(); im.material.dispose(); im.dispose && im.dispose(); }
+    for (const sw of [...Object.values(eswarm), drone, cruiser]) if (sw) for (const im of sw.meshes) { im.geometry.dispose(); if (im.material.map) im.material.map.dispose(); im.material.dispose(); im.dispose && im.dispose(); }
     if (props) { let matDone = false; for (const k of PROP_KEYS) { const im = props[k].meshes[0]; im.geometry.dispose(); if (!matDone) { im.material.dispose(); matDone = true; } im.dispose && im.dispose(); } }
-    b1 = null; b2 = null; b4 = null; drone = null; cruiser = null; props = null;
+    for (const k of Object.keys(eswarm)) eswarm[k] = null;
+    drone = null; cruiser = null; props = null;
     if (envRT) envRT.dispose();
     renderer.dispose();
     ctl.available = false;

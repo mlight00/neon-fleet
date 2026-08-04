@@ -51,10 +51,8 @@ test('B4-05: 검사실 + 실전 배선 — chase3dLab=b4, renderer b4 스웜, ma
   assert.match(lab, /import \{ createB4Model \} from '\.\/chase3d-b4\.js'/);
   assert.match(lab, /target === 'b4'/);
   const renderer = readFileSync(new URL('../js/chase3d-renderer.js', import.meta.url), 'utf8');
-  assert.match(renderer, /let b4 = makeSwarm\(createB4Geometry, createB4Materials, 13, B4_INSTANCE_MAX\)/);
-  assert.match(renderer, /placeSwarm\(b4, swarms\.b4\.buf, swarms\.b4\.n, B4_INSTANCE_MAX, 'wob', 0\)/);
+  // §G-4 이미지 파이프라인: b4 는 12종 빌보드 루프(eswarm)로 생성·배치된다
+  assert.match(renderer, /for \(const k of Object\.keys\(ENEMY3D\)\) eswarm\[k\] = makeBillboardSwarm\(k, ENEMY3D\[k\]\.cap\)/);
   const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
-  assert.match(main, /e instanceof Sniper\) \{/);
-  assert.match(main, /Math\.min\(B4_SCREEN_MAX, B4_SCREEN_LEN \* p\.scale\)/);
-  assert.match(main, /b4: \{ buf: _b4Buf, n: 0 \}/);
+  assert.match(main, /if \(e instanceof Sniper\) \{ put3D\('b4', e, e\.wob \|\| 0\); continue; \}/);
 });

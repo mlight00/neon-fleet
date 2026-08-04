@@ -3,8 +3,18 @@
 //  이미지 계약: assets/3d/*.webp — 사전 처리(검정 배경 제거·본체 코어 불투명+발광 luminance 페이드·정사각 크롭) 완료본.
 //  재질=Basic(조명 무관 — 이미지에 조명이 구워져 있음), 알파 블렌드, depthWrite off(글로우 페더 겹침 안전).
 export const BILLBOARD_TEX = {
-  b5: 'assets/3d/b5_gen.webp',   // 터렛(탑다운 3/4 렌더 — 추적 카메라 시점과 일치)
-  b6: 'assets/3d/b6_gen.webp',   // 위버(정면 별 렌더)
+  b1: 'assets/3d/b1_gen.webp',    // 소형 크리처(유충)
+  b2: 'assets/3d/b2_gen.webp',    // 중형 크리처(낫팔 리버)
+  b3: 'assets/3d/b3_gen.webp',    // 대형 크리처(3코어 베헤모스)
+  b4: 'assets/3d/b4_gen.webp',    // 저격수(외눈 랜스)
+  b5: 'assets/3d/b5_gen.webp',    // 터렛(탑다운 3/4 렌더 — 추적 카메라 시점과 일치)
+  b6: 'assets/3d/b6_gen.webp',    // 위버(정면 별 렌더)
+  b16: 'assets/3d/b16_gen.webp',  // 폭격기(폭탄 주머니 5)
+  b17: 'assets/3d/b17_gen.webp',  // 전기 재퍼(포크 번개)
+  b18: 'assets/3d/b18_gen.webp',  // 오비터(3날 회전체)
+  b19: 'assets/3d/b19_gen.webp',  // 방패병(육각 패널 방패)
+  b20: 'assets/3d/b20_gen.webp',  // 부화 모함(알 주머니)
+  b21: 'assets/3d/b21_gen.webp',  // 블링커(분리 장갑판)
 };
 
 /** 파트 배열 반환(픽업 파트 계약과 동일) — renderer 가 InstancedMesh 로 감싼다. 전장 1.0 평면. */

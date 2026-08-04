@@ -68,11 +68,8 @@ test('B56-04 검사실 모델: LOD 전환·update·stats·dispose 인터페이�
 test('B56-05 renderer 배선: 빌보드 스웜(이사 제작 렌더) + placeSwarm + 진단 카운트', () => {
   const r = read('js/chase3d-renderer.js');
   assert.match(r, /import { createBillboardParts } from '\.\/chase3d-billboards\.js'/);
-  assert.match(r, /let b5 = makeBillboardSwarm\('b5', B5_INSTANCE_MAX\)/);
-  assert.match(r, /let b6 = makeBillboardSwarm\('b6', B6_INSTANCE_MAX\)/);
-  assert.match(r, /if \(swarms\.b5\) placeSwarm\(b5, swarms\.b5\.buf, swarms\.b5\.n, B5_INSTANCE_MAX, 'wob', 0\)/);
-  assert.match(r, /if \(swarms\.b6\) placeSwarm\(b6, swarms\.b6\.buf, swarms\.b6\.n, B6_INSTANCE_MAX, 'wob', 0\)/);
-  assert.match(r, /b5Count: b5 \? b5\.count : -1, b6Count: b6 \? b6\.count : -1/);
+  assert.match(r, /for \(const k of Object\.keys\(ENEMY3D\)\) eswarm\[k\] = makeBillboardSwarm\(k, ENEMY3D\[k\]\.cap\)/);
+  assert.match(r, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, 'wob', 0\)/);
 });
 
 test('B56-07 빌보드 모듈: 텍스처 경로 존재 + 파트 계약 + 좌우 상쇄 회전', () => {
@@ -87,13 +84,14 @@ test('B56-07 빌보드 모듈: 텍스처 경로 존재 + 파트 계약 + 좌우 
   }
 });
 
-test('B56-06 main 수집: Turret/Weaver 분기 — 비변이만·상한·스탬프, 리셋·전달', () => {
+test('B56-06 main 수집: 적 12종 put3D 공용 헬퍼 — 비변이만·상한·스탬프·리셋', () => {
   const m = read('js/main.js');
-  assert.match(m, /e instanceof Turret\) {\s+\/\/ B5/);
-  assert.match(m, /e instanceof Weaver\) {\s+\/\/ B6/);
-  assert.match(m, /_b5n = 0; _b6n = 0;/);
-  assert.match(m, /_sw\.b5\.n = _b5n; _sw\.b6\.n = _b6n;/);
-  assert.match(m, /b5: { buf: _b5Buf, n: 0 }, b6: { buf: _b6Buf, n: 0 }/);
+  assert.match(m, /if \(e instanceof Turret\) { put3D\('b5', e, e\.wob \|\| 0\); continue; }/);
+  assert.match(m, /if \(e instanceof Weaver\) { put3D\('b6', e, \(e\.t \|\| 0\) \* 1\.7\); continue; }/);
+  assert.match(m, /if \(e instanceof Blinker\) { if \(e\.appearT >= 0\.9\) put3D\('b21', e, 0\); continue; }/);   // 텔레포트 페이드=2D 유지
+  assert.match(m, /if \(e\.affixes && e\.affixes\.length\) return/);
+  assert.match(m, /for \(const k in ENEMY3D\) _sw\[k\]\.n = 0;/);
+  assert.match(m, /_in3dMap\.set\(e, _b1Stamp\)/);
   // 검사실 가드 9타깃
   assert.match(m, /\['aurora', 'b1', 'b2', 'b4', 'b5', 'b6', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
 });

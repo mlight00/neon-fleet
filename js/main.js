@@ -29,7 +29,7 @@ import { createWheelStepAccumulator, resolveWheelZoom } from './wheel-input.js';
 import { createChaseProjection, chaseBlendForZoom, advanceChaseBlend, screenToWorldXAtPlayer, projectPoint, projectObject, CHASE_FULL_ZOOM } from './chase-camera.js';
 import { drawWorldProjected, collectEdgeWarnings } from './chase-render.js';
 import { drawWarpField } from './chase-backdrop.js';
-import { PROP_KEYS, PROP_CAPS } from './chase3d-prop-defs.js';   // 순수 상수 전용 모듈(의존 0) — 지오메트리·팩토리는 플래그 뒤 renderer 만 로드(Codex 재검토 P2)
+import { PROP_KEYS, PROP_CAPS, ENEMY3D } from './chase3d-prop-defs.js';   // 순수 상수 전용 모듈(의존 0) — 지오메트리·팩토리는 플래그 뒤 renderer 만 로드(Codex 재검토 P2)
 // 실제 3D 함미 추적(Phase 0, ?chase3d=1 전용). config/mapping은 순수(Three.js 미의존)라 정적 import 안전.
 //  renderer(Three.js 로드)는 플래그가 있을 때만 아래에서 동적 import 한다(§3.2: 플래그 없으면 three 미로드).
 import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, chase3dPropsEnabled, transitionT } from './chase3d-config.js';
@@ -2837,40 +2837,20 @@ function drawEdgeWarnings(ctx, r, proj) {
 }
 
 // ── B1 실전 스웜 수집 버퍼(이사 승인) — 프레임 중 할당 0(고정 슬롯 재사용). ──
-//  *_SCREEN_LEN = 100% 배율에서 한 마리의 화면 전장(논리px) — 3D 크기 기준.
-//  B1 보정 이력(이사 실기): 138(2D 1:1)=과대 → 95=과소 → 125 → **163(+30% "3D 모드에서 30% 정도 크게")**. 상한 325.
-//  B2(중형): 2D 스프라이트 논리 165px × 같은 배율감(1.09) ≈ 180, 상한 360(중형은 기함의 ~70%까지 허용).
-const B1_SCREEN_LEN = 163;
-const B1_SCREEN_MAX = 325;
-const B2_SCREEN_LEN = 180;
-const B2_SCREEN_MAX = 360;
-//  B4(저격수): 2D 스프라이트 논리 96px × 배율감 1.09 ≈ 105, 상한 210.
-const B4_SCREEN_LEN = 105;
-const B4_SCREEN_MAX = 210;
-//  B5(터렛)·B6(위버): 2D 스프라이트 논리 96px — B4 와 같은 배율감(§G-4).
-const B5_SCREEN_LEN = 105;
-const B5_SCREEN_MAX = 210;
-const B6_SCREEN_LEN = 105;
-const B6_SCREEN_MAX = 210;
-const _b1Buf = Array.from({ length: 28 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
-const _b2Buf = Array.from({ length: 8 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
-const _b4Buf = Array.from({ length: 8 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
-const _b5Buf = Array.from({ length: 8 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
-const _b6Buf = Array.from({ length: 8 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
+//  적 12종 화면 전장(len/max)·상한(cap)은 ENEMY3D(chase3d-prop-defs) 단일 진실 — 이력: B1 163=이사 실기 +30% 확정.
 //  아군 호위(§G-1): 드론=단순 다트(2D 시각 18px 계승), 순양함=미니 전함(2D 30px — 위계상 드론보다 확실히 큼).
 const DRONE_SCREEN_LEN = 22, DRONE_SCREEN_MAX = 44;
 const CRUISER_SCREEN_LEN = 42, CRUISER_SCREEN_MAX = 84;
 const _droneBuf = Array.from({ length: 60 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
 const _cruBuf = Array.from({ length: 10 }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 }));
 const _escBuf = Array.from({ length: 72 }, () => ({ x: 0, y: 0, kind: 0, roll: 0 }));   // escortsFor3D 작업 버퍼
-let _b1n = 0, _b2n = 0, _b4n = 0, _b5n = 0, _b6n = 0, _b1Stamp = 0;
+let _b1Stamp = 0;
 // 3D 포함 여부는 게임 객체에 쓰지 않고 sidecar(WeakMap)로 관리(Codex P2) — 저장·직렬화·디버깅과의 결합 원천 차단.
 const _in3dMap = new WeakMap();
 // ── 소품 3D(이사: "무기·배지") — 종별 화면 전장(논리px)·상한과 수집 버퍼. 레이저 빔·공명은 2D 스트릭 유지. ──
 const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], laser: [64, 150], crystal: [88, 200], coin: [22, 56], pow: [40, 92], pod: [64, 160], capsule: [44, 110] };
 const _sw = {
-  b1: { buf: _b1Buf, n: 0 }, b2: { buf: _b2Buf, n: 0 }, b4: { buf: _b4Buf, n: 0 },
-  b5: { buf: _b5Buf, n: 0 }, b6: { buf: _b6Buf, n: 0 },
+  ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k, { buf: Array.from({ length: ENEMY3D[k].cap }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 })), n: 0 }])),
   drone: { buf: _droneBuf, n: 0 }, cruiser: { buf: _cruBuf, n: 0 },
   props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1 })), n: 0 }])),
 };
@@ -2948,7 +2928,8 @@ function draw() {
     const followX = chaseProjection ? chaseProjection.C0 - chaseProjection.centerX : 0;
     // 실전 3D 스웜 수집(이사 승인): 크리처(B1·B2) + 소품(탄·픽업·배지) — 2.5D 투영 화면좌표·크기로 3D 인스턴스와 정합.
     //  변이(엘리트) 크리처는 제외(링·표식 유지), large(B3)·레이저 빔·공명 탄은 2D 유지. 버퍼 초과분도 2D 폴백.
-    _b1n = 0; _b2n = 0; _b4n = 0; _b5n = 0; _b6n = 0; _propLabelN = 0; _b1Stamp++;
+    for (const k in ENEMY3D) _sw[k].n = 0;
+    _propLabelN = 0; _b1Stamp++;
     for (const k of PROP_KEYS) _sw.props[k].n = 0;
     if (chase3d && state === 'play' && run && chaseProjection) {
       const passGate = (e, p) => {   // 기함 통과: 투영이 아래로 외삽(depth 1.6 공통) — 화면 밖이면 어디에도 안 그림
@@ -2969,49 +2950,30 @@ function draw() {
         const L = _propLabels[_propLabelN++];
         L.x = p.x; L.y = p.y; L.str = str; L.col = col; L.size = size;
       };
+      // §G-4 적 12종 공용 수집(이사 제작 렌더 빌보드) — 비변이만(변이=2D 유지로 링·표식 보존), 초과분 2D 폴백.
+      const put3D = (key, e, wob) => {
+        if (e.affixes && e.affixes.length) return;
+        const s3 = _sw[key];
+        if (s3.n >= s3.buf.length) return;
+        const p = projectObject(e, 'enemy', chaseProjection);
+        if (!passGate(e, p)) return;
+        const d = ENEMY3D[key];
+        const o = s3.buf[s3.n++];
+        o.sx = p.x; o.sy = p.y; o.px = Math.min(d.max, d.len * p.scale); o.wob = wob;
+        _in3dMap.set(e, _b1Stamp);
+      };
       for (const e of run.world.entities) {
         if (e.dead) continue;
-        if (e instanceof Creature) {
-          if (e.affixes && e.affixes.length) continue;
-          const small = e.size === 'small';
-          if (!small && e.size !== 'mid') continue;
-          if (small ? _b1n >= _b1Buf.length : _b2n >= _b2Buf.length) continue;
-          const p = projectObject(e, 'enemy', chaseProjection);
-          if (!passGate(e, p)) continue;
-          const o = small ? _b1Buf[_b1n++] : _b2Buf[_b2n++];
-          o.sx = p.x; o.sy = p.y;
-          o.px = small ? Math.min(B1_SCREEN_MAX, B1_SCREEN_LEN * p.scale) : Math.min(B2_SCREEN_MAX, B2_SCREEN_LEN * p.scale);
-          o.wob = e.wob || 0;
-          _in3dMap.set(e, _b1Stamp);
-          continue;
-        }
-        if (e instanceof Sniper) {   // B4 저격수(이사 "저격수부터") — 비변이만, 초과분 2D 폴백
-          if ((e.affixes && e.affixes.length) || _b4n >= _b4Buf.length) continue;
-          const p = projectObject(e, 'enemy', chaseProjection);
-          if (!passGate(e, p)) continue;
-          const o = _b4Buf[_b4n++];
-          o.sx = p.x; o.sy = p.y; o.px = Math.min(B4_SCREEN_MAX, B4_SCREEN_LEN * p.scale); o.wob = e.wob || 0;
-          _in3dMap.set(e, _b1Stamp);
-          continue;
-        }
-        if (e instanceof Turret) {   // B5 터렛(§G-4) — 비변이만, 초과분 2D 폴백
-          if ((e.affixes && e.affixes.length) || _b5n >= _b5Buf.length) continue;
-          const p = projectObject(e, 'enemy', chaseProjection);
-          if (!passGate(e, p)) continue;
-          const o = _b5Buf[_b5n++];
-          o.sx = p.x; o.sy = p.y; o.px = Math.min(B5_SCREEN_MAX, B5_SCREEN_LEN * p.scale); o.wob = e.wob || 0;
-          _in3dMap.set(e, _b1Stamp);
-          continue;
-        }
-        if (e instanceof Weaver) {   // B6 위버(§G-4) — 좌우 누빔 개체, 살랑 롤은 t 기반
-          if ((e.affixes && e.affixes.length) || _b6n >= _b6Buf.length) continue;
-          const p = projectObject(e, 'enemy', chaseProjection);
-          if (!passGate(e, p)) continue;
-          const o = _b6Buf[_b6n++];
-          o.sx = p.x; o.sy = p.y; o.px = Math.min(B6_SCREEN_MAX, B6_SCREEN_LEN * p.scale); o.wob = (e.t || 0) * 1.7;
-          _in3dMap.set(e, _b1Stamp);
-          continue;
-        }
+        if (e instanceof Creature) { put3D(e.size === 'small' ? 'b1' : e.size === 'mid' ? 'b2' : 'b3', e, e.wob || 0); continue; }
+        if (e instanceof Sniper) { put3D('b4', e, e.wob || 0); continue; }
+        if (e instanceof Turret) { put3D('b5', e, e.wob || 0); continue; }
+        if (e instanceof Weaver) { put3D('b6', e, (e.t || 0) * 1.7); continue; }   // 좌우 누빔 — 살랑 롤은 t 기반
+        if (e instanceof Bomber) { put3D('b16', e, 0); continue; }
+        if (e instanceof Zapper) { put3D('b17', e, 0); continue; }
+        if (e instanceof Orbiter) { put3D('b18', e, 0); continue; }
+        if (e instanceof Shielder) { put3D('b19', e, 0); continue; }
+        if (e instanceof BroodCarrier) { put3D('b20', e, 0); continue; }
+        if (e instanceof Blinker) { if (e.appearT >= 0.9) put3D('b21', e, 0); continue; }   // 텔레포트 페이드는 2D 연출 유지 — 완전 등장만 3D
         // 픽업·배지: 소품 3D 는 개발 플래그(chase3dProps=1) 전용 — 기본은 기존 2D(이사 "엉망" 판정, Codex A/B 권고)
         if (!CHASE3D_PROPS) continue;
         let key = null, label = '', lcol = '#eaf6ff';
@@ -3043,7 +3005,6 @@ function draw() {
           putProp('ebullet', b, p, colInt(b.color, 0xff7a5a), Math.atan2(b.vx || 0, -(b.vy || 1)));
         }
       }
-      _sw.b1.n = _b1n; _sw.b2.n = _b2n; _sw.b4.n = _b4n; _sw.b5.n = _b5n; _sw.b6.n = _b6n;
       // 아군 호위(§G-1): Squad 의 드론·순양함·호위기 위치(draw 와 동일 수식의 escortsFor3D)를 3D 인스턴스로.
       //  피격핵·HP바·플래시 링은 2D 유지(정보 보존) — 함선 본체만 3D 대체.
       _sw.drone.n = 0; _sw.cruiser.n = 0;

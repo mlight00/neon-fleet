@@ -13,3 +13,20 @@ export const PROP_BASE_COLOR = {
 
 /** 실전 인스턴스 상한(종별) — 수가 많은 탄은 넉넉히, 픽업은 소량. */
 export const PROP_CAPS = { pbullet: 96, ebullet: 96, missile: 24, laser: 48, crystal: 12, coin: 48, pow: 8, pod: 8, capsule: 8 };
+
+/** §G-4 적 12종 빌보드(이사 제작 Gemini 렌더) — cap=동시 표시 상한, len/max=화면 전장(논리px, 2D sizes×1.09 배율감).
+ *  B1 163 은 이사 실기 보정 확정값(+30%), B2/B4/B5/B6 기존값 유지. 신규 6종=2D sizes(92~96)×1.09. */
+export const ENEMY3D = {
+  b1: { cap: 28, len: 163, max: 325 },   // 소형 크리처(Creature small)
+  b2: { cap: 8, len: 180, max: 360 },    // 중형 크리처(Creature mid)
+  b3: { cap: 4, len: 200, max: 400 },    // 대형 크리처(Creature large)
+  b4: { cap: 8, len: 105, max: 210 },    // 저격수(Sniper)
+  b5: { cap: 8, len: 105, max: 210 },    // 터렛(Turret)
+  b6: { cap: 8, len: 105, max: 210 },    // 위버(Weaver)
+  b16: { cap: 8, len: 100, max: 200 },   // 폭격기(Bomber)
+  b17: { cap: 8, len: 105, max: 210 },   // 전기 재퍼(Zapper)
+  b18: { cap: 8, len: 100, max: 200 },   // 오비터(Orbiter)
+  b19: { cap: 8, len: 105, max: 210 },   // 방패병(Shielder)
+  b20: { cap: 4, len: 105, max: 210 },   // 부화 모함(BroodCarrier)
+  b21: { cap: 8, len: 100, max: 200 },   // 블링커(Blinker)
+};
