@@ -69,7 +69,7 @@ test('B56-05 renderer 배선: 빌보드 스웜(이사 제작 렌더) + placeSwar
   const r = read('js/chase3d-renderer.js');
   assert.match(r, /import { createBillboardParts } from '\.\/chase3d-billboards\.js'/);
   assert.match(r, /for \(const k of Object\.keys\(ENEMY3D\)\) eswarm\[k\] = makeBillboardSwarm\(k, ENEMY3D\[k\]\.cap\)/);
-  assert.match(r, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, 'wob', 0\)/);
+  assert.match(r, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, 'wob', 0, Math\.PI, ENEMY3D\[k\]\.pitch \?\? -0\.12\)/);
 });
 
 test('B56-07 빌보드 모듈: 텍스처 경로 존재 + 파트 계약 + 좌우 상쇄 회전', () => {

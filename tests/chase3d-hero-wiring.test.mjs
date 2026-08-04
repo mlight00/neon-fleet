@@ -44,9 +44,9 @@ test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배�
   // §G-4 이미지 파이프라인(이사): 적 12종 = Gemini 렌더 빌보드 — ENEMY3D 단일 진실 루프
   assert.match(renderer, /import \{ ENEMY3D \} from '\.\/chase3d-prop-defs\.js'/);
   assert.match(renderer, /for \(const k of Object\.keys\(ENEMY3D\)\) eswarm\[k\] = makeBillboardSwarm\(k, ENEMY3D\[k\]\.cap\)/);
-  assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI\)/);
+  assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI, pitchBase = -0\.12\)/);
   assert.match(renderer, /\.unproject\(camera\)/);
-  assert.match(renderer, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, 'wob', 0\)/);   // t≥0.5 도달 지점에서만 = 하드 컷 공유
+  assert.match(renderer, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, 'wob', 0, Math\.PI, ENEMY3D\[k\]\.pitch \?\? -0\.12\)/);   // t≥0.5 도달 지점에서만 = 하드 컷 공유
   assert.match(renderer, /return null; \/\* 비치명/);                          // 생성 실패 → AURORA 단독 폴백
   // main: 비변이만 수집(변이=2D 유지로 링·표식 보존), 크리처는 크기별 b1/b2/b3, 프레임 스탬프로 수집분만 2D 스킵
   assert.match(main, /if \(e\.affixes && e\.affixes\.length\) return/);

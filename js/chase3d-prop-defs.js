@@ -17,9 +17,9 @@ export const PROP_CAPS = { pbullet: 96, ebullet: 96, missile: 24, laser: 48, cry
 /** §G-4 적 12종 빌보드(이사 제작 Gemini 렌더) — cap=동시 표시 상한, len/max=화면 전장(논리px, 2D sizes×1.09 배율감).
  *  B1 163 은 이사 실기 보정 확정값(+30%), B2/B4/B5/B6 기존값 유지. 신규 6종=2D sizes(92~96)×1.09. */
 export const ENEMY3D = {
-  b1: { cap: 28, len: 163, max: 325 },   // 소형 크리처(Creature small)
-  b2: { cap: 8, len: 180, max: 360 },    // 중형 크리처(Creature mid)
-  b3: { cap: 4, len: 200, max: 400 },    // 대형 크리처(Creature large)
+  b1: { cap: 28, len: 163, max: 325, pitch: -0.55 },   // 소형 크리처(Creature small) — 머리부터 내리꽂는 다이빙 자세
+  b2: { cap: 8, len: 180, max: 360, pitch: -0.45 },    // 중형 크리처(Creature mid) — 다이빙 자세(소형보다 완만)
+  b3: { cap: 4, len: 200, max: 400, pitch: -0.35 },    // 대형 크리처(Creature large) — 육중함 유지(살짝만)
   b4: { cap: 8, len: 105, max: 210 },    // 저격수(Sniper)
   b5: { cap: 8, len: 105, max: 210 },    // 터렛(Turret)
   b6: { cap: 8, len: 105, max: 210 },    // 위버(Weaver)

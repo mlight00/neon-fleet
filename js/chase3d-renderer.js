@@ -192,7 +192,7 @@ function createHero3D(canvas3d, opts = {}) {
    *  깊이는 [6,60] 클램프(near/far·조명 안전권) — 클램프 시 스케일이 보정해 화면 크기는 항상 정확. 모델은 전장 1.0 공통.
    *  mode: 'wob'(크리처 — sin 감쇠 롤) | 'direct'(탄·아군 — wob 을 롤로 그대로) | 'spin'(픽업 — 시간 스핀).
    *  yawBase: π=전면이 카메라(적·소품 기본) / 0=노즈가 소실점 쪽(아군 — 위로 비행). */
-  function placeSwarm(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math.PI) {
+  function placeSwarm(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math.PI, pitchBase = -0.12) {
     if (!sw) return;
     const count = Math.min(n | 0, cap);
     const fpx = (ctl._lastLogH * 0.5) / Math.tan(camera.fov * Math.PI / 360);   // 논리px 초점거리
@@ -206,7 +206,7 @@ function createHero3D(canvas3d, opts = {}) {
       _sPos.copy(camera.position).addScaledVector(_sDir, depth / Math.max(1e-4, _sDir.dot(_sFwd)));
       if (mode === 'spin') _sEul.set(-0.12, yawBase + time * 1.4 + i * 0.73, 0);
       else if (mode === 'direct') _sEul.set(-0.12, yawBase, o.wob);
-      else _sEul.set(-0.12, yawBase, Math.sin(o.wob) * 0.15);
+      else _sEul.set(pitchBase, yawBase, Math.sin(o.wob) * 0.15);
       _sQ.setFromEuler(_sEul);
       _sM.compose(_sPos, _sQ, _sScl.setScalar(scl));
       for (const im of sw.meshes) {
@@ -250,7 +250,7 @@ function createHero3D(canvas3d, opts = {}) {
       if (swarms) {
         for (const k of Object.keys(ENEMY3D)) {
           const sk = swarms[k];
-          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, 'wob', 0);
+          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, 'wob', 0, Math.PI, ENEMY3D[k].pitch ?? -0.12);
           else placeSwarm(eswarm[k], null, 0, ENEMY3D[k].cap);
         }
         if (swarms.drone) placeSwarm(drone, swarms.drone.buf, swarms.drone.n, DRONE_INSTANCE_MAX, 'direct', 0, 0);     // 아군: 노즈가 소실점(전진 방향)
