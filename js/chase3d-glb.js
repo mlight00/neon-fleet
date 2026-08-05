@@ -86,7 +86,7 @@ export function createGlbShowcase(THREE, defs) {
       for (const p of parts) holder.add(new THREE.Mesh(p.geo, p.mat));
     }).catch(() => {});
   });
-  function update(time) { for (let i = 0; i < spinners.length; i++) spinners[i].rotation.y = Math.sin(time * 0.6 + i * 0.5) * 0.6; }   // 좌우 흔들 자전(정면 중심 ±34°)
+  function update(time) { for (let i = 0; i < spinners.length; i++) spinners[i].rotation.y = Math.PI + Math.sin(time * 0.6 + i * 0.5) * 0.6; }   // 얼굴(-z)이 진열 카메라(+z)를 향하게 π 오프셋 + 좌우 흔들 ±34°
   return {
     group,
     setLOD() { return 0; },
