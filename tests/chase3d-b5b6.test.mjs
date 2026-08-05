@@ -68,7 +68,7 @@ test('B56-04 검사실 모델: LOD 전환·update·stats·dispose 인터페이�
 test('B56-05 renderer 배선: 빌보드 스웜(이사 제작 렌더) + placeSwarm + 진단 카운트', () => {
   const r = read('js/chase3d-renderer.js');
   assert.match(r, /import { createBillboardParts } from '\.\/chase3d-billboards\.js'/);
-  assert.match(r, /for \(const k of Object\.keys\(ENEMY3D\)\) eswarm\[k\] = makeBillboardSwarm\(k, ENEMY3D\[k\]\.cap\)/);
+  assert.match(r, /eswarm\[k\] = def\.glb \? makeGlbSwarm\(k, def\) : makeBillboardSwarm\(k, def\.cap\)/);
   assert.match(r, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, 'wob', 0, Math\.PI, ENEMY3D\[k\]\.pitch \?\? -0\.12\)/);
 });
 

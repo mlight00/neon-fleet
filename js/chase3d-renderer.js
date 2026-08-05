@@ -10,6 +10,7 @@ import { transitionT, shouldRender3D, QUALITY } from './chase3d-config.js';
 import { createAuroraModel } from './chase3d-aurora-model.js';
 import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
 import { createBillboardParts } from './chase3d-billboards.js';
+import { loadEnemyGlbParts } from './chase3d-glb.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
 import { ENEMY3D } from './chase3d-prop-defs.js';
@@ -95,8 +96,26 @@ function createHero3D(canvas3d, opts = {}) {
       return sw;
     } catch (e) { return null; /* 비치명 — 초과분은 2D 폴백 */ }
   }
+  // glb 필드가 있는 종 = 실모델(비동기 로드, 실패 시 빌보드 폴백) — §G-5 이사 VARCO 파이프라인
+  function makeGlbSwarm(key, def) {
+    const sw = { meshes: [], count: 0 };
+    const attach = (parts) => {
+      for (const part of parts) {
+        const im = new THREE.InstancedMesh(part.geo, part.mat, def.cap);
+        im.count = 0; im.frustumCulled = false;
+        scene.add(im); sw.meshes.push(im);
+      }
+    };
+    loadEnemyGlbParts(THREE, def.glb, def)
+      .then(attach)
+      .catch(() => { try { attach(createBillboardParts(THREE, key)); } catch (e) {} });
+    return sw;
+  }
   const eswarm = {};
-  for (const k of Object.keys(ENEMY3D)) eswarm[k] = makeBillboardSwarm(k, ENEMY3D[k].cap);
+  for (const k of Object.keys(ENEMY3D)) {
+    const def = ENEMY3D[k];
+    eswarm[k] = def.glb ? makeGlbSwarm(k, def) : makeBillboardSwarm(k, def.cap);
+  }
   // 아군 호위(§G-1 위계: 기함 > 순양함 > 드론) — 노즈가 +Z(소실점 쪽) = yawBase 0 으로 배치
   let drone = makeSwarm(createDroneGeometry, createDroneMaterials, 0, DRONE_INSTANCE_MAX);
   let cruiser = makeSwarm(createCruiserGeometry, createCruiserMaterials, 0, CRUISER_INSTANCE_MAX);

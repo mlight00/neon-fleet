@@ -89,6 +89,8 @@ add('assets/art2-webp/branding/app_icon.webp');
 // (g) §G-4 이미지 빌보드 텍스처(터렛·위버) — 모듈의 경로 테이블에서 자동 동기
 const billboards = await import(pathToFileURL(join(ROOT, 'js', 'chase3d-billboards.js')).href);
 for (const v of Object.values(billboards.BILLBOARD_TEX)) add(v);
+const enemyDefs = await import(pathToFileURL(join(ROOT, 'js', 'chase3d-prop-defs.js')).href);
+for (const d of Object.values(enemyDefs.ENEMY3D)) if (d.glb) add(d.glb);
 
 // ── 2. 존재 검증 (§P0-6.7) ────────────────────────────────────
 const missing = [...manifest].filter((p) => !existsSync(join(ROOT, p)));
