@@ -122,7 +122,8 @@ function createHero3D(canvas3d, opts = {}) {
   // 프레임 중 할당 금지(§10.1): 배치 수학용 스크래치는 여기서 1회 생성해 재사용.
   const _sV = new THREE.Vector3(), _sDir = new THREE.Vector3(), _sFwd = new THREE.Vector3(),
         _sPos = new THREE.Vector3(), _sScl = new THREE.Vector3(), _sEul = new THREE.Euler(),
-        _sQ = new THREE.Quaternion(), _sM = new THREE.Matrix4(), _sCol = new THREE.Color();
+        _sQ = new THREE.Quaternion(), _sM = new THREE.Matrix4(), _sCol = new THREE.Color(),
+        _sQ2 = new THREE.Quaternion(), _sAxisZ = new THREE.Vector3(0, 0, 1);
   // ── 소품 스웜(이사: "무기·배지 3D") — 기본 OFF. opts.propsEnabled(=chase3dProps=1)일 때만 GPU 자원까지 생성.
   //  Codex 재검토 P2: 표시만 OFF 가 아니라 지오메트리·재질·InstancedMesh·프리웜 비용 자체를 0 으로.
   let props = null;
@@ -223,10 +224,18 @@ function createHero3D(canvas3d, opts = {}) {
       const depth = Math.min(60, Math.max(6, fpx / Math.max(1e-3, o.px)));      // 전장 1.0 모델 기준
       const scl = (o.px * depth) / fpx;                                         // 클램프 보정 → 화면 전장 = o.px 유지
       _sPos.copy(camera.position).addScaledVector(_sDir, depth / Math.max(1e-4, _sDir.dot(_sFwd)));
-      if (mode === 'spin') _sEul.set(-0.12, yawBase + time * 1.4 + i * 0.73, 0);
-      else if (mode === 'direct') _sEul.set(-0.12, yawBase, o.wob);
-      else _sEul.set(pitchBase, yawBase, Math.sin(o.wob) * 0.15);
-      _sQ.setFromEuler(_sEul);
+      if (mode === 'face') {
+        // 카메라 대면(§G-5 실모델): Matrix4.lookAt(개체, 카메라) 은 +z=개체-카메라 방향 → 전면(-z)이 카메라.
+        //  화면 위(멀리)에서도 정면이 압축되지 않는다(이사: "정면이 보여야"). wob 은 로컬 z 롤.
+        _sM.lookAt(_sPos, camera.position, camera.up);
+        _sQ.setFromRotationMatrix(_sM);
+        _sQ.multiply(_sQ2.setFromAxisAngle(_sAxisZ, Math.sin(o.wob) * 0.15));
+      } else {
+        if (mode === 'spin') _sEul.set(-0.12, yawBase + time * 1.4 + i * 0.73, 0);
+        else if (mode === 'direct') _sEul.set(-0.12, yawBase, o.wob);
+        else _sEul.set(pitchBase, yawBase, Math.sin(o.wob) * 0.15);
+        _sQ.setFromEuler(_sEul);
+      }
       _sM.compose(_sPos, _sQ, _sScl.setScalar(scl));
       for (const im of sw.meshes) {
         im.setMatrixAt(i, _sM);
@@ -269,7 +278,7 @@ function createHero3D(canvas3d, opts = {}) {
       if (swarms) {
         for (const k of Object.keys(ENEMY3D)) {
           const sk = swarms[k];
-          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, 'wob', 0, Math.PI, ENEMY3D[k].pitch ?? -0.12);
+          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, ENEMY3D[k].glb ? 'face' : 'wob', 0, Math.PI, ENEMY3D[k].pitch ?? -0.12);
           else placeSwarm(eswarm[k], null, 0, ENEMY3D[k].cap);
         }
         if (swarms.drone) placeSwarm(drone, swarms.drone.buf, swarms.drone.n, DRONE_INSTANCE_MAX, 'direct', 0, 0);     // 아군: 노즈가 소실점(전진 방향)

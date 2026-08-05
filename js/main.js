@@ -215,7 +215,7 @@ if (CHASE3D_ON) {
   if (stage) { canvas.after(canvas3d); canvas3d.after(hudCanvas); }
   hudCtx = hudCanvas.getContext('2d');
   sizeChase3DCanvases();
-  if (['aurora', 'b1', 'b2', 'b4', 'b5', 'b6', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB)) {
+  if (['aurora', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB)) {
     // ── 모델 검사실(Opus5 §8: aurora / B1 단독 / swarm=기함+B1 12) — 게임 렌더 대신 스튜디오. 기본 URL 미로드. ──
     canvas.style.visibility = 'hidden';
     const _ov = document.getElementById('overlay'); if (_ov) _ov.style.display = 'none';

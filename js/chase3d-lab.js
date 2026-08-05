@@ -7,6 +7,8 @@ import { createB1Model, createB1Geometry, createB1Materials } from './chase3d-b1
 import { createB2Model } from './chase3d-b2.js';
 import { createB4Model } from './chase3d-b4.js';
 import { createBillboardModel } from './chase3d-billboards.js';
+import { createGlbShowcase } from './chase3d-glb.js';
+import { ENEMY3D } from './chase3d-prop-defs.js';
 import { createAlliesModel } from './chase3d-allies.js';
 import { createPickupsShowcase } from './chase3d-props.js';
 import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
@@ -70,6 +72,9 @@ export function createAuroraLab(canvas, opts = {}) {
   } else if (target === 'b4') {
     model = createB4Model(THREE, { seed: 13, mobile, lods: [0, 1, 2] });
     model.group.scale.setScalar(4.2);
+  } else if (target === 'models') {
+    model = createGlbShowcase(THREE, ENEMY3D);   // §G-5 실모델 전 종 격자 진열(이사: 진행 없이 한 화면 평가)
+    model.group.scale.setScalar(0.9);   // 1.15 는 좌우 열 잘림(실측)
   } else if (target === 'b5' || target === 'b6') {
     model = createBillboardModel(THREE, target);   // §G-4 터렛·위버 = 이사 제작(Gemini) 렌더 빌보드(실전과 동일 판)
     model.group.scale.setScalar(3.3);   // 4.0 은 좌우 잘림(실측) — 여백 확보

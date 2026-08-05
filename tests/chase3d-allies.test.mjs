@@ -93,5 +93,5 @@ test('AL-04: 검사실 allies 타깃(6타깃 가드)', () => {
   assert.match(lab, /import \{ createAlliesModel \} from '\.\/chase3d-allies\.js'/);
   assert.match(lab, /target === 'allies'/);
   const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
-  assert.match(main, /\['aurora', 'b1', 'b2', 'b4', 'b5', 'b6', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
+  assert.match(main, /\['aurora', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
 });

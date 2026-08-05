@@ -26,10 +26,16 @@ export function loadEnemyGlbParts(THREE, url, opts = {}) {
         const toFloat = (g) => {
           for (const name of ['position', 'normal', 'uv']) {
             const a = g.attributes[name];
-            if (!a || a.array instanceof Float32Array) continue;
+            if (!a || (a.array instanceof Float32Array && !a.isInterleavedBufferAttribute)) continue;
+            // 양자화 출력은 정수형 + interleaved 일 수 있다 — 배열 직접 순회는 타 속성 데이터가 섞여
+            //  파편 형상이 된다(실측). getX/Y/Z/W 가 stride·역정규화를 모두 처리한다(r160).
             const f = new Float32Array(a.count * a.itemSize);
-            for (let i = 0; i < a.count; i++)
-              for (let j = 0; j < a.itemSize; j++) f[i * a.itemSize + j] = a.getComponent(i, j);
+            for (let i = 0; i < a.count; i++) {
+              f[i * a.itemSize] = a.getX(i);
+              if (a.itemSize > 1) f[i * a.itemSize + 1] = a.getY(i);
+              if (a.itemSize > 2) f[i * a.itemSize + 2] = a.getZ(i);
+              if (a.itemSize > 3) f[i * a.itemSize + 3] = a.getW(i);
+            }
             g.setAttribute(name, new THREE.BufferAttribute(f, a.itemSize));
           }
           return g;
@@ -64,4 +70,31 @@ export function loadEnemyGlbParts(THREE, url, opts = {}) {
   });
 }
 
-export default { loadEnemyGlbParts };
+/** 검사실 진열장(chase3dLab=models): 실모델 전 종을 격자 진열 — 게임 진행 없이 한 화면 평가(이사 요청).
+ *  lab 인터페이스(group/setLOD/update/stats/dispose). 각 모델 천천히 자전. */
+export function createGlbShowcase(THREE, defs) {
+  const group = new THREE.Group(); group.name = 'GLB_SHOWCASE';
+  const keys = Object.keys(defs).filter((k) => defs[k].glb);
+  const spinners = [];
+  const COLS = 3, GAP = 1.5;
+  keys.forEach((k, i) => {
+    const holder = new THREE.Group();
+    const col = i % COLS, row = Math.floor(i / COLS);
+    holder.position.set((col - (COLS - 1) / 2) * GAP, ((Math.ceil(keys.length / COLS) - 1) / 2 - row) * GAP, 0);
+    group.add(holder); spinners.push(holder);
+    loadEnemyGlbParts(THREE, defs[k].glb, defs[k]).then((parts) => {
+      for (const p of parts) holder.add(new THREE.Mesh(p.geo, p.mat));
+    }).catch(() => {});
+  });
+  function update(time) { for (let i = 0; i < spinners.length; i++) spinners[i].rotation.y = Math.sin(time * 0.6 + i * 0.5) * 0.6; }   // 좌우 흔들 자전(정면 중심 ±34°)
+  return {
+    group,
+    setLOD() { return 0; },
+    update,
+    stats() { return { lod: 0, triangles: 0, triByLod: { 0: 0 } }; },
+    dispose() { for (const h of spinners) h.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); },
+    get lod() { return 0; },
+  };
+}
+
+export default { loadEnemyGlbParts, createGlbShowcase };
