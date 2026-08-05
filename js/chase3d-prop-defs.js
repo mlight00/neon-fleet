@@ -19,8 +19,8 @@ export const PROP_CAPS = { pbullet: 96, ebullet: 96, missile: 24, laser: 48, cry
 export const ENEMY3D = {
   //  b1 = §G-5 실모델 1호(이사 VARCO 생성 GLB): rotX π/2 = 서 있는 모델(뿔 +y·노즈 -y)을 게임 축(노즈 -z)으로.
   //  pitch 는 실모델이라 실제 기울기로 작동 — 다이빙 자세 유지.
-  b1: { cap: 28, len: 163, max: 325, pitch: -0.55, glb: 'assets/3d/b1_model.glb', rotX: Math.PI / 2 },
-  b2: { cap: 8, len: 180, max: 360, pitch: -0.45 },    // 중형 크리처(Creature mid) — 다이빙 자세(소형보다 완만)
+  b1: { cap: 28, len: 163, max: 325, pitch: -0.55, glb: 'assets/3d/b1_model.glb', rotX: -Math.PI / 2 },
+  b2: { cap: 8, len: 180, max: 360, pitch: -0.45, glb: 'assets/3d/b2_model.glb', rotX: -Math.PI / 2 },   // 중형 크리처 — §G-5 실모델
   b3: { cap: 4, len: 200, max: 400, pitch: -0.35 },    // 대형 크리처(Creature large) — 육중함 유지(살짝만)
   b4: { cap: 8, len: 105, max: 210 },    // 저격수(Sniper)
   b5: { cap: 8, len: 105, max: 210 },    // 터렛(Turret)

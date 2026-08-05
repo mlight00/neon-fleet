@@ -26,12 +26,13 @@ def diet(src, dst, ratio=0.016):
         bv = doc['bufferViews'][im['bufferView']]
         raw = buf[bv.get('byteOffset', 0): bv.get('byteOffset', 0) + bv['byteLength']]
         pil = Image.open(io.BytesIO(raw))
-        if max(pil.size) > 1024:
-            pil = pil.resize((1024, 1024), Image.LANCZOS)
         out = io.BytesIO()
         if (im.get('name') or '').lower() in ('diffuse', 'basecolor', 'albedo') or i == 1:
+            if max(pil.size) > 1024: pil = pil.resize((1024, 1024), Image.LANCZOS)
             pil.convert('RGB').save(out, 'JPEG', quality=88); im['mimeType'] = 'image/jpeg'
         else:
+            # normal 등 보조맵은 512 로 충분(화면 표시 크기 기준) — 50MB 빌드 예산의 주범
+            if max(pil.size) > 512: pil = pil.resize((512, 512), Image.LANCZOS)
             pil.convert('RGB').save(out, 'PNG', optimize=True); im['mimeType'] = 'image/png'
         img_new[im['bufferView']] = out.getvalue()
 
