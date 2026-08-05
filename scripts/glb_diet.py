@@ -8,7 +8,7 @@
 import struct, json, io, os, sys, subprocess, tempfile
 from PIL import Image
 
-def diet(src, dst, ratio=0.016):
+def diet(src, dst, ratio=0.06):
     tmp = os.path.join(tempfile.gettempdir(), '_glb_diet_tmp.glb')
     r = subprocess.run(['npx', '--yes', 'gltfpack', '-i', src, '-o', tmp,
                         '-si', str(ratio), '-sa', '-noq'], shell=True, capture_output=True, text=True)
@@ -29,7 +29,9 @@ def diet(src, dst, ratio=0.016):
         out = io.BytesIO()
         if (im.get('name') or '').lower() in ('diffuse', 'basecolor', 'albedo') or i == 1:
             if max(pil.size) > 1024: pil = pil.resize((1024, 1024), Image.LANCZOS)
-            pil.convert('RGB').save(out, 'JPEG', quality=88); im['mimeType'] = 'image/jpeg'
+            from PIL import ImageEnhance
+            pil = ImageEnhance.Color(pil.convert('RGB')).enhance(1.12)   # 파이프라인 채도 손실 보상
+            pil.save(out, 'JPEG', quality=90, subsampling=0); im['mimeType'] = 'image/jpeg'
         else:
             # normal 등 보조맵은 512 로 충분(화면 표시 크기 기준) — 50MB 빌드 예산의 주범
             if max(pil.size) > 512: pil = pil.resize((512, 512), Image.LANCZOS)
@@ -58,4 +60,4 @@ def diet(src, dst, ratio=0.016):
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         raise SystemExit('사용: python scripts/glb_diet.py <입력.glb> <출력.glb> [ratio]')
-    diet(sys.argv[1], sys.argv[2], float(sys.argv[3]) if len(sys.argv) > 3 else 0.016)
+    diet(sys.argv[1], sys.argv[2], float(sys.argv[3]) if len(sys.argv) > 3 else 0.06)

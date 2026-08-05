@@ -29,15 +29,20 @@ export function loadEnemyGlbParts(THREE, url, opts = {}) {
           if (opts.rotY) geo.rotateY(opts.rotY);
           if (opts.rotZ) geo.rotateZ(opts.rotZ);
           geo.computeVertexNormals();
-          const mat = m.material;   // glTF PBR 그대로 — 씬 조명·IBL 반응(빌보드 Basic 과 달리 입체 음영)
-          if (mat && mat.map) {
-            mat.map.colorSpace = THREE.SRGBColorSpace;
-            // 게임의 어두운 우주 조명에서 텍스처 색이 죽는다(실측) → 자기 텍스처 자발광으로 바닥 밝기 확보
-            mat.emissiveMap = mat.map;
-            mat.emissive = new THREE.Color(0x6f6f6f);
-            mat.envMapIntensity = 1.2;
-            mat.needsUpdate = true;
-          }
+          // 재질은 통제된 Standard 로 재구성 — glTF 의 KHR_specular(Physical) 회색 반사와
+          //  과한 자발광(0x6f6f6f)이 채도를 죽였다(이사 원본 대비 실측). map+normal 만 취하고
+          //  자발광은 실루엣 유지용 최소만.
+          const src = m.material || {};
+          if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
+          const mat = new THREE.MeshStandardMaterial({
+            map: src.map || null,
+            normalMap: src.normalMap || null,
+            roughness: 0.62,
+            metalness: 0.05,
+            envMapIntensity: 1.0,
+            emissive: new THREE.Color(0x2e2e2e),
+            emissiveMap: src.map || null,
+          });
           out.push({ geo, mat });
         }
         resolve(out);
