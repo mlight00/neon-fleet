@@ -21,13 +21,13 @@ export const ENEMY3D = {
   //  pitch 는 실모델이라 실제 기울기로 작동 — 다이빙 자세 유지.
   b1: { cap: 28, len: 163, max: 325, pitch: -0.55, glb: 'assets/3d/b1_model.glb', rotX: -Math.PI / 2 },
   b2: { cap: 8, len: 180, max: 360, pitch: -0.45, glb: 'assets/3d/b2_model.glb', rotX: -Math.PI / 2 },   // 중형 크리처 — §G-5 실모델
-  b3: { cap: 4, len: 200, max: 400, pitch: -0.35 },    // 대형 크리처(Creature large) — 육중함 유지(살짝만)
-  b4: { cap: 8, len: 105, max: 210 },    // 저격수(Sniper)
-  b5: { cap: 8, len: 105, max: 210 },    // 터렛(Turret)
-  b6: { cap: 8, len: 105, max: 210 },    // 위버(Weaver)
+  b3: { cap: 4, len: 200, max: 400, pitch: -0.35, glb: 'assets/3d/b3_model.glb', rotX: -Math.PI / 2 },   // 대형 크리처 — §G-5 실모델
+  b4: { cap: 8, len: 105, max: 210, pitch: -0.4, glb: 'assets/3d/b4_model.glb', rotX: -Math.PI / 2 },   // 저격수 — §G-5 실모델(세로 랜스 다이빙)
+  b5: { cap: 8, len: 105, max: 210, glb: 'assets/3d/b5_model.glb', rotX: -Math.PI / 2 },   // 터렛 — §G-5 실모델
+  b6: { cap: 8, len: 105, max: 210, glb: 'assets/3d/b6_model.glb', rotX: -Math.PI / 2 },   // 위버 — §G-5 실모델
   b16: { cap: 8, len: 100, max: 200 },   // 폭격기(Bomber)
-  b17: { cap: 8, len: 105, max: 210 },   // 전기 재퍼(Zapper)
-  b18: { cap: 8, len: 100, max: 200 },   // 오비터(Orbiter)
+  b17: { cap: 8, len: 105, max: 210, pitch: -0.25, glb: 'assets/3d/b17_model.glb', rotX: -Math.PI / 2 },   // 전기 재퍼 — §G-5 실모델
+  b18: { cap: 8, len: 100, max: 200, glb: 'assets/3d/b18_model.glb', rotX: -Math.PI / 2 },   // 오비터 — §G-5 실모델
   b19: { cap: 8, len: 105, max: 210 },   // 방패병(Shielder)
   b20: { cap: 4, len: 105, max: 210 },   // 부화 모함(BroodCarrier)
   b21: { cap: 8, len: 100, max: 200 },   // 블링커(Blinker)

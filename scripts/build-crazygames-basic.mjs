@@ -89,8 +89,9 @@ add('assets/art2-webp/branding/app_icon.webp');
 // (g) §G-4 이미지 빌보드 텍스처(터렛·위버) — 모듈의 경로 테이블에서 자동 동기
 const billboards = await import(pathToFileURL(join(ROOT, 'js', 'chase3d-billboards.js')).href);
 for (const v of Object.values(billboards.BILLBOARD_TEX)) add(v);
-const enemyDefs = await import(pathToFileURL(join(ROOT, 'js', 'chase3d-prop-defs.js')).href);
-for (const d of Object.values(enemyDefs.ENEMY3D)) if (d.glb) add(d.glb);
+// §G-5 실모델(GLB)은 포털 빌드에서 제외 — 50MB 예산(8종 ×~2MB 초과). 로더가 404 를 받으면
+//  빌보드로 자동 폴백하므로 포털은 이미지 방식으로 동작한다. 실모델 포함은 포털 최적화 단계(사운드
+//  재인코딩·텍스처 예산 재설계)에서 재결정.
 
 // ── 2. 존재 검증 (§P0-6.7) ────────────────────────────────────
 const missing = [...manifest].filter((p) => !existsSync(join(ROOT, p)));
