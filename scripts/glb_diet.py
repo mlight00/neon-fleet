@@ -9,9 +9,12 @@ import struct, json, io, os, sys, subprocess, tempfile
 from PIL import Image
 
 def diet(src, dst, ratio=0.06):
+    # ratio >= 0.99 = 단순화 스킵(VARCO 리메시본 등 이미 정리된 토폴로지) — 양자화(KHR_mesh_quantization)만 적용해 메시 용량 절감
     tmp = os.path.join(tempfile.gettempdir(), '_glb_diet_tmp.glb')
-    r = subprocess.run(['npx', '--yes', 'gltfpack', '-i', src, '-o', tmp,
-                        '-si', str(ratio), '-sa', '-noq'], shell=True, capture_output=True, text=True)
+    args = ['npx', '--yes', 'gltfpack', '-i', src, '-o', tmp]
+    if ratio < 0.99:
+        args += ['-si', str(ratio), '-sa']
+    r = subprocess.run(args, shell=True, capture_output=True, text=True)
     if not os.path.exists(tmp):
         raise SystemExit('gltfpack 실패: ' + r.stderr[-400:])
     f = open(tmp, 'rb')

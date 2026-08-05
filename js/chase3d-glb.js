@@ -21,8 +21,21 @@ export function loadEnemyGlbParts(THREE, url, opts = {}) {
         const c = new THREE.Vector3(); box.getCenter(c);
         const size = new THREE.Vector3(); box.getSize(size);
         const k = 1 / (Math.max(size.x, size.y, size.z) || 1);
+        // 양자화(KHR_mesh_quantization) GLB: attribute 가 정수형 — 행렬 적용 전에 float 변환 필수
+        //  (정수 배열에 applyMatrix4 하면 결과가 다시 정수로 뭉개져 지오가 붕괴한다 — 실측)
+        const toFloat = (g) => {
+          for (const name of ['position', 'normal', 'uv']) {
+            const a = g.attributes[name];
+            if (!a || a.array instanceof Float32Array) continue;
+            const f = new Float32Array(a.count * a.itemSize);
+            for (let i = 0; i < a.count; i++)
+              for (let j = 0; j < a.itemSize; j++) f[i * a.itemSize + j] = a.getComponent(i, j);
+            g.setAttribute(name, new THREE.BufferAttribute(f, a.itemSize));
+          }
+          return g;
+        };
         for (const m of parts) {
-          const geo = m.geometry.clone().applyMatrix4(m.matrixWorld);
+          const geo = toFloat(m.geometry.clone()).applyMatrix4(m.matrixWorld);
           geo.translate(-c.x, -c.y, -c.z);
           geo.scale(k, k, k);
           if (opts.rotX) geo.rotateX(opts.rotX);
