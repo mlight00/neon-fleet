@@ -93,5 +93,5 @@ test('B56-06 main 수집: 적 12종 put3D 공용 헬퍼 — 비변이만·상한
   assert.match(m, /for \(const k in ENEMY3D\) _sw\[k\]\.n = 0;/);
   assert.match(m, /_in3dMap\.set\(e, _b1Stamp\)/);
   // 검사실 가드 9타깃
-  assert.match(m, /\['aurora', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
+  assert.match(m, /\['aurora', 'a0', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
 });

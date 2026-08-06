@@ -13,7 +13,7 @@ import { createBillboardParts } from './chase3d-billboards.js';
 import { loadEnemyGlbParts } from './chase3d-glb.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
-import { ENEMY3D, ALLY3D } from './chase3d-prop-defs.js';
+import { ENEMY3D, ALLY3D, PICKUP3D } from './chase3d-prop-defs.js';
 
 // 적 12종 동시 표시 상한은 ENEMY3D(chase3d-prop-defs) 단일 진실 — 아래는 기존 외부 참조 호환용 파생.
 export const B1_INSTANCE_MAX = ENEMY3D.b1.cap;
@@ -152,6 +152,11 @@ function createHero3D(canvas3d, opts = {}) {
         const isProj = (k === 'pbullet' || k === 'missile' || k === 'laser');
         const isPickup = (k === 'crystal' || k === 'coin' || k === 'pow' || k === 'pod' || k === 'capsule');
         if (isPickup || k === 'ebullet') {
+          // §G-7 픽업 4종 = 이사 VARCO 실모델 우선(로드 실패·미지정 종은 순수 조형 폴백)
+          if (isPickup && PICKUP3D[k] && PICKUP3D[k].glb) {
+            props[k] = makeGlbSwarm(k, PICKUP3D[k], () => createPickupParts(THREE, k));
+            continue;
+          }
           // §G-3 픽업 / §G-4 적탄(플라즈마 3파트) — 파트별 InstancedMesh, placeSwarm 이 한 몸으로 구동
           const maker = k === 'ebullet' ? createEnemyBulletParts : createPickupParts;
           const meshes = [];

@@ -76,7 +76,7 @@ export function createGlbShowcase(THREE, defs) {
   const group = new THREE.Group(); group.name = 'GLB_SHOWCASE';
   const keys = Object.keys(defs).filter((k) => defs[k].glb);
   const spinners = [];
-  const COLS = 3, GAP = 1.5;
+  const GAP = 1.5, COLS = Math.min(3, keys.length || 1);   // 종 수 기준 중앙 정렬 — 1종 진열(a0)이 왼쪽 칸(화면 밖)에 놓이던 함정
   keys.forEach((k, i) => {
     const holder = new THREE.Group();
     const col = i % COLS, row = Math.floor(i / COLS);

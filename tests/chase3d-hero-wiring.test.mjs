@@ -42,7 +42,7 @@ test('HW-09: 부분 추종(이사) — 2D C0 이탈을 3D 카메라 트럭 이�
 test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배치 + 2D 하드 컷 + 안전 폴백', () => {
   // 3D 레이어 = AURORA + 종별 인스턴스(버킷 3 = 종당 +3 draw). 배치는 2.5D 투영 화면좌표·크기에 정합(unproject).
   // §G-4 이미지 파이프라인(이사): 적 12종 = Gemini 렌더 빌보드 — ENEMY3D 단일 진실 루프
-  assert.match(renderer, /import \{ ENEMY3D, ALLY3D \} from '\.\/chase3d-prop-defs\.js'/);
+  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D \} from '\.\/chase3d-prop-defs\.js'/);
   assert.match(renderer, /eswarm\[k\] = def\.glb \? makeGlbSwarm\(k, def\) : makeBillboardSwarm\(k, def\.cap\)/);
   assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI, pitchBase = -0\.12, behindFlag = false\)/);
   assert.match(renderer, /\.unproject\(camera\)/);
@@ -153,7 +153,7 @@ test('HW-06: lab 플래그 정책 — chase3d=1 없으면 검사실 불가(§8)'
   assert.equal(chase3dLabTarget(''), '');
   // 기본 URL 에서 lab 모듈 미로드: 동적 import 는 CHASE3D_LAB 타깃 가드 안
   const i = main.indexOf("import('./chase3d-lab.js')");
-  const guard = main.lastIndexOf("if (['aurora', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB))", i);
+  const guard = main.lastIndexOf("if (['aurora', 'a0', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB))", i);
   assert.ok(guard > 0 && guard < i, 'lab import 는 6타깃 플래그 가드 안');
 });
 

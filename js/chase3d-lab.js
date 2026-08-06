@@ -75,6 +75,10 @@ export function createAuroraLab(canvas, opts = {}) {
   } else if (target === 'models') {
     model = createGlbShowcase(THREE, ENEMY3D);   // §G-5 실모델 전 종 격자 진열(이사: 진행 없이 한 화면 평가)
     model.group.scale.setScalar(0.9);   // 1.15 는 좌우 열 잘림(실측)
+  } else if (target === 'a0') {
+    // §G-7 기함 VARCO 단독 진열 — 현행(aurora 타깃)과 A/B 비교용. 회전=아군 함선 규약(rotX -π/2 + rotY π) 가설, 실측 보정.
+    model = createGlbShowcase(THREE, { a0: { glb: 'assets/3d/a0_model.glb', rotX: -Math.PI / 2, rotY: Math.PI } });
+    model.group.scale.setScalar(2.0);
   } else if (target === 'b5' || target === 'b6') {
     model = createBillboardModel(THREE, target);   // §G-4 터렛·위버 = 이사 제작(Gemini) 렌더 빌보드(실전과 동일 판)
     model.group.scale.setScalar(3.3);   // 4.0 은 좌우 잘림(실측) — 여백 확보

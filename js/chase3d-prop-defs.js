@@ -47,3 +47,13 @@ export const ALLY3D = {
   a1: { cap: 60, glb: 'assets/3d/a1_model.glb', rotX: -Math.PI / 2, rotY: Math.PI },   // 드론
   a2: { cap: 10, glb: 'assets/3d/a2_model.glb', rotX: -Math.PI / 2, rotY: Math.PI },   // 순양함
 };
+
+/** §G-7 픽업 실모델(이사 VARCO) — 'spin'(y 자전) 배치라 세운 그대로 두고 회전 보정은 실측만.
+ *  cap 은 PROP_CAPS 와 동일해야 한다(placeSwarm 상한·InstancedMesh 용량이 이 값). capsule 은
+ *  현행 규칙에서 스폰되지 않는 레거시라 제외(순수 조형 유지). 로드 실패 시 조형 폴백. */
+export const PICKUP3D = {
+  crystal: { cap: 12, glb: 'assets/3d/p1_model.glb' },
+  pod:     { cap: 8,  glb: 'assets/3d/p2_model.glb' },
+  coin:    { cap: 48, glb: 'assets/3d/p3_model.glb' },
+  pow:     { cap: 8,  glb: 'assets/3d/p4_model.glb' },
+};
