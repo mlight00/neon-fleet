@@ -59,6 +59,11 @@ function createHero3D(canvas3d, opts = {}) {
     const rim = new THREE.DirectionalLight(0x8fe8ff, 0.9); rim.position.set(2.5, 3.2, -6.5);
     const hemi = new THREE.HemisphereLight(0x2a3038, 0x0c0e12, 0.5);
     const sternAux = new THREE.PointLight(0x66d8ff, 9, 8, 2); sternAux.position.set(0, 0.3, -3.2);   // 함미 보조광(§7.3)
+    // §G-5 얼굴 보조광(이사): 실모델 적의 얼굴은 face 모드로 항상 카메라를 향한다 →
+    //  카메라 쪽에서 전방(+z)으로 쏘는 디렉셔널 하나로 전 적의 얼굴을 밝힌다(개체별 라이트 불요).
+    const faceLight = new THREE.DirectionalLight(0xffe8dc, 1.15);
+    faceLight.position.set(0, 2.5, -9); faceLight.target.position.set(0, 0, 10);
+    scene.add(faceLight, faceLight.target);
     scene.add(key, fill, rim, hemi, sternAux);
     // 모바일 판정 = 세로(portrait)·협폭 창(§9.3 DPR 제한과 동일 축). 데스크톱 800×450 같은 가로 소형창은 데스크톱.
     ctl._mobile = (typeof window !== 'undefined' && window.innerHeight > window.innerWidth && window.innerWidth <= 500);
