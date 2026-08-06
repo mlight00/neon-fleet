@@ -2917,6 +2917,43 @@ function drawSwapFlash(c) {
   c.globalAlpha = 1;
 }
 
+// ── 기함 충돌 섬광(이사 "정면에 부딪히는 느낌"): 적 몸체 충돌·적탄 명중(내구도 지불) 순간을 기수 섬광으로. ──
+//  신호 = squad.flash 상승 에지(takeShot 이 0.25 세트 — 보호막 방어 시엔 미발화) → 로직 무수정, 표시 전용.
+//  3D(t≥0.5) HUD 계층 전용: 2D 는 기존 링·burst 연출 유지. reduced-motion 이면 발화하지 않는다.
+let _impactFxAt = 0, _impactFxX = 0, _impactFxY = 0, _prevSquadFlash = 0;
+function noteImpact(t3d, r, proj) {
+  const fl = (r.squad && !r.squad.dead) ? (r.squad.flash || 0) : 0;
+  const rising = fl > _prevSquadFlash + 0.1;
+  _prevSquadFlash = fl;
+  if (!rising || t3d < 0.5 || !proj || prefersReducedMotion()) return;
+  const p = projectPoint({ x: r.squad.x, y: r.squad.y }, proj);
+  _impactFxAt = performance.now(); _impactFxX = p.x; _impactFxY = p.y - 34;   // 기함 투영점보다 기수 쪽
+}
+function drawImpactFlash(c) {
+  if (!_impactFxAt) return;
+  const el = (performance.now() - _impactFxAt) / 320;   // 0.32초
+  if (el >= 1) { _impactFxAt = 0; return; }
+  const a = (1 - el) * (1 - el);
+  const R = 26 + el * 96;
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  const g = c.createRadialGradient(_impactFxX, _impactFxY, 2, _impactFxX, _impactFxY, R);
+  g.addColorStop(0, `rgba(255,244,214,${0.9 * a})`);    // 백열 코어
+  g.addColorStop(0.3, `rgba(255,170,90,${0.55 * a})`);  // 화염 주황(위험색 계열 — 워프 청백과 구분)
+  g.addColorStop(1, 'rgba(255,90,60,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(_impactFxX, _impactFxY, R, 0, Math.PI * 2); c.fill();
+  c.globalAlpha = 0.85 * a; c.strokeStyle = '#ffd2a0'; c.lineWidth = 2.5;   // 확장 충격파 링
+  c.beginPath(); c.arc(_impactFxX, _impactFxY, R * 0.66, 0, Math.PI * 2); c.stroke();
+  c.globalAlpha = 0.6 * a; c.lineWidth = 1.5;           // 위쪽 부채꼴 파편 스파크(부딪힌 방향)
+  for (let i = 0; i < 6; i++) {
+    const ang = -Math.PI / 2 + (i - 2.5) * 0.5, r0 = R * 0.5, r1 = R * (1.05 + (i % 2) * 0.25);
+    c.beginPath(); c.moveTo(_impactFxX + Math.cos(ang) * r0, _impactFxY + Math.sin(ang) * r0);
+    c.lineTo(_impactFxX + Math.cos(ang) * r1, _impactFxY + Math.sin(ang) * r1); c.stroke();
+  }
+  c.restore();
+  c.globalAlpha = 1;
+}
+
 function draw() {
   syncPlayButtons();   // 상태에 따라 일시정지·차지 버튼 표시/숨김 (draw는 headless step에서도 호출됨)
   // 방어: 치수가 비정상(NaN·0·음수)이면 렌더를 건너뛴다 — createLinearGradient 등이 비유한값에 예외를 던져 프리즈되는 것을 차단.
@@ -3035,6 +3072,7 @@ function draw() {
   }
   chase3dT = t3d;
   if (state === 'play' && run) noteSwap(t3d, run, chaseProjection);   // 기함 2D↔3D 스왑 교차 감지 → 워프 플래시
+  if (state === 'play' && run) noteImpact(t3d, run, chaseProjection); // 기함 피격(충돌·명중) 상승 에지 → 충돌 섬광
   // HUD 계층(§6): 3D 활성 시 #game-hud(3D 위)로, 아니면 #game(ctx). 매 프레임 #game-hud를 지워 잔상 방지.
   const hctx = (t3d > 0 && hudCtx) ? hudCtx : ctx;
   if (hudCtx) { hudCtx.setTransform(1, 0, 0, 1, 0, 0); hudCtx.clearRect(0, 0, hudCanvas.width, hudCanvas.height); if (hctx !== ctx) hudCtx.setTransform(scale, 0, 0, scale, 0, 0); }
@@ -3120,6 +3158,7 @@ function draw() {
     r.effects.drawScreen(hctx, LOGICAL_W, logicalH);   // 전체 화면 흰색 플래시는 카메라 '밖'(고정). 3D 활성 시 HUD 계층(#game-hud)로.
     if (chaseProj) drawEdgeWarnings(hctx, r, chaseProj);   // §9: 화면 밖 위험 경고(월드 위·HUD 아래)
     drawSwapFlash(hctx);   // 기함 2D↔3D 스왑 워프 플래시(월드 위·HUD 아래) — 형태 교체 순간을 섬광으로 은폐
+    drawImpactFlash(hctx); // 기함 충돌 섬광(적 몸체·적탄이 내구도를 지불한 순간 — 기수 충격파)
     if (t3d >= 0.5) drawPropLabels(hctx);   // 3D 픽업의 정보 라벨(+N·▲N·무기명) — 게임 정보는 잃지 않는다
 
     // 섹터 클리어 컷신: 위아래 시네마 띠. 격침되는 보스를 두고 기함이 빠져나가는 구간을
