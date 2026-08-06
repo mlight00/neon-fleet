@@ -40,8 +40,10 @@ export const ENEMY3D = {
   b11: { cap: 1, len: 371, max: 750, glb: 'assets/3d/b11_model.glb', rotX: 0, rotY: Math.PI },
 };
 
-/** §G-6 아군 실모델(드론·순양함) — 노즈 +z(소실점) 계약, 'direct' 배치. 회전은 실측 보정. */
+/** §G-6 아군 실모델(드론·순양함) — 노즈 +z(소실점) 계약, 'direct' 배치. 회전은 실측 보정.
+ *  rotY π = 이사 실기 지적(드론 위아래 반전 — 노즈가 화면 아래를 향함) 교정: 기수만 180° 돌리고
+ *  갑판은 그대로 카메라(+y) 쪽 유지. rotX 부호 반전은 배 밑면이 보이게 되므로 금지(실측). */
 export const ALLY3D = {
-  a1: { cap: 60, glb: 'assets/3d/a1_model.glb', rotX: -Math.PI / 2 },   // 드론
-  a2: { cap: 10, glb: 'assets/3d/a2_model.glb', rotX: -Math.PI / 2 },   // 순양함
+  a1: { cap: 60, glb: 'assets/3d/a1_model.glb', rotX: -Math.PI / 2, rotY: Math.PI },   // 드론
+  a2: { cap: 10, glb: 'assets/3d/a2_model.glb', rotX: -Math.PI / 2, rotY: Math.PI },   // 순양함
 };
