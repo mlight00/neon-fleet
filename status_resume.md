@@ -6,7 +6,9 @@
 - **아군 방향 규약(실측 확정): rotX -π/2 + rotY π** — 이사 지적(8/6) "드론 위아래 반전" 교정: rotY π 로 기수만 180°(+z 소실점), ⚠️rotX 부호 반전은 배 밑면 노출이라 금지. 실측 `g7-drone-fixed-crop.png`.
 - **기함 가림 교정(8/6 이사 "적·수송선이 정면에 부딪히는 게 아니라 위로 지나감", 2445459)**: 근접 깊이 클램프 6 < 기함 시선깊이 11.2 가 원인 — placeSwarm behindFlag 로 적·픽업 깊이를 기함 기수 뒤([6,FB)→[FB,FB+1.5) 단조 리매핑, 화면 위치·크기 불변)로 밀어 겹침 구간에서 기함이 가림. 아군·탄은 기함 앞 유지. HW-13, 864/864. 실측 `g7-occl-final-crop.png`. 이사 판정(8/6): "아까보다는 괜찮다" — 수용, 추가 미세조정 여지.
 - **충돌 섬광(8/6 이사 요청, 9d12d40)**: 적 몸체 충돌·적탄 명중(내구도 지불) 순간 기함 기수에 백열+주황 충격파+스파크 0.32s — 신호=squad.flash 상승 에지(로직 무수정), 3D HUD 계층 전용, 보호막 방어·reduced-motion 미발화. 실측 `g7-impact-crop.png`(내구도 100→78 충돌 프레임).
-- **VARCO 5종 프롬프트 전달(8/6)**: `E:\workspace\claude\neon-fleet\assets\3d\프롬프트_픽업기함_5종.md` — P1 크리스탈·P2 보급수송선·P3 코인·P4 POW·A0 기함(참고 4장=`제작원본\참고_픽업기함\`). 완성 GLB 명=p1~p4_50k.glb·a0_50k.glb. **이사 생성 대기** → 도착 시 다이어트→투입→방향보정→실측(기함은 A/B 비교 후 교체).
+- **§G-7 픽업 4종 실모델 투입(8/6, 742341c)**: 이사 VARCO 5종 수령 → PICKUP3D(crystal/pod/coin/pow, cap=PROP_CAPS) — renderer 픽업 생성 GLB 우선·조형 폴백, capsule 레거시 제외. 실측 `g7-pickups-real.png`(실전 4종 동시). ⚠️진열장 1종 함정: createGlbShowcase 격자가 3열 고정이라 단독 진열이 화면 밖(x=-1.5·scale 2) — 종 수 기준 중앙 정렬로 수정.
+- **기함 VARCO A/B 대기(8/6)**: `chase3dLab=a0`(VARCO, 아군 규약 rotX -π/2+rotY π) vs `chase3dLab=aurora`(현행) — 비교판 `g7-flagship-ab.png` 이사 전송, **판정 대기**(승인 시 hero 기함 교체 배선).
+- **기함 등급 구조 확인**: 기함=6등급(T0 EMBER~T5 QUASAR, balance.js names). 3D는 현재 등급 무관 AURORA 단일 → **티어 스왑 배선 필요**. T0/T1=드론(a1)·순양함(a2)과 동일 아트라 재사용, 신규 제작=T2 ARCLIGHT·T4 ZENITH·T5 QUASAR — **프롬프트 전달** `E:\workspace\claude\neon-fleet\assets\3d\프롬프트_기함티어_3종.md`(참고 3장 변환 완료, 완성명 t2/t4/t5_50k.glb). **이사 생성 대기** → 도착 시 티어 스왑 구현.
 - 864/864, 포털 빌드 46.6MB(GLB 제외→빌보드 폴백). 보스 페이즈 연출은 실전 보스전에서 이사 확인 후 조정.
 
 ## (기록) §G-5 실모델 기준 확정(이사 승인) — 2d01199
