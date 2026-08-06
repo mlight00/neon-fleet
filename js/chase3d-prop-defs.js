@@ -31,4 +31,17 @@ export const ENEMY3D = {
   b19: { cap: 8, len: 105, max: 210, glb: 'assets/3d/b19_model.glb', rotX: 0, rotY: Math.PI },   // 방패병 — §G-5 실모델
   b20: { cap: 4, len: 105, max: 210, glb: 'assets/3d/b20_model.glb', rotX: 0, rotY: Math.PI },   // 부화 모함 — §G-5 실모델
   b21: { cap: 8, len: 100, max: 200, glb: 'assets/3d/b21_model.glb', rotX: 0, rotY: Math.PI },   // 블링커 — §G-5 실모델
+  //  보스 6종(§G-6): 대형 단일 개체(cap 1). len = 2D sizes(380/340)×1.09.
+  b7: { cap: 1, len: 414, max: 830, glb: 'assets/3d/b7_model.glb', rotX: 0, rotY: Math.PI },     // 하이브 퀸(최종)
+  b22: { cap: 1, len: 414, max: 830, glb: 'assets/3d/b22_model.glb', rotX: 0, rotY: Math.PI },   // 네온 아비터(최종)
+  b8: { cap: 1, len: 371, max: 750, glb: 'assets/3d/b8_model.glb', rotX: 0, rotY: Math.PI },
+  b9: { cap: 1, len: 371, max: 750, glb: 'assets/3d/b9_model.glb', rotX: 0, rotY: Math.PI },
+  b10: { cap: 1, len: 371, max: 750, glb: 'assets/3d/b10_model.glb', rotX: 0, rotY: Math.PI },
+  b11: { cap: 1, len: 371, max: 750, glb: 'assets/3d/b11_model.glb', rotX: 0, rotY: Math.PI },
+};
+
+/** §G-6 아군 실모델(드론·순양함) — 노즈 +z(소실점) 계약, 'direct' 배치. 회전은 실측 보정. */
+export const ALLY3D = {
+  a1: { cap: 60, glb: 'assets/3d/a1_model.glb', rotX: -Math.PI / 2 },   // 드론
+  a2: { cap: 10, glb: 'assets/3d/a2_model.glb', rotX: -Math.PI / 2 },   // 순양함
 };

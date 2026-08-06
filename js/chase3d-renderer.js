@@ -13,7 +13,7 @@ import { createBillboardParts } from './chase3d-billboards.js';
 import { loadEnemyGlbParts } from './chase3d-glb.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
-import { ENEMY3D } from './chase3d-prop-defs.js';
+import { ENEMY3D, ALLY3D } from './chase3d-prop-defs.js';
 
 // 적 12종 동시 표시 상한은 ENEMY3D(chase3d-prop-defs) 단일 진실 — 아래는 기존 외부 참조 호환용 파생.
 export const B1_INSTANCE_MAX = ENEMY3D.b1.cap;
@@ -102,7 +102,7 @@ function createHero3D(canvas3d, opts = {}) {
     } catch (e) { return null; /* 비치명 — 초과분은 2D 폴백 */ }
   }
   // glb 필드가 있는 종 = 실모델(비동기 로드, 실패 시 빌보드 폴백) — §G-5 이사 VARCO 파이프라인
-  function makeGlbSwarm(key, def) {
+  function makeGlbSwarm(key, def, fallback) {
     const sw = { meshes: [], count: 0 };
     const attach = (parts) => {
       for (const part of parts) {
@@ -113,7 +113,7 @@ function createHero3D(canvas3d, opts = {}) {
     };
     loadEnemyGlbParts(THREE, def.glb, def)
       .then(attach)
-      .catch(() => { try { attach(createBillboardParts(THREE, key)); } catch (e) {} });
+      .catch(() => { try { attach(fallback ? fallback() : createBillboardParts(THREE, key)); } catch (e) {} });
     return sw;
   }
   const eswarm = {};
@@ -121,9 +121,19 @@ function createHero3D(canvas3d, opts = {}) {
     const def = ENEMY3D[k];
     eswarm[k] = def.glb ? makeGlbSwarm(k, def) : makeBillboardSwarm(k, def.cap);
   }
-  // 아군 호위(§G-1 위계: 기함 > 순양함 > 드론) — 노즈가 +Z(소실점 쪽) = yawBase 0 으로 배치
-  let drone = makeSwarm(createDroneGeometry, createDroneMaterials, 0, DRONE_INSTANCE_MAX);
-  let cruiser = makeSwarm(createCruiserGeometry, createCruiserMaterials, 0, CRUISER_INSTANCE_MAX);
+  // 아군 호위(§G-1 위계: 기함 > 순양함 > 드론) — 노즈가 +Z(소실점 쪽) = yawBase 0 으로 배치.
+  //  §G-6: 이사 제작 실모델(GLB) 우선, 로드 실패 시 기존 디지타이즈 조형 폴백.
+  function allyFallbackParts(makeGeo, makeMats, seed) {
+    const geo = makeGeo(THREE, { lod: ctl._mobile ? 1 : 0 });
+    const bmat = makeMats(THREE, { seed, mobile: ctl._mobile });
+    return Object.keys(geo.buckets).map((k) => ({ geo: geo.buckets[k], mat: bmat.mats[k] }));
+  }
+  let drone = ALLY3D.a1.glb
+    ? makeGlbSwarm('a1', ALLY3D.a1, () => allyFallbackParts(createDroneGeometry, createDroneMaterials, 0))
+    : makeSwarm(createDroneGeometry, createDroneMaterials, 0, DRONE_INSTANCE_MAX);
+  let cruiser = ALLY3D.a2.glb
+    ? makeGlbSwarm('a2', ALLY3D.a2, () => allyFallbackParts(createCruiserGeometry, createCruiserMaterials, 0))
+    : makeSwarm(createCruiserGeometry, createCruiserMaterials, 0, CRUISER_INSTANCE_MAX);
   // 프레임 중 할당 금지(§10.1): 배치 수학용 스크래치는 여기서 1회 생성해 재사용.
   const _sV = new THREE.Vector3(), _sDir = new THREE.Vector3(), _sFwd = new THREE.Vector3(),
         _sPos = new THREE.Vector3(), _sScl = new THREE.Vector3(), _sEul = new THREE.Euler(),

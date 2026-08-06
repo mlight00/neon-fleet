@@ -2952,15 +2952,16 @@ function draw() {
       };
       // §G-4 적 12종 공용 수집(이사 제작 렌더 빌보드) — 비변이만(변이=2D 유지로 링·표식 보존), 초과분 2D 폴백.
       const put3D = (key, e, wob) => {
-        if (e.affixes && e.affixes.length) return;
+        if (e.affixes && e.affixes.length) return null;
         const s3 = _sw[key];
-        if (s3.n >= s3.buf.length) return;
+        if (!s3 || s3.n >= s3.buf.length) return null;   // 로스터 밖 보스 등 — 2D 유지
         const p = projectObject(e, 'enemy', chaseProjection);
-        if (!passGate(e, p)) return;
+        if (!passGate(e, p)) return null;
         const d = ENEMY3D[key];
         const o = s3.buf[s3.n++];
         o.sx = p.x; o.sy = p.y; o.px = Math.min(d.max, d.len * p.scale); o.wob = wob;
         _in3dMap.set(e, _b1Stamp);
+        return p;
       };
       for (const e of run.world.entities) {
         if (e.dead) continue;
@@ -2974,6 +2975,12 @@ function draw() {
         if (e instanceof Shielder) { put3D('b19', e, 0); continue; }
         if (e instanceof BroodCarrier) { put3D('b20', e, 0); continue; }
         if (e instanceof Blinker) { if (e.appearT >= 0.9) put3D('b21', e, 0); continue; }   // 텔레포트 페이드는 2D 연출 유지 — 완전 등장만 3D
+        if (e instanceof Boss || e instanceof MidBoss) {   // §G-6 보스 — 대형 단일 개체(cap 1), 이름 라벨은 HUD 계층으로 보존
+          const bid = String(e.spriteId || (e.def && e.def.id) || '').toLowerCase();
+          const bp = ENEMY3D[bid] ? put3D(bid, e, 0) : null;
+          if (bp && e.def && (e.def.korName || e.def.name)) putLabel(bp, EN ? e.def.name : (e.def.korName || e.def.name), '#ffd166', 13);
+          continue;
+        }
         // 픽업·배지: 소품 3D 는 개발 플래그(chase3dProps=1) 전용 — 기본은 기존 2D(이사 "엉망" 판정, Codex A/B 권고)
         if (!CHASE3D_PROPS) continue;
         let key = null, label = '', lcol = '#eaf6ff';
