@@ -44,9 +44,9 @@ test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배�
   // §G-4 이미지 파이프라인(이사): 적 12종 = Gemini 렌더 빌보드 — ENEMY3D 단일 진실 루프
   assert.match(renderer, /import \{ ENEMY3D, ALLY3D \} from '\.\/chase3d-prop-defs\.js'/);
   assert.match(renderer, /eswarm\[k\] = def\.glb \? makeGlbSwarm\(k, def\) : makeBillboardSwarm\(k, def\.cap\)/);
-  assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI, pitchBase = -0\.12\)/);
+  assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI, pitchBase = -0\.12, behindFlag = false\)/);
   assert.match(renderer, /\.unproject\(camera\)/);
-  assert.match(renderer, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, ENEMY3D\[k\]\.glb \? 'face' : 'wob', 0, Math\.PI, ENEMY3D\[k\]\.pitch \?\? -0\.12\)/);   // t≥0.5 도달 지점에서만 = 하드 컷 공유
+  assert.match(renderer, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, ENEMY3D\[k\]\.glb \? 'face' : 'wob', 0, Math\.PI, ENEMY3D\[k\]\.pitch \?\? -0\.12, true\)/);   // t≥0.5 도달 지점에서만 = 하드 컷 공유
   assert.match(renderer, /return null; \/\* 비치명/);                          // 생성 실패 → AURORA 단독 폴백
   // main: 비변이만 수집(변이=2D 유지로 링·표식 보존), 크리처는 크기별 b1/b2/b3, 프레임 스탬프로 수집분만 2D 스킵
   assert.match(main, /if \(e\.affixes && e\.affixes\.length\) return/);
@@ -73,7 +73,8 @@ test('HW-11: 소품 3D(§G-2 갱신) — 발사체 3종 원본 텍스처 재질 
   assert.ok(!/styleC\/C1\.png/.test(props3), '픽업에서 원본 그림 파일 참조 제거');
   assert.match(renderer, /new THREE\.InstancedMesh\(createPropGeometry\(THREE, k\), mat, PROP_CAPS\[k\]\)/);
   assert.match(renderer, /im\.setColorAt\(i, _sCol\)/);                                    // instanceColor(적탄·픽업)
-  assert.match(renderer, /\(k === 'pbullet' \|\| k === 'ebullet' \|\| k === 'missile' \|\| k === 'laser'\) \? 'direct' : 'spin'/);   // 탄=진행각, 픽업=스핀
+  assert.match(renderer, /const isShot = \(k === 'pbullet' \|\| k === 'ebullet' \|\| k === 'missile' \|\| k === 'laser'\)/);   // 탄=진행각, 픽업=스핀
+  assert.match(renderer, /isShot \? 'direct' : 'spin', time, Math\.PI, -0\.12, !isShot/);
   // main: 레이저 랜스도 3D 수집(공명 레일만 2D 전용 렌더 유지), 발사체는 원본색(흰색 — 2D 도 원색 blit)
   assert.match(main, /if \(b\.dead \|\| b\.resonanceId\) continue;/);
   assert.match(main, /b\.kind === 'laser' \? 'laser' : b instanceof HomingMissile \? 'missile' : 'pbullet'/);
@@ -169,4 +170,15 @@ test('HW-08: DOM 메뉴는 캔버스 계층 위(§6) — #stage flex 자식 z-in
 test('HW-07: 구 임시 모델은 삭제하지 않고 dev fallback 으로 유지(§9.1)', () => {
   assert.match(renderer, /function createLegacy3D/);
   assert.match(renderer, /createChaseScene/);   // 구 경로가 여전히 배선됨(chase3dTest 전용)
+});
+
+test('HW-13: 기함 가림 계약(이사 "적·수송선이 기함 위로 지나감") — 적·픽업만 기함 뒤, 탄·아군은 앞', () => {
+  // 근접 개체의 깊이 하한(6)이 기함(원점 시선깊이 ~11.2)보다 앞이라 z-buffer 가 적을 기함 위에 그렸다.
+  // 교정: behindFlag 스웜은 깊이를 기함 기수 뒤로 리매핑 — 화면 위치(광선상 이동)·크기(scl 보정)는 불변, 개체 간 순서 유지(단조).
+  assert.match(renderer, /const FLAG_NOSE_CLEAR = 2\.8/);
+  assert.match(renderer, /const flagBehind = -camera\.position\.dot\(_sFwd\) \+ FLAG_NOSE_CLEAR/);
+  assert.match(renderer, /if \(behindFlag && depth < flagBehind && flagBehind > 6\.5\) depth = flagBehind \+ \(\(depth - 6\) \/ \(flagBehind - 6\)\) \* 1\.5/);
+  // 아군(드론·순양함)은 behindFlag 미전달(기함 갑판 위 편대 유지) — direct 호출에 9번째 인자 없음
+  assert.match(renderer, /placeSwarm\(drone, swarms\.drone\.buf, swarms\.drone\.n, DRONE_INSTANCE_MAX, 'direct', 0, 0\)/);
+  assert.match(renderer, /placeSwarm\(cruiser, swarms\.cruiser\.buf, swarms\.cruiser\.n, CRUISER_INSTANCE_MAX, 'direct', 0, 0\)/);
 });

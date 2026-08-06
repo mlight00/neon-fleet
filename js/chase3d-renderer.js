@@ -226,17 +226,24 @@ function createHero3D(canvas3d, opts = {}) {
    *  화면점을 카메라 광선으로 되쏘아 "그 화면 크기가 나오는 깊이"에 놓는다 → 위치·크기 모두 2D 와 정합.
    *  깊이는 [6,60] 클램프(near/far·조명 안전권) — 클램프 시 스케일이 보정해 화면 크기는 항상 정확. 모델은 전장 1.0 공통.
    *  mode: 'wob'(크리처 — sin 감쇠 롤) | 'direct'(탄·아군 — wob 을 롤로 그대로) | 'spin'(픽업 — 시간 스핀).
-   *  yawBase: π=전면이 카메라(적·소품 기본) / 0=노즈가 소실점 쪽(아군 — 위로 비행). */
-  function placeSwarm(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math.PI, pitchBase = -0.12) {
+   *  yawBase: π=전면이 카메라(적·소품 기본) / 0=노즈가 소실점 쪽(아군 — 위로 비행).
+   *  behindFlag(이사 "적·수송선이 기함 위로 지나가는 느낌"): 적·픽업은 깊이 하한을 기함 기수 뒤로 밀어
+   *  겹침 구간에서 기함이 개체를 가리게 한다(정면에 부딪히거나 밑을 스치는 그림). 광선상 이동+스케일 보정이라
+   *  화면 위치·크기는 불변, [6,FB) → [FB,FB+1.5) 단조 리매핑이라 개체끼리의 앞뒤 순서도 유지.
+   *  아군·아군탄(기함에서 발사)·적탄(기함에 명중)은 기함 앞이 맞으므로 제외. */
+  const FLAG_NOSE_CLEAR = 2.8;   // 기함 원점→기수 끝 시선깊이 실측 +2.2(전장 4.78, boxZ +2.28) + 여유
+  function placeSwarm(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math.PI, pitchBase = -0.12, behindFlag = false) {
     if (!sw) return;
     const count = Math.min(n | 0, cap);
     const fpx = (ctl._lastLogH * 0.5) / Math.tan(camera.fov * Math.PI / 360);   // 논리px 초점거리
     camera.getWorldDirection(_sFwd);
+    const flagBehind = -camera.position.dot(_sFwd) + FLAG_NOSE_CLEAR;   // 기함(원점) 시선깊이 + 기수 여유 — 매 프레임 카메라 추종
     for (let i = 0; i < count; i++) {
       const o = buf[i];
       _sV.set((o.sx / ctl._lastLogW) * 2 - 1, -((o.sy / ctl._lastLogH) * 2 - 1), 0.5).unproject(camera);
       _sDir.subVectors(_sV, camera.position).normalize();
-      const depth = Math.min(60, Math.max(6, fpx / Math.max(1e-3, o.px)));      // 전장 1.0 모델 기준
+      let depth = Math.min(60, Math.max(6, fpx / Math.max(1e-3, o.px)));        // 전장 1.0 모델 기준
+      if (behindFlag && depth < flagBehind && flagBehind > 6.5) depth = flagBehind + ((depth - 6) / (flagBehind - 6)) * 1.5;
       const scl = (o.px * depth) / fpx;                                         // 클램프 보정 → 화면 전장 = o.px 유지
       _sPos.copy(camera.position).addScaledVector(_sDir, depth / Math.max(1e-4, _sDir.dot(_sFwd)));
       if (mode === 'face') {
@@ -293,14 +300,15 @@ function createHero3D(canvas3d, opts = {}) {
       if (swarms) {
         for (const k of Object.keys(ENEMY3D)) {
           const sk = swarms[k];
-          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, ENEMY3D[k].glb ? 'face' : 'wob', 0, Math.PI, ENEMY3D[k].pitch ?? -0.12);
+          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, ENEMY3D[k].glb ? 'face' : 'wob', 0, Math.PI, ENEMY3D[k].pitch ?? -0.12, true);   // 적=기함 뒤(이사: "위로 지나감" 교정)
           else placeSwarm(eswarm[k], null, 0, ENEMY3D[k].cap);
         }
         if (swarms.drone) placeSwarm(drone, swarms.drone.buf, swarms.drone.n, DRONE_INSTANCE_MAX, 'direct', 0, 0);     // 아군: 노즈가 소실점(전진 방향)
         if (swarms.cruiser) placeSwarm(cruiser, swarms.cruiser.buf, swarms.cruiser.n, CRUISER_INSTANCE_MAX, 'direct', 0, 0);   // 실측: hero 카메라 기준 yaw 0 = 지오 +z 가 소실점 → 지오를 노즈 +z 로 로프트
         if (props && swarms.props) for (const k of PROP_KEYS) {
           const s = swarms.props[k];
-          if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], (k === 'pbullet' || k === 'ebullet' || k === 'missile' || k === 'laser') ? 'direct' : 'spin', time);
+          const isShot = (k === 'pbullet' || k === 'ebullet' || k === 'missile' || k === 'laser');   // 탄=기함 앞 유지(발사·명중 연출)
+          if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], isShot ? 'direct' : 'spin', time, Math.PI, -0.12, !isShot);   // 픽업=기함 뒤(수송선·크리스탈)
         }
       } else {
         for (const k of Object.keys(ENEMY3D)) placeSwarm(eswarm[k], null, 0, ENEMY3D[k].cap);
