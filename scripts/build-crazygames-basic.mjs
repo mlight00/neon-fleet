@@ -60,6 +60,9 @@ const MB = (n) => (n / 1024 / 1024).toFixed(2) + ' MB';
 // ── 1. 매니페스트 ─────────────────────────────────────────────
 const manifest = new Set();
 const add = (p) => manifest.add(String(p).split('\\').join('/'));
+// 소스 경로 → dist 경로 재배치(다를 때만). 포털 전용 경량 자산을 원본과 같은 런타임 경로로 내보낼 때 쓴다.
+const remap = new Map();
+const distPath = (p) => remap.get(p) || p;
 
 // (a) 정적 런타임 파일. tuner.js/tuner-spec.js 는 tuner.html 전용(런타임 미import) → 제외.
 add('index.html');
@@ -83,15 +86,27 @@ for (const f of readdirSync(join(ROOT, 'assets', 'fonts'))) add('assets/fonts/' 
 // (e) 사운드: ogg만(mp3 제외)
 for (const f of readdirSync(join(ROOT, 'assets', 'sound'))) if (f.endsWith('.ogg')) add('assets/sound/' + f);
 
-// (f) 앱 아이콘
+// (f) 브랜딩 — 앱 아이콘 + 타이틀 엠블럼(ui.js 가 타이틀 화면에서 <img> 로 직접 참조).
+//  emblem 은 매니페스트에 없어 포털 빌드에서 404 였다(실측 — dist 브라우저 QA에서 발견).
 add('assets/art2-webp/branding/app_icon.webp');
+add('assets/art2-webp/branding/emblem.webp');
 
 // (g) §G-4 이미지 빌보드 텍스처(터렛·위버) — 모듈의 경로 테이블에서 자동 동기
 const billboards = await import(pathToFileURL(join(ROOT, 'js', 'chase3d-billboards.js')).href);
 for (const v of Object.values(billboards.BILLBOARD_TEX)) add(v);
-// §G-5 실모델(GLB)은 포털 빌드에서 제외 — 50MB 예산(8종 ×~2MB 초과). 로더가 404 를 받으면
-//  빌보드로 자동 폴백하므로 포털은 이미지 방식으로 동작한다. 실모델 포함은 포털 최적화 단계(사운드
-//  재인코딩·텍스처 예산 재설계)에서 재결정.
+// (h) §G-10 실모델(GLB) 포털 포함 — 이사 결정 "사운드 재인코딩해서 3D 넣어줘".
+//  개발본(assets/3d/*.glb, 종당 ~2MB)은 그대로 두고, 포털은 경량본(assets/3d/portal/)을 같은
+//  런타임 경로(assets/3d/)로 재배치해 내보낸다. 코드·경로 수정 없이 포털에서도 실모델이 뜬다.
+//  경량본이 없으면 매니페스트에 안 들어가고 로더가 404 → 빌보드 폴백(기존 동작 유지).
+const PORTAL_GLB_DIR = join(ROOT, 'assets', '3d', 'portal');
+if (existsSync(PORTAL_GLB_DIR)) {
+  for (const f of readdirSync(PORTAL_GLB_DIR)) {
+    if (!f.endsWith('.glb')) continue;
+    const srcRel = 'assets/3d/portal/' + f;
+    add(srcRel);
+    remap.set(srcRel, 'assets/3d/' + f);
+  }
+}
 
 // ── 2. 존재 검증 (§P0-6.7) ────────────────────────────────────
 const missing = [...manifest].filter((p) => !existsSync(join(ROOT, p)));
@@ -107,7 +122,7 @@ mkdirSync(OUT, { recursive: true });
 // ── 4. 복사 ──────────────────────────────────────────────────
 let bytes = 0, count = 0;
 for (const p of manifest) {
-  const src = join(ROOT, p), dst = join(OUT, p);
+  const src = join(ROOT, p), dst = join(OUT, distPath(p));
   mkdirSync(dirname(dst), { recursive: true });
   copyFileSync(src, dst);
   bytes += statSync(src).size; count++;
@@ -129,14 +144,14 @@ if (/[가-힣]/.test(idxHtml)) die('dist index.html 에 한글 잔존(포털은 
 // ── 5. 상대경로 / 금지내용 검증 ───────────────────────────────
 for (const p of manifest) {
   if (!/\.(html|css|js)$/.test(p)) continue;
-  const txt = readFileSync(join(OUT, p), 'utf8');
+  const txt = readFileSync(join(OUT, distPath(p)), 'utf8');
   const abs = [...txt.matchAll(/(?:src|href)\s*=\s*["']([^"']+)["']/g)].map((m) => m[1])
     .filter((u) => u.startsWith('/') || /^https?:\/\//i.test(u));
   if (abs.length) die(`${p} 에 절대경로 런타임 참조: ${abs.join(', ')}`);
 }
 for (const p of manifest) {
   if (!p.endsWith('.js') && !p.endsWith('.html')) continue;
-  const txt = readFileSync(join(OUT, p), 'utf8');
+  const txt = readFileSync(join(OUT, distPath(p)), 'utf8');
   // 실제 시크릿/ID: 어떤 파일에도 GA4 측정 ID·Prolific 완료 URL이 채워져 있으면 안 된다(둘 다 빈 값이어야 함).
   if (/measurementId:\s*'G-[A-Z0-9]{4,}'/.test(txt)) die(`${p} 에 GA4 측정 ID(비어 있어야 함)`);
   if (/(PROLIFIC_COMPLETION_URL|PROLIFIC_NO_CONSENT_URL)\s*=\s*'https?:/.test(txt)) die(`${p} 에 Prolific 완료 URL(비어 있어야 함)`);
@@ -153,7 +168,7 @@ if (count >= MAX_FILES) die(`파일 수 ${count} ≥ ${MAX_FILES}`);
 
 // ── 7. ZIP (index.html 이 루트, 정방향 슬래시) ────────────────
 if (existsSync(ZIP)) rmSync(ZIP);
-writeFileSync(ZIP, makeZip([...manifest].map((p) => ({ name: p, data: readFileSync(join(OUT, p)) }))));
+writeFileSync(ZIP, makeZip([...manifest].map((p) => ({ name: distPath(p), data: readFileSync(join(OUT, distPath(p))) }))));
 const zipBytes = statSync(ZIP).size;
 
 // ── 8. 요약 ──────────────────────────────────────────────────

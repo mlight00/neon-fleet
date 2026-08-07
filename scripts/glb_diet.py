@@ -8,12 +8,19 @@
 import struct, json, io, os, sys, subprocess, tempfile
 from PIL import Image
 
-def diet(src, dst, ratio=0.06):
-    # ratio >= 0.99 = 단순화 스킵(VARCO 리메시본 등 이미 정리된 토폴로지) — 양자화(KHR_mesh_quantization)만 적용해 메시 용량 절감
+def diet(src, dst, ratio=0.06, tex=1024, quality=90, aggressive=True):
+    """ratio >= 0.99 = 단순화 스킵(VARCO 리메시본 등 이미 정리된 토폴로지) — 양자화만 적용해 메시 용량 절감.
+
+    tex/quality = diffuse 목표 해상도·JPEG 품질. 포털 배포본(50MB 예산)은 낮춰 쓰고, 개발본은 기본값.
+    aggressive=False = gltfpack -sa 생략 — 리메시된 균일 토폴로지는 일반 단순화로도 형태가 유지된다
+    (-sa 는 UV 아일랜드를 무시해 '녹은 무늬'를 만든 전력이 있다 — §G-5 실측).
+    """
     tmp = os.path.join(tempfile.gettempdir(), '_glb_diet_tmp.glb')
     args = ['npx', '--yes', 'gltfpack', '-i', src, '-o', tmp]
     if ratio < 0.99:
-        args += ['-si', str(ratio), '-sa']
+        args += ['-si', str(ratio)]
+        if aggressive:
+            args += ['-sa']
     r = subprocess.run(args, shell=True, capture_output=True, text=True)
     if not os.path.exists(tmp):
         raise SystemExit('gltfpack 실패: ' + r.stderr[-400:])
@@ -31,13 +38,14 @@ def diet(src, dst, ratio=0.06):
         pil = Image.open(io.BytesIO(raw))
         out = io.BytesIO()
         if (im.get('name') or '').lower() in ('diffuse', 'basecolor', 'albedo') or i == 1:
-            if max(pil.size) > 1024: pil = pil.resize((1024, 1024), Image.LANCZOS)
+            if max(pil.size) > tex: pil = pil.resize((tex, tex), Image.LANCZOS)
             from PIL import ImageEnhance
             pil = ImageEnhance.Color(pil.convert('RGB')).enhance(1.12)   # 파이프라인 채도 손실 보상
-            pil.save(out, 'JPEG', quality=90, subsampling=0); im['mimeType'] = 'image/jpeg'
+            pil.save(out, 'JPEG', quality=quality, subsampling=0); im['mimeType'] = 'image/jpeg'
         else:
             # normal 등 보조맵은 512 로 충분(화면 표시 크기 기준) — 50MB 빌드 예산의 주범
-            if max(pil.size) > 512: pil = pil.resize((512, 512), Image.LANCZOS)
+            aux = max(256, tex // 2)
+            if max(pil.size) > aux: pil = pil.resize((aux, aux), Image.LANCZOS)
             pil.convert('RGB').save(out, 'PNG', optimize=True); im['mimeType'] = 'image/png'
         img_new[im['bufferView']] = out.getvalue()
 
@@ -63,4 +71,10 @@ def diet(src, dst, ratio=0.06):
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         raise SystemExit('사용: python scripts/glb_diet.py <입력.glb> <출력.glb> [ratio]')
-    diet(sys.argv[1], sys.argv[2], float(sys.argv[3]) if len(sys.argv) > 3 else 0.06)
+    a = sys.argv[1:]
+    pos = [x for x in a if not x.startswith('--')]
+    def opt(name, cast, dflt):
+        return cast(a[a.index(name) + 1]) if name in a else dflt
+    diet(pos[0], pos[1], float(pos[2]) if len(pos) > 2 else 0.06,
+         tex=opt('--tex', int, 1024), quality=opt('--quality', int, 90),
+         aggressive='--noaggr' not in a)
