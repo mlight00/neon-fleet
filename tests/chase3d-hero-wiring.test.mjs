@@ -297,15 +297,18 @@ test('HW-17: §G-15 이사 실기 4건 — 연출 구간 3D 소등 / 탄색 일�
   assert.match(main, /const cinematic = !!run && \(run\.phase === 'flythrough' \|\| run\.phase === 'cutscene'\)/);
   assert.match(main, /if \(chase3d && state === 'play' && run && !cinematic\)/);
   // (1) 발칸 색 = 2D 탄색(진화색), 미사일만 원본 흰색
-  assert.match(main, /const col = key === 'missile' \? 0xffffff : colInt\(b\.color, key === 'laser' \? 0xbff6ff : 0xeafffd\)/);
+  // §G-20 종류별로 2D 와 같은 색: 드론 예광탄=청록, 레이저=b.color, 발칸=백열 코어(흰색), 미사일=원색
+  assert.match(main, /b\.kind === 'tracer' \? 0x3ff5e0/);
+  assert.match(main, /b\.kind === 'laser' \? colInt\(b\.color, 0x8fe8ff\)/);
+  assert.match(main, /: 0xfffefb;/);   // 발칸은 b.color 를 쓰지 않는다(2D 가 스프라이트+백열 코어라 흰색)
   assert.match(renderer, /createProjMaterial\(THREE, k, false\)/);   // 발칸·레이저는 주황 로켓 그림 미적용
   const props = readFileSync(new URL('../js/chase3d-props.js', import.meta.url), 'utf8');
   assert.match(props, /export function createProjMaterial\(THREE, key, textured = true\)/);
   // (1) 레이저=길고 가늘게, 미사일=크게, 화면 최소 크기 하한
   assert.match(defs, /export const SHOT_LEN = \{ pbullet: 0\.62, ebullet: 0\.50, missile: 1\.50, laser: 1\.70 \}/);
-  assert.match(defs, /export const SHOT_W = \{ pbullet: 1\.0, ebullet: 1\.0, missile: 1\.0, laser: 0\.17 \}/);
+  assert.match(defs, /export const SHOT_W = \{ pbullet: 1\.0, ebullet: 1\.0, missile: 1\.0, laser: 0\.32 \}/);
   assert.match(defs, /export const SHOT_MIN_PX = \{/);
-  assert.match(renderer, /const k2 = minPx > 0 \? Math\.max\(1, \(minPx \* depth\) \/ \(fpx \* len\)\) : 1/);
+  assert.match(renderer, /const k2 = minPx > 0 \? Math\.max\(1, \(minPx \* depth\) \/ \(fpx \* len \* mul\)\) : 1/);
   // (4) 파괴된 보스는 HP 바에서 빠진다(빈 붉은 칸이 남지 않게)
   assert.match(renderJs, /const liveBosses = bosses\.filter\(\(b\) => b && !b\.dead\)/);
   assert.match(renderJs, /if \(liveBosses\.length\) \{/);
@@ -323,4 +326,21 @@ test('HW-18: §G-16 위험물 4종 — 모델 준비 게이트(없으면 2D 유�
   assert.match(main, /if \(e instanceof Debris\) \{ put3D\('h2', e, e\.rot \|\| 0\); continue; \}/);
   assert.match(main, /if \(e instanceof Charger\) \{ put3D\('h3', e, 0\); continue; \}/);
   assert.match(main, /if \(e instanceof Mine\) \{ put3D\('h4', e, \(e\.t \|\| 0\) \* 1\.2\); continue; \}/);
+});
+
+test('HW-19: §G-20 2D↔3D 정합 3건 — 탄 색·크기 위계 / 레이저 가시성 / 차지 원형은 2D 전용', () => {
+  const defs = readFileSync(new URL('../js/chase3d-prop-defs.js', import.meta.url), 'utf8');
+  const ents = readFileSync(new URL('../js/entities.js', import.meta.url), 'utf8');
+  // 드론 예광탄은 2D 에서 작다(2×8) — 3D 도 같은 위계로 배율을 싣는다
+  assert.match(main, /sl\.buf\[sl\.n - 1\]\.mul = \(b\.kind === 'tracer'\) \? 0\.55 : 1;/);
+  assert.match(main, /wx: 0, wy: 0, mul: 1/);
+  assert.match(renderer, /const m2 = mul \* k2;/);
+  // 레이저는 2D beamW\*2 대역 굵기여야 보인다(0.17 은 안 보였다)
+  assert.match(defs, /laser: 0\.32 \}/);
+  assert.match(defs, /missile: 22, laser: 26 \}/);
+  // 3D 가 기함을 그리는 구간에서는 2D 차지 원·게이지 링을 그리지 않는다(단계 표시는 유지)
+  assert.match(ents, /const flagIn3D = fsAlpha <= 0\.001;/);
+  assert.match(ents, /if \(!flagIn3D\) \{/);
+  const chargeBlock = ents.slice(ents.indexOf('// 차지 랜스 충전 표시'), ents.indexOf('// 파워/실드/무적 링'));
+  assert.match(chargeBlock, /ctx\.fillText\('⚡' \+ stg/);   // 단계 표시는 3D 에서도 남는다
 });

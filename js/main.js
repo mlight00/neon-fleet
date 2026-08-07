@@ -2855,7 +2855,7 @@ const _sw = {
   ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k, { buf: Array.from({ length: ENEMY3D[k].cap }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 })), n: 0 }])),
   drone: { buf: _droneBuf, n: 0 }, cruiser: { buf: _cruBuf, n: 0 },
   //  §G-13 발사체는 화면좌표(sx/sy/px)가 아니라 월드좌표(wx/wy)로 3D 에 놓는다 — 2.5D 투영의 휨을 물려받지 않게.
-  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1, wx: 0, wy: 0 })), n: 0 }])),
+  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1, wx: 0, wy: 0, mul: 1 })), n: 0 }])),
 };
 // 픽업 정보 라벨(+N·▲N·무기명·POW)은 3D 위 HUD 계층에 유지 — 시각만 3D 로 바꾸고 게임 정보는 잃지 않는다.
 const _propLabels = Array.from({ length: 24 }, () => ({ x: 0, y: 0, str: '', col: '#eaf6ff', size: 15 }));
@@ -2946,7 +2946,7 @@ function draw() {
         const [len, max] = PROP_LEN[key];
         const o = s.buf[s.n++];
         o.sx = p.x; o.sy = p.y; o.px = Math.min(max, len * p.scale); o.wob = wob; o.col = col;
-        o.wx = e.x; o.wy = e.y;   // §G-13 발사체 월드 배치용(픽업은 미사용)
+        o.wx = e.x; o.wy = e.y; o.mul = 1;   // §G-13 월드 배치 + §G-20 종류별 크기 배율(발사체만)
         _in3dMap.set(e, _b1Stamp);
         return true;
       };
@@ -3015,10 +3015,19 @@ function draw() {
           const key = b.kind === 'laser' ? 'laser' : b instanceof HomingMissile ? 'missile' : 'pbullet';
           // §G-15 색 일치(이사 "발칸이 2D 는 흰색인데 3D 는 다른 색"): 2D drawVulcan 과 같은 탄색을 그대로 넘긴다.
           //  미사일만 원본 실모델 색(흰색=텍스처 원색) 유지.
-          //  기본 발칸은 2D 에서 '백열 코어'가 커 보여 흰색으로 읽힌다(이사) → 흰빛 시안이 기본,
-          //  진화색이 지정된 탄은 그 색을 그대로 쓴다.
-          const col = key === 'missile' ? 0xffffff : colInt(b.color, key === 'laser' ? 0xbff6ff : 0xeafffd);
-          putProp(key, b, p, col, Math.atan2(b.vx || 0, -(b.vy || -1)));
+          //  §G-20 2D 와 색·크기를 종류별로 맞춘다(이사 "드론이 쏘는 발사체 색상이 2D·3D 가 다르다").
+          //   2D 실제 값: 드론 예광탄(tracer)=COLORS.ally 청록 2×8 작은 막대 / 기함 발칸=스프라이트+백열 코어(흰색으로 읽힘)
+          //   / 레이저=b.color 없으면 #8fe8ff. 미사일만 실모델 원색 유지.
+          //   ⚠️발칸은 b.color(=WEAPON_COLORS.vulcan 청록)를 쓰면 안 된다 — 2D 는 그 색을 쓰지 않고
+          //    스프라이트(PROJ_VULCAN_BASE) 위에 백열 코어를 덮어 그려서 화면에서는 흰색으로 읽힌다(실측).
+          const col = key === 'missile' ? 0xffffff
+            : b.kind === 'tracer' ? 0x3ff5e0
+            : b.kind === 'laser' ? colInt(b.color, 0x8fe8ff)
+            : 0xfffefb;
+          if (putProp(key, b, p, col, Math.atan2(b.vx || 0, -(b.vy || -1)))) {
+            //  드론 예광탄은 2D 에서 기함 발칸보다 확연히 작다(2×8 vs 스프라이트) — 3D 도 같은 위계로.
+            const sl = _sw.props[key]; sl.buf[sl.n - 1].mul = (b.kind === 'tracer') ? 0.55 : 1;
+          }
         }
         for (const b of run.world.enemyBullets) {
           if (b.dead || b.kind === 'laser' || b.resonanceId) continue;

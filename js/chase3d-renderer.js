@@ -458,8 +458,12 @@ function createHero3D(canvas3d, opts = {}) {
       _sQ.setFromEuler(_sEul);
       //  화면 최소 전장 보정(§G-15 이사 "탄이 화면 끝까지 안 가고 중간에서 사라진다"): 2D 의 KIND_SCALE.minRel 과
       //  같은 성격의 하한. 진짜 원근이라 멀어지면 무한히 작아져 시야에서 먼저 지워졌다.
-      const k2 = minPx > 0 ? Math.max(1, (minPx * depth) / (fpx * len)) : 1;
-      _sM.compose(_sPos, _sQ, _sScl.set(len * wRel * k2, len * wRel * k2, len * k2));
+      //  §G-20 종류별 크기 배율(o.mul) — 드론 예광탄은 기함 발칸보다 작다(2D 위계 계승).
+      //   최소 화면 크기 하한은 배율까지 반영한 실제 크기(len×mul) 기준으로 재야 위계가 안 뒤집힌다.
+      const mul = o.mul || 1;
+      const k2 = minPx > 0 ? Math.max(1, (minPx * depth) / (fpx * len * mul)) : 1;
+      const m2 = mul * k2;
+      _sM.compose(_sPos, _sQ, _sScl.set(len * wRel * m2, len * wRel * m2, len * m2));
       for (const im of sw.meshes) {
         im.setMatrixAt(i, _sM);
         if (sw.colored && o.col >= 0) { _sCol.setHex(o.col); im.setColorAt(i, _sCol); }

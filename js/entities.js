@@ -1349,19 +1349,26 @@ export class Squad {
     }
 
     // 차지 랜스 충전 표시
+    //  §G-20 이사 지적: 2D 는 평면이라 기함을 감싸는 원이 어울리는데, 함미 3D 에서는 입체 함선을
+    //  납작한 2D 원이 관통하듯 감싸 어색하다. 3D 가 기함을 그리는 구간(flagshipAlpha 0)에서는
+    //  원·게이지 링을 그리지 않는다 — 그 자리는 3D 집속 코어·포구(§G-11/G-12)가 맡는다.
+    //  단계 표시(⚡N)는 정보라 계속 남긴다.
     if (this.charge > 0) {
       const ch = BAL.charge;
       const stg = this.chargeStage;
       const col = stg >= 3 ? COLORS.reward : COLORS.ally;
       const frac = Math.min(1, (this.charge % ch.stageTime) / ch.stageTime);
       const rr = (w + 14 + stg * 7) * ringS;
+      const flagIn3D = fsAlpha <= 0.001;
       ctx.save();
-      ctx.globalAlpha = 0.15 + 0.1 * stg + 0.08 * Math.sin(this.t * 22);
-      ctx.fillStyle = col;
-      ctx.beginPath(); ctx.arc(ov.x, ov.y, rr * 0.7, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = col; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(ov.x, ov.y, rr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
+      if (!flagIn3D) {
+        ctx.globalAlpha = 0.15 + 0.1 * stg + 0.08 * Math.sin(this.t * 22);
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(ov.x, ov.y, rr * 0.7, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = col; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(ov.x, ov.y, rr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
+      }
       if (stg > 0) {
         ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.font = 'bold 15px Pretendard, sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('⚡' + stg, ov.x, ov.y - rr - 6);

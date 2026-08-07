@@ -104,11 +104,13 @@ export const SHOT_LEN = { pbullet: 0.62, ebullet: 0.50, missile: 1.50, laser: 1.
 /** 전장 대비 가로·두께 배율. 1=원형 비율 유지, <1=가늘게(광선).
  *  ⚠️레이저 재교정(이사 "함미모드?" — 기함이 안 보임): 전장 3.4·굵기 0.5 는 폭이 1.7 unit(=월드 28px)이라
  *  2D 빔 굵기(beamW 4~9px)의 4배였다. 연사로 겹치면 기함 위에 흰 기둥이 쌓여 함선을 통째로 가린다.
- *  전장 1.7·굵기 0.17(≈월드 4.8px)로 2D 빔 굵기에 맞춘다. */
-export const SHOT_W = { pbullet: 1.0, ebullet: 1.0, missile: 1.0, laser: 0.17 };
+ *  §G-20 재조정(이사 "함미모드에서 레이저가 안 보인다"): 0.17(월드 4.8px)은 너무 얇았다.
+ *  2D 는 빔 굵기를 `max(MIN_SCREEN_PX, beamW*2*scale)` 로 그려 추적 배율에서 화면 16~27px 이 된다.
+ *  → 0.32(월드 ≈9px = beamW*2 대역)로 올린다. §G-18 의 28px(기함을 덮던 값)의 1/3 이다. */
+export const SHOT_W = { pbullet: 1.0, ebullet: 1.0, missile: 1.0, laser: 0.32 };
 /** 화면 최소 전장(논리px). 2D 는 KIND_SCALE.minRel 로 탄이 아주 작아지지 않게 막는데, 3D 는 진짜 원근이라
  *  그 바닥이 없어 중간에서 사라지는 것처럼 보였다(이사) → 같은 성격의 하한을 3D 에도 준다. */
-export const SHOT_MIN_PX = { pbullet: 16, ebullet: 15, missile: 22, laser: 18 };
+export const SHOT_MIN_PX = { pbullet: 16, ebullet: 15, missile: 22, laser: 26 };
 /** 발사체 고도 — 기수 집속 코어(y 0.35)와 같은 평면대에 둬 "포구에서 나간다"로 읽히게. */
 export const SHOT_Y = 0.30;
 
