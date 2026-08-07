@@ -79,6 +79,10 @@ export function createAuroraLab(canvas, opts = {}) {
     // §G-7 기함 VARCO 단독 진열 — 현행(aurora 타깃)과 A/B 비교용. 회전=아군 함선 규약(rotX -π/2 + rotY π) 가설, 실측 보정.
     model = createGlbShowcase(THREE, { a0: { glb: 'assets/3d/a0_model.glb', rotX: -Math.PI / 2, rotY: Math.PI } });
     model.group.scale.setScalar(2.0);
+  } else if (target === 'hazards') {
+    //  §G-16 위험물 4종(운석·잔해·돌격기·기뢰) 진열 — 방향 판독용. labView=front 필수.
+    model = createGlbShowcase(THREE, { h1: ENEMY3D.h1, h2: ENEMY3D.h2, h3: ENEMY3D.h3, h4: ENEMY3D.h4 });
+    model.group.scale.setScalar(0.62);
   } else if (target === 'weapons') {
     model = createGlbShowcase(THREE, WEAPON3D);   // §G-12 기함 무기 5종 격자(포탑3·미사일·포구) — 방향 판독용
     model.group.scale.setScalar(0.62);

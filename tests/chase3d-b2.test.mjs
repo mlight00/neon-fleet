@@ -61,5 +61,5 @@ test('B2-06: 검사실 배선 — chase3dLab=b2 타깃 + 5타깃 가드', () => 
   assert.match(lab, /import \{ createB2Model \} from '\.\/chase3d-b2\.js'/);
   assert.match(lab, /target === 'b2'/);
   const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
-  assert.match(main, /\['aurora', 'a0', 'flags', 'weapons', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
+  assert.match(main, /\['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
 });
