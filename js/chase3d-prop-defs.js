@@ -100,12 +100,15 @@ export const SHOT_KEYS = ['pbullet', 'ebullet', 'missile', 'laser'];
 /** 발사체 3D 전장(unit). 기함 전장 4.78 기준.
  *  §G-15 이사 실기 교정: 레이저는 "2D 처럼 길게 뻗는 광선"이어야 하는데 짧고 통통해 풍선처럼 보였다 →
  *  전장 3.4 + 굵기 0.5 배(가늘게). 유도탄은 "너무 작다" → 0.86 → 1.5. */
-export const SHOT_LEN = { pbullet: 0.62, ebullet: 0.50, missile: 1.50, laser: 3.40 };
-/** 전장 대비 가로·두께 배율. 1=원형 비율 유지, <1=가늘게(광선). */
-export const SHOT_W = { pbullet: 1.0, ebullet: 1.0, missile: 1.0, laser: 0.50 };
+export const SHOT_LEN = { pbullet: 0.62, ebullet: 0.50, missile: 1.50, laser: 1.70 };
+/** 전장 대비 가로·두께 배율. 1=원형 비율 유지, <1=가늘게(광선).
+ *  ⚠️레이저 재교정(이사 "함미모드?" — 기함이 안 보임): 전장 3.4·굵기 0.5 는 폭이 1.7 unit(=월드 28px)이라
+ *  2D 빔 굵기(beamW 4~9px)의 4배였다. 연사로 겹치면 기함 위에 흰 기둥이 쌓여 함선을 통째로 가린다.
+ *  전장 1.7·굵기 0.17(≈월드 4.8px)로 2D 빔 굵기에 맞춘다. */
+export const SHOT_W = { pbullet: 1.0, ebullet: 1.0, missile: 1.0, laser: 0.17 };
 /** 화면 최소 전장(논리px). 2D 는 KIND_SCALE.minRel 로 탄이 아주 작아지지 않게 막는데, 3D 는 진짜 원근이라
  *  그 바닥이 없어 중간에서 사라지는 것처럼 보였다(이사) → 같은 성격의 하한을 3D 에도 준다. */
-export const SHOT_MIN_PX = { pbullet: 16, ebullet: 15, missile: 22, laser: 30 };
+export const SHOT_MIN_PX = { pbullet: 16, ebullet: 15, missile: 22, laser: 18 };
 /** 발사체 고도 — 기수 집속 코어(y 0.35)와 같은 평면대에 둬 "포구에서 나간다"로 읽히게. */
 export const SHOT_Y = 0.30;
 

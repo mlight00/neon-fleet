@@ -302,8 +302,8 @@ test('HW-17: §G-15 이사 실기 4건 — 연출 구간 3D 소등 / 탄색 일�
   const props = readFileSync(new URL('../js/chase3d-props.js', import.meta.url), 'utf8');
   assert.match(props, /export function createProjMaterial\(THREE, key, textured = true\)/);
   // (1) 레이저=길고 가늘게, 미사일=크게, 화면 최소 크기 하한
-  assert.match(defs, /export const SHOT_LEN = \{ pbullet: 0\.62, ebullet: 0\.50, missile: 1\.50, laser: 3\.40 \}/);
-  assert.match(defs, /export const SHOT_W = \{ pbullet: 1\.0, ebullet: 1\.0, missile: 1\.0, laser: 0\.50 \}/);
+  assert.match(defs, /export const SHOT_LEN = \{ pbullet: 0\.62, ebullet: 0\.50, missile: 1\.50, laser: 1\.70 \}/);
+  assert.match(defs, /export const SHOT_W = \{ pbullet: 1\.0, ebullet: 1\.0, missile: 1\.0, laser: 0\.17 \}/);
   assert.match(defs, /export const SHOT_MIN_PX = \{/);
   assert.match(renderer, /const k2 = minPx > 0 \? Math\.max\(1, \(minPx \* depth\) \/ \(fpx \* len\)\) : 1/);
   // (4) 파괴된 보스는 HP 바에서 빠진다(빈 붉은 칸이 남지 않게)
