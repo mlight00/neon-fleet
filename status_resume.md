@@ -7,7 +7,8 @@
 - **⚠️3D 렌더는 그대로 쓰면 안 된다**: 사실적 PBR 이라 2D 아트(발광·채도 과장)보다 어두워 "예쁘지만 안 보이는" 스프라이트가 됨 → 마감 단계 필수.
 - 기함(A1~A6)은 무기 리그·프레임 오버레이가 본체를 덮어 화면상 차이가 거의 없다(실측 g9-flag-ab.png) — 부작용 없어 일관성 목적으로 교체 유지.
 - **⚠️외곽 발광 폐기(이사 실기 "이상한데?", 83b42e7)**: 어두운 배경 식별성을 노려 실루엣 외곽에 후광을 깔았는데 **작게 그려지는 개체(드론 18px)는 후광이 본체를 덮어** 뿌옇게 뭉갬. 원본 2D 도 halo 없이 그림 자체 발광으로 식별 — 채도·밝기만이 정답. 26종 재마감(glow=None). 실측 g9-glow-fix.png.
-- 포털 빌드 46.62 → **41.58MB**(새 스프라이트가 더 가벼움). 실측 g9-sample-final·g9-play2d.png.
+- **⚠️T2 기함만 교체가 안 먹던 함정(이사 "기함 3d 이미지 적용이 안된다", 819bdda)**: T2(ARCLIGHT)는 `shipSprite` 가 A3 가 아니라 **`H2_BASE_FRAME`**(assets/art2-webp/ships/frames/H2_base_aligned.webp, 533×768)을 쓰고 A3 는 폴백일 뿐 — 게다가 그 위에 무기별 외장 `H2_ASSAULT/H2_CARRIER` 가 덮인다. → ①H2_base_aligned 를 t2 실모델 렌더로 교체 ②`drawHullFrame` 외장 오버레이 폐지(`HULL_FRAME_OVERLAY=false`, 6등급 중 T2 특례라 통일). ⚠️무기별 함체 외장 변화 연출은 사라짐(구분은 포대 마운트·HUD 유지). **교훈: 아트 교체 전 스프라이트를 실제로 고르는 코드 경로(shipSprite/오버레이)를 먼저 읽을 것 — 파일명 추정 금지.**
+- 포털 빌드 46.62 → **41.40MB**(새 스프라이트가 더 가벼움). 실측 g9-sample-final·g9-play2d·g9-h2-final-ab.png.
 
 ## (기록) §G-8 기함 실모델 6등급 스왑 + 피격 파편·흔들림 (c5fc1b1, 865/865)
 - **기함 6등급 전부 실모델**(이사 "B 로 하자"): T0/T1=a1/a2 재사용, T2 ARCLIGHT·T4 ZENITH·T5 QUASAR 신규, T3 AURORA=a0. `FLAG3D` 테이블 + flagRig(홀더 6 + 절차 AURORA 폴백).
