@@ -40,3 +40,8 @@ assets/art2/
 
 # 세션 QA 스크래치 서버/프로브(재생성 가능, 리포 미포함)
 scratch_*.mjs
+
+# 렌더 도구 중간 산출물(스프라이트 원본 렌더)·파이썬 캐시
+docs/qa/chase3d-opus5-aurora/sprite_*.png
+docs/qa/chase3d-opus5-aurora/fin_*.png
+scripts/__pycache__/
