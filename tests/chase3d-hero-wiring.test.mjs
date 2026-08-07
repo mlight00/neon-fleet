@@ -9,8 +9,8 @@ const renderer = readFileSync(new URL('../js/chase3d-renderer.js', import.meta.u
 const entities = readFileSync(new URL('../js/entities.js', import.meta.url), 'utf8');
 const chaseRender = readFileSync(new URL('../js/chase-render.js', import.meta.url), 'utf8');
 
-test('HW-01: hero 가 기본 — createChase3D(canvas3d, { hero, propsEnabled })', () => {
-  assert.match(main, /createChase3D\(canvas3d, \{ hero: !CHASE3D_TEST, propsEnabled: CHASE3D_PROPS \}\)/);
+test('HW-01: hero 가 기본 — createChase3D(canvas3d, { hero })', () => {
+  assert.match(main, /createChase3D\(canvas3d, \{ hero: !CHASE3D_TEST \}\)/);
   assert.match(renderer, /if \(opts\.hero\) return createHero3D\(canvas3d, opts\);/);
 });
 
@@ -92,14 +92,15 @@ test('HW-11: 소품 3D(§G-2 갱신) — 발사체 3종 원본 텍스처 재질 
   assert.match(props, /blending: THREE\.AdditiveBlending/);
 });
 
-test('HW-12: Codex 검토 반영 — 소품 3D 기본 OFF 게이트 + sidecar 무오염 + 진단 확장', () => {
-  // 이사 실기 "무기·크리스탈·수송함 엉망" + Codex "가독성 A/B 통과 전 2D 유지" → 소품 3D 는 chase3dProps=1 개발 전용.
+test('HW-12: §G-14 소품 3D 상시 + sidecar 무오염 + 진단 확장', () => {
+  // 기본 OFF 였던 이유는 임시 조형이 "엉망"이라는 실기 판정 — §G-7 VARCO 실모델 교체로 전제가 사라져
+  //  이사 지시로 픽업까지 상시 3D. 개발 플래그(chase3dProps)는 폐기했다(죽은 스위치 금지).
   const cfg = readFileSync(new URL('../js/chase3d-config.js', import.meta.url), 'utf8');
-  assert.match(cfg, /export function chase3dPropsEnabled\(search = ''\)/);
-  assert.match(cfg, /p\.get\('chase3d'\) === '1' && p\.get\('chase3dProps'\) === '1'/);
-  assert.match(main, /const CHASE3D_PROPS = chase3dPropsEnabled\(location\.search\)/);
-  assert.match(main, /if \(!CHASE3D_PROPS\) continue;/);      // 픽업 수집 게이트
-  assert.match(main, /§G-13 발사체 3D 는 상시/);              // 탄은 상시 3D(이사) — 픽업만 개발 플래그
+  assert.ok(!/chase3dPropsEnabled/.test(cfg), 'chase3dProps 플래그 폐기');
+  assert.ok(!/CHASE3D_PROPS/.test(main), 'main 에 소품 게이트 상수 없음');
+  assert.ok(!/opts\.propsEnabled/.test(renderer), 'renderer 에 소품 생성 게이트 없음');
+  assert.match(main, /§G-13 발사체 3D 는 상시/);
+  assert.match(main, /§G-14 상시/);                          // 픽업도 상시 3D
   // sidecar: 렌더 상태가 게임 객체에 기록되지 않는다(회귀 방지)
   assert.match(main, /const _in3dMap = new WeakMap\(\)/);
   assert.ok(!/\._in3d\b/.test(main), 'main 에 게임 객체 _in3d 필드 없음');
@@ -108,10 +109,11 @@ test('HW-12: Codex 검토 반영 — 소품 3D 기본 OFF 게이트 + sidecar �
   assert.match(renderer, /Object\.keys\(ENEMY3D\)\.map\(\(k\) => \[k \+ 'Count', eswarm\[k\] \? eswarm\[k\]\.count : -1\]\)/);
   assert.match(renderer, /propCounts: props \? Object\.fromEntries\(PROP_KEYS\.filter\(\(k\) => !SHOT_KEYS\.includes\(k\)\)\.map/);
   assert.match(renderer, /shotCounts: shots \? Object\.fromEntries\(SHOT_KEYS\.map/);   // §G-13 발사체 진단
-  // Codex 재검토 P2-1: 소품 OFF = GPU 자원 생성까지 OFF(표시만 OFF 금지)
+  // §G-14: 픽업도 상시 3D — 생성 게이트 자체가 없다(죽은 스위치 금지). 대신 픽업/발사체 스웜이 모두 준비되는지 확인.
   const propBlock = renderer.slice(renderer.indexOf('let props = null;'), renderer.indexOf('/** 셰이더 프리웜'));
-  assert.match(propBlock, /if \(opts\.propsEnabled\) \{/);
-  assert.ok(propBlock.indexOf('if (opts.propsEnabled) {') < propBlock.indexOf('createPropMaterial(THREE)'), '재질·지오메트리 생성이 게이트 안');
+  assert.ok(!/opts\.propsEnabled/.test(propBlock), '소품 생성 게이트 없음');
+  assert.match(propBlock, /createPickupParts\(THREE, k\)/);
+  assert.match(propBlock, /let shots = null;/);
   // Codex 재검토 P2-2: 기본 URL 정적 로드 체인 절단 — main 은 순수 상수 모듈만, 팩토리(→aurora-geometry)는 미로드
   const staticImports = [...main.matchAll(/^\s*import\s+[^;]*from\s+['"]([^'"]+)['"]/gm)].map((m) => m[1]);
   assert.ok(staticImports.includes('./chase3d-prop-defs.js'), 'main 은 prop-defs(의존 0)만 정적 import');
@@ -272,11 +274,9 @@ test('HW-16: §G-13 발사체 상시 3D — 화면 정합 + 월드 깊이·자�
   assert.match(defs, /export const SHOT_LEN = \{/);
   // 원인 기록: 2D 는 탄 스프라이트를 화면축 고정으로 그린다(회전 없음) — 그래서 어디에 있든 "똑바로 선" 그림
   assert.ok(!/rotate\(/.test(chaseRender), 'chase-render 는 회전을 쓰지 않는다(=2D 탄이 진행 방향으로 기울지 않던 원인)');
-  // 상시 생성: 개발 플래그(propsEnabled) 밖에서 shots 를 만든다
-  const shotsIdx = renderer.indexOf('let shots = null;');
-  const propsIdx = renderer.indexOf('if (opts.propsEnabled) {');
-  assert.ok(shotsIdx > propsIdx, 'shots 생성이 props 게이트 블록 밖(뒤)에 있다');
-  assert.ok(!/if \(opts\.propsEnabled\)[\s\S]{0,60}shots/.test(renderer), 'shots 는 개발 플래그에 묶이지 않는다');
+  // 상시 생성: 픽업(props)과 발사체(shots) 모두 어떤 URL 플래그에도 묶이지 않는다
+  assert.ok(renderer.indexOf('let shots = null;') > renderer.indexOf('let props = null;'), 'shots 는 props 블록 뒤');
+  assert.ok(!/propsEnabled/.test(renderer), 'renderer 전체에 소품 게이트 없음');
   // 배치: 화면좌표 역투영(정합) + 월드 진행축 깊이 + 진행 방향 yaw
   assert.match(renderer, /function placeShots\(sw, buf, n, cap, key, sqy\)/);
   assert.match(renderer, /const depth = Math\.min\(80, Math\.max\(3\.5, \(sqy - o\.wy\) \* SCALE_Z \+ CAMERA\.chase\.dist\)\)/);

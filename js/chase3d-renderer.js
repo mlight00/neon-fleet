@@ -256,10 +256,10 @@ function createHero3D(canvas3d, opts = {}) {
   const _deb = [];
   let _shakeT = 0, _prevFlash = 0, _lcg = 7;
   const _rnd = () => ((_lcg = (_lcg * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-  // ── 소품 스웜(이사: "무기·배지 3D") — 기본 OFF. opts.propsEnabled(=chase3dProps=1)일 때만 GPU 자원까지 생성.
-  //  Codex 재검토 P2: 표시만 OFF 가 아니라 지오메트리·재질·InstancedMesh·프리웜 비용 자체를 0 으로.
+  // ── 픽업 스웜(§G-14 상시, 이사 "픽업도 3D 로 켜줘") — 기본 OFF 였던 전제(임시 조형 "엉망")는
+  //  §G-7 VARCO 실모델 교체로 사라졌다. 발사체는 §G-13 의 shots 가 따로 담당한다.
   let props = null;
-  if (opts.propsEnabled) {
+  {
     try {
       const pm = createPropMaterial(THREE);
       props = {};

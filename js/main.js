@@ -32,7 +32,7 @@ import { drawWarpField } from './chase-backdrop.js';
 import { PROP_KEYS, PROP_CAPS, ENEMY3D } from './chase3d-prop-defs.js';   // 순수 상수 전용 모듈(의존 0) — 지오메트리·팩토리는 플래그 뒤 renderer 만 로드(Codex 재검토 P2)
 // 실제 3D 함미 추적(Phase 0, ?chase3d=1 전용). config/mapping은 순수(Three.js 미의존)라 정적 import 안전.
 //  renderer(Three.js 로드)는 플래그가 있을 때만 아래에서 동적 import 한다(§3.2: 플래그 없으면 three 미로드).
-import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, chase3dPropsEnabled, transitionT } from './chase3d-config.js';
+import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, transitionT } from './chase3d-config.js';
 // ── Gate 1: 8분 핵심 재미 (전면개편 §5). ?coreLoopTest=1 하네스에서 전체 스택을 구동. ──
 import { createRunMetrics } from './run-metrics.js';
 import { createRunDirector, tickDirector, elapsed, nextEvent } from './run-director.js';
@@ -200,9 +200,8 @@ const input = createInput(canvas, LOGICAL_W, { screenToWorldX: (sx) => currentSc
 const CHASE3D_ON = chase3dEnabled(location.search);
 const CHASE3D_TEST = chase3dTestEnabled(location.search);
 const CHASE3D_LAB = chase3dLabTarget(location.search);   // 'aurora' = 모델 검사실(Opus5 §8)
-// 소품(탄·픽업) 3D 는 기본 OFF(이사 실기 "엉망" + Codex 가독성 판정) — 기존 2D 스트릭·스프라이트가 기본.
-//  ?chase3d=1&chase3dProps=1 로만 켜서 가독성 A/B 비교에 사용한다. 크리처(B1/B2/B4)·기함 3D 는 영향 없음.
-const CHASE3D_PROPS = chase3dPropsEnabled(location.search) || FLEETLAB;   // §G-2: 함대 프리뷰는 무기 3D 까지 켠 관찰 장면
+// §G-14 소품(탄·픽업) 3D 상시(이사 "픽업도 3D 로 켜줘"). 기본 OFF 였던 이유는 2022년식 임시 조형이 "엉망"이라는
+//  실기 판정이었는데, §G-7 에서 픽업 4종이 이사 VARCO 실모델로 교체돼 전제가 사라졌다. 개발 플래그(chase3dProps)는 폐기.
 if (CHASE3D_ON) {
   const stage = document.getElementById('stage');
   canvas3d = document.createElement('canvas'); canvas3d.id = 'game3d';
@@ -239,7 +238,7 @@ if (CHASE3D_ON) {
     //  Opus5 hero(기본): 3D 는 AURORA 기함만(§9.1). chase3dTest 레거시 장면만 구 전체-3D dev fallback.
     import('./chase3d-renderer.js').then((m) => {
       try {
-        const c = m.createChase3D(canvas3d, { hero: !CHASE3D_TEST, propsEnabled: CHASE3D_PROPS });
+        const c = m.createChase3D(canvas3d, { hero: !CHASE3D_TEST });
         if (c && c.available) {
           chase3d = c;
           if (c.prewarmRun) c.prewarmRun(LOGICAL_W, logicalH, canvas.width, canvas.height).then((p) => console.info('[chase3d] 프리웜', p));   // §10.2 셰이더 사전 준비
@@ -2984,8 +2983,7 @@ function draw() {
           if (bp && e.def && (e.def.korName || e.def.name)) putLabel(bp, EN ? e.def.name : (e.def.korName || e.def.name), '#ffd166', 13);
           continue;
         }
-        // 픽업·배지: 소품 3D 는 개발 플래그(chase3dProps=1) 전용 — 기본은 기존 2D(이사 "엉망" 판정, Codex A/B 권고)
-        if (!CHASE3D_PROPS) continue;
+        // 픽업·배지 3D(§G-14 상시) — 정보 라벨(+N·▲N·POW·무기명)은 HUD 계층에 그대로 남는다
         let key = null, label = '', lcol = '#eaf6ff';
         if (e instanceof Crystal) { key = 'crystal'; label = `+${e.payout}`; }
         else if (e instanceof Coin) key = 'coin';

@@ -16,10 +16,6 @@ export function chase3dLabTarget(search = '') {
 }
 /** 소품(탄·픽업) 3D — 개발/A-B 전용 플래그. 이사 실기 "엉망" + Codex "가독성 A/B 통과 전 2D 유지" 판정으로
  *  기본 OFF(기존 2D 스트릭·스프라이트). chase3d=1 과 함께 chase3dProps=1 일 때만 켠다. */
-export function chase3dPropsEnabled(search = '') {
-  try { const p = new URLSearchParams(search); return p.get('chase3d') === '1' && p.get('chase3dProps') === '1'; } catch { return false; }
-}
-
 // ── 전환 계약(§7). 기존 2.5D chaseBlend와 같은 구간을 쓴다: 1.6~2.0에서 smoothstep. ──
 export const CHASE3D = {
   START_ZOOM: 1.60,   // 이 아래(100~160%)는 WebGL 휴면(§7 · §9.4)
