@@ -2852,7 +2852,8 @@ const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], lase
 const _sw = {
   ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k, { buf: Array.from({ length: ENEMY3D[k].cap }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 })), n: 0 }])),
   drone: { buf: _droneBuf, n: 0 }, cruiser: { buf: _cruBuf, n: 0 },
-  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1 })), n: 0 }])),
+  //  §G-13 발사체는 화면좌표(sx/sy/px)가 아니라 월드좌표(wx/wy)로 3D 에 놓는다 — 2.5D 투영의 휨을 물려받지 않게.
+  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1, wx: 0, wy: 0 })), n: 0 }])),
 };
 // 픽업 정보 라벨(+N·▲N·무기명·POW)은 3D 위 HUD 계층에 유지 — 시각만 3D 로 바꾸고 게임 정보는 잃지 않는다.
 const _propLabels = Array.from({ length: 24 }, () => ({ x: 0, y: 0, str: '', col: '#eaf6ff', size: 15 }));
@@ -2943,6 +2944,7 @@ function draw() {
         const [len, max] = PROP_LEN[key];
         const o = s.buf[s.n++];
         o.sx = p.x; o.sy = p.y; o.px = Math.min(max, len * p.scale); o.wob = wob; o.col = col;
+        o.wx = e.x; o.wy = e.y;   // §G-13 발사체 월드 배치용(픽업은 미사용)
         _in3dMap.set(e, _b1Stamp);
         return true;
       };
@@ -2996,8 +2998,8 @@ function draw() {
         if (!passGate(e, p)) continue;
         if (putProp(key, e, p, -1, 0) && label) putLabel(p, label, lcol, key === 'crystal' ? 16 : 13);
       }
-      // 탄환 3D 도 같은 개발 플래그 뒤 — 기본은 기존 2D 탄·스트릭.
-      if (CHASE3D_PROPS) {
+      // §G-13 발사체 3D 는 상시(이사 "발사체도 3D 모두 적용"). 픽업만 개발 플래그(chase3dProps=1) 유지.
+      {
         for (const b of run.world.bullets) {
           if (b.dead || b.resonanceId) continue;   // §G-2: 레이저 랜스도 3D(공명 레일만 2D 전용 렌더 유지)
           const p = projectObject(b, 'playerBullet', chaseProjection);

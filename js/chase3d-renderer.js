@@ -5,7 +5,7 @@
 //  구 전체-3D 경로는 개발 fallback(chase3dTest 레거시 장면)으로 보존(§9.1), hero 에선 사용하지 않음.
 import * as THREE from './vendor/three.module.js';
 import { createChaseScene } from './chase3d-scene.js';
-import { makeChaseCamera, buildSnapshot, computeSceneModel, screenXToWorldX as invX, CAMERA } from './chase3d-mapping.js';
+import { makeChaseCamera, buildSnapshot, computeSceneModel, screenXToWorldX as invX, CAMERA, SCALE_Z } from './chase3d-mapping.js';
 import { transitionT, shouldRender3D, QUALITY } from './chase3d-config.js';
 import { createAuroraModel } from './chase3d-aurora-model.js';
 import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
@@ -13,7 +13,7 @@ import { createBillboardParts } from './chase3d-billboards.js';
 import { loadEnemyGlbParts } from './chase3d-glb.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
-import { ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS } from './chase3d-prop-defs.js';
+import { ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS, SHOT_KEYS, SHOT_LEN } from './chase3d-prop-defs.js';
 import { BAL } from './balance.js';   // 순수 수치 표(로직 없음) — 차지 만충 시간 환산에만 읽는다(§3.1 읽기 전용)
 
 // 적 12종 동시 표시 상한은 ENEMY3D(chase3d-prop-defs) 단일 진실 — 아래는 기존 외부 참조 호환용 파생.
@@ -264,6 +264,7 @@ function createHero3D(canvas3d, opts = {}) {
       const pm = createPropMaterial(THREE);
       props = {};
       for (const k of PROP_KEYS) {
+        if (SHOT_KEYS.includes(k)) continue;   // §G-13 발사체는 아래 shots 로 분리(상시 ON) — 여기서도 만들면 이중 표시
         // §G-2 발사체 3종=원본 가산 재질(이사 승인) / §G-3 픽업 5종=순수 조형 멀티 파트(이사 "2D 이어붙이기 금지")
         //  / ebullet 은 §G-4 순수 조형 예정 — 임시로 공용 자발광 유지.
         //  §G-12 유도 미사일 탄체 = 이사 VARCO 실모델(W4). 나머지 발사체는 원본 텍스처 가산 재질 유지.
@@ -301,6 +302,37 @@ function createHero3D(canvas3d, opts = {}) {
       }
     } catch (e) { props = null; /* 소품 실패는 비치명 */ }
   }
+  // ── §G-13 발사체 스웜: 개발 플래그와 무관하게 항상 생성(이사 "발사체도 3D 모두 적용") ──
+  //  픽업과 달리 발사체는 2D 로 두면 스프라이트가 화면축에 고정돼(회전 없음) 어디에 있든 "똑바로 선" 그림이 된다.
+  //  그래서 소실점으로 날아가는 탄이 옆으로 미끄러지는 것처럼 보였다(이사 "무기를 집어 던지는 느낌").
+  let shots = null;
+  try {
+    shots = {};
+    for (const k of SHOT_KEYS) {
+      if (k === 'missile' && WEAPON3D.missile.glb) {
+        //  §G-12 유도 미사일 탄체 = 이사 VARCO 실모델(W4). rotY 0 = 원본 그대로(노즈 −z) — 절차 발사체와 같은 규약.
+        shots[k] = makeGlbSwarm(k, { ...WEAPON3D.missile, rotY: 0 }, () => [{ geo: createPropGeometry(THREE, k), mat: createProjMaterial(THREE, k) }]);
+        continue;
+      }
+      if (k === 'ebullet') {   // §G-4 적탄 = 플라즈마 3파트 + 적 종별 탄색 틴트
+        const meshes = [];
+        for (const part of createEnemyBulletParts(THREE, k)) {
+          const im = new THREE.InstancedMesh(part.geo, part.mat, PROP_CAPS[k]);
+          im.count = 0; im.frustumCulled = false;
+          _sCol.setHex(PROP_BASE_COLOR.ebullet); for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol);
+          scene.add(im); meshes.push(im);
+        }
+        shots[k] = { meshes, count: 0, colored: true };
+        continue;
+      }
+      const im = new THREE.InstancedMesh(createPropGeometry(THREE, k), createProjMaterial(THREE, k), PROP_CAPS[k]);
+      im.count = 0; im.frustumCulled = false;
+      _sCol.setHex(0xffffff);   // 원본 텍스처가 색을 가짐(2D 도 원색 blit)
+      for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol);
+      scene.add(im);
+      shots[k] = { meshes: [im], count: 0, colored: true };
+    }
+  } catch (e) { shots = null; /* 실패는 비치명 — 수집 스탬프가 없으면 2D 가 그대로 그린다 */ }
 
   const onLost = (ev) => { ev.preventDefault(); ctl.degraded = true; ctl.reason = 'context-lost'; };
   const onRestored = () => { ctl.degraded = false; ctl.reason = ''; };
@@ -386,6 +418,41 @@ function createHero3D(canvas3d, opts = {}) {
         _sQ.setFromEuler(_sEul);
       }
       _sM.compose(_sPos, _sQ, _sScl.setScalar(scl));
+      for (const im of sw.meshes) {
+        im.setMatrixAt(i, _sM);
+        if (sw.colored && o.col >= 0) { _sCol.setHex(o.col); im.setColorAt(i, _sCol); }
+      }
+    }
+    for (const im of sw.meshes) {
+      im.count = count;
+      if (count) { im.instanceMatrix.needsUpdate = true; if (sw.colored && im.instanceColor) im.instanceColor.needsUpdate = true; }
+    }
+    sw.count = count;
+  }
+  /** §G-13 발사체 배치. 두 값을 각각 옳은 출처에서 가져온다.
+   *   ①화면 위치 = 2.5D 투영 좌표(o.sx/o.sy) — 적·기함·픽업이 전부 이 좌표계에 정합돼 있다. 발사체만 월드로
+   *     따로 놓으면 가로 퍼짐이 1.5배 커져(실측 396px vs 270px) 탄이 적을 빗나가 보인다.
+   *   ②깊이·자세 = 월드 좌표 — 2D 는 탄 스프라이트를 화면축 고정으로 그려(drawProjected 에 회전 없음) 어디에
+   *     있든 "똑바로 선" 그림이 된다. 소실점으로 가야 할 탄이 옆으로 미끄러져 보이던 원인이 이것이다.
+   *     3D 는 진행 방향으로 실제 회전시키고, 깊이도 픽셀 역산이 아니라 월드 진행축에서 준다. */
+  function placeShots(sw, buf, n, cap, key, sqy) {
+    if (!sw) return;
+    const count = Math.min(n | 0, cap);
+    const len = SHOT_LEN[key] || 0.5;
+    camera.getWorldDirection(_sFwd);
+    for (let i = 0; i < count; i++) {
+      const o = buf[i];
+      _sV.set((o.sx / ctl._lastLogW) * 2 - 1, -((o.sy / ctl._lastLogH) * 2 - 1), 0.5).unproject(camera);
+      _sDir.subVectors(_sV, camera.position).normalize();
+      // 시선 깊이 = 탄이 기함보다 얼마나 앞서 나갔는지(월드) + 카메라가 기함 뒤에 있는 거리
+      const depth = Math.min(80, Math.max(3.5, (sqy - o.wy) * SCALE_Z + CAMERA.chase.dist));
+      _sPos.copy(camera.position).addScaledVector(_sDir, depth / Math.max(1e-4, _sDir.dot(_sFwd)));
+      //  노즈는 −z(loftProjectile "노즈(−z)=그림 상단", 미사일 GLB 도 rotY 0 으로 통일) → π 로 뒤집는다.
+      //  3D X 축은 화면 좌우와 반대(추적 카메라 lookAt 기저 실측)라 진행각 부호도 뒤집는다.
+      //  아군탄 wob≈0 → +z(소실점으로), 적탄 wob≈π → −z(카메라로), 퍼짐탄은 실제 벌어진 방향 그대로.
+      _sEul.set(0, Math.PI - (o.wob || 0), 0);
+      _sQ.setFromEuler(_sEul);
+      _sM.compose(_sPos, _sQ, _sScl.setScalar(len));
       for (const im of sw.meshes) {
         im.setMatrixAt(i, _sM);
         if (sw.colored && o.col >= 0) { _sCol.setHex(o.col); im.setColorAt(i, _sCol); }
@@ -542,14 +609,20 @@ function createHero3D(canvas3d, opts = {}) {
         if (swarms.drone) placeSwarm(drone, swarms.drone.buf, swarms.drone.n, DRONE_INSTANCE_MAX, 'direct', 0, 0);     // 아군: 노즈가 소실점(전진 방향)
         if (swarms.cruiser) placeSwarm(cruiser, swarms.cruiser.buf, swarms.cruiser.n, CRUISER_INSTANCE_MAX, 'direct', 0, 0);   // 실측: hero 카메라 기준 yaw 0 = 지오 +z 가 소실점 → 지오를 노즈 +z 로 로프트
         if (props && swarms.props) for (const k of PROP_KEYS) {
+          if (SHOT_KEYS.includes(k)) continue;   // 발사체는 아래 placeShots
           const s = swarms.props[k];
-          const isShot = (k === 'pbullet' || k === 'ebullet' || k === 'missile' || k === 'laser');   // 탄=기함 앞 유지(발사·명중 연출)
-          if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], isShot ? 'direct' : 'spin', time, Math.PI, -0.12, !isShot);   // 픽업=기함 뒤(수송선·크리스탈)
+          if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], 'spin', time, Math.PI, -0.12, true);   // 픽업=기함 뒤(수송선·크리스탈)
+        }
+        // §G-13 발사체(상시 3D) — 탄은 기함 앞 유지(발사·명중 연출)
+        if (shots) for (const k of SHOT_KEYS) {
+          const s = swarms.props && swarms.props[k];
+          placeShots(shots[k], s ? s.buf : null, s ? s.n : 0, PROP_CAPS[k], k, sq.y);
         }
       } else {
         for (const k of Object.keys(ENEMY3D)) placeSwarm(eswarm[k], null, 0, ENEMY3D[k].cap);
         placeSwarm(drone, null, 0, DRONE_INSTANCE_MAX); placeSwarm(cruiser, null, 0, CRUISER_INSTANCE_MAX);
-        if (props) for (const k of PROP_KEYS) placeSwarm(props[k], null, 0, PROP_CAPS[k]);
+        if (props) for (const k of PROP_KEYS) { if (!SHOT_KEYS.includes(k)) placeSwarm(props[k], null, 0, PROP_CAPS[k]); }
+        if (shots) for (const k of SHOT_KEYS) placeShots(shots[k], null, 0, PROP_CAPS[k], k, sq.y);
       }
       renderer.render(scene, camera);
       ctl._rendered = true;
@@ -571,7 +644,8 @@ function createHero3D(canvas3d, opts = {}) {
       ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k + 'Count', eswarm[k] ? eswarm[k].count : -1])),
       droneCount: drone ? drone.count : -1, cruiserCount: cruiser ? cruiser.count : -1,
       flagTier: ctl._flagTier ?? -1, debrisCount: debris ? debris.count : -1, shaking: _shakeT > 0,   // §G-8 기함 실모델·피격 연출 진단
-      propCounts: props ? Object.fromEntries(PROP_KEYS.map((k) => [k, props[k].count])) : null,   // Codex P2: 진단이 확장 범위를 따라가게
+      propCounts: props ? Object.fromEntries(PROP_KEYS.filter((k) => !SHOT_KEYS.includes(k)).map((k) => [k, props[k].count])) : null,   // Codex P2: 진단이 확장 범위를 따라가게
+      shotCounts: shots ? Object.fromEntries(SHOT_KEYS.map((k) => [k, shots[k].count])) : null,   // §G-13 발사체(상시 3D)
       prewarm: { ...ctl.prewarm },
     };
   }
@@ -579,11 +653,13 @@ function createHero3D(canvas3d, opts = {}) {
     try { canvas3d.removeEventListener('webglcontextlost', onLost); canvas3d.removeEventListener('webglcontextrestored', onRestored); } catch {}
     if (model) model.dispose();
     for (const sw of [...Object.values(eswarm), drone, cruiser]) if (sw) for (const im of sw.meshes) { im.geometry.dispose(); if (im.material.map) im.material.map.dispose(); im.material.dispose(); im.dispose && im.dispose(); }
-    if (props) { let matDone = false; for (const k of PROP_KEYS) { const im = props[k].meshes[0]; im.geometry.dispose(); if (!matDone) { im.material.dispose(); matDone = true; } im.dispose && im.dispose(); } }
+    const disposeSw = (sw) => { if (!sw) return; for (const im of sw.meshes) { im.geometry.dispose(); if (im.material.map) im.material.map.dispose(); im.material.dispose(); im.dispose && im.dispose(); } };
+    if (props) for (const k of PROP_KEYS) { if (!SHOT_KEYS.includes(k)) disposeSw(props[k]); }
+    if (shots) for (const k of SHOT_KEYS) disposeSw(shots[k]);
     for (const k of Object.keys(eswarm)) eswarm[k] = null;
     for (const k of Object.keys(flags)) flags[k].holder.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
     debris.geometry.dispose(); debris.material.dispose(); debris.dispose && debris.dispose();
-    drone = null; cruiser = null; props = null;
+    drone = null; cruiser = null; props = null; shots = null;
     if (envRT) envRT.dispose();
     renderer.dispose();
     ctl.available = false;
