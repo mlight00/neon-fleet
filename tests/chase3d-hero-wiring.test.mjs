@@ -42,7 +42,7 @@ test('HW-09: 부분 추종(이사) — 2D C0 이탈을 3D 카메라 트럭 이�
 test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배치 + 2D 하드 컷 + 안전 폴백', () => {
   // 3D 레이어 = AURORA + 종별 인스턴스(버킷 3 = 종당 +3 draw). 배치는 2.5D 투영 화면좌표·크기에 정합(unproject).
   // §G-4 이미지 파이프라인(이사): 적 12종 = Gemini 렌더 빌보드 — ENEMY3D 단일 진실 루프
-  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS, SHOT_KEYS, SHOT_LEN \} from '\.\/chase3d-prop-defs\.js'/);
+  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS, SHOT_KEYS, SHOT_LEN, SHOT_W, SHOT_MIN_PX \} from '\.\/chase3d-prop-defs\.js'/);
   assert.match(renderer, /eswarm\[k\] = def\.glb \? makeGlbSwarm\(k, def\) : makeBillboardSwarm\(k, def\.cap\)/);
   assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI, pitchBase = -0\.12, behindFlag = false\)/);
   assert.match(renderer, /\.unproject\(camera\)/);
@@ -79,7 +79,7 @@ test('HW-11: 소품 3D(§G-2 갱신) — 발사체 3종 원본 텍스처 재질 
   // main: 레이저 랜스도 3D 수집(공명 레일만 2D 전용 렌더 유지), 발사체는 원본색(흰색 — 2D 도 원색 blit)
   assert.match(main, /if \(b\.dead \|\| b\.resonanceId\) continue;/);
   assert.match(main, /b\.kind === 'laser' \? 'laser' : b instanceof HomingMissile \? 'missile' : 'pbullet'/);
-  assert.match(main, /putProp\(key, b, p, 0xffffff/);
+  assert.match(main, /putProp\(key, b, p, col, Math\.atan2/);   // §G-15 2D 와 같은 탄색을 넘긴다
   assert.match(main, /e instanceof Crystal\) \{ key = 'crystal'; label = `\+\$\{e\.payout\}`/);
   assert.match(main, /e instanceof DronePod\) \{ key = 'pod'; label = `▲\$\{e\.payout\}`/);
   assert.match(main, /function drawPropLabels\(c\)/);
@@ -202,7 +202,7 @@ test('HW-14: §G-8 기함 실모델 등급 스왑 + 피격 연출 교체(이사 
     assert.match(line, /rotY: Math\.PI/, `${f} 노즈 +z 정렬`);
   }
   // renderer: 리그·홀더·등급 배율·가시성 스왑
-  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS, SHOT_KEYS, SHOT_LEN \}/);
+  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS, SHOT_KEYS, SHOT_LEN, SHOT_W, SHOT_MIN_PX \}/);
   assert.match(renderer, /const TIER_SCALE = \[0\.62, 0\.75, 0\.88, 1\.00, 1\.13, 1\.26\]/);
   assert.match(renderer, /holder\.visible = false; holder\.scale\.setScalar\(FLAG_LEN \* \(TIER_SCALE\[\+t\] \?\? 1\)\)/);
   assert.match(renderer, /for \(const k of Object\.keys\(flags\)\) flags\[k\]\.holder\.visible = \(useGlb && \+k === tier\)/);
@@ -288,4 +288,39 @@ test('HW-16: §G-13 발사체 상시 3D — 화면 정합 + 월드 깊이·자�
   // main: 월드 좌표 기록 + 발사체 수집은 플래그 밖
   assert.match(main, /o\.wx = e\.x; o\.wy = e\.y;/);
   assert.match(main, /wx: 0, wy: 0/);
+});
+
+test('HW-17: §G-15 이사 실기 4건 — 연출 구간 3D 소등 / 탄색 일치 / 최소 크기 / 죽은 보스 바 제거', () => {
+  const defs = readFileSync(new URL('../js/chase3d-prop-defs.js', import.meta.url), 'utf8');
+  const renderJs = readFileSync(new URL('../js/render.js', import.meta.url), 'utf8');
+  // (3) 섹터 종료 연출에서 3D 소등 — flythrough 는 2D 기함이 화면 위로 빠져나가는데 3D 기함은 제자리라 두 척이 된다
+  assert.match(main, /const cinematic = !!run && \(run\.phase === 'flythrough' \|\| run\.phase === 'cutscene'\)/);
+  assert.match(main, /if \(chase3d && state === 'play' && run && !cinematic\)/);
+  // (1) 발칸 색 = 2D 탄색(진화색), 미사일만 원본 흰색
+  assert.match(main, /const col = key === 'missile' \? 0xffffff : colInt\(b\.color, key === 'laser' \? 0xbff6ff : 0xeafffd\)/);
+  assert.match(renderer, /createProjMaterial\(THREE, k, false\)/);   // 발칸·레이저는 주황 로켓 그림 미적용
+  const props = readFileSync(new URL('../js/chase3d-props.js', import.meta.url), 'utf8');
+  assert.match(props, /export function createProjMaterial\(THREE, key, textured = true\)/);
+  // (1) 레이저=길고 가늘게, 미사일=크게, 화면 최소 크기 하한
+  assert.match(defs, /export const SHOT_LEN = \{ pbullet: 0\.62, ebullet: 0\.50, missile: 1\.50, laser: 3\.40 \}/);
+  assert.match(defs, /export const SHOT_W = \{ pbullet: 1\.0, ebullet: 1\.0, missile: 1\.0, laser: 0\.50 \}/);
+  assert.match(defs, /export const SHOT_MIN_PX = \{/);
+  assert.match(renderer, /const k2 = minPx > 0 \? Math\.max\(1, \(minPx \* depth\) \/ \(fpx \* len\)\) : 1/);
+  // (4) 파괴된 보스는 HP 바에서 빠진다(빈 붉은 칸이 남지 않게)
+  assert.match(renderJs, /const liveBosses = bosses\.filter\(\(b\) => b && !b\.dead\)/);
+  assert.match(renderJs, /if \(liveBosses\.length\) \{/);
+  assert.ok(!/ctx\.fillStyle = bo\.dead \?/.test(renderJs), '죽은 보스용 회색 채움 분기 제거(애초에 목록에서 빠짐)');
+});
+
+test('HW-18: §G-16 위험물 4종 — 모델 준비 게이트(없으면 2D 유지, 사라지지 않는다)', () => {
+  const defs = readFileSync(new URL('../js/chase3d-prop-defs.js', import.meta.url), 'utf8');
+  for (const [k, n] of [['h1', 'Meteor'], ['h2', 'Debris'], ['h3', 'Charger'], ['h4', 'Mine']]) {
+    assert.ok(defs.includes(`glb: 'assets/3d/${k}_model.glb'`), `${k}=${n} 엔트리`);
+  }
+  assert.match(renderer, /ctl\.swarmReady = \(k\) => !!\(eswarm\[k\] && eswarm\[k\]\.meshes && eswarm\[k\]\.meshes\.length\)/);
+  assert.match(main, /if \(chase3d && chase3d\.swarmReady && !chase3d\.swarmReady\(key\)\) return null;/);
+  assert.match(main, /if \(e instanceof Meteor\) \{ put3D\('h1', e, e\.rot \|\| 0\); continue; \}/);
+  assert.match(main, /if \(e instanceof Debris\) \{ put3D\('h2', e, e\.rot \|\| 0\); continue; \}/);
+  assert.match(main, /if \(e instanceof Charger\) \{ put3D\('h3', e, 0\); continue; \}/);
+  assert.match(main, /if \(e instanceof Mine\) \{ put3D\('h4', e, \(e\.t \|\| 0\) \* 1\.2\); continue; \}/);
 });

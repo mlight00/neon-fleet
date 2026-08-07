@@ -292,9 +292,12 @@ export function createPickupParts(THREE, key) {
 }
 
 /** 발사체 전용 재질 — 원본 webp albedo + 가산 발광(instanceColor 로 진화색 틴트). Node/실패 시 단색 폴백. */
-export function createProjMaterial(THREE, key) {
+/** textured=false 면 원본 그림을 입히지 않는다(§G-15 이사 "발칸 색이 2D 와 다르다").
+ *  2D 발칸은 진화색 + 백열 코어의 단색 예광탄이고 레이저는 단색 광선이라, 주황 로켓 그림을 입히면 색이 어긋난다.
+ *  대신 instanceColor 로 2D 와 같은 탄색을 그대로 받는다. 미사일만 원본 그림을 유지한다(실모델 폴백). */
+export function createProjMaterial(THREE, key, textured = true) {
   let map = null;
-  const def = PROJ_TEX[key];
+  const def = textured ? PROJ_TEX[key] : null;
   if (def && typeof document !== 'undefined' && THREE.TextureLoader) {
     try {
       map = new THREE.TextureLoader().load(def.url);

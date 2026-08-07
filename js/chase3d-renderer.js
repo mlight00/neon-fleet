@@ -13,7 +13,7 @@ import { createBillboardParts } from './chase3d-billboards.js';
 import { loadEnemyGlbParts } from './chase3d-glb.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
-import { ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS, SHOT_KEYS, SHOT_LEN } from './chase3d-prop-defs.js';
+import { ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS, SHOT_KEYS, SHOT_LEN, SHOT_W, SHOT_MIN_PX } from './chase3d-prop-defs.js';
 import { BAL } from './balance.js';   // 순수 수치 표(로직 없음) — 차지 만충 시간 환산에만 읽는다(§3.1 읽기 전용)
 
 // 적 12종 동시 표시 상한은 ENEMY3D(chase3d-prop-defs) 단일 진실 — 아래는 기존 외부 참조 호환용 파생.
@@ -325,9 +325,10 @@ function createHero3D(canvas3d, opts = {}) {
         shots[k] = { meshes, count: 0, colored: true };
         continue;
       }
-      const im = new THREE.InstancedMesh(createPropGeometry(THREE, k), createProjMaterial(THREE, k), PROP_CAPS[k]);
+      //  §G-15: 발칸·레이저는 원본 그림(주황 로켓·크리스탈)을 입히지 않는다 — 2D 는 진화색 단색이라 색이 어긋났다.
+      const im = new THREE.InstancedMesh(createPropGeometry(THREE, k), createProjMaterial(THREE, k, false), PROP_CAPS[k]);
       im.count = 0; im.frustumCulled = false;
-      _sCol.setHex(0xffffff);   // 원본 텍스처가 색을 가짐(2D 도 원색 blit)
+      _sCol.setHex(0xffffff);   // 실제 색은 매 프레임 instanceColor(2D 탄색)로 들어온다
       for (let i = 0; i < PROP_CAPS[k]; i++) im.setColorAt(i, _sCol);
       scene.add(im);
       shots[k] = { meshes: [im], count: 0, colored: true };
@@ -439,6 +440,9 @@ function createHero3D(canvas3d, opts = {}) {
     if (!sw) return;
     const count = Math.min(n | 0, cap);
     const len = SHOT_LEN[key] || 0.5;
+    const wRel = SHOT_W[key] ?? 1;
+    const minPx = SHOT_MIN_PX[key] || 0;
+    const fpx = (ctl._lastLogH * 0.5) / Math.tan(camera.fov * Math.PI / 360);   // 논리px 초점거리
     camera.getWorldDirection(_sFwd);
     for (let i = 0; i < count; i++) {
       const o = buf[i];
@@ -452,7 +456,10 @@ function createHero3D(canvas3d, opts = {}) {
       //  아군탄 wob≈0 → +z(소실점으로), 적탄 wob≈π → −z(카메라로), 퍼짐탄은 실제 벌어진 방향 그대로.
       _sEul.set(0, Math.PI - (o.wob || 0), 0);
       _sQ.setFromEuler(_sEul);
-      _sM.compose(_sPos, _sQ, _sScl.setScalar(len));
+      //  화면 최소 전장 보정(§G-15 이사 "탄이 화면 끝까지 안 가고 중간에서 사라진다"): 2D 의 KIND_SCALE.minRel 과
+      //  같은 성격의 하한. 진짜 원근이라 멀어지면 무한히 작아져 시야에서 먼저 지워졌다.
+      const k2 = minPx > 0 ? Math.max(1, (minPx * depth) / (fpx * len)) : 1;
+      _sM.compose(_sPos, _sQ, _sScl.set(len * wRel * k2, len * wRel * k2, len * k2));
       for (const im of sw.meshes) {
         im.setMatrixAt(i, _sM);
         if (sw.colored && o.col >= 0) { _sCol.setHex(o.col); im.setColorAt(i, _sCol); }
@@ -668,6 +675,9 @@ function createHero3D(canvas3d, opts = {}) {
     try { const gl = renderer.getContext(); const ext = gl.getExtension('WEBGL_lose_context'); if (ext) { ext.loseContext(); return true; } } catch {}
     return false;
   }
+  //  §G-16 모델 준비 여부(비동기 GLB) — main 이 이걸 보고 수집할지 정한다. 모델이 없는 종을 3D 로 올렸다고
+  //  표시해 버리면 2D 도 스킵돼 개체가 통째로 사라진다. 준비 안 된 종은 기존 2D 를 그대로 쓴다.
+  ctl.swarmReady = (k) => !!(eswarm[k] && eswarm[k].meshes && eswarm[k].meshes.length);
   ctl.frame = frame; ctl.prewarmRun = prewarm; ctl.screenXToWorldX = screenXToWorldX; ctl.info = info;
   ctl.dispose = dispose; ctl.forceContextLoss = forceContextLoss; ctl.renderer = renderer; ctl.model = model; ctl.scene = { scene, camera };
   return ctl;

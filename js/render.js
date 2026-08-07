@@ -175,32 +175,35 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   ctx.fillRect(40, 8, barW * Math.min(1, progress), 5);
 
   // 보스 HP — 다중 보스면 상단에 나란히 (각 보스 HP바), 1기면 이름·수치까지 표시
-  if (bosses.length) {
-    const n = bosses.length;
+  //  §G-15 파괴된 보스는 바에서 뺀다(이사 "보스 2개 중 먼저 파괴된 보스 영역이 붉은 사각형으로 남는다").
+  //   죽은 보스는 hp 0 이라 채움이 0 → 배경(rgba(255,61,113,0.25))만 빈 붉은 칸으로 남아 있었다.
+  const liveBosses = bosses.filter((b) => b && !b.dead);
+  if (liveBosses.length) {
+    const n = liveBosses.length;
     const totalW = logicalW - 120, gap = 6;
     const bw = (totalW - gap * (n - 1)) / n;
     for (let i = 0; i < n; i++) {
-      const bo = bosses[i], bx = 60 + i * (bw + gap);
+      const bo = liveBosses[i], bx = 60 + i * (bw + gap);
       ctx.fillStyle = 'rgba(255,61,113,0.25)';
       ctx.fillRect(bx, 30, bw, 10);
-      ctx.fillStyle = bo.dead ? 'rgba(150,150,170,0.5)' : COLORS.danger;
+      ctx.fillStyle = COLORS.danger;
       ctx.fillRect(bx, 30, bw * Math.max(0, bo.hp / bo.maxHp), 10);
     }
     ctx.font = 'bold 11px Pretendard, sans-serif';
     ctx.fillStyle = COLORS.text;
     if (n === 1) {
       ctx.textAlign = 'left';
-      ctx.fillText(bosses[0].name || 'BOSS', 60, 51);
+      ctx.fillText(liveBosses[0].name || 'BOSS', 60, 51);
       ctx.textAlign = 'right';
       ctx.fillStyle = '#ff8080';
-      ctx.fillText(`${Math.ceil(bosses[0].hp).toLocaleString()} / ${bosses[0].maxHp.toLocaleString()}`, logicalW - 60, 51);
+      ctx.fillText(`${Math.ceil(liveBosses[0].hp).toLocaleString()} / ${liveBosses[0].maxHp.toLocaleString()}`, logicalW - 60, 51);
     } else {
       ctx.textAlign = 'center';
-      ctx.fillText(`${en ? 'Boss' : '보스'} ×${n} · ${bosses[0].name}`, logicalW / 2, 51);
+      ctx.fillText(`${en ? 'Boss' : '보스'} ×${n} · ${liveBosses[0].name}`, logicalW / 2, 51);
     }
     // 네온 아비터 전용 STAGGER/BREAK 보조 바 (다른 보스엔 표시 안 함)
     // 보스 이름·HP(y=51)와 모듈 줄(y=83) 사이에 배치 — 라벨 y=64, 바 y=68~73, BREAK y=70 (중첩 방지)
-    const bo = bosses[0];
+    const bo = liveBosses[0];
     if (n === 1 && bo.stagger !== undefined && bo.staggerMax) {
       const sbw = logicalW - 120;
       if (bo.breakT > 0) {

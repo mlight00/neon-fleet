@@ -38,6 +38,13 @@ export const ENEMY3D = {
   b9: { cap: 1, len: 371, max: 750, glb: 'assets/3d/b9_model.glb', rotX: 0, rotY: Math.PI },
   b10: { cap: 1, len: 371, max: 750, glb: 'assets/3d/b10_model.glb', rotX: 0, rotY: Math.PI },
   b11: { cap: 1, len: 371, max: 750, glb: 'assets/3d/b11_model.glb', rotX: 0, rotY: Math.PI },
+  //  §G-16 위험물 4종(이사 "삼각형·원형으로 남은 적들과 운석, 제대로된 이미지화"): 이 넷만 아트가 아예 없어
+  //  2D 도형 폴백으로 남아 있었다(운석은 C4 스프라이트 파일 자체가 없다). 모델을 넣으면 즉시 뜬다 —
+  //  GLB 가 없으면 스웜이 비고(swarmReady=false) main 이 수집을 건너뛰어 기존 2D 가 그대로 나온다(사라지지 않는다).
+  h1: { cap: 8, len: 100, max: 200, glb: 'assets/3d/h1_model.glb', rotX: 0, rotY: Math.PI },   // 운석(Meteor) — 파괴 가능
+  h2: { cap: 8, len: 92, max: 184, glb: 'assets/3d/h2_model.glb', rotX: 0, rotY: Math.PI },    // 잔해(Debris) — 파괴 불가
+  h3: { cap: 8, len: 105, max: 210, glb: 'assets/3d/h3_model.glb', rotX: 0, rotY: Math.PI },   // 돌격기(Charger)
+  h4: { cap: 8, len: 96, max: 192, glb: 'assets/3d/h4_model.glb', rotX: 0, rotY: Math.PI },    // 기뢰(Mine)
 };
 
 /** §G-6 아군 실모델(드론·순양함) — 노즈 +z(소실점) 계약, 'direct' 배치. 회전은 실측 보정.
@@ -90,8 +97,15 @@ export const MOUNT_POINTS = [
  *  → 발사체만은 월드 좌표를 3D 로 직접 매핑한다(worldToX3/worldToZ3 = 선형). 선형 매핑 + 진짜 원근 카메라는
  *   월드 직선을 화면 직선으로 보낸다 = 소실점으로 곧게 날아간다. */
 export const SHOT_KEYS = ['pbullet', 'ebullet', 'missile', 'laser'];
-/** 발사체 3D 전장(unit). 기함 전장 4.78 기준 — 2D 스트릭과 비슷한 존재감으로 실측 조정. */
-export const SHOT_LEN = { pbullet: 0.52, ebullet: 0.48, missile: 0.86, laser: 2.0 };
+/** 발사체 3D 전장(unit). 기함 전장 4.78 기준.
+ *  §G-15 이사 실기 교정: 레이저는 "2D 처럼 길게 뻗는 광선"이어야 하는데 짧고 통통해 풍선처럼 보였다 →
+ *  전장 3.4 + 굵기 0.5 배(가늘게). 유도탄은 "너무 작다" → 0.86 → 1.5. */
+export const SHOT_LEN = { pbullet: 0.62, ebullet: 0.50, missile: 1.50, laser: 3.40 };
+/** 전장 대비 가로·두께 배율. 1=원형 비율 유지, <1=가늘게(광선). */
+export const SHOT_W = { pbullet: 1.0, ebullet: 1.0, missile: 1.0, laser: 0.50 };
+/** 화면 최소 전장(논리px). 2D 는 KIND_SCALE.minRel 로 탄이 아주 작아지지 않게 막는데, 3D 는 진짜 원근이라
+ *  그 바닥이 없어 중간에서 사라지는 것처럼 보였다(이사) → 같은 성격의 하한을 3D 에도 준다. */
+export const SHOT_MIN_PX = { pbullet: 16, ebullet: 15, missile: 22, laser: 30 };
 /** 발사체 고도 — 기수 집속 코어(y 0.35)와 같은 평면대에 둬 "포구에서 나간다"로 읽히게. */
 export const SHOT_Y = 0.30;
 

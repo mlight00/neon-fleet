@@ -63,7 +63,7 @@ test('C3D-fallback-main: 초기화 실패/미가용이면 chase3d 미설정 → 
   assert.match(main, /catch \(e\) \{ console\.warn\('\[chase3d\] 초기화 예외/);
   assert.match(main, /\.catch\(\(e\) => console\.warn\('\[chase3d\] 모듈 로드 실패/);
   // draw() 에서 chase3d 없으면 t3d=0 → 2D 월드 정상 렌더(RC2)
-  assert.match(main, /if \(chase3d && state === 'play' && run\) t3d = chase3d\.frame/);
+  assert.match(main, /if \(chase3d && state === 'play' && run && !cinematic\) t3d = chase3d\.frame/);
 });
 
 // ── §12.6 시각 계약 정적 ──

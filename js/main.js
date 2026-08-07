@@ -2957,6 +2957,8 @@ function draw() {
         if (e.affixes && e.affixes.length) return null;
         const s3 = _sw[key];
         if (!s3 || s3.n >= s3.buf.length) return null;   // 로스터 밖 보스 등 — 2D 유지
+        //  §G-16: 모델이 아직 없는 종(위험물 4종 등)은 3D 로 올리지 않는다 — 올렸다고 표시하면 2D 도 스킵돼 사라진다.
+        if (chase3d && chase3d.swarmReady && !chase3d.swarmReady(key)) return null;
         const p = projectObject(e, 'enemy', chaseProjection);
         if (!passGate(e, p)) return null;
         const d = ENEMY3D[key];
@@ -2977,6 +2979,11 @@ function draw() {
         if (e instanceof Shielder) { put3D('b19', e, 0); continue; }
         if (e instanceof BroodCarrier) { put3D('b20', e, 0); continue; }
         if (e instanceof Blinker) { if (e.appearT >= 0.9) put3D('b21', e, 0); continue; }   // 텔레포트 페이드는 2D 연출 유지 — 완전 등장만 3D
+        // §G-16 위험물 4종 — 모델이 준비된 종만 3D(없으면 put3D 가 null 반환 → 기존 2D 유지)
+        if (e instanceof Meteor) { put3D('h1', e, e.rot || 0); continue; }
+        if (e instanceof Debris) { put3D('h2', e, e.rot || 0); continue; }
+        if (e instanceof Charger) { put3D('h3', e, 0); continue; }
+        if (e instanceof Mine) { put3D('h4', e, (e.t || 0) * 1.2); continue; }
         if (e instanceof Boss || e instanceof MidBoss) {   // §G-6 보스 — 대형 단일 개체(cap 1), 이름 라벨은 HUD 계층으로 보존
           const bid = String(e.spriteId || (e.def && e.def.id) || '').toLowerCase();
           const bp = ENEMY3D[bid] ? put3D(bid, e, 0) : null;
@@ -3003,8 +3010,12 @@ function draw() {
           const p = projectObject(b, 'playerBullet', chaseProjection);
           if (!passGate(b, p)) continue;
           const key = b.kind === 'laser' ? 'laser' : b instanceof HomingMissile ? 'missile' : 'pbullet';
-          // §G-2: 원본 그림 자체가 색을 가짐(2D 도 원색 blit) — 틴트 없이 흰색(진화 구분은 후속: 진화별 텍스처)
-          putProp(key, b, p, 0xffffff, Math.atan2(b.vx || 0, -(b.vy || -1)));
+          // §G-15 색 일치(이사 "발칸이 2D 는 흰색인데 3D 는 다른 색"): 2D drawVulcan 과 같은 탄색을 그대로 넘긴다.
+          //  미사일만 원본 실모델 색(흰색=텍스처 원색) 유지.
+          //  기본 발칸은 2D 에서 '백열 코어'가 커 보여 흰색으로 읽힌다(이사) → 흰빛 시안이 기본,
+          //  진화색이 지정된 탄은 그 색을 그대로 쓴다.
+          const col = key === 'missile' ? 0xffffff : colInt(b.color, key === 'laser' ? 0xbff6ff : 0xeafffd);
+          putProp(key, b, p, col, Math.atan2(b.vx || 0, -(b.vy || -1)));
         }
         for (const b of run.world.enemyBullets) {
           if (b.dead || b.kind === 'laser' || b.resonanceId) continue;
@@ -3031,7 +3042,11 @@ function draw() {
         }
       }
     }
-    if (chase3d && state === 'play' && run) t3d = chase3d.frame(run, camera.current, LOGICAL_W, logicalH, canvas.width, canvas.height, performance.now() * 0.001, followX, _sw);
+    // §G-15 연출 구간은 함미 3D 를 끈다(이사 "섹터 종료 시 날아가는 2D 기함과 3D 기함이 모두 보임").
+    //  flythrough=기함이 화면 위로 빠져나가는 연출인데 3D 기함은 카메라에 고정돼 제자리에 남아 두 척이 된다.
+    //  cutscene=전체화면 연출(게임 로직 정지). 둘 다 2D 전용 연출이라 3D 레이어를 통째로 내린다.
+    const cinematic = !!run && (run.phase === 'flythrough' || run.phase === 'cutscene');
+    if (chase3d && state === 'play' && run && !cinematic) t3d = chase3d.frame(run, camera.current, LOGICAL_W, logicalH, canvas.width, canvas.height, performance.now() * 0.001, followX, _sw);
     else if (canvas3d) { canvas3d.style.opacity = '0'; canvas3d.style.visibility = 'hidden'; }
   }
   chase3dT = t3d;
