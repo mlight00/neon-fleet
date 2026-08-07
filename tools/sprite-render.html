@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>네온 함대 — 3D→2D 스프라이트 렌더 도구</title>
+<style>
+  body { margin: 0; background: #0b0d14; color: #cfe6ff; font: 14px/1.6 system-ui, sans-serif; padding: 16px; }
+  #log { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+  canvas { image-rendering: pixelated; border: 1px solid #223; margin: 4px; vertical-align: top; }
+  h1 { font-size: 16px; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<h1>3D → 2D 스프라이트 렌더 (개발 도구 — 게임에 포함되지 않음)</h1>
+<div id="log">대기 중… <code>?run=1</code> 로 전체 렌더, <code>?run=b1</code> 로 단일 렌더.</div>
+<div id="out"></div>
+<script type="module" src="./sprite-render.js"></script>
+</body>
+</html>
