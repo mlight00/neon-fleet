@@ -5,12 +5,13 @@ import { chase3dEnabled, chase3dTestEnabled, transitionT, shouldRender3D, CHASE3
 
 // §12.1 기능 플래그 + §7 전환값. config 는 순수(Three.js 미의존)라 Node 에서 그대로 검증.
 
-test('C3D-flag: chase3dEnabled 는 ?chase3d=1 에서만 참', () => {
+test('C3D-flag: §G-19 chase3dEnabled 는 기본 ON, ?chase3d=0 만 해제', () => {
+  // 배포판(포털)은 index.html 을 쿼리 없이 연다 — 예전 계약(=1 필수)이면 3D 가 영영 안 켜진다.
   assert.equal(chase3dEnabled('?chase3d=1'), true);
   assert.equal(chase3dEnabled('?chase3d=1&x=2'), true);
-  assert.equal(chase3dEnabled(''), false);
+  assert.equal(chase3dEnabled(''), true);
   assert.equal(chase3dEnabled('?chase3d=0'), false);
-  assert.equal(chase3dEnabled('?foo=1'), false);
+  assert.equal(chase3dEnabled('?foo=1'), true);
 });
 
 test('C3D-testflag: chase3dTestEnabled 는 chase3d=1 과 chase3dTest=1 둘 다 필요', () => {

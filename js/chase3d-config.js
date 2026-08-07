@@ -2,15 +2,19 @@
 //  작업지시서 §3.2 / §5 / §7 / §9 / §10. 이 모듈은 순수 상수·판정만 담는다(Three.js 미의존).
 //  게임 규칙·밸런스·좌표(worldX/worldY)는 절대 건드리지 않는다. 여기 값은 "보는 방식"에만 쓰인다.
 
-/** URLSearchParams 문자열(또는 location.search)에서 3D 시제품 플래그를 읽는다. */
+/** 함미 3D 사용 여부. §G-19 부터 **기본 ON**, `?chase3d=0` 만 명시적 해제다.
+ *  이전에는 `?chase3d=1` 이 있어야 켜졌는데, 배포판(포털)은 index.html 을 쿼리 없이 열기 때문에
+ *  3D 가 한 번도 켜지지 않았다 — §G-10 에서 GLB 20MB 를 넣고도 실제로는 2D 로만 돌았다(이사 "배포본이 이상해").
+ *  개발본과 배포본이 같은 그림이어야 하므로 기본값을 뒤집는다. WebGL 실패·컨텍스트 손실은
+ *  available=false 로 떨어져 기존 2.5D(RC2)로 자동 복귀하므로 안전하다(§3.3). */
 export function chase3dEnabled(search = '') {
-  try { return new URLSearchParams(search).get('chase3d') === '1'; } catch { return false; }
+  try { return new URLSearchParams(search).get('chase3d') !== '0'; } catch { return true; }
 }
-/** 결정적 검증 장면(개발 오버레이 포함) 플래그. chase3d=1 과 함께여야 의미가 있다. */
+/** 결정적 검증 장면(개발 오버레이 포함) 플래그. **chase3d=1 을 명시**해야 열린다(기본 ON 과 무관 — 개발 전용). */
 export function chase3dTestEnabled(search = '') {
   try { const p = new URLSearchParams(search); return p.get('chase3d') === '1' && p.get('chase3dTest') === '1'; } catch { return false; }
 }
-/** AURORA 모델 검사실(Opus5 §8). chase3d=1 필수 — 기본 URL 에선 절대 빈 문자열. */
+/** 모델 검사실(Opus5 §8). **chase3d=1 을 명시**해야 열린다 — 기본 URL 에선 절대 빈 문자열(기본 ON 과 무관). */
 export function chase3dLabTarget(search = '') {
   try { const p = new URLSearchParams(search); return p.get('chase3d') === '1' ? (p.get('chase3dLab') || '') : ''; } catch { return ''; }
 }

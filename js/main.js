@@ -196,7 +196,10 @@ function rebuildChaseProjection() {
 // 입력: 마우스/터치 화면 X를 카메라로 역변환해 월드 목표 X를 얻는다(§6). input이 카메라 모듈을 직접 import하지 않도록 콜백 주입.
 const input = createInput(canvas, LOGICAL_W, { screenToWorldX: (sx) => currentScreenToWorldX(sx) });
 
-// ── 실제 3D 함미 추적(Phase 0) 부트스트랩 — ?chase3d=1 전용, 폴백 안전(§3·§6) ──
+// ── 실제 3D 함미 추적 부트스트랩 — 폴백 안전(§3·§6) ──
+//  §G-19 배포판 3D 미점등 수정(이사 "배포본이 이상해"): 포털 빌드는 index.html 을 쿼리 없이 열기 때문에
+//  `?chase3d=1` 이 붙을 수 없어 3D 가 한 번도 켜지지 않았다(§G-10 에서 GLB 20MB 를 넣고도 2D 로만 돌았다).
+//  → chase3dEnabled 를 기본 ON 으로 뒤집었다. 해제는 `?chase3d=0`. 개발본·배포본이 같은 그림이 된다.
 const CHASE3D_ON = chase3dEnabled(location.search);
 const CHASE3D_TEST = chase3dTestEnabled(location.search);
 const CHASE3D_LAB = chase3dLabTarget(location.search);   // 'aurora' = 모델 검사실(Opus5 §8)
