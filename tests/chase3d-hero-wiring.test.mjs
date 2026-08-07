@@ -42,7 +42,7 @@ test('HW-09: 부분 추종(이사) — 2D C0 이탈을 3D 카메라 트럭 이�
 test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배치 + 2D 하드 컷 + 안전 폴백', () => {
   // 3D 레이어 = AURORA + 종별 인스턴스(버킷 3 = 종당 +3 draw). 배치는 2.5D 투영 화면좌표·크기에 정합(unproject).
   // §G-4 이미지 파이프라인(이사): 적 12종 = Gemini 렌더 빌보드 — ENEMY3D 단일 진실 루프
-  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D \} from '\.\/chase3d-prop-defs\.js'/);
+  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS \} from '\.\/chase3d-prop-defs\.js'/);
   assert.match(renderer, /eswarm\[k\] = def\.glb \? makeGlbSwarm\(k, def\) : makeBillboardSwarm\(k, def\.cap\)/);
   assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI, pitchBase = -0\.12, behindFlag = false\)/);
   assert.match(renderer, /\.unproject\(camera\)/);
@@ -153,7 +153,7 @@ test('HW-06: lab 플래그 정책 — chase3d=1 없으면 검사실 불가(§8)'
   assert.equal(chase3dLabTarget(''), '');
   // 기본 URL 에서 lab 모듈 미로드: 동적 import 는 CHASE3D_LAB 타깃 가드 안
   const i = main.indexOf("import('./chase3d-lab.js')");
-  const guard = main.lastIndexOf("if (['aurora', 'a0', 'flags', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB))", i);
+  const guard = main.lastIndexOf("if (['aurora', 'a0', 'flags', 'weapons', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB))", i);
   assert.ok(guard > 0 && guard < i, 'lab import 는 6타깃 플래그 가드 안');
 });
 
@@ -198,7 +198,7 @@ test('HW-14: §G-8 기함 실모델 등급 스왑 + 피격 연출 교체(이사 
     assert.match(line, /rotY: Math\.PI/, `${f} 노즈 +z 정렬`);
   }
   // renderer: 리그·홀더·등급 배율·가시성 스왑
-  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D \}/);
+  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS \}/);
   assert.match(renderer, /const TIER_SCALE = \[0\.62, 0\.75, 0\.88, 1\.00, 1\.13, 1\.26\]/);
   assert.match(renderer, /holder\.visible = false; holder\.scale\.setScalar\(FLAG_LEN \* \(TIER_SCALE\[\+t\] \?\? 1\)\)/);
   assert.match(renderer, /for \(const k of Object\.keys\(flags\)\) flags\[k\]\.holder\.visible = \(useGlb && \+k === tier\)/);
@@ -212,4 +212,54 @@ test('HW-14: §G-8 기함 실모델 등급 스왑 + 피격 연출 교체(이사 
   // 기각된 섬광 연출은 완전 제거(이사 "정말 별로다")
   assert.ok(!/drawImpactFlash/.test(main), '충돌 섬광 제거');
   assert.ok(!/noteImpact/.test(main), '충돌 섬광 감지 제거');
+});
+
+test('HW-15: §G-12 기함 무기 실모델(이사 VARCO 5종) — 갑판 포탑 스왑·기수 차지 포구·미사일 탄체', () => {
+  const defs = readFileSync(new URL('../js/chase3d-prop-defs.js', import.meta.url), 'utf8');
+  // 테이블: 5종 + 진열장 실측 회전(포신·노즈가 +z)
+  assert.match(defs, /export const WEAPON3D = \{/);
+  for (const [k, f] of [['vulcan', 'w1'], ['laser', 'w2'], ['homing', 'w3'], ['missile', 'w4'], ['muzzle', 'w5']]) {
+    assert.match(defs, new RegExp(`${k}\s*:.*assets/3d/${f}_model\.glb`), `${k}=${f}`);
+  }
+  const wBlock = defs.slice(defs.indexOf('export const WEAPON3D'), defs.indexOf('export const MOUNT_POINTS'));
+  const rotOf = (k) => (wBlock.split('\n').find((l) => l.trim().startsWith(k)) || '');
+  assert.match(rotOf('vulcan'), /rotY: Math\.PI/);          // 포구 다발이 -z 원본
+  assert.match(rotOf('laser'), /rotY: -Math\.PI \/ 4/);      // 비축 포신(315°에서 포구가 정면 — 6° 스윕 실측)
+  assert.match(rotOf('homing'), /rotY: 0/);                 // 3×3 발사관이 이미 +z
+  assert.match(rotOf('missile'), /rotY: Math\.PI/);         // 노즈 -z 원본(0°는 노즐·핀이 보인다)
+  assert.match(rotOf('muzzle'), /rotY: 0/);                 // 금색 조리개가 +z
+  // 장착점 표는 ships.js 의 NORMALIZED_MOUNTS 와 값이 같아야 한다(2D·3D 같은 자리)
+  const ships = readFileSync(new URL('../js/ships.js', import.meta.url), 'utf8');
+  const grab = (src, name) => {
+    const i = src.indexOf(name);
+    const s = src.indexOf('[', i), e = src.indexOf('];', s);
+    return JSON.parse(src.slice(s, e + 1).replace(/\s+/g, '').replace(/,\]/g, ']'));   // 트레일링 콤마 제거
+  };
+  assert.deepEqual(grab(defs, 'export const MOUNT_POINTS'), grab(ships, 'const NORMALIZED_MOUNTS'), '2D·3D 장착점 표 동기');
+  // renderer 배선: 무기 1종만 켜는 스왑 + 2D 와 같은 개수 규칙 + 기함 롤 공유
+  assert.match(renderer, /const mountRig = new THREE\.Group\(\)/);
+  assert.match(renderer, /for \(const k of \['vulcan', 'laser', 'homing'\]\)/);
+  assert.match(renderer, /const n = Math\.min\(pts\.length, Math\.max\(1, 1 \+ tier \+ Math\.max\(0, lv - 1\)\)\)/);
+  assert.match(renderer, /const wKey = sq\.weapon === 'laser' \? 'laser' : sq\.weapon === 'homing' \? 'homing' : 'vulcan'/);
+  assert.match(renderer, /mountRig\.visible = useGlb && placeMounts\(tier, wKey, sq\.weaponLv \| 0, flags\[tier\]\.box/);
+  assert.match(renderer, /mountRig\.rotation\.z = bank/);
+  assert.match(renderer, /flags\[t\] = \{ holder, ok: false, box: null \}/);   // 장착점 환산 기준(기함 바운딩)
+  // 차지 포구: chargeRig 자식이라 충전·발사 동안만 보인다(상시 표시 금지 — 실루엣 변형)
+  assert.match(renderer, /const muzzleRig = new THREE\.Group\(\)/);
+  assert.match(renderer, /chargeRig\.add\(muzzleRig\)/);
+  assert.match(renderer, /muzzleRig\.position\.set\(0, 0\.35, NOSE_Z - ms \* 0\.9\)/);
+  assert.match(renderer, /muzzleRig\.rotation\.set\(0, Math\.PI, time \* 1\.1\)/);   // 조리개가 카메라를 향한다(전방으로 두면 뚫린 뒷면=검은 덩어리 — 실측)
+  // 기수 기준점은 등급별 실측 바운딩 — 상수 2.6(T3) 이면 T4·T5 에서 코어·포구가 선체에 묻힌다
+  assert.match(renderer, /const NOSE_Z = \(flags\[tier\] && flags\[tier\]\.box \? flags\[tier\]\.box\.max\.z \* \(FLAG_LEN \* \(TIER_SCALE\[tier\] \?\? 1\)\) : 2\.25\) \+ 0\.35/);
+  // 충전 신호: 실전 Squad 는 charge(초)만 갖는다 — charging/chargeFrac 만 읽던 §G-11 은 실플레이에서 안 떴다
+  assert.match(renderer, /const chgOn = sq\.charging !== undefined \? !!sq\.charging : \(sq\.charge \|\| 0\) > 0\.001/);
+  assert.match(renderer, /const CHARGE_FULL = BAL\.charge\.stageTime \* BAL\.charge\.maxStage/);
+  // 미사일 탄체: 소품 경로에서 GLB 스왑(로드 실패 시 기존 원본 텍스처 조형 폴백)
+  assert.match(renderer, /if \(k === 'missile' && WEAPON3D\.missile\.glb\) \{/);
+  assert.match(renderer, /props\[k\] = makeGlbSwarm\(k, WEAPON3D\.missile,/);
+  // 실제 GLB 파일 존재(개발본)
+  for (const f of ['w1', 'w2', 'w3', 'w4', 'w5']) {
+    const p = new URL(`../assets/3d/${f}_model.glb`, import.meta.url);
+    assert.ok(readFileSync(p).length > 100_000, `${f}_model.glb 존재·비어있지 않음`);
+  }
 });

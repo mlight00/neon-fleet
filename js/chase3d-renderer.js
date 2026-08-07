@@ -13,7 +13,8 @@ import { createBillboardParts } from './chase3d-billboards.js';
 import { loadEnemyGlbParts } from './chase3d-glb.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
-import { ENEMY3D, ALLY3D, PICKUP3D, FLAG3D } from './chase3d-prop-defs.js';
+import { ENEMY3D, ALLY3D, PICKUP3D, FLAG3D, WEAPON3D, MOUNT_POINTS } from './chase3d-prop-defs.js';
+import { BAL } from './balance.js';   // 순수 수치 표(로직 없음) — 차지 만충 시간 환산에만 읽는다(§3.1 읽기 전용)
 
 // 적 12종 동시 표시 상한은 ENEMY3D(chase3d-prop-defs) 단일 진실 — 아래는 기존 외부 참조 호환용 파생.
 export const B1_INSTANCE_MAX = ENEMY3D.b1.cap;
@@ -157,10 +158,63 @@ function createHero3D(canvas3d, opts = {}) {
     const holder = new THREE.Group();
     holder.visible = false; holder.scale.setScalar(FLAG_LEN * (TIER_SCALE[+t] ?? 1));
     flagRig.add(holder);
-    flags[t] = { holder, ok: false };
+    flags[t] = { holder, ok: false, box: null };
     loadEnemyGlbParts(THREE, FLAG3D[t].glb, FLAG3D[t])
-      .then((parts) => { for (const p of parts) holder.add(new THREE.Mesh(p.geo, p.mat)); flags[t].ok = true; })
+      .then((parts) => {
+        const bb = new THREE.Box3();
+        for (const p of parts) { p.geo.computeBoundingBox(); bb.union(p.geo.boundingBox); holder.add(new THREE.Mesh(p.geo, p.mat)); }
+        flags[t].box = bb;   // §G-12 갑판 장착점 환산 기준(정규화 모델 단위 — 홀더 배율 S 를 곱해 쓴다)
+        flags[t].ok = true;
+      })
       .catch(() => { /* 실패 = 해당 티어만 절차 AURORA 유지 */ });
+  }
+  // ── §G-12 기함 무기 실모델(이사 VARCO): 갑판 포탑 3종 + 기수 차지 포구 ──
+  //  포탑은 2D drawWeaponRig 과 같은 장착점·같은 개수 규칙을 쓴다(표시만 3D — 판정·규칙 무관).
+  //  종당 InstancedMesh 1(파트 1) → 한 무기만 보이므로 드로우 +1.
+  const mountRig = new THREE.Group();
+  mountRig.visible = false;
+  flagRig.add(mountRig);
+  const mounts3 = {};
+  for (const k of ['vulcan', 'laser', 'homing']) {
+    const rec = { meshes: [], ok: false };
+    mounts3[k] = rec;
+    loadEnemyGlbParts(THREE, WEAPON3D[k].glb, WEAPON3D[k])
+      .then((parts) => {
+        for (const p of parts) {
+          const im = new THREE.InstancedMesh(p.geo, p.mat, WEAPON3D[k].cap);
+          im.count = 0; im.frustumCulled = false; im.visible = false;
+          mountRig.add(im); rec.meshes.push(im);
+        }
+        rec.ok = true;
+      })
+      .catch(() => { /* 실패 = 해당 무기만 포탑 미표시(기함 본체는 그대로) */ });
+  }
+  const MOUNT_LEN = 0.135;   // 기함 배율 S 대비 포탑 전장(실측 — 갑판을 덮지 않고 실루엣에 얹히는 크기)
+  /** 갑판 포탑 배치: 현재 무기 1종만 켠다. box=기함 GLB 바운딩(정규화), S=홀더 배율. */
+  function placeMounts(tier, key, lv, box, S) {
+    for (const k in mounts3) {
+      if (k === key) continue;
+      for (const m of mounts3[k].meshes) { m.count = 0; m.visible = false; }
+    }
+    const rec = mounts3[key];
+    if (!rec || !rec.ok || !rec.meshes.length) return false;
+    const pts = MOUNT_POINTS[tier] || MOUNT_POINTS[0];
+    const n = Math.min(pts.length, Math.max(1, 1 + tier + Math.max(0, lv - 1)));   // 2D drawWeaponRig 과 동일한 개수 규칙
+    const sx = box ? (box.max.x - box.min.x) : 0.62;
+    const sz = box ? (box.max.z - box.min.z) : 1.0;
+    const topY = box ? box.max.y : 0.12;
+    _sScl.setScalar(MOUNT_LEN * S * (1 + Math.max(0, lv - 1) * 0.045));
+    _sQ.identity();
+    for (let i = 0; i < n; i++) {
+      const p = pts[i];
+      //  x 는 0.88 로 안쪽으로(장착점 원본은 2D 스프라이트 폭 기준 — 3D 선체는 날개 끝이 얇아 그대로 쓰면 가장자리에 걸친다),
+      //  y 는 상단의 66%(선체 곡면 위에 얹히되 뜨지 않는 높이 — 실측)
+      _sPos.set(p[0] * sx * S * 0.88, topY * S * 0.66, -p[1] * sz * S);
+      _sM.compose(_sPos, _sQ, _sScl);
+      for (const m of rec.meshes) m.setMatrixAt(i, _sM);
+    }
+    for (const m of rec.meshes) { m.count = n; m.visible = true; m.instanceMatrix.needsUpdate = true; }
+    return true;
   }
   // ── §G-8 피격 연출(이사 "섬광은 별로 — 부품이 떨어져 나가고 기체가 흔들리게") ──
   //  신호=squad.flash 상승 에지(takeShot 세트 — 로직 무수정). 파편=세라믹 장갑 조각 InstancedMesh 1 드로우,
@@ -183,6 +237,14 @@ function createHero3D(canvas3d, opts = {}) {
   chargeRig.add(chargeCore, chargeHalo, lanceCore, lanceGlow);
   chargeRig.visible = false;
   flagRig.add(chargeRig);
+  //  §G-12 차지 포구(W5): 충전·발사 동안만 기수에 전개된다 — 상시 표시하면 기함 실루엣이 바뀐다.
+  //  코어보다 살짝 뒤에 두어 집속 구체가 포구 입에서 자라는 것처럼 보이게 한다.
+  const muzzleRig = new THREE.Group();
+  muzzleRig.visible = false;
+  chargeRig.add(muzzleRig);
+  loadEnemyGlbParts(THREE, WEAPON3D.muzzle.glb, WEAPON3D.muzzle)
+    .then((parts) => { for (const p of parts) muzzleRig.add(new THREE.Mesh(p.geo, p.mat)); muzzleRig.visible = true; })
+    .catch(() => { /* 실패 = 기존 코어·헤일로만 */ });
   let _lanceT = 0, _lanceStage = 1, _prevCharge = 0;
 
   const DEBRIS_MAX = 16;
@@ -204,6 +266,11 @@ function createHero3D(canvas3d, opts = {}) {
       for (const k of PROP_KEYS) {
         // §G-2 발사체 3종=원본 가산 재질(이사 승인) / §G-3 픽업 5종=순수 조형 멀티 파트(이사 "2D 이어붙이기 금지")
         //  / ebullet 은 §G-4 순수 조형 예정 — 임시로 공용 자발광 유지.
+        //  §G-12 유도 미사일 탄체 = 이사 VARCO 실모델(W4). 나머지 발사체는 원본 텍스처 가산 재질 유지.
+        if (k === 'missile' && WEAPON3D.missile.glb) {
+          props[k] = makeGlbSwarm(k, WEAPON3D.missile, () => [{ geo: createPropGeometry(THREE, k), mat: createProjMaterial(THREE, k) }]);
+          continue;
+        }
         const isProj = (k === 'pbullet' || k === 'missile' || k === 'laser');
         const isPickup = (k === 'crystal' || k === 'coin' || k === 'pow' || k === 'pod' || k === 'capsule');
         if (isPickup || k === 'ebullet') {
@@ -364,14 +431,27 @@ function createHero3D(canvas3d, opts = {}) {
       model.group.visible = !useGlb;
       if (useGlb) flags[tier].holder.rotation.z = bank;
       ctl._flagTier = useGlb ? tier : -1;
+      // §G-12 갑판 포탑: 현재 무기 1종을 장착점 수만큼(2D 와 동일 규칙) 세운다 — 실모델 기함일 때만.
+      const wKey = sq.weapon === 'laser' ? 'laser' : sq.weapon === 'homing' ? 'homing' : 'vulcan';
+      mountRig.visible = useGlb && placeMounts(tier, wKey, sq.weaponLv | 0, flags[tier].box, FLAG_LEN * (TIER_SCALE[tier] ?? 1));
+      mountRig.rotation.z = bank;
+      ctl._mountKey = mountRig.visible ? wKey : '';
       // 프레임 간격(차지 감쇠·파편 적분 공용) — time 은 초 단위 누적
       const dt = Math.min(0.05, Math.max(0, time - (ctl._prevTime || time)));
       ctl._prevTime = time;
       // §G-11 차지 연출: 충전 집속(기수 앞 코어가 커지며 밝아짐) → 발사 순간 빔(0.34s, 2D ChargeLance 수명과 동일)
-      const chg = sq.charging ? Math.max(0, Math.min(1, sq.chargeFrac || 0)) : 0;
+      //  ⚠️실전 Squad 는 charging/chargeFrac 을 갖지 않는다 — 충전 상태는 charge(누적 초)·chargeStage 다.
+      //   (charging/chargeFrac 은 검사용 합성 run 의 필드라, 그것만 읽던 §G-11 연출이 실플레이에서 한 번도
+      //    뜨지 않았다 — 실측.) 합성 run 이면 그 값을, 실전이면 charge 를 만충 시간으로 정규화해 쓴다.
+      const CHARGE_FULL = BAL.charge.stageTime * BAL.charge.maxStage;   // 단계시간×최대단계 = 만충(초)
+      const chgOn = sq.charging !== undefined ? !!sq.charging : (sq.charge || 0) > 0.001;
+      const chgFrac = sq.chargeFrac !== undefined ? sq.chargeFrac : (sq.charge || 0) / CHARGE_FULL;
+      const chg = chgOn ? Math.max(0, Math.min(1, chgFrac)) : 0;
       if (_prevCharge > 0.25 && chg === 0) { _lanceT = 0.34; _lanceStage = _prevCharge >= 0.99 ? 3 : 1; }   // 충전 해제=발사
       _prevCharge = chg;
-      const NOSE_Z = 2.6;   // 기함 기수 앞(전장 4.78 기준) — 여기서 모으고 여기서 쏜다
+      //  기수 앞 = 실제 기함 바운딩의 +z 끝 + 여유. 상수 2.6(T3 기준)으로 두면 T4·T5 는 기수가 더 길어
+      //  집속 코어·포구가 선체 안에 묻힌다(실측). 폴백은 절차 AURORA 기준값.
+      const NOSE_Z = (flags[tier] && flags[tier].box ? flags[tier].box.max.z * (FLAG_LEN * (TIER_SCALE[tier] ?? 1)) : 2.25) + 0.35;
       if (chg > 0) {
         const puff = 1 + Math.sin(time * 18) * 0.08;
         chargeCore.position.set(0, 0.35, NOSE_Z);
@@ -382,6 +462,15 @@ function createHero3D(canvas3d, opts = {}) {
         chargeHalo.material.opacity = 0.12 + chg * 0.3;
       } else {
         chargeCore.material.opacity = 0; chargeHalo.material.opacity = 0;
+      }
+      //  §G-12 차지 포구(W5): 집속 코어를 감싸는 금색 조리개 링. 충전 중 천천히 돌아 "가동" 느낌을 준다.
+      //  ⚠️조리개(금색 입)를 전방(+z)으로 두면 함미 추적 카메라에는 뚫린 뒷면만 보여 검은 덩어리가 된다(실측).
+      //   그래서 리그에서 180° 돌려 조리개가 카메라를 향하게 하고, 코어를 그 앞에 둬 링 안에서 빛나게 한다.
+      if (muzzleRig.children.length) {
+        const ms = FLAG_LEN * (TIER_SCALE[tier] ?? 1) * 0.13;
+        muzzleRig.position.set(0, 0.35, NOSE_Z - ms * 0.9);
+        muzzleRig.scale.setScalar(ms);
+        muzzleRig.rotation.set(0, Math.PI, time * 1.1);
       }
       if (_lanceT > 0) {
         _lanceT = Math.max(0, _lanceT - dt);

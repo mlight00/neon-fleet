@@ -58,6 +58,31 @@ export const PICKUP3D = {
   pow:     { cap: 8,  glb: 'assets/3d/p4_model.glb' },
 };
 
+/** §G-12 기함 무기 실모델(이사 VARCO) — 포탑 3종은 갑판 장착점에, 미사일은 발사체로, 포구는 기수에.
+ *  포신·노즈는 +z(소실점=전방)를 향해야 한다. rotY 는 검사실 진열(chase3dLab=weapons) 30°/6° 스윕
+ *  캡처로 확정한 실측값이다 — 바운딩박스는 앞뒤를 못 가린다(§G-8 교훈).
+ *   w1 발칸: 포구 다발이 -z → π.   w2 레이저: 포신이 비축(대각) → -π/4(315°에서 포구가 카메라 정면).
+ *   w3 유도: 3×3 발사관이 이미 +z → 0.   w4 미사일: 노즈 -z(0°는 노즐·핀) → π.   w5 포구: 금색 조리개가 +z → 0. */
+export const WEAPON3D = {
+  vulcan: { cap: 5, glb: 'assets/3d/w1_model.glb', rotY: Math.PI },        // W1 발칸 포탑
+  laser:  { cap: 5, glb: 'assets/3d/w2_model.glb', rotY: -Math.PI / 4 },   // W2 레이저 포탑
+  homing: { cap: 5, glb: 'assets/3d/w3_model.glb', rotY: 0 },              // W3 유도 발사대
+  missile:{ cap: 24, glb: 'assets/3d/w4_model.glb', rotY: Math.PI },       // W4 유도 미사일 탄체(발사체 — PROP_CAPS.missile 과 동일)
+  muzzle: { cap: 1, glb: 'assets/3d/w5_model.glb', rotY: 0 },              // W5 차지 포구(기수 고정)
+};
+
+/** 갑판 장착점(정규화) — ships.js 의 NORMALIZED_MOUNTS 사본. 2D 스프라이트와 같은 자리에 3D 포탑을 세운다.
+ *  x=폭 비율(+우), y=길이 비율(−가 전방) — 3D 에서는 z = −y × 모델 길이로 환산한다.
+ *  ⚠️ships.js 가 바뀌면 여기도 같이 바꿀 것(테스트 W3D-05 가 두 표의 일치를 잠근다). */
+export const MOUNT_POINTS = [
+  [[0, -0.24]],
+  [[-0.22, -0.12], [0.22, -0.12]],
+  [[-0.28, -0.08], [0.28, -0.08], [0, -0.30]],
+  [[-0.3, -0.12], [0.3, -0.12], [-0.16, -0.3], [0.16, -0.3]],
+  [[-0.3, -0.08], [0.3, -0.08], [-0.16, -0.28], [0.16, -0.28], [0, -0.36]],
+  [[-0.32, -0.05], [0.32, -0.05], [-0.2, -0.24], [0.2, -0.24], [0, -0.38]],
+];
+
 /** §G-8 기함 실모델(이사 승인 "B 로 하자") — 등급(squad.tier 0~5)별 스왑. 회전=아군 함선 규약.
  *  T0 EMBER·T1 FLARE 는 드론·순양함과 같은 원화라 a1/a2 모델 재사용(이사 합의). 로드 전·실패 시
  *  절차 AURORA 폴백(포털 빌드=GLB 제외라 자동 폴백). 전장은 renderer 의 FLAG_LEN 이 통일. */
