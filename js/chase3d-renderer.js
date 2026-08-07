@@ -165,6 +165,26 @@ function createHero3D(canvas3d, opts = {}) {
   // ── §G-8 피격 연출(이사 "섬광은 별로 — 부품이 떨어져 나가고 기체가 흔들리게") ──
   //  신호=squad.flash 상승 에지(takeShot 세트 — 로직 무수정). 파편=세라믹 장갑 조각 InstancedMesh 1 드로우,
   //  결정적 의사난수(LCG — Math.random 금지 계약). 흔들림=flagRig 감쇠 진동(절차·GLB 기함 공통).
+  // ── §G-11 차지 연출 3D(이사 "기함 무기와 차지 이펙트도 3D") — 충전 집속 → 발사 빔 ──
+  //  ⚠️실모델 스왑 이후 절차 AURORA 의 emissive 펄스(charging/chargeFrac)가 안 보이게 됐다(model.group 숨김).
+  //   그래서 기함 모델 종류와 무관하게 리그에 붙는 별도 연출로 만든다: 기수 앞 집속 코어 + 발사 순간 빔.
+  const chargeCore = new THREE.Mesh(
+    new THREE.SphereGeometry(0.30, 20, 14),
+    new THREE.MeshBasicMaterial({ color: 0xbfefff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const chargeHalo = new THREE.Mesh(
+    new THREE.SphereGeometry(0.62, 20, 14),
+    new THREE.MeshBasicMaterial({ color: 0x5fd8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  //  발사 빔: 기수(+z)로 뻗는 원통. 길이 1 로 만들고 scale.z 로 늘린다(회전 없이 축 정렬).
+  const lanceGeo = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true);
+  lanceGeo.rotateX(Math.PI / 2);   // 기본 y축 → +z 축
+  const lanceCore = new THREE.Mesh(lanceGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  const lanceGlow = new THREE.Mesh(lanceGeo, new THREE.MeshBasicMaterial({ color: 0x66e0ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  const chargeRig = new THREE.Group();
+  chargeRig.add(chargeCore, chargeHalo, lanceCore, lanceGlow);
+  chargeRig.visible = false;
+  flagRig.add(chargeRig);
+  let _lanceT = 0, _lanceStage = 1, _prevCharge = 0;
+
   const DEBRIS_MAX = 16;
   const debris = new THREE.InstancedMesh(
     new THREE.BoxGeometry(0.30, 0.08, 0.44),
@@ -344,9 +364,40 @@ function createHero3D(canvas3d, opts = {}) {
       model.group.visible = !useGlb;
       if (useGlb) flags[tier].holder.rotation.z = bank;
       ctl._flagTier = useGlb ? tier : -1;
-      // §G-8 피격 연출(이사: 섬광 대신 "부품 이탈 + 기체 흔들림") — flash 상승 에지에서 발화
+      // 프레임 간격(차지 감쇠·파편 적분 공용) — time 은 초 단위 누적
       const dt = Math.min(0.05, Math.max(0, time - (ctl._prevTime || time)));
       ctl._prevTime = time;
+      // §G-11 차지 연출: 충전 집속(기수 앞 코어가 커지며 밝아짐) → 발사 순간 빔(0.34s, 2D ChargeLance 수명과 동일)
+      const chg = sq.charging ? Math.max(0, Math.min(1, sq.chargeFrac || 0)) : 0;
+      if (_prevCharge > 0.25 && chg === 0) { _lanceT = 0.34; _lanceStage = _prevCharge >= 0.99 ? 3 : 1; }   // 충전 해제=발사
+      _prevCharge = chg;
+      const NOSE_Z = 2.6;   // 기함 기수 앞(전장 4.78 기준) — 여기서 모으고 여기서 쏜다
+      if (chg > 0) {
+        const puff = 1 + Math.sin(time * 18) * 0.08;
+        chargeCore.position.set(0, 0.35, NOSE_Z);
+        chargeCore.scale.setScalar((0.35 + chg * 1.15) * puff);
+        chargeCore.material.opacity = 0.35 + chg * 0.55;
+        chargeHalo.position.copy(chargeCore.position);
+        chargeHalo.scale.setScalar((0.4 + chg * 1.5) * puff);
+        chargeHalo.material.opacity = 0.12 + chg * 0.3;
+      } else {
+        chargeCore.material.opacity = 0; chargeHalo.material.opacity = 0;
+      }
+      if (_lanceT > 0) {
+        _lanceT = Math.max(0, _lanceT - dt);
+        const p = _lanceT / 0.34;                       // 1 → 0
+        const len = 110, rad = (0.34 + 0.24 * p) * (_lanceStage >= 3 ? 1.5 : 1);   // 2D 는 화면 끝까지 뻗는다 — 소실점까지 닿게
+        for (const [m, r, o] of [[lanceCore, rad * 0.42, 0.9 * p], [lanceGlow, rad, 0.5 * p]]) {
+          m.position.set(0, 0.35, NOSE_Z + len / 2);
+          m.scale.set(r, r, len);
+          m.material.opacity = o;
+        }
+        if (_lanceStage >= 3) lanceGlow.material.color.setHex(0xffd166); else lanceGlow.material.color.setHex(0x66e0ff);
+      } else {
+        lanceCore.material.opacity = 0; lanceGlow.material.opacity = 0;
+      }
+      chargeRig.visible = chg > 0 || _lanceT > 0;
+      // §G-8 피격 연출(이사: 섬광 대신 "부품 이탈 + 기체 흔들림") — flash 상승 에지에서 발화
       const fl = sq.flash || 0;
       if (fl > _prevFlash + 0.1 && !prefersReducedMotion3D()) {
         _shakeT = 0.42;
