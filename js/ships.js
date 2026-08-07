@@ -313,8 +313,13 @@ export function shipSprite(tier, weapon) {
   return spriteCache[tier];
 }
 
-/** H2 전용 외장 프레임. aligned 3종은 같은 533×768 원점을 절대 변경하지 않는다. */
+/** H2 전용 외장 프레임 — §G-9 이후 폐지(이사 "기함 3D 이미지 적용이 안된다").
+ *  T2 만 본체 위에 무기별 외장(H2_ASSAULT/H2_CARRIER)을 덮어써서, 본체를 3D 실모델 렌더로 바꿔도
+ *  구 아트 프레임이 화면을 가려 교체가 보이지 않았다. 6등급 중 T2 에만 있던 특례라 통일이 맞다.
+ *  무기 구분은 그대로 남는다(포대 마운트 drawWeaponRig + HUD 무기명). 호출부·시그니처는 보존. */
+const HULL_FRAME_OVERLAY = false;
 export function drawHullFrame(ctx, tier, weapon, previousWeapon = null, blend = 1) {
+  if (!HULL_FRAME_OVERLAY) return;
   if (tier !== 2) return;
   const frameFor = (w) => getSprite(w === 'homing' ? 'H2_CARRIER' : 'H2_ASSAULT');
   const current = frameFor(weapon);
