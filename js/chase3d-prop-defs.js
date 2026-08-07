@@ -57,3 +57,18 @@ export const PICKUP3D = {
   coin:    { cap: 48, glb: 'assets/3d/p3_model.glb' },
   pow:     { cap: 8,  glb: 'assets/3d/p4_model.glb' },
 };
+
+/** §G-8 기함 실모델(이사 승인 "B 로 하자") — 등급(squad.tier 0~5)별 스왑. 회전=아군 함선 규약.
+ *  T0 EMBER·T1 FLARE 는 드론·순양함과 같은 원화라 a1/a2 모델 재사용(이사 합의). 로드 전·실패 시
+ *  절차 AURORA 폴백(포털 빌드=GLB 제외라 자동 폴백). 전장은 renderer 의 FLAG_LEN 이 통일. */
+//  ⚠️회전은 GLB 원본 자세에 따라 다르다(실측 필수 — 바운딩박스 최대축으로 판별):
+//   a1/a2 = y 최대(서 있음) → rotX -π/2 로 눕힌다. t2/t4/t5 = z 최대(이미 누움) → rotX 금지(적용하면 세워져 5m 벽이 됨).
+//   a0 = x 최대(넓적) → rotX -π/2 로 갑판을 위로.
+export const FLAG3D = {
+  0: { glb: 'assets/3d/a1_model.glb', rotX: -Math.PI / 2, rotY: Math.PI },   // EMBER (드론 원화 — 서 있는 원본)
+  1: { glb: 'assets/3d/a2_model.glb', rotX: -Math.PI / 2, rotY: Math.PI },   // FLARE (순양함 원화 — 서 있는 원본)
+  2: { glb: 'assets/3d/t2_model.glb', rotY: Math.PI },                       // ARCLIGHT (누운 원본)
+  3: { glb: 'assets/3d/a0_model.glb', rotX: -Math.PI / 2, rotY: Math.PI },   // AURORA (A/B 의 B)
+  4: { glb: 'assets/3d/t4_model.glb', rotY: Math.PI },                       // ZENITH (누운 원본)
+  5: { glb: 'assets/3d/t5_model.glb', rotY: Math.PI },                       // QUASAR (누운 원본)
+};

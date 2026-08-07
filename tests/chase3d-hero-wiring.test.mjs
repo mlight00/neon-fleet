@@ -42,7 +42,7 @@ test('HW-09: 부분 추종(이사) — 2D C0 이탈을 3D 카메라 트럭 이�
 test('HW-10: 크리처 실전 스웜 B1+B2(이사 승인) — 화면 정합 배치 + 2D 하드 컷 + 안전 폴백', () => {
   // 3D 레이어 = AURORA + 종별 인스턴스(버킷 3 = 종당 +3 draw). 배치는 2.5D 투영 화면좌표·크기에 정합(unproject).
   // §G-4 이미지 파이프라인(이사): 적 12종 = Gemini 렌더 빌보드 — ENEMY3D 단일 진실 루프
-  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D \} from '\.\/chase3d-prop-defs\.js'/);
+  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D \} from '\.\/chase3d-prop-defs\.js'/);
   assert.match(renderer, /eswarm\[k\] = def\.glb \? makeGlbSwarm\(k, def\) : makeBillboardSwarm\(k, def\.cap\)/);
   assert.match(renderer, /function placeSwarm\(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math\.PI, pitchBase = -0\.12, behindFlag = false\)/);
   assert.match(renderer, /\.unproject\(camera\)/);
@@ -153,7 +153,7 @@ test('HW-06: lab 플래그 정책 — chase3d=1 없으면 검사실 불가(§8)'
   assert.equal(chase3dLabTarget(''), '');
   // 기본 URL 에서 lab 모듈 미로드: 동적 import 는 CHASE3D_LAB 타깃 가드 안
   const i = main.indexOf("import('./chase3d-lab.js')");
-  const guard = main.lastIndexOf("if (['aurora', 'a0', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB))", i);
+  const guard = main.lastIndexOf("if (['aurora', 'a0', 'flags', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB))", i);
   assert.ok(guard > 0 && guard < i, 'lab import 는 6타깃 플래그 가드 안');
 });
 
@@ -181,4 +181,35 @@ test('HW-13: 기함 가림 계약(이사 "적·수송선이 기함 위로 지나
   // 아군(드론·순양함)은 behindFlag 미전달(기함 갑판 위 편대 유지) — direct 호출에 9번째 인자 없음
   assert.match(renderer, /placeSwarm\(drone, swarms\.drone\.buf, swarms\.drone\.n, DRONE_INSTANCE_MAX, 'direct', 0, 0\)/);
   assert.match(renderer, /placeSwarm\(cruiser, swarms\.cruiser\.buf, swarms\.cruiser\.n, CRUISER_INSTANCE_MAX, 'direct', 0, 0\)/);
+});
+
+test('HW-14: §G-8 기함 실모델 등급 스왑 + 피격 연출 교체(이사 "섬광 말고 부품 이탈·흔들림")', () => {
+  const defs = readFileSync(new URL('../js/chase3d-prop-defs.js', import.meta.url), 'utf8');
+  // 등급 6종 테이블 — T0/T1 은 드론·순양함 원화 재사용, T2~T5 는 전용 실모델
+  assert.match(defs, /export const FLAG3D = \{/);
+  for (const [t, f] of [[0, 'a1'], [1, 'a2'], [2, 't2'], [3, 'a0'], [4, 't4'], [5, 't5']]) {
+    assert.match(defs, new RegExp(`${t}: \{ glb: 'assets/3d/${f}_model\.glb'`), `T${t}=${f}`);
+  }
+  // ⚠️회전 규약: 서 있는 원본(a1/a2/a0)만 rotX -π/2, 누운 원본(t2/t4/t5)은 rotX 금지(적용 시 5m 벽으로 세워짐 — 실측)
+  const flagBlock = defs.slice(defs.indexOf('export const FLAG3D'));
+  for (const f of ['t2', 't4', 't5']) {
+    const line = flagBlock.split('\n').find((l) => l.includes(`${f}_model.glb`));
+    assert.ok(line && !/rotX/.test(line), `${f} 는 rotX 금지(이미 누운 원본)`);
+    assert.match(line, /rotY: Math\.PI/, `${f} 노즈 +z 정렬`);
+  }
+  // renderer: 리그·홀더·등급 배율·가시성 스왑
+  assert.match(renderer, /import \{ ENEMY3D, ALLY3D, PICKUP3D, FLAG3D \}/);
+  assert.match(renderer, /const TIER_SCALE = \[0\.62, 0\.75, 0\.88, 1\.00, 1\.13, 1\.26\]/);
+  assert.match(renderer, /holder\.visible = false; holder\.scale\.setScalar\(FLAG_LEN \* \(TIER_SCALE\[\+t\] \?\? 1\)\)/);
+  assert.match(renderer, /for \(const k of Object\.keys\(flags\)\) flags\[k\]\.holder\.visible = \(useGlb && \+k === tier\)/);
+  assert.match(renderer, /model\.group\.visible = !useGlb/);   // 실모델 준비 전·실패 시 절차 AURORA 폴백
+  // 피격 연출: 파편 InstancedMesh + 감쇠 흔들림, 신호는 squad.flash 상승 에지(게임 로직 무수정)
+  assert.match(renderer, /const debris = new THREE\.InstancedMesh\(/);
+  assert.match(renderer, /if \(fl > _prevFlash \+ 0\.1 && !prefersReducedMotion3D\(\)\)/);
+  assert.match(renderer, /_shakeT = Math\.max\(0, _shakeT - dt\)/);
+  assert.match(renderer, /flagRig\.rotation\.z = Math\.sin\(w \* 1\.3 \+ 0\.6\) \* 0\.09 \* k/);
+  assert.ok(!/Math\.random\(\)/.test(renderer), '파편 난수는 결정적 LCG(_rnd) — Math.random 금지 계약');
+  // 기각된 섬광 연출은 완전 제거(이사 "정말 별로다")
+  assert.ok(!/drawImpactFlash/.test(main), '충돌 섬광 제거');
+  assert.ok(!/noteImpact/.test(main), '충돌 섬광 감지 제거');
 });

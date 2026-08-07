@@ -13,7 +13,7 @@ import { createBillboardParts } from './chase3d-billboards.js';
 import { loadEnemyGlbParts } from './chase3d-glb.js';
 import { createDroneGeometry, createCruiserGeometry, createDroneMaterials, createCruiserMaterials, DRONE_INSTANCE_MAX, CRUISER_INSTANCE_MAX } from './chase3d-allies.js';
 import { PROP_KEYS, PROP_CAPS, PROP_BASE_COLOR, createPropGeometry, createPropMaterial, createProjMaterial, createPickupParts, createEnemyBulletParts } from './chase3d-props.js';
-import { ENEMY3D, ALLY3D, PICKUP3D } from './chase3d-prop-defs.js';
+import { ENEMY3D, ALLY3D, PICKUP3D, FLAG3D } from './chase3d-prop-defs.js';
 
 // 적 12종 동시 표시 상한은 ENEMY3D(chase3d-prop-defs) 단일 진실 — 아래는 기존 외부 참조 호환용 파생.
 export const B1_INSTANCE_MAX = ENEMY3D.b1.cap;
@@ -27,6 +27,12 @@ export function createChase3D(canvas3d, opts = {}) {
   return createLegacy3D(canvas3d);
 }
 
+/** 접근성: 모션 최소화 사용자는 피격 파편·흔들림을 받지 않는다(main 의 동명 헬퍼와 같은 계약). */
+function prefersReducedMotion3D() {
+  try { return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch { return false; }
+}
+
 // ── hero: AURORA 전용 씬 (색관리 §7.3 + IBL + 프리웜 §10.2) ──
 function createHero3D(canvas3d, opts = {}) {
   const ctl = {
@@ -34,7 +40,7 @@ function createHero3D(canvas3d, opts = {}) {
     _t: 0, _zoom: 1, _lastW: 0, _lastH: 0, _lastDpr: 0, _rendered: false,
     prewarm: { done: false, programsBefore: -1, programsAfter: -1, ms: 0 },
   };
-  let renderer, model, scene, camera, envRT;
+  let renderer, model, scene, camera, envRT, flagRig;
   try {
     renderer = new THREE.WebGLRenderer({ canvas: canvas3d, alpha: true, premultipliedAlpha: false, antialias: true, powerPreference: 'high-performance' });
   } catch (e1) {
@@ -68,7 +74,10 @@ function createHero3D(canvas3d, opts = {}) {
     // 모바일 판정 = 세로(portrait)·협폭 창(§9.3 DPR 제한과 동일 축). 데스크톱 800×450 같은 가로 소형창은 데스크톱.
     ctl._mobile = (typeof window !== 'undefined' && window.innerHeight > window.innerWidth && window.innerWidth <= 500);
     model = createAuroraModel(THREE, { seed: 7, mobile: ctl._mobile, lods: [0, 1] });
-    scene.add(model.group);
+    // §G-8 기함 리그: 절차 AURORA + 등급별 GLB 홀더를 한 리그에 담아 피격 흔들림을 공통 적용
+    flagRig = new THREE.Group();
+    flagRig.add(model.group);
+    scene.add(flagRig);
     camera = new THREE.PerspectiveCamera(CAMERA.chase.fov, 1, CAMERA.near, CAMERA.far);
   } catch (e) { ctl.reason = 'hero-scene-exception:' + String(e && e.message || e); try { renderer.dispose(); } catch {} return ctl; }
   ctl.available = true;
@@ -139,6 +148,32 @@ function createHero3D(canvas3d, opts = {}) {
         _sPos = new THREE.Vector3(), _sScl = new THREE.Vector3(), _sEul = new THREE.Euler(),
         _sQ = new THREE.Quaternion(), _sM = new THREE.Matrix4(), _sCol = new THREE.Color(),
         _sQ2 = new THREE.Quaternion(), _sAxisZ = new THREE.Vector3(0, 0, 1);
+  // ── §G-8 기함 실모델(이사 승인 "B 로 하자"): squad.tier(0~5)별 GLB 홀더 — 로드 전·실패 시 절차 AURORA 폴백 ──
+  const FLAG_LEN = 4.78;   // 절차 AURORA(T3) 실측 전장 — 전장 1.0 정규화 GLB 를 이 배율로(카메라·조명 구도 유지)
+  //  등급 위엄: 2D SHIP_VISUAL_SIZE 비[34,50,68,88,112,140]/88 을 √로 압축 — 원비는 T5 가 1.59배라 화면을 넘긴다(구도 파괴).
+  const TIER_SCALE = [0.62, 0.75, 0.88, 1.00, 1.13, 1.26];
+  const flags = {};
+  for (const t of Object.keys(FLAG3D)) {
+    const holder = new THREE.Group();
+    holder.visible = false; holder.scale.setScalar(FLAG_LEN * (TIER_SCALE[+t] ?? 1));
+    flagRig.add(holder);
+    flags[t] = { holder, ok: false };
+    loadEnemyGlbParts(THREE, FLAG3D[t].glb, FLAG3D[t])
+      .then((parts) => { for (const p of parts) holder.add(new THREE.Mesh(p.geo, p.mat)); flags[t].ok = true; })
+      .catch(() => { /* 실패 = 해당 티어만 절차 AURORA 유지 */ });
+  }
+  // ── §G-8 피격 연출(이사 "섬광은 별로 — 부품이 떨어져 나가고 기체가 흔들리게") ──
+  //  신호=squad.flash 상승 에지(takeShot 세트 — 로직 무수정). 파편=세라믹 장갑 조각 InstancedMesh 1 드로우,
+  //  결정적 의사난수(LCG — Math.random 금지 계약). 흔들림=flagRig 감쇠 진동(절차·GLB 기함 공통).
+  const DEBRIS_MAX = 16;
+  const debris = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.30, 0.08, 0.44),
+    new THREE.MeshStandardMaterial({ color: 0xe3e6ea, roughness: 0.55, metalness: 0.12, emissive: 0x17191d }),
+    DEBRIS_MAX);
+  debris.count = 0; debris.frustumCulled = false; scene.add(debris);
+  const _deb = [];
+  let _shakeT = 0, _prevFlash = 0, _lcg = 7;
+  const _rnd = () => ((_lcg = (_lcg * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   // ── 소품 스웜(이사: "무기·배지 3D") — 기본 OFF. opts.propsEnabled(=chase3dProps=1)일 때만 GPU 자원까지 생성.
   //  Codex 재검토 P2: 표시만 OFF 가 아니라 지오메트리·재질·InstancedMesh·프리웜 비용 자체를 0 으로.
   let props = null;
@@ -301,6 +336,62 @@ function createHero3D(canvas3d, opts = {}) {
       const bank = Math.max(-bankMax, Math.min(bankMax, bankSrc));
       model.setLOD(ctl._mobile ? 1 : 0);   // 창 기준 판정(세로 게임 컬럼 폭 아님)
       model.update(time, { bank, charging: !!sq.charging, chargeFrac: sq.chargeFrac || 0 });
+      // §G-8 등급 스왑(이사 "B 로 하자"): squad.tier 의 실모델이 준비됐으면 그것만, 아니면 절차 AURORA 유지.
+      //  절차 모델의 bank·bob 은 model.update 가 담당 — GLB 홀더는 같은 bank 를 롤로 직접 적용.
+      const tier = Math.max(0, Math.min(5, sq.tier | 0));
+      const useGlb = flags[tier] && flags[tier].ok;
+      for (const k of Object.keys(flags)) flags[k].holder.visible = (useGlb && +k === tier);
+      model.group.visible = !useGlb;
+      if (useGlb) flags[tier].holder.rotation.z = bank;
+      ctl._flagTier = useGlb ? tier : -1;
+      // §G-8 피격 연출(이사: 섬광 대신 "부품 이탈 + 기체 흔들림") — flash 상승 에지에서 발화
+      const dt = Math.min(0.05, Math.max(0, time - (ctl._prevTime || time)));
+      ctl._prevTime = time;
+      const fl = sq.flash || 0;
+      if (fl > _prevFlash + 0.1 && !prefersReducedMotion3D()) {
+        _shakeT = 0.42;
+        const n = Math.min(7, DEBRIS_MAX - _deb.length);
+        for (let i = 0; i < n; i++) {
+          const a = _rnd() * Math.PI * 2, sp = 1.6 + _rnd() * 2.4;
+          //  기함 전장 FLAG_LEN(≈4.8) 기준 — 기수 앞·갑판 위에서 튀어나와야 함체에 파묻히지 않는다(실측).
+          _deb.push({
+            x: (_rnd() - 0.5) * 2.4, y: 0.5 + _rnd() * 0.9, z: 1.6 + _rnd() * 1.2,
+            vx: Math.cos(a) * sp, vy: 1.6 + _rnd() * 2.4, vz: 1.6 + _rnd() * 3.0,     // +z=카메라 쪽(뒤로 흩어짐)
+            rx: (_rnd() - 0.5) * 9, ry: (_rnd() - 0.5) * 9, rz: (_rnd() - 0.5) * 9,
+            ax: _rnd() * 6.28, ay: _rnd() * 6.28, az: _rnd() * 6.28,
+            life: 0.85 + _rnd() * 0.45, t: 0, s: 1.1 + _rnd() * 1.1,
+          });
+        }
+      }
+      _prevFlash = fl;
+      // 파편 적분(중력 없음 — 우주) + 수명 소멸. 인스턴스 행렬 갱신은 살아있는 것만.
+      let dn = 0;
+      for (let i = 0; i < _deb.length; i++) {
+        const d = _deb[i];
+        d.t += dt;
+        if (d.t >= d.life) continue;
+        d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
+        d.vx *= 0.985; d.vy *= 0.985; d.vz *= 0.985;
+        d.ax += d.rx * dt; d.ay += d.ry * dt; d.az += d.rz * dt;
+        const k = 1 - d.t / d.life;
+        _sEul.set(d.ax, d.ay, d.az); _sQ.setFromEuler(_sEul);
+        _sM.compose(_sPos.set(d.x, d.y, d.z), _sQ, _sScl.setScalar(d.s * (0.45 + k * 0.55)));
+        debris.setMatrixAt(dn++, _sM);
+        _deb[dn - 1] = d;   // 살아있는 것만 앞으로 압축(별도 배열 할당 없이)
+      }
+      _deb.length = dn;
+      debris.count = dn;
+      if (dn) debris.instanceMatrix.needsUpdate = true;
+      // 기체 흔들림: 감쇠 진동(피격 방향 무관 — 충격 직후 크게, 0.42s 안에 잦아든다). 카메라는 건드리지 않는다(멀미 방지).
+      if (_shakeT > 0) {
+        _shakeT = Math.max(0, _shakeT - dt);
+        const k = _shakeT / 0.42, w = time * 46;
+        flagRig.position.set(Math.sin(w) * 0.16 * k, Math.sin(w * 1.7 + 1.1) * 0.11 * k, 0);
+        flagRig.rotation.z = Math.sin(w * 1.3 + 0.6) * 0.09 * k;
+        flagRig.rotation.x = Math.sin(w * 0.9) * 0.05 * k;
+      } else if (flagRig.position.x !== 0 || flagRig.rotation.z !== 0) {
+        flagRig.position.set(0, 0, 0); flagRig.rotation.set(0, 0, 0);
+      }
       // 실전 스웜(크리처+소품) — t≥0.5 에서만 이 지점에 도달 = 2D 스킵과 같은 하드 컷
       if (swarms) {
         for (const k of Object.keys(ENEMY3D)) {
@@ -339,6 +430,7 @@ function createHero3D(canvas3d, opts = {}) {
       geometries: r.memory.geometries, textures: r.memory.textures, aurora: model ? model.stats() : null,
       ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k + 'Count', eswarm[k] ? eswarm[k].count : -1])),
       droneCount: drone ? drone.count : -1, cruiserCount: cruiser ? cruiser.count : -1,
+      flagTier: ctl._flagTier ?? -1, debrisCount: debris ? debris.count : -1, shaking: _shakeT > 0,   // §G-8 기함 실모델·피격 연출 진단
       propCounts: props ? Object.fromEntries(PROP_KEYS.map((k) => [k, props[k].count])) : null,   // Codex P2: 진단이 확장 범위를 따라가게
       prewarm: { ...ctl.prewarm },
     };
@@ -349,6 +441,8 @@ function createHero3D(canvas3d, opts = {}) {
     for (const sw of [...Object.values(eswarm), drone, cruiser]) if (sw) for (const im of sw.meshes) { im.geometry.dispose(); if (im.material.map) im.material.map.dispose(); im.material.dispose(); im.dispose && im.dispose(); }
     if (props) { let matDone = false; for (const k of PROP_KEYS) { const im = props[k].meshes[0]; im.geometry.dispose(); if (!matDone) { im.material.dispose(); matDone = true; } im.dispose && im.dispose(); } }
     for (const k of Object.keys(eswarm)) eswarm[k] = null;
+    for (const k of Object.keys(flags)) flags[k].holder.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+    debris.geometry.dispose(); debris.material.dispose(); debris.dispose && debris.dispose();
     drone = null; cruiser = null; props = null;
     if (envRT) envRT.dispose();
     renderer.dispose();

@@ -8,7 +8,7 @@ import { createB2Model } from './chase3d-b2.js';
 import { createB4Model } from './chase3d-b4.js';
 import { createBillboardModel } from './chase3d-billboards.js';
 import { createGlbShowcase } from './chase3d-glb.js';
-import { ENEMY3D } from './chase3d-prop-defs.js';
+import { ENEMY3D, FLAG3D } from './chase3d-prop-defs.js';
 import { createAlliesModel } from './chase3d-allies.js';
 import { createPickupsShowcase } from './chase3d-props.js';
 import { forgeEnvEquirect } from './chase3d-aurora-materials.js';
@@ -79,6 +79,9 @@ export function createAuroraLab(canvas, opts = {}) {
     // §G-7 기함 VARCO 단독 진열 — 현행(aurora 타깃)과 A/B 비교용. 회전=아군 함선 규약(rotX -π/2 + rotY π) 가설, 실측 보정.
     model = createGlbShowcase(THREE, { a0: { glb: 'assets/3d/a0_model.glb', rotX: -Math.PI / 2, rotY: Math.PI } });
     model.group.scale.setScalar(2.0);
+  } else if (target === 'flags') {
+    model = createGlbShowcase(THREE, FLAG3D);   // §G-8 기함 6등급 격자 진열(T0 EMBER ~ T5 QUASAR) — 진화 순서 육안 확인
+    model.group.scale.setScalar(0.62);   // 3열×2행 격자(GAP 1.5)가 세로 뷰포트에 들어오는 배율(실측)
   } else if (target === 'b5' || target === 'b6') {
     model = createBillboardModel(THREE, target);   // §G-4 터렛·위버 = 이사 제작(Gemini) 렌더 빌보드(실전과 동일 판)
     model.group.scale.setScalar(3.3);   // 4.0 은 좌우 잘림(실측) — 여백 확보
