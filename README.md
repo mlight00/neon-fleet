@@ -156,3 +156,18 @@ node --test tests/*.test.mjs
 - 격납고: 코인으로 영구 강화 (시작 드론/공격력/발사 속도/코인 획득)
 - 스테이지 2~10 해금 (전자기 폭풍 존, ÷ 게이트, 신규 크리처)
 - 효과음/배경음, 엔드리스 모드, GitHub Pages 배포
+
+## 크레딧 · 자산 출처
+
+| 자산 | 출처 | 라이선스 |
+|---|---|---|
+| 효과음 48개 | [Kenney.nl](https://kenney.nl) — Sci-fi Sounds · Impact Sounds · Interface Sounds · Digital Audio · UI Audio | **CC0 1.0** (저작권 포기 · 표기 의무 없음) |
+| 배경음 21곡 | Google Flow (music) | 제작자 유료 구독 산출물 |
+| 이미지 아트 | Gemini (유료 구독) + 자체 후처리 | 제작자 유료 구독 산출물 |
+| 본문 폰트 | [Pretendard](https://github.com/orioncactus/pretendard) | SIL Open Font License 1.1 |
+| 3D 렌더 | [three.js](https://threejs.org) | MIT |
+| 게임 코드 | 자체 제작 | — |
+
+효과음은 Kenney 원본을 `scripts/build-sfx-from-kenney.mjs` 로 잘라·정규화해 만들었다
+(사양: `docs/2026-08-13-SFX-재제작-사양서.md`). 자산별 상세 감사는
+`docs/release/crazygames-basic-launch/asset-license-audit.md` 참조.
