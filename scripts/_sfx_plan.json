@@ -1,0 +1,163 @@
+[
+ {
+  "id": "vulcan",
+  "n": 3,
+  "dur": 0.22,
+  "prompt": "Single shot from a heavy rotary Vulcan autocannon, real gunpowder gunshot with a sharp cracking report, deep mechanical thump and a metallic breech clank, military machine gun firing, aggressive and weighty, dry, no reverb, no tail, tight one-shot",
+  "src": "revised-20260813"
+ },
+ {
+  "id": "laser",
+  "n": 3,
+  "dur": 0.22,
+  "prompt": "Single sci-fi energy laser bolt, sharp electric zap with a fast downward pitch sweep and a thick punchy low-end, powerful, dry, no reverb, tight one-shot",
+  "src": "saved"
+ },
+ {
+  "id": "missile",
+  "n": 2,
+  "dur": 0.45,
+  "prompt": "Sci-fi homing rocket launch, quick ignition click then a whooshing thruster with a low rumble, punchy, dry, short",
+  "src": "saved"
+ },
+ {
+  "id": "hit",
+  "n": 3,
+  "dur": 0.3,
+  "prompt": "Satisfying bullet impact on enemy armor plating, crunchy metallic hit with a bright sharp crack, a meaty punchy body and a quick sparkling ring, rewarding arcade hit marker, dry, tight, no long reverb tail",
+  "src": "revised-20260813"
+ },
+ {
+  "id": "explode_s",
+  "n": 3,
+  "dur": 0.55,
+  "prompt": "Small sci-fi explosion, quick punchy blast with metallic debris and a short low thump, dry, tight",
+  "src": "saved"
+ },
+ {
+  "id": "explode_l",
+  "n": 2,
+  "dur": 1.0,
+  "prompt": "Large heavy sci-fi explosion, deep booming blast with flying metal shrapnel and a powerful low-end punch, cinematic but tight",
+  "src": "saved"
+ },
+ {
+  "id": "crystal",
+  "n": 2,
+  "dur": 0.58,
+  "prompt": "Bright crystal shatter followed by an ascending magical sparkle chime, glassy, rewarding, satisfying collect sound",
+  "src": "saved"
+ },
+ {
+  "id": "gate_good",
+  "n": 2,
+  "dur": 0.6,
+  "prompt": "Positive sci-fi power-up chime, a quick bright ascending warp tone, energizing, clean and uplifting",
+  "src": "saved"
+ },
+ {
+  "id": "gate_bad",
+  "n": 2,
+  "dur": 0.6,
+  "prompt": "Negative sci-fi warning tone, a quick descending warp buzz, ominous and disappointing",
+  "src": "saved"
+ },
+ {
+  "id": "pickup",
+  "n": 2,
+  "dur": 0.4,
+  "prompt": "Short sci-fi item pickup blip, a satisfying digital click with a soft warm hum, clean",
+  "src": "saved"
+ },
+ {
+  "id": "evolve",
+  "n": 1,
+  "dur": 0.91,
+  "prompt": "Powerful sci-fi ship transformation, a rising metallic energy charge building into a bright triumphant burst, heroic upgrade, epic and satisfying",
+  "src": "saved"
+ },
+ {
+  "id": "demote",
+  "n": 1,
+  "dur": 1.0,
+  "prompt": "Sci-fi power-down, a descending failing energy tone with a soft mechanical wind-down, disappointing",
+  "src": "saved"
+ },
+ {
+  "id": "shield_on",
+  "n": 1,
+  "dur": 1.9,
+  "prompt": "Sci-fi energy shield activating, a protective humming force field powering up with a soft bloom",
+  "src": "saved"
+ },
+ {
+  "id": "shield_pop",
+  "n": 2,
+  "dur": 0.5,
+  "prompt": "Energy shield deflecting a hit, a sharp electric zap and the shatter of a force field bubble",
+  "src": "saved"
+ },
+ {
+  "id": "damage",
+  "n": 2,
+  "dur": 0.65,
+  "prompt": "Heavy destructive impact on a starship hull, deep explosive thud with tearing metal, groaning structural crunch and scattering debris shrapnel, alarming and powerful damage hit, dry, minimal reverb",
+  "src": "revised-20260813"
+ },
+ {
+  "id": "telegraph",
+  "n": 1,
+  "dur": 0.35,
+  "prompt": "Short menacing alien weapon charge-up beep, a warning that an enemy is about to fire, tense",
+  "src": "saved"
+ },
+ {
+  "id": "boss_in",
+  "n": 1,
+  "dur": 1.0,
+  "prompt": "Massive alien mothership arrival, a deep intimidating horn roar layered with heavy metallic rumble, dread and scale",
+  "src": "saved"
+ },
+ {
+  "id": "boss_die",
+  "n": 1,
+  "dur": 2.0,
+  "prompt": "Huge boss death sequence, an enormous chain of explosions with deep booms and scattering debris, climactic and victorious",
+  "src": "saved"
+ },
+ {
+  "id": "click",
+  "n": 1,
+  "dur": 0.25,
+  "prompt": "Soft clean sci-fi interface button click, subtle, crisp, minimal",
+  "src": "saved"
+ },
+ {
+  "id": "buy",
+  "n": 1,
+  "dur": 0.75,
+  "prompt": "Satisfying sci-fi upgrade purchase, a metallic clank combined with a bright coin chime, rewarding",
+  "src": "saved"
+ },
+ {
+  "id": "charge_up",
+  "n": 4,
+  "dur": 1.0,
+  "prompt": "Sci-fi weapon energy charging up, rising electric hum with accelerating pitch sweep and building intensity, powerful capacitor whine, clean and smooth, no reverb tail",
+  "src": "new"
+ },
+ {
+  "id": "charge_full",
+  "n": 4,
+  "dur": 2.0,
+  "prompt": "Sci-fi weapon fully charged ready signal, bright sustained energy tone locking in with a confident shimmer, powerful and clear, ready-to-fire cue, minimal reverb",
+  "src": "new"
+ },
+ {
+  "id": "lance_fire",
+  "n": 4,
+  "dur": 0.48,
+  "prompt": "Massive sci-fi energy lance discharge, huge electric railgun blast with a deep bass detonation and a piercing beam sweep, devastating ultimate weapon, dry, tight, no long tail",
+  "src": "new"
+ }
+]

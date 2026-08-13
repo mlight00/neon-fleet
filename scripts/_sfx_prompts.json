@@ -1,0 +1,128 @@
+[
+ {
+  "id": "vulcan",
+  "ko": "발칸 발사",
+  "dur": "0.2s",
+  "prompt": "Single heavy sci-fi pulse cannon shot, punchy gun blast with a deep bass thump and a sharp metallic snap, aggressive and weighty, dry, no reverb, no tail, tight one-shot"
+ },
+ {
+  "id": "laser",
+  "ko": "레이저 발사",
+  "dur": "0.2s",
+  "prompt": "Single sci-fi energy laser bolt, sharp electric zap with a fast downward pitch sweep and a thick punchy low-end, powerful, dry, no reverb, tight one-shot"
+ },
+ {
+  "id": "missile",
+  "ko": "호밍 발사",
+  "dur": "0.4s",
+  "prompt": "Sci-fi homing rocket launch, quick ignition click then a whooshing thruster with a low rumble, punchy, dry, short"
+ },
+ {
+  "id": "hit",
+  "ko": "적 피격 틱",
+  "dur": "0.1s",
+  "prompt": "Tiny metallic impact tick, a bullet striking metal armor, very short, dry, crisp"
+ },
+ {
+  "id": "explode_s",
+  "ko": "소형 폭발",
+  "dur": "0.4s",
+  "prompt": "Small sci-fi explosion, quick punchy blast with metallic debris and a short low thump, dry, tight"
+ },
+ {
+  "id": "explode_l",
+  "ko": "대형 폭발",
+  "dur": "0.8s",
+  "prompt": "Large heavy sci-fi explosion, deep booming blast with flying metal shrapnel and a powerful low-end punch, cinematic but tight"
+ },
+ {
+  "id": "crystal",
+  "ko": "크리스탈 파괴(보상)",
+  "dur": "0.7s",
+  "prompt": "Bright crystal shatter followed by an ascending magical sparkle chime, glassy, rewarding, satisfying collect sound"
+ },
+ {
+  "id": "gate_good",
+  "ko": "이득 게이트",
+  "dur": "0.5s",
+  "prompt": "Positive sci-fi power-up chime, a quick bright ascending warp tone, energizing, clean and uplifting"
+ },
+ {
+  "id": "gate_bad",
+  "ko": "손해 게이트",
+  "dur": "0.5s",
+  "prompt": "Negative sci-fi warning tone, a quick descending warp buzz, ominous and disappointing"
+ },
+ {
+  "id": "pickup",
+  "ko": "캡슐/파워 획득",
+  "dur": "0.3s",
+  "prompt": "Short sci-fi item pickup blip, a satisfying digital click with a soft warm hum, clean"
+ },
+ {
+  "id": "evolve",
+  "ko": "함선 진화",
+  "dur": "1.5s",
+  "prompt": "Powerful sci-fi ship transformation, a rising metallic energy charge building into a bright triumphant burst, heroic upgrade, epic and satisfying"
+ },
+ {
+  "id": "demote",
+  "ko": "강등",
+  "dur": "0.8s",
+  "prompt": "Sci-fi power-down, a descending failing energy tone with a soft mechanical wind-down, disappointing"
+ },
+ {
+  "id": "shield_on",
+  "ko": "실드 획득",
+  "dur": "0.6s",
+  "prompt": "Sci-fi energy shield activating, a protective humming force field powering up with a soft bloom"
+ },
+ {
+  "id": "shield_pop",
+  "ko": "실드로 피해 무효",
+  "dur": "0.5s",
+  "prompt": "Energy shield deflecting a hit, a sharp electric zap and the shatter of a force field bubble"
+ },
+ {
+  "id": "damage",
+  "ko": "드론 손실",
+  "dur": "0.4s",
+  "prompt": "Taking damage, a dull heavy metallic crunch impact with a brief low alarm undertone, dry"
+ },
+ {
+  "id": "telegraph",
+  "ko": "적 발사 예고",
+  "dur": "0.3s",
+  "prompt": "Short menacing alien weapon charge-up beep, a warning that an enemy is about to fire, tense"
+ },
+ {
+  "id": "boss_in",
+  "ko": "보스 등장",
+  "dur": "2s",
+  "prompt": "Massive alien mothership arrival, a deep intimidating horn roar layered with heavy metallic rumble, dread and scale"
+ },
+ {
+  "id": "boss_die",
+  "ko": "보스 격파",
+  "dur": "2.5s",
+  "prompt": "Huge boss death sequence, an enormous chain of explosions with deep booms and scattering debris, climactic and victorious"
+ },
+ {
+  "id": "click",
+  "ko": "버튼 클릭",
+  "dur": "0.15s",
+  "prompt": "Soft clean sci-fi interface button click, subtle, crisp, minimal"
+ },
+ {
+  "id": "buy",
+  "ko": "격납고 구매",
+  "dur": "0.6s",
+  "prompt": "Satisfying sci-fi upgrade purchase, a metallic clank combined with a bright coin chime, rewarding"
+ },
+ {
+  "id": "start",
+  "ko": "출격",
+  "dur": "1s",
+  "prompt": "Spaceship fleet launch, a powerful engine ignition whoosh building and taking off, energetic"
+ }
+]

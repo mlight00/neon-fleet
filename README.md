@@ -161,13 +161,17 @@ node --test tests/*.test.mjs
 
 | 자산 | 출처 | 라이선스 |
 |---|---|---|
-| 효과음 48개 | [Kenney.nl](https://kenney.nl) — Sci-fi Sounds · Impact Sounds · Interface Sounds · Digital Audio · UI Audio | **CC0 1.0** (저작권 포기 · 표기 의무 없음) |
+| 효과음 48개 | [ElevenLabs](https://elevenlabs.io) Sound Effects (유료 Starter, 자체 프롬프트) | 유료 등급 산출물 |
 | 배경음 21곡 | Google Flow (music) | 제작자 유료 구독 산출물 |
 | 이미지 아트 | Gemini (유료 구독) + 자체 후처리 | 제작자 유료 구독 산출물 |
 | 본문 폰트 | [Pretendard](https://github.com/orioncactus/pretendard) | SIL Open Font License 1.1 |
 | 3D 렌더 | [three.js](https://threejs.org) | MIT |
 | 게임 코드 | 자체 제작 | — |
 
-효과음은 Kenney 원본을 `scripts/build-sfx-from-kenney.mjs` 로 잘라·정규화해 만들었다
-(사양: `docs/2026-08-13-SFX-재제작-사양서.md`). 자산별 상세 감사는
+효과음은 `scripts/gen-sfx-elevenlabs.mjs` 로 생성했다. 프롬프트·길이·충실도는
+`scripts/_sfx_plan.json` 에 id 별로 남아 있어 언제든 같은 소리를 다시 뽑을 수 있다
+(사양: `docs/2026-08-13-SFX-재제작-사양서.md`).
+
+Kenney CC0 로 만든 대체본도 `scripts/build-sfx-from-kenney.mjs` 로 재현 가능하다 —
+제약이 아예 없는 예비안으로 남겨 둔다. 자산별 상세 감사는
 `docs/release/crazygames-basic-launch/asset-license-audit.md` 참조.

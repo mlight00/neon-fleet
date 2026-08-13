@@ -43,33 +43,32 @@
 </div>
 
 <div class="note">
-  <b>왜 이 비교가 필요한가</b> — 효과음을 새로 만들 필요가 없을 수도 있습니다.
-  <code>js/audio.js</code> 에 <b>합성음 레시피 25종</b>이 이미 있고, 샘플이 있는 23종을 전부 덮습니다.
-  샘플 48개(0.5MB)를 지우면 그대로 그 소리가 납니다. 라이선스 문제도 같이 사라집니다.<br>
-  <b>노란색 “새 후보”</b>가 이번에 Kenney CC0 팩에서 골라 규격에 맞춘 48개입니다.
-  <b>CC0 = 저작권 포기</b>라 상업 배포까지 자유롭습니다. 출처 표기 의무도 없습니다.<br>
-  들어보시고 <b>바꿀 항목만</b> 알려주시면 그것만 다른 소리로 교체하겠습니다.
+  <b>노란색 “새 후보”</b>가 이사님 <b>ElevenLabs 유료 등급</b>으로 방금 새로 만든 48개입니다.
+  저장돼 있던 프롬프트 20종에 제가 3종(차지 충전·차지 완료·랜스 발사)을 더해 23종을 생성했습니다.<br>
+  무기·타격은 프롬프트 충실도 0.8, UI·차임은 0.5 로 나눠 뽑았습니다(원래 프롬프트 문서의 규칙).<br>
+  <b>빨간색 “현재”</b>는 지금 게임에 들어 있는 Kenney CC0 음원입니다.
+  들어보시고 <b>바꿀 항목만</b> 알려주시면 그것만 다시 뽑겠습니다.
 </div>
 
 <div class="legend">
-  <span><span class="sw" style="background:#ff9a9a"></span>ElevenLabs 샘플 (현재)</span>
+  <span><span class="sw" style="background:#ff9a9a"></span>현재 — Kenney CC0</span>
   <span><span class="sw" style="background:#3ff5e0"></span>내장 합성음</span>
-  <span><span class="sw" style="background:#ffd93d"></span>새 후보 — Kenney CC0 (상업 이용 자유)</span>
+  <span><span class="sw" style="background:#ffd93d"></span>새 후보 — ElevenLabs (유료 등급 · 상업 이용 가능)</span>
 </div>
 
 <div class="bar">
   <button class="big" id="unlock">① 소리 켜기 (먼저 눌러주세요)</button>
-  <button class="big a" id="allA" disabled>② 샘플 전체 순차 재생</button>
+  <button class="big a" id="allA" disabled>② 현재(Kenney) 전체</button>
   <button class="big b" id="allB" disabled>③ 합성음 전체</button>
-  <button class="big c" id="allC" disabled>④ Kenney CC0 전체 순차 재생</button>
+  <button class="big c" id="allC" disabled>④ ElevenLabs 전체 순차 재생</button>
   <button id="stop" disabled>정지</button>
   <span class="status" id="status">대기 중</span>
 </div>
 
 <table>
   <thead><tr><th style="width:150px">효과음</th><th style="width:170px">쓰이는 곳</th>
-    <th style="width:230px">현재 (ElevenLabs)</th><th style="width:150px">내장 합성음</th>
-    <th>새 후보 (Kenney CC0)</th></tr></thead>
+    <th style="width:210px">현재 (Kenney CC0)</th><th style="width:130px">내장 합성음</th>
+    <th>새 후보 (ElevenLabs 유료)</th></tr></thead>
   <tbody id="rows"></tbody>
 </table>
 
@@ -205,7 +204,7 @@ async function playAll(which) {
     if (stopFlag) break;
     const tr = document.querySelector(`tr[data-id="${id}"]`);
     mark(tr);
-    status(`${which === 'a' ? '현재 샘플' : which === 'c' ? 'Kenney CC0' : '내장 합성음'} 재생 중 — ${id} (${KO[id] || ''})`);
+    status(`${which === 'a' ? '현재(Kenney)' : which === 'c' ? 'ElevenLabs' : '내장 합성음'} 재생 중 — ${id} (${KO[id] || ''})`);
     const dur = which === 'a' ? await playSample(id, 1)
       : which === 'c' ? await playFrom(NEW, id, 1) : playSynth(id);
     await sleep(Math.max(500, dur * 1000 + 260));
