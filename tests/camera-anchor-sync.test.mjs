@@ -63,7 +63,11 @@ test('AS-03: 130% 빠른 좌우 이동 중 매 프레임 역변환 오차 ≤ 0.
 // 배선 가드(정규식 아닌 실동작 12~14를 보완): 실제 호출 순서·가드를 소스로 고정
 test('AS-04: main 배선 — update()의 input.tick 직전 sync, draw 재동기화, run/squad 가드', () => {
   const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
-  assert.match(main, /syncCameraAnchor\(\);[\s\S]{0,160}input\.tick\(dt\);/);                   // update: tick 직전(사이 rebuildChaseProjection 허용)
+  //  §G-34: 문자열 인접성 대신 **호출 순서**로 계약을 본다(주석을 넣을 때마다 깨졌다 — 네 번째다).
+  //   계약의 내용은 "카메라 anchor 동기화가 input.tick 보다 앞선다" 이지 "두 줄이 붙어 있다" 가 아니다.
+  const iSync = main.indexOf('syncCameraAnchor();');
+  const iTick = main.indexOf('input.tick(dt);');
+  assert.ok(iSync >= 0 && iTick > iSync, `sync(${iSync}) 가 input.tick(${iTick}) 보다 앞에 온다`);
   assert.match(main, /const camActive = state === 'play'[\s\S]{0,140}syncCameraAnchor\(\);/);  // draw: 재동기화
   assert.match(main, /function syncCameraAnchor\(\) \{\s*\n\s*if \(state !== 'play' \|\| !run \|\| !run\.squad\) return;/);
 });

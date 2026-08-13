@@ -74,13 +74,15 @@ test('AL-03: 실전 배선 — Squad.escortsFor3D + hideEscorts 게이트 + rend
   assert.match(ef, /Math\.sin\(this\.t \* 3 \+ i\) \* 1\.5/);
   assert.match(ef, /< def\.clearR\) continue/);
   // 2D 스킵: 본체 blit 만 게이트(HP바·플래시 링은 유지)
-  assert.match(entities, /const hideEsc = !!\(this\._viewOpts && this\._viewOpts\.hideEscorts\)/);
-  assert.match(entities, /if \(!hideEsc\) for \(let i = 0; i < n; i\+\+\) \{/);
-  assert.match(entities, /if \(!hideEsc\) blit\(ctx, type === 'cruiser'/);
+  assert.match(entities, /const hideDrone = !!\(this\._viewOpts && this\._viewOpts\.hideDroneBody\)/);
+  assert.match(entities, /if \(!hideDrone\) for \(let i = 0; i < n; i\+\+\) \{/);
+  assert.match(entities, /if \(!\(type === 'cruiser' \? hideCruiser : hideDrone\)\) blit\(ctx, type === 'cruiser'/);
   const cr = readFileSync(new URL('../js/chase-render.js', import.meta.url), 'utf8');
-  assert.match(cr, /hideEscorts: !!opts\.hideEscorts/);
+  assert.match(cr, /hideDroneBody: !!\(opts\.hideDroneBody \?\? opts\.hideEscorts\)/);
+  assert.match(cr, /hideCruiserBody: !!\(opts\.hideCruiserBody \?\? opts\.hideEscorts\)/);
   const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
-  assert.match(main, /hideEscorts: t3d >= 0\.5/);
+  assert.match(main, /hideDroneBody: in3D && _c3dAllyDrone/);
+  assert.match(main, /hideCruiserBody: in3D && _c3dAllyCruiser/);
   assert.match(main, /run\.squad\.escortsFor3D\(_escBuf\)/);
   const renderer = readFileSync(new URL('../js/chase3d-renderer.js', import.meta.url), 'utf8');
   assert.match(renderer, /placeSwarm\(drone, swarms\.drone\.buf, swarms\.drone\.n, DRONE_INSTANCE_MAX, 'direct', 0, 0\)/);
@@ -93,5 +95,5 @@ test('AL-04: 검사실 allies 타깃(6타깃 가드)', () => {
   assert.match(lab, /import \{ createAlliesModel \} from '\.\/chase3d-allies\.js'/);
   assert.match(lab, /target === 'allies'/);
   const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
-  assert.match(main, /\['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
+  assert.match(main, /const CHASE3D_LAB_TARGETS = \['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'\]/);
 });

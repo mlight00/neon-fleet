@@ -12,7 +12,7 @@ import { PROP_KEYS } from './chase3d-prop-defs.js';
 //  형상 = 납작 방추 로프트(노즈 −z, 소품 placeSwarm 기본 yawBase π 계약과 일치), UV = (x,z)→그림 (u,v).
 //  재질 = AdditiveBlending(2D 의 'lighter' 합성과 동일 감성 — 투명부는 가산 0 이라 알파 처리 불필요).
 export const PROJ_TEX = {
-  pbullet: { url: 'assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_base.webp', aspect: 0.4469 },
+  pbullet: { url: 'assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_base.webp', aspect: 0.4438 },   // §G-24 v1 실탄 스프라이트(142×320)
   missile: { url: 'assets/art2-webp/weapons/projectiles/nf2_proj_homing_base.webp', aspect: 0.5125 },
   laser: { url: 'assets/art2-webp/weapons/projectiles/nf2_proj_laser_base.webp', aspect: 0.4094 },
 };
@@ -291,6 +291,33 @@ export function createPickupParts(THREE, key) {
   return parts;
 }
 
+/** §G-24 발칸 실탄(V1)의 **탄저 예광 발광** — 3D 에서 진화색을 내는 자리.
+ *
+ * 왜 본체를 물들이지 않나: 실모델은 자기 텍스처(은색 몸체·황동 탄피)를 가지므로 instanceColor 로
+ * 틴트하면 금속이 통째로 물들어 탁해진다(§G-2 에서 겪은 실패 — "원본 주황 탄두가 초록으로 왜곡").
+ * 그래서 작은 가산합성 발광체 하나만 얹어 색을 낸다 — 금속은 원색, 발광만 2D 와 같은 진화색.
+ *
+ * 왜 노즈가 아니라 탄저인가: 게임 추적 카메라는 탄을 **뒤에서** 본다(탄은 소실점 쪽으로 날아가고
+ * placeShots 의 yaw = π − wob 로 노즈가 카메라 반대편을 향한다). 노즈에 얹으면 탄 몸체에 완전히
+ * 가려져 색이 하나도 안 보인다(실측: cap@NOSE 3색 전부 미표시). 탄저에 얹으면 황동 링 안쪽이
+ * 진화색으로 채워져 또렷하다 — 실제 예광탄도 탄저의 예광제가 타며 뒤에서 빛나므로 물리적으로도 맞다.
+ *
+ * 치수 근거는 V1 지오메트리 실측: 정규화 후 z ∈ [−0.5, +0.5], z별 최대 반경이 −0.5 쪽 0.034 →
+ * +0.5 쪽 0.094 이므로 −z 가 노즈(게임 규약과 일치 — rotY 0 이 맞다), +z 가 탄저.
+ * 반경 0.075 는 탄피 반경 0.094 보다 작아 황동 테두리를 남기고(더 키우면 링이 사라져 뭉툭해진다),
+ * z 0.52 는 탄저면(0.5)을 살짝 넘겨 확실히 보이게 한다(0.44 로 넣으면 탄 안에 묻혀 거의 안 보인다).
+ */
+export function createVulcanTracerGlow(THREE) {
+  const geo = new THREE.SphereGeometry(0.075, 12, 8);
+  geo.scale(1, 1, 0.55);       // 탄저에 붙은 납작한 발광판
+  geo.translate(0, 0, 0.52);   // 탄저(+z) — 카메라를 향하는 면
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, blending: THREE.AdditiveBlending,
+    transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false,
+  });
+  return { geo, mat };
+}
+
 /** 발사체 전용 재질 — 원본 webp albedo + 가산 발광(instanceColor 로 진화색 틴트). Node/실패 시 단색 폴백. */
 /** textured=false 면 원본 그림을 입히지 않는다(§G-15 이사 "발칸 색이 2D 와 다르다").
  *  2D 발칸은 진화색 + 백열 코어의 단색 예광탄이고 레이저는 단색 광선이라, 주황 로켓 그림을 입히면 색이 어긋난다.
@@ -345,6 +372,36 @@ export function createPropGeometry(THREE, key) {
 /** 공용 자발광 재질 1개 — instanceColor 가 개체별 색을 입힌다(네온 톤 유지 위해 toneMapped 끔). */
 export function createPropMaterial(THREE) {
   return new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+}
+
+/** §G-21 §4.2 갑판 포탑 절차 폴백. w1~w3 GLB 가 실패하면 3D 구간에 무기 표현이 하나도 남지 않는다
+ *  (2D 무기 리그는 기함 스프라이트와 함께 숨겨져 있어 대신 그려주지 않는다). 그래서 "무기 종류가 읽히는"
+ *  최소 형태만 절차로 만든다 — 발칸=다연장 짧은 총열, 레이저=긴 단일 총열+집속 링, 유도=상자형 발사관.
+ *  GLB 파트와 같은 계약: 전장(최대 치수) 1.0 정규화 · 총구는 +z(기함 기수 방향) · 파트 배열 반환. */
+export function createTurretFallbackParts(THREE, key) {
+  const parts = [];
+  const barrel = (r, len, x, y, z) => { const g = new THREE.CylinderGeometry(r, r, len, 8); g.rotateX(Math.PI / 2); g.translate(x, y, z); return g; };
+  const base = new THREE.CylinderGeometry(0.30, 0.38, 0.24, 10); base.translate(0, -0.02, -0.16);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd8dee6, metalness: 0.62, roughness: 0.38, envMapIntensity: 1.0 });
+  const accentMat = new THREE.MeshStandardMaterial({ color: 0x2ec8e6, metalness: 0.35, roughness: 0.3, emissive: 0x1d8fa8, emissiveIntensity: 0.9 });
+  if (key === 'laser') {
+    parts.push({ geo: mergeGeos(THREE, [base, barrel(0.075, 0.92, 0, 0.06, 0.34)]), mat: bodyMat });
+    const ring = new THREE.TorusGeometry(0.16, 0.035, 6, 14); ring.translate(0, 0.06, 0.62);
+    parts.push({ geo: ring, mat: accentMat });
+  } else if (key === 'homing') {
+    const tube = (x, y) => { const g = new THREE.BoxGeometry(0.20, 0.20, 0.62); g.translate(x, y, 0.22); return g; };
+    parts.push({ geo: mergeGeos(THREE, [base, tube(-0.11, 0.07), tube(0.11, 0.07), tube(-0.11, 0.28), tube(0.11, 0.28)]), mat: bodyMat });
+  } else {   // vulcan — 짧은 총열 3열(연사감)
+    parts.push({ geo: mergeGeos(THREE, [base, barrel(0.05, 0.60, -0.11, 0.08, 0.26), barrel(0.05, 0.60, 0, 0.08, 0.26), barrel(0.05, 0.60, 0.11, 0.08, 0.26)]), mat: bodyMat });
+    const drum = new THREE.CylinderGeometry(0.14, 0.14, 0.20, 8); drum.rotateZ(Math.PI / 2); drum.translate(0, 0.08, -0.06);
+    parts.push({ geo: drum, mat: accentMat });
+  }
+  //  전장 1.0 정규화(파트 전체를 한 덩어리로 재는 것이 GLB 계약과 같다)
+  const bb = new THREE.Box3();
+  for (const p of parts) { p.geo.computeBoundingBox(); bb.union(p.geo.boundingBox); }
+  const span = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z) || 1;
+  for (const p of parts) { p.geo.scale(1 / span, 1 / span, 1 / span); p.geo.computeVertexNormals(); }
+  return parts;
 }
 
 /** 검사실 전시(§G-3 평가용, 이사 "수송선이 빨리 터져 평가 불가") — 픽업 5종을 나란히 회전 진열. */

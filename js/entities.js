@@ -10,6 +10,8 @@ import { shipSprite, shipBaseSprite, drawFlames, drawDeckLights, drawCommandFram
 import { getSprite, bossDefFor, bossDefById } from './sprites.js';
 import { affixAbsorb, affixOnDeath, affixContactMult, affixShotHoming, affixDraw } from './affixes.js';
 import { canEvolveWeapon, evolutionStage, superEvoEffects, evoLevelMult, weaponProjectileColor } from './weapon-evolutions.js';
+// §G-22 §8.2 발사체 시각 사양 단일 진실 — 3D 어댑터(chase3d-shot-spec.js)가 같은 모듈을 읽는다.
+import { PROJ_COLOR, vulcanArtScale, laserArtScale, laserBoltLength, laserScreenWidth, squadLaserBeamW, VULCAN_CORE, vulcanCoreWidth, TRACER_BOX } from './projectile-visual-spec.js';
 import { doctrineEffects, phaseDamageMult } from './doctrines.js';
 import { droneReward } from './adaptive-logic.js';
 import { addFlow, updateFlow, onFlowHit } from './flow.js';
@@ -18,6 +20,8 @@ import { frameDamageMult, frameInvulnActive } from './command-frames.js';
 import { resolveHit, canEmergencyRebuild, doEmergencyRebuild, repair as survRepair, hullFrac } from './survivability.js';
 import { sfx } from './audio.js';
 import { UPGRADE_DURATIONS, upgradeGrade } from './creative-direction.js';
+//  §G39-R1: 랜스·메아리·시즈 광역이 3D 몸체 플래시를 남기도록 공용 어댑터를 쓴다(추가 입자는 만들지 않는다).
+import { hitWithFeedback } from './impact-feedback.js';
 
 // 캔버스 라벨/토스트 언어(포털·Prolific=영어, 그 외 한국어). main.js가 로드 시 setEntityLang(EN) 1회 설정.
 //  캔버스 텍스트는 DOM에 없어 DOM 스캔으로 못 잡으므로 여기서 명시적으로 분기한다(§P0-2).
@@ -30,22 +34,92 @@ const TRAIT_TAGS_EN = ['Balanced', 'Rapid Fire', 'Focused Fire', 'Wide Barrage',
 const evName = (t) => (LANG_EN ? (EV_NAMES_EN[Math.min(t, EV_NAMES_EN.length - 1)] || '') : BAL.evolution.names[t]);
 const traitTag = (t) => (LANG_EN ? (TRAIT_TAGS_EN[Math.min(t, TRAIT_TAGS_EN.length - 1)] || '') : BAL.shipTraits[Math.min(t, BAL.shipTraits.length - 1)].tag);
 
+/**
+ * §G-42 — wing 하드포인트를 **좌우 번갈아** 쓴다. 보조무기 슬롯과 공명 레일이 **같은 함수**를 쓴다.
+ *
+ *  이사님 제보(2026-08-13): "레이저 보조무기 선택 시 빔이 기함의 우측에 형성되어 나간다. 2D 와 3D 모두 같다."
+ *  원인은 `hardpointX.wing(22)` 을 **항상 +** 로만 더한 것. 주무기 마운트는 좌우 대칭인데 보조무기만
+ *  통째로 오른쪽으로 밀렸다.
+ *
+ *  ⚠️**크기(hx)는 게임 좌표라 바꾸지 않는다**(§G-28 P0-1 — 시각 문제로 이 값을 줄이면 안 된다).
+ *   여기서 바꾸는 것은 **부호뿐**이며, 그것도 탄이 실제로 생기는 자리라 이사님 승인 아래 한 변경이다.
+ *  ⚠️전역 `Math.random()` 을 쓰지 않는다 — 단순 카운터다. 난수를 쓰면 치명타·탄 분산·스폰 순서가
+ *   그만큼 밀려 전투 결과가 달라진다(§G39-R1 계약).
+ *
+ *  @param holder 카운터를 얹을 객체(기함). 게임 저장 대상이 아닌 임시 필드다
+ *  @param key    카운터 필드명(슬롯마다 달라야 서로 간섭하지 않는다)
+ *  @param hx     하드포인트 오프셋 **크기**. 0 이면 카운터를 건드리지 않고 0 을 돌려준다(main 슬롯)
+ */
+export function alternateHardpointX(holder, key, hx) {
+  if (!hx) return 0;
+  holder[key] = ((holder[key] || 0) + 1) % 2;
+  return holder[key] ? hx : -hx;
+}
+
 // ───────────────────────── 이펙트 (파티클 + 텍스트 + 충격파 링 + 화면 플래시)
+/** §G-39 이펙트 입자 예산. ⚠️낮은 우선순위가 예약을 선점하지 못하게 한다. */
+export const EFFECT_BUDGET = {
+  total: 600,      // 전체 안전 상한
+  normal: 480,     // 낮음·보통 사용선
+  hitSpark: 120,   // 그중 hit-spark 몫
+};
+//  §G39-R2: 고우선 예약 **여유**(= total − normal). 코드가 읽는 상한이 아니라 파생값이다.
+//   ⚠️이름을 `high` 로 두면 "고우선은 120 까지"로 읽힌다 — 실제로는 고우선의 상한이 `total`(600)이고
+//    480~600 구간을 일반이 못 넘게 막아 둔 **여유**가 120 이다. 고우선이 적으면 비어 있는 normal 영역도 쓴다.
+//    (§G39-R1 자체점검에서 죽은 필드임을 발견 → Codex R1 재검수가 개명·파생을 제안해 반영.)
+EFFECT_BUDGET.highReserve = EFFECT_BUDGET.total - EFFECT_BUDGET.normal;
 export function createEffects() {
   const parts = [];
+  let nHitSpark = 0, nHigh = 0;   // 카테고리별 활성 수(예산 집행용)
+  //  §G-39: **전용 visual RNG**(LCG). 전역 Math.random 을 쓰면 치명타·스폰 난수 순서가 밀려
+  //   연출만 추가했는데 전투 결과가 달라진다(entities.js:910 이 같은 전역 RNG 를 쓴다).
+  let _vrng = 1;
+  const vseed = (s) => { _vrng = (s >>> 0) || 1; };
+  const vrand = () => { _vrng = (_vrng * 1664525 + 1013904223) >>> 0; return _vrng / 4294967296; };
   const texts = [];
   const rings = [];
   const flashes = [];   // 총구 섬광 + 진화 후광 (짧은 발광 스프라이트)
   let flashV = 0;
   const TAU = Math.PI * 2;
   return {
-    burst(x, y, color, n = 14, speed = 160) {
+    burst(x, y, color, n = 14, speed = 160, opts) {
+      const high = !!(opts && opts.priority === 'high');
       for (let i = 0; i < n; i++) {
+        //  ⚠️§G39-R1: 예산 밖이어도 **난수는 그대로 소비한다.**
+        //   전역 `Math.random()` 은 치명타·탄 분산·스폰과 공유된다. 상한에서 `break` 로 건너뛰면
+        //   그 뒤 전투 결과가 통째로 달라진다(Codex 구현검수 §2 — 480 이 찬 뒤 burst(8) 이 24회→0회였다).
+        //   소비 순서 a→v→size 는 §G-39 이전과 글자 그대로 같다. 예산 밖은 `push` 만 생략한다.
         const a = Math.random() * Math.PI * 2;
         const v = speed * (0.4 + Math.random() * 0.6);
-        parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5, max: 0.5, color, size: 2 + Math.random() * 3 });
+        const size = 2 + Math.random() * 3;
+        //  §G-39 예산: 고우선은 예약 슬롯까지, 일반은 normal 선까지.
+        if (high ? parts.length >= EFFECT_BUDGET.total : parts.length >= EFFECT_BUDGET.normal) continue;
+        parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5, max: 0.5, color, size, hi: high });
+        if (high) nHigh++;
       }
     },
+    /**
+     * §G-39 피격 스파크 — **전역 RNG 를 쓰지 않는다.**
+     *  @returns 실제로 만들었으면 true
+     */
+    hitSpark(x, y, color, count = 2, speed = 90, seed = 0) {
+      if (nHitSpark >= EFFECT_BUDGET.hitSpark) return false;
+      if (parts.length >= EFFECT_BUDGET.normal) return false;
+      vseed((seed * 2654435761) ^ 0x9e3779b9);
+      let made = 0;
+      for (let i = 0; i < count; i++) {
+        if (nHitSpark >= EFFECT_BUDGET.hitSpark || parts.length >= EFFECT_BUDGET.normal) break;
+        const a = vrand() * Math.PI * 2;
+        const v = speed * (0.4 + vrand() * 0.6);
+        parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5, max: 0.5, color, size: 1.5 + vrand() * 2, hs: true });
+        nHitSpark++; made++;
+      }
+      return made > 0;
+    },
+    /** 예산 진단(테스트·성능 보고용). */
+    partsStats() { return { total: parts.length, hitSpark: nHitSpark, high: nHigh }; },
+    /** 결정성 테스트용 입자 스냅샷. */
+    debugParts() { return parts.map((p) => [+p.x.toFixed(4), +p.y.toFixed(4), +p.vx.toFixed(4), +p.vy.toFixed(4), +p.size.toFixed(4)]); },
     text(x, y, str, color, size = 20) {
       // 최근 문구와 겹치면 위로 밀어 자동 스택 (업그레이드 등 여러 문구 동시 표시 시 중첩 방지)
       let ny = y, moved = true, guard = 0;
@@ -83,7 +157,11 @@ export function createEffects() {
       }
       for (const f of flashes) { if (f.delay > 0) { f.delay -= dt; continue; } f.life -= dt; }
       flashV = Math.max(0, flashV - dt * 5);
-      for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1);
+      for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) {
+        if (parts[i].hs) nHitSpark--;
+        if (parts[i].hi) nHigh--;
+        parts.splice(i, 1);
+      }
       for (let i = texts.length - 1; i >= 0; i--) if (texts[i].life <= 0) texts.splice(i, 1);
       for (let i = rings.length - 1; i >= 0; i--) if (rings[i].life <= 0) rings.splice(i, 1);
       for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].life <= 0) flashes.splice(i, 1);
@@ -360,12 +438,12 @@ export class Squad {
     for (const e of world.entities) {
       if (e.dead || !e.hitByBullet) continue;
       if (e.y < this.y && Math.abs(e.x - echo.x) <= echo.halfW + (e.r || 0)) {
-        e.hitByBullet(echo.dmg, world, ctx);
+        hitWithFeedback(e, world, echo.dmg, ctx);   // §G39-R1 몸체 플래시(실효 피해만)
         if (e.dead) world.notifyEnemyKilled?.(e);   // 메아리 랜스 처치도 킬 이벤트 집계
       }
     }
     if (world.bosses) for (const bo of world.bosses) {
-      if (!bo.dead && Math.abs(bo.x - echo.x) <= echo.halfW + bo.r) bo.hitByBullet(echo.dmg * (world.mfx?.bossDmgMult ?? 1), world, ctx);
+      if (!bo.dead && Math.abs(bo.x - echo.x) <= echo.halfW + bo.r) hitWithFeedback(bo, world, echo.dmg * (world.mfx?.bossDmgMult ?? 1), ctx);
     }
     world.spawnEntity(new ChargeLance(echo.x, this.y, echo.halfW, echo.stage));
     world.effects.ring(echo.x, this.y, '#ffd93d');
@@ -494,14 +572,14 @@ export class Squad {
     this._evoProg = 0;
     const st = evolutionStage(w, this.weaponLv, BAL.weapons.maxLv, this.weaponEvolutions, this.evoLevels, this.weaponEvolutions2, this.superLevels);
     if (st === 'evoUp') {
-      this.evoLevels[w] = (this.evoLevels[w] || 1) + 1;
+      this.evoLevels[w] = (this.evoLevels[w] || 1) + 1;   // §G39-R1: 아래 burst 는 고우선(진화는 드물고 결정적인 연출)
       world.effects.text(this.x, this.y - 64, ek(`${wl(w)} evolution Lv${this.evoLevels[w]} up!`, `${WEAPON_LABELS[w]} 진화 Lv${this.evoLevels[w]} 강화!`), COLORS.reward);
-      world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
+      world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160, { priority: 'high', kind: 'evolution' });
       this.triggerUpgradeFx(world, 'evolution');
     } else if (st === 'superUp') {
       this.superLevels[w] = (this.superLevels[w] || 1) + 1;
       world.effects.text(this.x, this.y - 64, ek(`${wl(w)} super-evolution Lv${this.superLevels[w]} up!`, `${WEAPON_LABELS[w]} 초진화 Lv${this.superLevels[w]} 강화!`), COLORS.reward);
-      world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160);
+      world.effects.burst(this.x, this.y - 20, COLORS.reward, 10, 160, { priority: 'high', kind: 'superEvolution' });
       this.triggerUpgradeFx(world, 'super');
     } else if (st === 'pick1' || st === 'pick2' || st === 're') {
       this.pendingWeaponEvolution = w;
@@ -583,7 +661,8 @@ export class Squad {
       this.evolvePunch = 0.5;
       // (선택창 제거: 기함 업그레이드는 자동. 모듈 드래프트는 정비 노드에서만 뜬다)
       world.effects.halo(this.x, this.y, COLORS.reward);
-      world.effects.burst(this.x, this.y, COLORS.ally, 24, 260);
+      //  §G39-R1 고우선: 일반 pool(480)이 차도 이 연출은 예약 슬롯(600)까지 살아남는다.
+      world.effects.burst(this.x, this.y, COLORS.ally, 24, 260, { priority: 'high', kind: 'flagshipTierUp' });
       world.effects.text(this.x, this.y - 98, ek(`Flagship rank up: ${evName(this.tier)} · power +${gain}`, `기함 등급 상승: ${ev.names[this.tier]} · 화력 +${gain}`), COLORS.reward, 18);
       world.effects.text(this.x, this.y - 76, ek(`Flagship trait: 『${traitTag(this.tier)}』`, `기함 특성 획득: 『${BAL.shipTraits[Math.min(this.tier, BAL.shipTraits.length - 1)].tag}』`), COLORS.ally, 14);
       sfx('evolve');
@@ -690,6 +769,10 @@ export class Squad {
     this.weapon = mainWeapon;
     this.wing = { weaponId: null, level: 1 };
     this._wingAcc = 0;
+    //  §G-42: 좌우 교대 카운터도 출격마다 0 으로 — 같은 조건이면 같은 순서로 나가야 한다(결정성).
+    this._wingAcc_side = 0;
+    this.fireAcc_side = 0;
+    this._railSide = 0;
   }
 
   /**
@@ -758,7 +841,8 @@ export class Squad {
     world.metrics?.emergencyRebuild();
     world.metrics?.hullRepair();
     world.effects.halo(this.x, this.y, COLORS.reward);
-    world.effects.burst(this.x, this.y, COLORS.reward, 22, 240);
+    //  §G39-R1 고우선: 일반 pool(480)이 차도 이 연출은 예약 슬롯(600)까지 살아남는다.
+    world.effects.burst(this.x, this.y, COLORS.reward, 22, 240, { priority: 'high', kind: 'emergencyRebuild' });
     world.effects.text(this.x, this.y - 56, ek(`Emergency rebuild! Cruiser +${addC} · hull repaired`, `긴급 재건! 순양함 +${addC} · 구조 수리`), COLORS.reward, 16);
     sfx('evolve');
     return true;
@@ -844,6 +928,9 @@ export class Squad {
     // 빔 반폭 = 기함 시각 半폭 기준(업그레이드로 기함이 커질수록 빔도 넓어지되 항상 기함과 비례, 이사).
     const shipHalfW = (SHIP_DEFS[Math.min(this.tier, SHIP_DEFS.length - 1)]?.visualWidth || 40) * 0.5;
     const halfW = shipHalfW * (ch.widthShipMult ?? 1.05) * (1 + (ch.widthStageStep ?? 0.18) * (stage - 1));
+    //  §G-40: **판정 폭 ≠ 그림 폭.** 3D 가 빔을 2배로 그리므로(LANCE_3D_WIDTH_MULT) 보이는 대로
+    //   맞도록 판정도 같은 배수를 쓴다. ⚠️난이도 상향(이사님 승인). 2D 그림은 halfW 그대로다.
+    const hitHalfW = halfW * (ch.hitWidthMult ?? 1);
     // 차지 피해도 자동사격과 같은 계수(발사속도·공격력·무기레벨·무기계수)로 스케일 → 강화할수록 같이 강해진다.
     const W = BAL.weapons;
     const fireRate = (world.stats?.fireRate ?? BAL.squad.fireRate) * (mfx.fireRateMult ?? 1);
@@ -858,16 +945,16 @@ export class Squad {
     const lanceCtx = { lance: true, pierceDefense: doctrineEffects(this.doctrine, BAL.doctrine).lancePierceDefense && stage >= 3, stage, echo: false, attackId: (this._lanceId = (this._lanceId || 0) + 1) };
     for (const e of world.entities) {       // 앞쪽 컬럼의 적 전부 관통
       if (e.dead || !e.hitByBullet) continue;
-      if (e.y < this.y && Math.abs(e.x - this.x) <= halfW + (e.r || 0)) {
-        e.hitByBullet(dmg, world, lanceCtx);
+      if (e.y < this.y && Math.abs(e.x - this.x) <= hitHalfW + (e.r || 0)) {
+        hitWithFeedback(e, world, dmg, lanceCtx);   // §G39-R1 몸체 플래시(실효 피해만)
         if (e.dead) world.notifyEnemyKilled?.(e);   // 차지 랜스 처치도 킬 이벤트 집계
       }
     }
     if (world.bosses) for (const bo of world.bosses) {   // 랜스 컬럼 안의 모든 보스 타격
-      if (!bo.dead && Math.abs(bo.x - this.x) <= halfW + bo.r) bo.hitByBullet(dmg * (mfx.bossDmgMult ?? 1), world, lanceCtx);
+      if (!bo.dead && Math.abs(bo.x - this.x) <= hitHalfW + bo.r) hitWithFeedback(bo, world, dmg * (mfx.bossDmgMult ?? 1), lanceCtx);
     }
     // 경로 적탄 소멸은 3단계 이상에서만 (1·2단계는 적탄 못 지움)
-    if (stage >= 3) for (const b of world.enemyBullets) if (Math.abs(b.x - this.x) <= halfW + 18) b.dead = true;
+    if (stage >= 3) for (const b of world.enemyBullets) if (Math.abs(b.x - this.x) <= hitHalfW + 18) b.dead = true;
     world.spawnEntity(new ChargeLance(this.x, this.y, halfW, stage));
     world.effects.flash(0.3 + 0.12 * stage);
     world.effects.ring(this.x, this.y, COLORS.ally);
@@ -892,7 +979,7 @@ export class Squad {
     const evoMult = evoLevelMult(this.weaponEvolutions[this.weapon], this.evoLevels[this.weapon], WEB.evoLevelStep);   // 진화 레벨(1→3) 피해 배수
     const se = superEvoEffects(this.weaponEvolutions2[this.weapon], BAL.weaponSuperEvolution);   // 2단계 초진화 배수 (미선택이면 중립)
     const projColor = weaponProjectileColor(evo, this.weaponEvolutions2[this.weapon], WEAPON_COLORS[this.weapon]);   // 진화별 발사체 색 (초진화>진화>기본)
-    const projArt = weaponProjectileSpriteId(this.weapon, evo);
+    const projArt = weaponProjectileSpriteId(this.weapon, evo, this.weaponEvolutions2[this.weapon]);   // §G-28 P0-3 초진화색
     const superLv = this.superLevels[this.weapon] || 0;
     const seDmg = se.dmgMult * (1 + Math.max(0, superLv - 1) * WEB.superLevelStep);   // 초진화 레벨(1→3) 추가 배수
     const pb = (mfx.pierceBonus || 0) + se.pierceBonus;
@@ -941,7 +1028,7 @@ export class Squad {
     const evoMult = evoLevelMult(evo, this.evoLevels[weaponId], WEB.evoLevelStep);
     const se = superEvoEffects(this.weaponEvolutions2[weaponId], BAL.weaponSuperEvolution);
     const projColor = weaponProjectileColor(evo, this.weaponEvolutions2[weaponId], WEAPON_COLORS[weaponId]);
-    const projArt = weaponProjectileSpriteId(weaponId, evo);
+    const projArt = weaponProjectileSpriteId(weaponId, evo, this.weaponEvolutions2[weaponId]);   // §G-28 P0-3 초진화색
     const superLv = this.superLevels[weaponId] || 0;
     const seDmg = se.dmgMult * (1 + Math.max(0, superLv - 1) * WEB.superLevelStep);
     const pb = (mfx.pierceBonus || 0) + se.pierceBonus;
@@ -955,6 +1042,14 @@ export class Squad {
     const ascPierce = 0;
     const midKey = accKey + '_mountIdx';
     const cutKey = accKey + '_cutterCount';
+    //  §G-42 (이사 제보 2026-08-13): wing 하드포인트를 **좌우 번갈아** 쓴다.
+    //   예전에는 hx 를 항상 +22 로만 더해 보조무기가 늘 기함 오른쪽에서 나갔다(2D·3D 동일).
+    //   레이저는 초당 18발이라 그 자리가 기둥으로 이어져 "빔이 우측에 형성된다"로 보였다.
+    //  ⚠️**크기 22 는 게임 좌표라 그대로 둔다**(§G-28 P0-1 — 시각 문제로 이 값을 바꾸면 안 된다).
+    //   바꾸는 것은 **부호뿐**이고, 그것도 탄이 실제로 생기는 자리라 이사님 승인 아래 한 변경이다.
+    //  ⚠️전역 `Math.random()` 을 쓰지 않는다 — 단순 카운터다. 난수를 쓰면 치명타·분산·스폰 순서가 밀린다(§G39-R1).
+    const sideKey = accKey + '_side';
+    const nextHx = () => alternateHardpointX(this, sideKey, hx);   // main 슬롯(hx=0)은 그대로 0
 
     if (weaponId === 'homing') {
       const siege = evo === 'homing_siege' ? WE.homing_siege : null;
@@ -967,25 +1062,29 @@ export class Squad {
         this[accKey] -= 1;
         const alive = world.bullets.filter((b) => b.kind === 'homing' && !b.dead).length;
         if (alive >= cap) continue;
+        const shx = nextHx();                                   // §G-42: 이번 발의 좌/우 (웨스프 묶음은 같은 쪽)
         const md = crit(dps / W.homing.rate * trait.dmg);
         if (wasp) {
           for (let k = 0; k < wasp.count && alive + k < cap; k++) {
-            const mis = new HomingMissile(this.x + hx, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, level, projColor, projArt);
+            const mis = new HomingMissile(this.x + shx, this.y - 14, (Math.random() - 0.5) * 300, md * wasp.totalFrac / wasp.count, level, projColor, projArt);
+            noteShotOrigin(mis, this.x, this.y - 14);                        // §G-28 P0-1 (렌더 전용)
             mis.wasp = true; mis.r *= 0.8; mis.sourceWeaponId = weaponId;
             world.bullets.push(mis);
           }
-          world.effects.muzzle(this.x + hx, this.y - 14, '#ffd0a0', 6);
+          world.effects.muzzle(this.x, this.y - 14, '#ffd0a0', 6);        // §G-28 P0-1 (렌더 전용)
         } else if (siege) {
-          const mis = new HomingMissile(this.x + hx, this.y - 14, (Math.random() - 0.5) * 120, md * siege.dmgMult, level, projColor, projArt);
+          const mis = new HomingMissile(this.x + shx, this.y - 14, (Math.random() - 0.5) * 120, md * siege.dmgMult, level, projColor, projArt);
+          noteShotOrigin(mis, this.x, this.y - 14);                          // §G-28 P0-1 (렌더 전용)
           mis.r *= siege.sizeMult; mis.speedMult = siege.speedMult; mis.turnMult = siege.turnMult; mis.sourceWeaponId = weaponId;
           mis.blast = { radius: siege.blastRadius, frac: siege.blastFrac, bossBonus: siege.bossBonus };
           world.bullets.push(mis);
-          world.effects.muzzle(this.x + hx, this.y - 14, '#ff9c41', 8);
+          world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 8);        // §G-28 P0-1 (렌더 전용)
         } else {
-          const mis = new HomingMissile(this.x + hx, this.y - 14, (Math.random() - 0.5) * 240, md, level, projColor, projArt);
+          const mis = new HomingMissile(this.x + shx, this.y - 14, (Math.random() - 0.5) * 240, md, level, projColor, projArt);
+          noteShotOrigin(mis, this.x, this.y - 14);                          // §G-28 P0-1 (렌더 전용)
           mis.sourceWeaponId = weaponId;
           world.bullets.push(mis);
-          world.effects.muzzle(this.x + hx, this.y - 14, '#ff9c41', 5);
+          world.effects.muzzle(this.x, this.y - 14, '#ff9c41', 5);        // §G-28 P0-1 (렌더 전용)
         }
         this.recoil = 1.5;
         sfx('missile');
@@ -1010,17 +1109,20 @@ export class Squad {
       const dmg = crit(dps / shotsBase * trait.dmg);
       this[midKey] = ((this[midKey] || 0) + 1) % mounts.length;
       const m = mounts[this[midKey]];
+      const shx = nextHx();                                     // §G-42: 이번 발의 좌/우
       if (isLaser) {
-        let beamW = 3 + level * 1.5;
+        let beamW = squadLaserBeamW(level);   // §G-22 §8.2: 굵기 사양은 projectile-visual-spec 단일 진실(값 동일, 판정 무관)
         let pierce = W.laser.pierce[Math.min(level, W.laser.pierce.length) - 1] + pb + trait.pierce + ascPierce;
         let ldmg = dmg, isCut = false;
         if (cutter) { this[cutKey] = (this[cutKey] || 0) + 1; if (this[cutKey] % cutter.every === 0) { beamW *= cutter.widthMult; pierce += cutter.pierceBonus; ldmg *= cutter.dmgMult; isCut = true; } }
-        const b = new Bullet(this.x + hx + m.x, this.y + m.y, ldmg, { vy: -W.laser.speed, kind: 'laser', pierce, beamW, lv: level, color: projColor, artId: projArt });
+        const b = new Bullet(this.x + shx + m.x, this.y + m.y, ldmg, { vy: -W.laser.speed, kind: 'laser', pierce, beamW, lv: level, color: projColor, artId: projArt });
         if (prism) b.split = true;
         if (isCut) b.cutter = cutter.clearRadius;
         b.sourceWeaponId = weaponId;
         world.bullets.push(b);
-        world.effects.muzzle(this.x + hx + m.x, this.y + m.y - 2, isCut ? '#ffffff' : '#a8f0ff', isCut ? 9 : 6);
+        //  §G-28 P0-1: 포구는 **선체 위 마운트**에 그린다(hx 제외 — 렌더 전용). 탄 좌표는 위에서 이미 확정됐다.
+        noteShotOrigin(b, this.x + m.x, this.y + m.y);
+        world.effects.muzzle(this.x + m.x, this.y + m.y - 2, isCut ? '#ffffff' : '#a8f0ff', isCut ? 9 : 6);
         sfx('laser');
       } else {
         let spread = (W.vulcan.spreadDeg[Math.min(level, W.vulcan.spreadDeg.length) - 1] * Math.PI) / 180 * trait.spread * se.spreadMult;
@@ -1028,7 +1130,7 @@ export class Squad {
         if (storm) spread *= WE.vulcan_storm.spread;
         const a = (Math.random() - 0.5) * 2 * spread;
         const vpb = pb + (needle ? (needle.pierceBonus || 0) : 0);
-        const b = new Bullet(this.x + hx + m.x, this.y + m.y, dmg, {
+        const b = new Bullet(this.x + shx + m.x, this.y + m.y, dmg, {
           vx: Math.sin(a) * W.vulcan.speed, vy: -Math.cos(a) * W.vulcan.speed, kind: 'vulcan',
           pierce: (vpb + trait.pierce + ascPierce) > 0 ? 1 + vpb + trait.pierce + ascPierce : 0, lv: level, color: projColor, artId: projArt,
         });
@@ -1036,7 +1138,8 @@ export class Squad {
         if (storm) b.ricochet = true;
         b.sourceWeaponId = weaponId;
         world.bullets.push(b);
-        world.effects.muzzle(this.x + hx + m.x, this.y + m.y - 2, COLORS.ally, 5);
+        noteShotOrigin(b, this.x + m.x, this.y + m.y);                      // §G-28 P0-1 (렌더 전용)
+        world.effects.muzzle(this.x + m.x, this.y + m.y - 2, COLORS.ally, 5);
         sfx('vulcan');
       }
       this.recoil = 1.2;
@@ -1128,7 +1231,7 @@ export class Squad {
     if (units <= 0 || dps <= 0) return;
     const W = BAL.weapons;
     const projColor = weaponProjectileColor(this.weaponEvolutions[this.weapon], this.weaponEvolutions2[this.weapon], WEAPON_COLORS[this.weapon]);   // 진화별 색 (기함과 동일)
-    const projArt = weaponProjectileSpriteId(this.weapon, this.weaponEvolutions[this.weapon]);
+    const projArt = weaponProjectileSpriteId(this.weapon, this.weaponEvolutions[this.weapon], this.weaponEvolutions2[this.weapon]);   // §G-28 P0-3
     const shotsPerSec = Math.min(20, 3 + units * 1.6);
     this.supportAcc = (this.supportAcc || 0) + shotsPerSec * dt;
     const tgt = this._nearestEnemy(world);   // 순양함은 능동 호위: 가장 가까운 적을 조준 사격
@@ -1212,10 +1315,13 @@ export class Squad {
 
     // 호위 드론 무리 (기함 반경 안쪽은 비움). 추적: Y가 위쪽인 드론일수록 작고 소실점으로 수렴.
     //  ⚠️ 위치 수식 변경 시 escortsFor3D 와 동기화(§G-1). hero 3D 가 호위를 그리는 프레임엔 2D 스킵(hideEscorts).
-    const hideEsc = !!(this._viewOpts && this._viewOpts.hideEscorts);
+    //  §G-22 §3.2: 드론(a1)·순양함(a2)은 3D 모델이 따로 준비되므로 숨김도 따로 받는다.
+    //   하나의 플래그로 둘 다 숨기면, 한쪽 GLB 만 준비된 수 초 동안 나머지가 2D·3D 어디에도 없어 사라진다.
+    const hideDrone = !!(this._viewOpts && this._viewOpts.hideDroneBody);
+    const hideCruiser = !!(this._viewOpts && this._viewOpts.hideCruiserBody);
     const n = Math.min(this.count, BAL.squad.drawCap);
     const scout = shipSprite(0, this.weapon);
-    if (!hideEsc) for (let i = 0; i < n; i++) {
+    if (!hideDrone) for (let i = 0; i < n; i++) {
       const o = this._offsets[i];
       const ox = o.x * w;
       if (Math.hypot(ox, o.y * w * 0.8) < def.clearR) continue;
@@ -1253,7 +1359,7 @@ export class Squad {
         ctx.save();
         const s = place(wx, wy);
         ctx.rotate(this.bank * 0.25);
-        if (!hideEsc) blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, (type === 'cruiser' ? cruiserBlitScale() : droneBlitScale() * 1.4) * s);   // 본체만 3D 대체 — HP바·플래시는 아래 유지
+        if (!(type === 'cruiser' ? hideCruiser : hideDrone)) blit(ctx, type === 'cruiser' ? cSprite : scout, 0, 0, (type === 'cruiser' ? cruiserBlitScale() : droneBlitScale() * 1.4) * s);   // 본체만 3D 대체 — HP바·플래시는 아래 유지
         if (type === 'cruiser') {
           const hp = this.cruiserHp[i] ?? cMax;
           if ((this.cruiserFlash[i] || 0) > 0) {
@@ -1518,16 +1624,16 @@ export class Bullet {
 
   drawLaser(ctx) {
     // 이동 잔상까지 '하나로 이어진' 스트릭 — 느린 프레임에서 두 조각으로 갈라져 보이던 문제 해결
-    const c = this.color || '#a8f0ff';     // 진화별 발사체 색 (없으면 기본 레이저색)
+    const c = this.color || PROJ_COLOR.laser;     // 진화별 발사체 색 (없으면 기본 레이저색)
     const w = this.beamW;
-    const L = 34 + this.lv * 8;
+    const L = laserBoltLength(this.lv);
     const top = Math.min(this.y, this.prevY) - L / 2;
     const bot = Math.max(this.y, this.prevY) + L / 2;
     const h = bot - top;
     // 색 본체를 진하게 — 진화색이 확실히 보이도록 (예전엔 흰 코어가 빔을 덮어 색이 거의 안 보였음)
     ctx.globalAlpha = 0.8;
     ctx.fillStyle = c;
-    ctx.fillRect(this.x - w, top, w * 2, h);
+    ctx.fillRect(this.x - w, top, laserScreenWidth(w), h);
     // 가는 백열 중심선만 — 색을 덮지 않게 얇게
     ctx.globalAlpha = 0.85;
     ctx.fillStyle = '#ffffff';
@@ -1541,7 +1647,7 @@ export class Bullet {
     ctx.translate(this.x, this.y);
     ctx.rotate(Math.atan2(this.vx, -this.vy));
     if (this.scale) ctx.scale(this.scale, this.scale);   // 니들: 탄 크기 축소
-    const c = this.color || COLORS.ally;   // 진화별 발사체 색 (없으면 기본 발칸색)
+    const c = this.color || PROJ_COLOR.vulcan;   // 진화별 발사체 색 (없으면 기본 발칸색)
     if (this.lv === 1) {
       // Lv1: 가는 예광탄
       ctx.fillStyle = c;
@@ -1611,11 +1717,19 @@ export class Bullet {
   }
 
   draw(ctx) {
+    //  §G-28 P0-1: 발사 직후 잠깐만 시각 x 를 포구(선체 위 마운트)에서 실제 x 로 이어 붙인다.
+    //   그리기 좌표만 옮기므로 하위 분기(스프라이트·레이저·예광탄)가 전부 함께 따라온다.
+    const _odx = shotOriginDX(this);
+    if (_odx !== 0) { ctx.save(); ctx.translate(_odx, 0); try { this._drawBody(ctx); } finally { ctx.restore(); } return; }
+    this._drawBody(ctx);
+  }
+
+  _drawBody(ctx) {
     if (this.resonanceId === 'railStorm') { this.drawResonanceRail(ctx); return; }   // 공명 레일 전용 렌더
     const art = this.artId && getSprite(this.artId);
     if (art && this.kind !== 'tracer') {
       const a = Math.atan2(this.vx, -this.vy);
-      const sc = this.kind === 'laser' ? 0.58 + this.lv * 0.08 : 0.38 + this.lv * 0.07;
+      const sc = this.kind === 'laser' ? laserArtScale(this.lv) : vulcanArtScale(this.lv);
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.rotate(a);
@@ -1627,7 +1741,7 @@ export class Bullet {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.9;
       if (this.kind === 'laser') {
-        const wantW = this.beamW * 2;
+        const wantW = laserScreenWidth(this.beamW);
         const artW = art.logicalW * s;
         ctx.save();
         if (artW > 0 && artW < wantW) ctx.scale(wantW / artW, 1);   // 가로만 늘림(길이는 유지)
@@ -1643,15 +1757,15 @@ export class Bullet {
       } else {
         blit(ctx, art, 0, 0, s);
       }
-      // 발칸 발사체 스프라이트는 세로로 길고 폭이 7~9px로 얇은 데다 가산합성이라, 밝은 폭발 위나
-      // 오렌지 계열 진화(템페스트)에서는 배경·이펙트에 묻혀 잘 안 보인다. 밝은 백열 코어를 '덮어쓰기'로
-      // 항상 덧그려, 어떤 배경·발사체 색에서도 탄의 형태가 또렷하게 남게 한다.
+      // 발칸 발사체는 화면에서 폭 3~8px 로 아주 작고 가산합성이라, 밝은 폭발 위에서는 배경에 묻힌다.
+      // 그래서 백열 심을 '덮어쓰기'로 덧그려 탄 위치를 잃지 않게 한다. 단 심은 어디까지나 심이라
+      // 탄 폭에 비례해야 한다(§G-24) — 고정폭이던 시절엔 심이 탄을 통째로 덮어 어떤 진화든 흰 막대였다.
       if (this.kind === 'vulcan') {
-        const h = art.logicalH * s;
+        const h = art.logicalH * s, cw = vulcanCoreWidth(art.logicalW * s);
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
-        ctx.fillStyle = '#fffefb';
-        ctx.fillRect(-1.4, -h * 0.46, 2.8, h * 0.92);
+        ctx.fillStyle = PROJ_COLOR.vulcanCore;
+        ctx.fillRect(-cw / 2, h * VULCAN_CORE.yRel - h * (VULCAN_CORE.hRel / 2), cw, h * VULCAN_CORE.hRel);
       }
       ctx.restore();
       return;
@@ -1659,10 +1773,10 @@ export class Bullet {
     if (this.kind === 'laser') {
       this.drawLaser(ctx);
     } else if (this.kind === 'tracer') {
-      // 호위 드론 소형탄
-      ctx.fillStyle = COLORS.ally;
+      // 호위 드론 소형탄 — 진화색을 쓰지 않는다(항상 아군 청록). 3D 도 같은 상수를 읽는다(§G-22 §8.2).
+      ctx.fillStyle = PROJ_COLOR.tracer;
       ctx.globalAlpha = 0.85;
-      ctx.fillRect(this.x - 1, this.y - 5, 2, 8);
+      ctx.fillRect(this.x - TRACER_BOX.w / 2, this.y - TRACER_BOX.h * 0.625, TRACER_BOX.w, TRACER_BOX.h);
       ctx.globalAlpha = 1;
     } else {
       this.drawVulcan(ctx);
@@ -1776,6 +1890,13 @@ export class HomingMissile {
     if (this.y < -30 || this.y > world.logicalH + 30 || this.x < -30 || this.x > world.logicalW + 30) this.dead = true;
   }
   draw(ctx) {
+    //  §G-28 P0-1: 발사 직후 잠깐 시각 x 를 기함 중심(포구)에서 실제 x 로 이어 붙인다(렌더 전용).
+    const _odx = shotOriginDX(this);
+    if (_odx !== 0) { ctx.save(); ctx.translate(_odx, 0); try { this._drawBody(ctx); } finally { ctx.restore(); } return; }
+    this._drawBody(ctx);
+  }
+
+  _drawBody(ctx) {
     const c = this.color || COLORS.reward;   // 진화별 발사체 색 (없으면 기본 금색)
     // 꼬리 잔상 (레벨이 오를수록 굵고 길게)
     if (this.trail.length > 1) {
@@ -1851,13 +1972,13 @@ export class HomingMissile {
     for (const o of world.entities) {
       if (o === hit || o.dead || !o.hitByBullet || o.indestructible || o.bulletPhantom?.(world)) continue;   // 통과 대상은 폭발 대상에서도 제외
       if (Math.hypot(o.x - this.x, o.y - this.y) <= radius + (o.r || 0)) {
-        o.hitByBullet(this.damage * frac, world);
+        hitWithFeedback(o, world, this.damage * frac);   // §G39-R1 몸체 플래시(직격은 main 이, 광역은 여기가 담당)
         if (o.dead) world.notifyEnemyKilled?.(o);   // 시즈 토피도 광역 처치도 킬 이벤트 집계
       }
     }
     if (world.boss && !world.boss.dead && world.phase === 'boss' && world.boss !== hit &&
         Math.hypot(world.boss.x - this.x, world.boss.y - this.y) <= radius + world.boss.r) {
-      world.boss.hitByBullet(this.damage * frac, world);
+      hitWithFeedback(world.boss, world, this.damage * frac);
     }
     world.effects.burst(this.x, this.y, '#ff9c41', 12, radius * 1.8);
     world.effects.ring(this.x, this.y, '#ff9c41', 0, radius);   // 시각 링을 실제 폭발 반경에 맞춤
@@ -1921,6 +2042,32 @@ export class Coin extends Scrolling {
   }
   draw(ctx) {
     const r = this.r;
+    //  §G-26 실모델 스프라이트(p3). 스프라이트가 아직 안 뜨면 아래 코드 도형으로 폴백한다.
+    const art = lockedSprite(this, 'PROP_COIN');
+    if (art) {
+      //  §G-43 (이사 "코인이 너무 칙칙하다 — 더 밝고 빛나는 금색으로"):
+      //  스프라이트 원본이 실제로 어둡다(실측: 불투명 픽셀 평균 RGB(98,73,20) · 밝기 23%).
+      //  ⚠️이미지를 다시 굽지 않는다 — **그릴 때** 밝힌다(렌더 전용, 자산·판정 불변).
+      //   ① 뒤에 금색 후광을 깔아 "빛나는" 느낌을 만들고
+      //   ② 같은 그림을 가산 합성으로 한 번 더 얹어 밝기·채도를 올린다(형태는 그대로).
+      const s = (r * 2) / art.logicalH;
+      ctx.save();
+      try {
+        ctx.globalAlpha = 0.55;
+        glow(ctx, '#ffe98a', 12, (c) => {
+          c.fillStyle = '#ffd54a';
+          c.beginPath(); c.arc(this.x, this.y, r * 0.72, 0, Math.PI * 2); c.fill();
+        });
+        ctx.globalAlpha = 1;
+        blit(ctx, art, this.x, this.y, s);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.62;                 // 가산 1회 — 평균 밝기 23% → 실측 40%대
+        blit(ctx, art, this.x, this.y, s);
+        ctx.globalAlpha = 0.30;                 // 코어만 한 번 더(중앙이 더 반짝인다)
+        blit(ctx, art, this.x, this.y, s * 0.82);
+      } finally { ctx.restore(); }
+      return;
+    }
     glow(ctx, '#ffd93d', 8, (c) => {
       c.fillStyle = '#ffd93d';
       c.beginPath(); c.arc(this.x, this.y, r, 0, Math.PI * 2); c.fill();
@@ -1985,8 +2132,10 @@ export class Crystal extends Scrolling {
     const r = this.r;
     const gem = getSprite('C1');
     if (gem) {
-      // 새 크리스탈 스프라이트(발광·프리즘 굴절 포함, 이사 제작 → 크로마키). r 비례 표시.
-      blit(ctx, gem, this.x, this.y, (r * 2.8) / gem.logicalH);
+      //  §G-28 P1-1: 2.8r → 2.4r. 세로로 긴 보석이라 높이를 키울수록 판정 밖 그림이 커졌다(실측 +15.5px).
+      //   폭은 원본 비율상 r 에 못 미치므로(좌우 빈 띠) 판정 링으로 실제 범위를 알린다.
+      blit(ctx, gem, this.x, this.y, (r * 2.4) / gem.logicalH);
+      drawHitRing(ctx, this.x, this.y, r, 'rgba(150,235,255,0.26)');
     } else {
       // 폴백: 코드 단일 젬
       glow(ctx, '#6fe3ff', 10, (c) => {
@@ -2068,8 +2217,9 @@ export class DronePod extends Scrolling {
     const r = this.r;
     const pod = getSprite('C5');
     if (pod) {
-      // 새 보급 수송선 스프라이트(이사 제작 → 크로마키). r 비례 표시. 크리스탈(보석)과 시각 구분.
-      blit(ctx, pod, this.x, this.y, (r * 2.6) / pod.logicalH);
+      //  §G-28 P1-1: 2.6r → 2.15r. 그림이 판정보다 컸다(실측 상하 +7px) — "맞을 것 같은데 안 맞는" 쪽이라 더 나쁘다.
+      blit(ctx, pod, this.x, this.y, (r * 2.15) / pod.logicalH);
+      drawHitRing(ctx, this.x, this.y, r, 'rgba(170,215,255,0.24)');
     } else {
       // 폴백: 청록 육각 컨테이너
       glow(ctx, COLORS.ally, 12, (c) => {
@@ -2285,6 +2435,24 @@ export class Pow extends Scrolling {
   }
   draw(ctx) {
     const r = this.r, pulse = 0.72 + 0.28 * Math.sin(this.t * 6);
+    //  §G-26 실모델 스프라이트(p4 별). 맥동은 크기로 남긴다 — "지금 먹을 수 있는 것"이라는 신호가 사라지면 안 된다.
+    //  §G-28 P1-2: **'POW' 글자를 되살린다.** 별 아이콘만으로는 "이게 무슨 강화인지"를 알려주지 못했다 —
+    //   신규 플레이어에게 이 글자가 유일한 단서였다. 다만 아이콘 위에 겹쳐 뭉개지지 않도록
+    //   본체보다 작게, 어두운 테두리를 깔아 아래쪽에 놓는다(3D HUD 와 중복 과장하지 않는 최소 표기).
+    const art = lockedSprite(this, 'C3');
+    if (art) {
+      blit(ctx, art, this.x, this.y, (r * 2 * (0.94 + 0.1 * pulse)) / art.logicalH);
+      const fs = Math.max(8, Math.round(r * 0.62));
+      ctx.save();
+      ctx.font = `bold ${fs}px Pretendard, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = Math.max(2, fs * 0.34); ctx.strokeStyle = 'rgba(30,18,0,0.85)';
+      ctx.strokeText('POW', this.x, this.y + r * 0.06);
+      ctx.fillStyle = '#fff6d0';
+      ctx.fillText('POW', this.x, this.y + r * 0.06);
+      ctx.restore();
+      return;
+    }
     glow(ctx, '#ffd93d', 12, (c) => {
       c.fillStyle = `rgba(255,217,61,${0.82 * pulse})`; c.strokeStyle = '#fff4c6'; c.lineWidth = 2;
       c.beginPath();
@@ -2464,6 +2632,73 @@ function broodSprite(crack) {
     }
   });
 }
+// ── §G-28 P0-1 발사구 렌더 보정 (게임 좌표 불변) ──
+//  wing 슬롯 탄은 `기함x + hardpointX.wing(22) + 마운트x` 에서 생성된다. 이건 **게임 좌표**라
+//  건드릴 수 없는데(§G-23 에서 건드렸다가 §G-28 에서 복원), 그 자리는 모든 등급에서 선체 밖이다
+//  (실측: T0 +14px · T2 +12px · T4 +11px · T5 +5px). 그래서 "허공에서 쏘는" 것처럼 보였다.
+//
+//  해결은 렌더 전용이다. 마운트(`m.x`)는 설계상 **선체 위 장착점**이므로 그 자리를 시각 출발점으로 삼고,
+//  탄이 조금 나아가는 동안 시각 x 를 실제 x 로 이어 붙인다. 탄의 x/vx/vy/충돌원/발사 수/RNG 는 그대로다.
+//  게임 객체에 필드를 붙이지 않으려고 WeakMap sidecar 를 쓴다(절대 계약 §3).
+const SHOT_ORIGIN = new WeakMap();          // Bullet|HomingMissile → { x0, y0 }
+
+// ── §G-28 P1-2 표현 고정 ──
+//  스프라이트는 비동기로 로드된다. 그래서 개체가 살아 있는 도중에 코드 도형 → 실모델로 **바뀌는**
+//  구간이 있었다(선로딩이 끝나기 전에 전투가 시작될 수 있다). 같은 물체가 눈앞에서 변신하면
+//  "버그"로 읽힌다. 그래서 개체마다 **첫 렌더 시점의 가용 여부를 고정**해 생존 내내 유지한다.
+//  게임 객체에 필드를 붙이지 않으려고 WeakMap sidecar 를 쓴다(절대 계약 §3).
+const ART_LOCK = new WeakMap();             // 개체 → 스프라이트 사용 여부(고정)
+
+/** §G-28 P1-1 판정 링 — 그림 실루엣과 원형 판정이 어긋나는 개체에만 그린다.
+ *
+ *  실측(§G-28): 크리스탈·수송선·잔해는 원본 모델이 세로로 길어, 긴 변을 r 에 맞추면
+ *  좌우에 "보이지 않는 판정 띠"가 생기거나(크리스탈 최대 24px·잔해 20px)
+ *  위아래로 "판정 밖 그림"이 튀어나온다(수송선 최대 7px). 원본 비율을 유지하는 한
+ *  폭과 높이를 동시에 맞출 수 없으므로, **실제 판정 반경을 약한 링으로 보여준다.**
+ *  ⚠️장식이 아니다. 반드시 판정 반경 r 에 정확히 그린다(충돌은 계속 원 — 계약 불변).
+ */
+export function drawHitRing(ctx, x, y, r, color = 'rgba(180,220,255,0.30)') {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+/** 이 개체가 쓸 스프라이트. 첫 호출에서 판정을 고정하고, 이후에는 그 결정을 지킨다. */
+export function lockedSprite(obj, id) {
+  let use = ART_LOCK.get(obj);
+  if (use === undefined) { use = !!getSprite(id); ART_LOCK.set(obj, use); }
+  return use ? getSprite(id) : null;
+}
+const ORIGIN_BLEND_PX = 26;                 // 이 거리만큼 나아가면 시각 x = 실제 x
+
+/** 발사 직후의 **시각** 출발점을 기록한다(포구=선체 위 마운트). 게임 좌표와 무관. */
+export function noteShotOrigin(shot, x0, y0) {
+  if (shot) SHOT_ORIGIN.set(shot, { x0, y0 });
+}
+
+/** 이 탄을 그릴 때 x 를 얼마나 옮길지(**월드 px**). 보간이 끝났거나 기록이 없으면 0.
+ *
+ *  §G-34 §7: **순수 조회**다(읽으면서 지우지 않는다). 한 프레임에 여러 렌더 경로가 같은 탄을 읽는다 —
+ *  2D 직접 · 2.5D 투영 · 3D 수집이 각각 부른다. 예전처럼 첫 호출에서 `delete` 하면 **두 번째 호출이 0** 을
+ *  받아 경로마다 다른 자리에 그려진다. WeakMap 이라 탄이 죽으면 어차피 함께 사라지므로 지울 이유도 없다.
+ *  ⚠️단위는 **월드 px** 다. 화면에 얹을 때는 반드시 투영을 거쳐야 한다(§7 의 요지) —
+ *   그리기 좌표계에서 `translate` 하면 경로마다 배율이 달리 먹어 어긋난다(Codex G-1: 2.5D 11.44px 과보정). */
+export function shotOriginDX(shot) {
+  const o = SHOT_ORIGIN.get(shot);
+  if (!o) return 0;
+  const moved = Math.abs(shot.y - o.y0);
+  if (moved >= ORIGIN_BLEND_PX) return 0;
+  const p = 1 - moved / ORIGIN_BLEND_PX;
+  return (o.x0 - shot.x) * p;
+}
+
+/** 이 탄을 그릴 **월드 x**. 모든 렌더 경로가 투영 입력으로 이 값을 쓴다 — 그러면 보정이 한 곳에서만 일어난다. */
+export function shotRenderX(shot) { return shot.x + shotOriginDX(shot); }
+
 const swarmSprites = {};
 function getSwarmSprite(key) {
   if (!swarmSprites[key]) {
@@ -2687,6 +2922,30 @@ export class Debris extends Scrolling {
   draw(ctx) {
     const r = this.r;
     const pl = 0.5 + 0.5 * Math.sin(this.pulse * 3);   // 붉은 경고 테두리 맥동 (파괴 불가 = 피하라)
+    //  §G-26 실모델 스프라이트(h2). **붉은 경고 맥동은 반드시 남긴다** — 이건 장식이 아니라
+    //  "파괴 불가, 피하라"는 유일한 신호다. 스프라이트 뒤에 맥동 후광으로 옮겨 같은 뜻을 전한다.
+    const art = lockedSprite(this, 'PROP_DEBRIS');
+    if (art) {
+      const s = (r * 2) / art.logicalH;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rot);
+      //  경고는 **실루엣 그림자**로 낸다. 원형 후광으로 깔았더니 잔해가 세로로 긴 구조물이라
+      //  원이 본체보다 커져 "빨간 공"으로 보였다(실측). 그림자는 그림 모양을 그대로 따라간다.
+      ctx.save();
+      ctx.shadowColor = '#ff5a46';
+      ctx.shadowBlur = 9 + 11 * pl;
+      ctx.globalAlpha = 0.55 + 0.45 * pl;
+      blit(ctx, art, 0, 0, s);
+      ctx.restore();
+      blit(ctx, art, 0, 0, s);   // 본체는 그림자 없이 또렷하게
+      ctx.restore();
+      //  §G-28 P1-1: 잔해는 세로로 긴 구조물이라 좌우에 보이지 않는 판정 띠가 남는다(실측 최대 20.5px).
+      //   충돌 판정(원)은 계약상 그대로 두고, 실제 범위를 링으로 보여준다 — 파괴 불가라 회피가 유일한 대응이다.
+      //   회전과 무관하게 화면 기준으로 그려야 판정과 같은 원이 된다(rotate 밖에서 그린다).
+      drawHitRing(ctx, this.x, this.y, r * 0.82, 'rgba(255,140,120,0.28)');
+      return;
+    }
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
@@ -2837,18 +3096,44 @@ export class EnemyShot {
       ctx.globalAlpha = 1;
     } else if (this.shape === 'ember') {
       // 잉걸: 발광 코어 + 외곽 글로우 (용암탄)
-      glow(ctx, c, 10, (g) => {
-        g.fillStyle = c;
-        g.beginPath(); g.arc(this.x, this.y, this.r, 0, Math.PI * 2); g.fill();
-      });
+      //  §G-34 §10-2: shadowBlur(glow) 제거. ember 는 보스 **탄막**에 쓰인다(bosses.js spiral·pincer·rain)
+      //   — spiral·rain 은 다탄 패턴이라 수십 개가 동시에 뜬다. §G-27 에서 orb 만 고치고 여기가 남아 있었다.
+      //   orb 와 같은 원리로 **가산합성 후광**으로 낸다: 인상은 같고 blur 비용은 0.
+      //  ⚠️본체는 source-over 불투명이어야 한다 — 검은 배경 위 가산합성은 색을 알파만큼 어둡게 만든다.
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.78, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#fff3d0';
       ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.4, 0, Math.PI * 2); ctx.fill();
     } else {
-      // orb: 외피 + 흰 코어 (기본/조준탄)
+      // orb(기본·조준탄): 3D 플라즈마와 **같은 3겹** — 꼬리 + 셸 + 백열 코어.
+      //  §G-27. 이전에는 색 원 + 작은 흰 점이라 "그냥 구슬"이었고, 같은 탄이 함미(3D)에서는
+      //  진행 방향으로 늘어난 플라즈마였다. 비율은 3D 파트(chase3d-props.createEnemyBulletParts)에서 가져왔다:
+      //   코어 0.22 / 셸 0.34(진행축 1.35배) / 꼬리 반경 0.18·길이 0.55 — 셸 반경을 화면 r 로 잡아 환산.
+      //  ⚠️적탄은 화면에 수십 개가 동시에 뜬다. shadowBlur(glow) 는 쓰지 않고 가산합성 타원 2개로만 낸다.
+      const ang = Math.atan2(this.vx, -this.vy);   // 회전 후 진행 방향 = −y(위)
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(ang);
       ctx.fillStyle = c;
-      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.35, 0, Math.PI * 2); ctx.fill();
+      //  ⚠️3D 비율을 그대로 쓰면 꼬리가 길어 "올챙이"가 되고 셸이 판정 반경보다 크게 보인다(실측).
+      //   2D 는 판정 원(r)이 곧 플레이어가 읽는 크기이므로 꼬리·셸을 조여 r 안쪽에 머물게 한다.
+      //  ⚠️셸까지 가산합성으로 그리면 검은 배경 위에서 색이 알파만큼(62%) 어두워져 탄이 탁해진다(실측).
+      //   셸은 불투명으로 원래 색을 온전히 내고, **꼬리만** 가산합성으로 은은하게 깐다.
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.34;                       // 꼬리 — 진행 반대(+y)로 끌리는 자취
+      ctx.beginPath(); ctx.ellipse(0, this.r * 0.72, this.r * 0.48, this.r * 1.15, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;                          // 셸 — 진행축으로 살짝 늘어난 본체
+      ctx.beginPath(); ctx.ellipse(0, 0, this.r * 0.94, this.r * 1.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#ffffff';                    // 코어 — 백열(덮어쓰기라 어떤 배경에서도 위치가 남는다)
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.42, 0, Math.PI * 2); ctx.fill();
     }
   }
 }
@@ -3223,20 +3508,27 @@ export class Charger extends Scrolling {
     const ang = this.state === 'dash' ? Math.atan2(this.dashVX, this.dashVY) : 0;
     ctx.rotate(ang * 0.5);
     ctx.scale(s, s);
-    glow(ctx, COLORS.danger, 12, (c) => {
-      c.fillStyle = '#3a1020';
-      c.strokeStyle = COLORS.danger;
-      c.lineWidth = 2.5;
-      c.beginPath();
-      c.moveTo(0, this.r);                        // 앞(아래) 뾰족한 쐐기
-      c.lineTo(-this.r * 0.9, -this.r * 0.7);
-      c.lineTo(0, -this.r * 0.3);
-      c.lineTo(this.r * 0.9, -this.r * 0.7);
-      c.closePath(); c.fill(); c.stroke();
-    });
-    ctx.fillStyle = '#ffdf7a';
-    ctx.globalAlpha = 0.7 + 0.3 * Math.sin(this.t * 8);
-    ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+    //  §G-26 실모델 스프라이트(h3). 모델의 코가 이미 아래(진행 방향)를 향한다 — 회전 규약 그대로.
+    //  코드 쐐기와 달리 엔진 코어가 모델 안에 있으므로 별도 코어 점은 그리지 않는다.
+    const art = lockedSprite(this, 'PROP_CHARGER');
+    if (art) {
+      blit(ctx, art, 0, 0, (this.r * 2) / art.logicalH);
+    } else {
+      glow(ctx, COLORS.danger, 12, (c) => {
+        c.fillStyle = '#3a1020';
+        c.strokeStyle = COLORS.danger;
+        c.lineWidth = 2.5;
+        c.beginPath();
+        c.moveTo(0, this.r);                        // 앞(아래) 뾰족한 쐐기
+        c.lineTo(-this.r * 0.9, -this.r * 0.7);
+        c.lineTo(0, -this.r * 0.3);
+        c.lineTo(this.r * 0.9, -this.r * 0.7);
+        c.closePath(); c.fill(); c.stroke();
+      });
+      ctx.fillStyle = '#ffdf7a';
+      ctx.globalAlpha = 0.7 + 0.3 * Math.sin(this.t * 8);
+      ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.fillRect(this.x - this.r, this.y - this.r - 8, this.r * 2, 3);
@@ -3306,19 +3598,34 @@ export class Mine extends Scrolling {
       ctx.beginPath(); ctx.arc(this.x, this.y, BAL.mine.blastRadius, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
-    glow(ctx, armed ? COLORS.danger : COLORS.enemyHigh, 12, (c) => {
-      c.strokeStyle = armed ? COLORS.danger : COLORS.enemyHigh;
-      c.fillStyle = 'rgba(40,16,40,0.85)';
-      c.lineWidth = 2;
-      c.beginPath(); c.arc(this.x, this.y, this.r, 0, Math.PI * 2); c.fill(); c.stroke();
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        c.beginPath();
-        c.moveTo(this.x + Math.cos(a) * this.r, this.y + Math.sin(a) * this.r);
-        c.lineTo(this.x + Math.cos(a) * (this.r + 5), this.y + Math.sin(a) * (this.r + 5));
-        c.stroke();
-      }
-    });
+    //  §G-26 실모델 스프라이트(h4). 무장 여부는 색으로 알려야 하는데 스프라이트는 색이 고정이라,
+    //  무장 시 붉은 후광을 뒤에 깐다 — 코드 도형이 선 색으로 하던 일을 후광이 대신한다.
+    const art = lockedSprite(this, 'PROP_MINE');
+    if (art) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = armed ? 0.30 + 0.34 * pulse : 0.16;
+      ctx.shadowColor = armed ? COLORS.danger : COLORS.enemyHigh;
+      ctx.shadowBlur = armed ? 16 + 10 * pulse : 8;
+      ctx.fillStyle = armed ? COLORS.danger : COLORS.enemyHigh;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.9, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      blit(ctx, art, this.x, this.y, (this.r * 2) / art.logicalH);
+    } else {
+      glow(ctx, armed ? COLORS.danger : COLORS.enemyHigh, 12, (c) => {
+        c.strokeStyle = armed ? COLORS.danger : COLORS.enemyHigh;
+        c.fillStyle = 'rgba(40,16,40,0.85)';
+        c.lineWidth = 2;
+        c.beginPath(); c.arc(this.x, this.y, this.r, 0, Math.PI * 2); c.fill(); c.stroke();
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          c.beginPath();
+          c.moveTo(this.x + Math.cos(a) * this.r, this.y + Math.sin(a) * this.r);
+          c.lineTo(this.x + Math.cos(a) * (this.r + 5), this.y + Math.sin(a) * (this.r + 5));
+          c.stroke();
+        }
+      });
+    }
     ctx.fillStyle = armed ? COLORS.danger : '#ffdf7a';
     ctx.globalAlpha = pulse;
     ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI * 2); ctx.fill();

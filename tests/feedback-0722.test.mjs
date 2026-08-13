@@ -21,7 +21,7 @@ test('FB-01: 타이틀 워드마크 가운데 정렬', () => {
 });
 
 test('FB-02: 레이저 스프라이트 굵기가 beamW를 따른다 (커터 초진화가 얇아지지 않게)', () => {
-  assert.ok(entSrc.includes('const wantW = this.beamW * 2'), 'beamW 기준 목표 폭');
+  assert.ok(entSrc.includes('const wantW = laserScreenWidth(this.beamW)'), 'beamW 기준 목표 폭');
   assert.ok(/if \(artW > 0 && artW < wantW\) ctx\.scale\(wantW \/ artW, 1\)/.test(entSrc), '좁으면 가로만 확대');
   assert.ok(entSrc.includes('if (this.cutter) {'), '절단탄 전용 백열 심');
   // 아트 자체가 얇은 게 사건의 원인이었다 — 커터 아트는 기본 아트보다 좁다는 사실을 고정

@@ -80,5 +80,17 @@ export function createInput(canvas, logicalW, opts = {}) {
     }
   };
 
+  //  §G-35 P0-2/P0-3: 카메라 정책이 **입력 수단**에 따라 갈린다(Codex 6차 §2).
+  //   포인터(마우스·터치 드래그)는 카메라 목표를 화면 포인터 위치에서 정해 폐루프를 끊고,
+  //   키보드는 화면 정합 문제가 없으므로 기함 기반 데드존을 쓴다.
+  //  ⚠️읽기 전용 스냅샷이다 — 카메라 쪽이 input 내부 상태를 직접 만지지 않게 한다.
+  input.controlState = () => ({
+    mode: lastPointerType || 'key',          // 'mouse' | 'touch' | 'key'
+    screenX: lastScreenX,                    // 마지막 논리 화면 x
+    touchActive: lastPointerType === 'touch' && !!input.active,
+    //  포인터 정합을 적용해야 하는 상태인가 — 마우스는 항상, 터치는 드래그 중에만.
+    pointerDriven: lastPointerType === 'mouse' || (lastPointerType === 'touch' && !!input.active),
+  });
+
   return input;
 }

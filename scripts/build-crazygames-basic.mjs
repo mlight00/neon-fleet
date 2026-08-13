@@ -91,6 +91,49 @@ for (const f of readdirSync(join(ROOT, 'assets', 'sound'))) if (f.endsWith('.ogg
 add('assets/art2-webp/branding/app_icon.webp');
 add('assets/art2-webp/branding/emblem.webp');
 
+// (f-2) §G-36 P0-3 — runtime asset graph. **빌드와 `PKG-08` 이 같은 helper 를 쓴다.**
+//  ⚠️G35 는 정규식을 두 파일에 복사했고, 동적 게이트가 `!declared.size` 라 **모든 미등록 경로를
+//   통과**시켰다(Codex 7차 §3). 이제 각 동적 표현이 **정확히 한 family** 에 매칭돼야 한다.
+{
+  const { buildAssetGraph, toAssetRecords, verifyAssetRecords, formatMissing,
+    createCrazyGamesAssetFamilies, setNodeFs } =
+    await import(pathToFileURL(join(ROOT, 'scripts', 'lib', 'asset-graph.mjs')).href);
+  const sprites = await import(pathToFileURL(join(ROOT, 'js', 'sprites.js')).href);
+  const zone = await import(pathToFileURL(join(ROOT, 'js', 'zone-backdrop.js')).href);
+  //  §G-37 §1-2: family 정의는 **한 곳**에서 온다 — 빌드와 `g36-asset-graph` 테스트가 같은 것을 본다.
+  setNodeFs(await import('node:fs'));
+  const ASSET_FAMILIES = createCrazyGamesAssetFamilies({ root: ROOT, sprites, zone });
+
+  const textFiles = [...manifest].filter((r) => /\.(?:js|mjs|css|html)$/i.test(r))
+    .map((rel) => ({ rel, src: readFileSync(join(ROOT, rel), 'utf8') }));
+  const g = buildAssetGraph(textFiles, ASSET_FAMILIES);
+
+  if (g.problems.length) {
+    throw new Error('[build] 동적 asset 표현을 해결하지 못했다: '
+      + g.problems.map((p) => `${p.file}: ${p.expr} — ${p.reason}`).join(' | '));
+  }
+  //  소스 존재 검증 + 규칙 (a)~(g) 가 못 본 참조 추가.
+  const OWNED = [/^assets\/3d\//, /^assets\/sound\//, /^assets\/remodel-v2\//, /^assets\/styleC\//,
+    /^assets\/art2-webp\/(?:styleC|bosses|enemies|weapons|branding)\//];
+  //  §G-37 P0: 정적 참조와 **family entries 를 같은 레코드 목록**으로 합쳐 순회한다.
+  //   G36 은 `g.statics` 만 add 해서, 새 family 를 정상 등록해도 매니페스트에 안 들어갔다(Codex 8차 §2).
+  const records = toAssetRecords(g, { resolveDist: distPath });
+  const { missingSource, conflicts } = verifyAssetRecords(records, { source: (p) => existsSync(join(ROOT, p)) });
+  if (missingSource.length) throw new Error('[build] ' + formatMissing('소스 파일 없음', missingSource));
+  if (conflicts.length) {
+    throw new Error('[build] 서로 다른 source 가 같은 dist 경로를 쓴다: '
+      + conflicts.map((c) => `${c.distPath} ← ${c.a} / ${c.b}`).join(' | '));
+  }
+  let added = 0;
+  for (const r of records) {
+    if (manifest.has(r.sourcePath) || OWNED.some((rx) => rx.test(r.sourcePath))) continue;
+    add(r.sourcePath); added++;
+  }
+  globalThis.__NF_ASSET_RECORDS = records;   // 진단용
+  console.log(`  asset graph: 레코드 ${records.length}(정적 ${g.statics.length} + family ${records.length - g.statics.length})`
+    + ` · 동적표현 ${g.dynamics.length} 전부 매칭 · 신규 ${added}`);
+}
+
 // (g) §G-4 이미지 빌보드 텍스처(터렛·위버) — 모듈의 경로 테이블에서 자동 동기
 const billboards = await import(pathToFileURL(join(ROOT, 'js', 'chase3d-billboards.js')).href);
 for (const v of Object.values(billboards.BILLBOARD_TEX)) add(v);
@@ -134,7 +177,13 @@ const idxPath = join(OUT, 'index.html');
 const idxHtml = readFileSync(idxPath, 'utf8')
   .replace('<html lang="ko">', '<html lang="en">')
   .replace('<title>네온 함대 — Neon Fleet</title>', '<title>Neon Fleet</title>')
-  .replace(/\n\s*<!-- 개발 중[^\n]*-->/, '')
+  //  §G-38: HTML 주석을 **전부** 제거한다(여러 줄 주석 포함).
+  //   예전엔 `<!-- 개발 중 ... -->` 한 줄만 지웠다. 그래서 한국어 주석을 새로 넣자마자
+  //   아래 "한글 잔존" 게이트에 걸려 빌드가 죽었다 — 게이트가 제 일을 한 것이다.
+  //  ⚠️소스 index.html 의 한국어 주석은 그대로 둔다(팀이 읽는 문서다). 포털본만 지운다.
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/[ \t]+$/gm, '')                    // 주석을 지우고 남은 들여쓰기 꼬리
+  .replace(/(\r?\n){3,}/g, '\n\n')             // 빈 줄 3개 이상 → 2개
   .replace(/\n\s*<meta http-equiv="Cache-Control"[^>]*>/, '')
   .replace(/\n\s*<meta http-equiv="Pragma"[^>]*>/, '')
   .replace(/\n\s*<meta http-equiv="Expires"[^>]*>/, '');

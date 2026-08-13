@@ -131,27 +131,48 @@ export function createAuroraLab(canvas, opts = {}) {
   // 맵 단독 보기용 베이직 재질(원 재질 참조 보존 → 복귀 가능)
   const solo = { albedo: new Map(), normal: new Map(), orm: new Map(), emissive: new Map() };
   const flat = (tex) => new THREE.MeshBasicMaterial({ map: tex || null, color: tex ? 0xffffff : 0x101010 });
-  model.group.traverse((o) => {
-    if (!o.isMesh) return;
+  /** §G-21 §8: 메시 1개를 맵 단독보기 대상으로 등록(멱등).
+   *  예전에는 생성 직후 한 번만 traverse 해서, **비동기로 늦게 붙는 GLB**(weapons·hazards·flags 검사실)는
+   *  litMat 이 없어 wireframe/albedo/normal 모드가 통째로 먹히지 않았다(Codex P1).
+   *  이제는 새 메시가 발견될 때마다 그 시점의 원본 재질을 잡아 등록한다 — 등록은 메시당 1회라 모드 전환마다
+   *  재질을 새로 만들지 않고, 원본 참조(litMat)도 잃지 않는다. */
+  function registerMesh(o) {
+    if (o.userData.litMat) return;
     const m = o.material;
+    if (!m) return;
     solo.albedo.set(o, flat(m.map));
     solo.normal.set(o, flat(m.normalMap));
     solo.orm.set(o, flat(m.roughnessMap));
     solo.emissive.set(o, flat(m.emissiveMap || null));
     o.userData.litMat = m;
-  });
+  }
 
   function applyMode() {
     model.group.traverse((o) => {
       if (!o.isMesh) return;
+      registerMesh(o);   // 늦게 붙은 GLB 메시도 여기서 처음 등록된다(원본 재질이 아직 원본인 시점)
       const lit = o.userData.litMat;
-      if (!lit) return;   // GLB 는 비동기로 뒤늦게 붙는다 — 초기 스냅샷에 없는 메시는 원 재질 그대로 둔다(맵 단독보기 대상 아님)
+      if (!lit) return;
       if (state.mode === 'lit') { o.material = lit; lit.wireframe = false; }
       else if (state.mode === 'wireframe') { o.material = lit; lit.wireframe = true; }
       else o.material = solo[state.mode].get(o) || lit;
       if (o.name === 'aurora_glow' || o.name === 'aurora_core') o.visible = state.glow || state.mode !== 'lit';
     });
     lights.visible = state.light;
+  }
+  //  GLB 가 붙는 시점을 이벤트로 알 수 없으므로(로더가 검사실 밖에 있다) 메시 수 변화로 감지한다.
+  //  변하지 않으면 아무 일도 하지 않는다 — 매 프레임 재질을 다시 세팅하지 않기 위해서다.
+  //  §G-22 §10: 가능하면 로더가 주는 개정 번호(stats().revision)를 쓴다 — 같은 수의 메시가 **교체**되는
+  //  경우도 잡힌다. 개정 번호를 제공하지 않는 모델은 메시 수 비교로 폴백한다(개수만이 단일 진실은 아니다).
+  let _meshN = -1, _rev = -1;
+  function syncLateMeshes() {
+    let rev = -1;
+    try { const s = model.stats && model.stats(); if (s && Number.isFinite(s.revision)) rev = s.revision; } catch (e) {}
+    let n = 0;
+    model.group.traverse((o) => { if (o.isMesh) n++; });
+    if (n === _meshN && rev === _rev) return;
+    _meshN = n; _rev = rev;
+    applyMode();
   }
   function applyView() {
     const v = VIEWS[state.view] || VIEWS['rear-high'];
@@ -177,6 +198,7 @@ export function createAuroraLab(canvas, opts = {}) {
     applyView();
   }
   function render() {
+    syncLateMeshes();   // 비동기 GLB 가 붙었으면 현재 모드를 그 메시에도 적용(§8)
     if (state.rotate && !state.freeze) model.group.rotation.y += 0.004;
     model.update(state.freeze ? 0.6 : state.time, {});
     renderer.render(scene, camera);

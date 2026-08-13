@@ -1,0 +1,92 @@
+{
+  "회차": "§G-37",
+  "수집일": "2026-08-12",
+  "대상": "dist/crazygames-basic (빌드 직후)",
+  "서버": {
+    "url": "http://127.0.0.1:8347",
+    "script": "E:/workspace/claude/neon-fleet/worktrees/_tools/nocache-server.py",
+    "특징": "Cache-Control: no-store — python -m http.server 는 캐시 헤더를 안 보내 옛 ES 모듈이 실행된다"
+  },
+
+  "수집방식": {
+    "요약": "Browser pane 이 화면에 표시되지 않아 rAF 가 멈춘다 → window.__NF3D 훅으로 프레임을 손으로 구동했다",
+    "프레임구동": "ctl.frame(run, zoom, 480, 800, cw, ch, t, 0, swarms) 를 40회 반복",
+    "캡처": "#game(2D) · #game3d(3D) · #game-hud 를 한 캔버스에 합성 후 toDataURL",
+    "한계": [
+      "실플레이 입력(마우스 실제 드래그·키보드 실입력)은 rAF 가 멈춘 상태라 재생할 수 없다",
+      "따라서 TRACK/HOLD/RECENTER 상태 전이는 브라우저에서 육안 확인하지 못했다 — node 테스트로만 검증됨",
+      "PMREM·셰이더 컴파일은 실제 GPU 로 수행됐다(아래 webgl 참조) — 이 부분은 헤드리스 스모크가 못 보던 영역이다"
+    ]
+  },
+
+  "런타임": {
+    "webgl": {
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1060 3GB (0x00001C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "비고": "SwiftShader 가 아닌 **실제 GPU**다 — 셰이더 컴파일·프리웜이 진짜로 돌았다"
+    },
+    "devicePixelRatio": 2,
+    "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) ...",
+    "⚠️기기에뮬레이션": "Browser pane 은 viewport 폭 768 미만이면 **모바일 에뮬레이션**을 켠다(Android UA·터치 5점). 480·360 캡처는 전부 이 상태였다",
+    "PERF_PROFILE": { "mobile": true, "pixelRatioCap": 1, "minFps": 30, "lod": 1, "viewport": { "w": 480, "h": 800 } },
+    "⚠️프로파일고정": "PERF_PROFILE 은 로드 시점에 한 번 정해진다. 800x600 으로 창을 키운 뒤에도 mobile/lod1 그대로였다 — 데스크톱 lod0 경로는 이번 QA 에서 **실행되지 않았다**"
+  },
+
+  "포인터입력특성": {
+    "maxTouchPoints": 5,
+    "pointer:coarse": true,
+    "pointer:fine": false,
+    "hover:none": true,
+    "ontouchstart": true,
+    "판정": "터치 **에뮬레이션**이다(실기기 아님). §7 이 요구한 '실제 coarse pointer 인지 에뮬레이션인지 기록' 에 대한 답: 에뮬레이션"
+  },
+
+  "3D상태": {
+    "phase": 3,
+    "reason": "",
+    "hero": true,
+    "geometries": 64,
+    "textures": 91,
+    "flagTier": 0,
+    "swaps": 0,
+    "프리웜": "programsAfter 11~12 · 147~231ms"
+  },
+
+  "발사체배치실측": {
+    "shotCounts": { "pbullet": 3, "ebullet": 2, "missile": 0, "laser": 0 },
+    "의미": "placeShots 를 실제로 통과했다. 헤드리스 스모크(§5)가 pbullet>=1·ebullet>=1 로 잠근 계약과 같은 지표를 브라우저에서 재확인"
+  },
+
+  "줌↔3D전환실측": {
+    "방법": "zoom 1.0 → 2.2 로 올리며 같은 장면을 캡처해 바이트 비교",
+    "결과": [
+      { "zoom": 1.0, "canvas3dOpacity": "0", "판정": "2D" },
+      { "zoom": 1.4, "canvas3dOpacity": "0", "판정": "2D" },
+      { "zoom": 1.8, "canvas3dOpacity": "1", "판정": "전환 중(중간 화면)" },
+      { "zoom": 2.0, "canvas3dOpacity": "1", "판정": "전환 완료" },
+      { "zoom": 2.1, "canvas3dOpacity": "1", "판정": "2.0 과 픽셀 동일" },
+      { "zoom": 2.2, "canvas3dOpacity": "1", "판정": "2.0 과 픽셀 동일" }
+    ],
+    "⚠️보고": "지시서가 요구한 `480x800-200.png` 와 `480x800-220.png` 는 **바이트 동일**(md5 8cab472d…)이다. 캡처 실수가 아니라, 배율 2.0 에서 블렌드가 끝나고 그 위로는 3D 카메라가 고정이기 때문이다. C안이 가로 시야를 zoom 과 분리한 결과와 일치한다"
+  },
+
+  "기함표시게이트": {
+    "계약": "선체 + 선택 무기가 **둘 다** 준비돼야 3D 로 넘어간다(flagshipReadyForDisplay)",
+    "브라우저확인": "tier5-missile-220.png 에 발사기 6문이 선체에 붙은 상태로 렌더됨 — 무기 공백 없이 한 번에 올라온 상태",
+    "⚠️미확인": "'준비 전에는 2D 유지' 의 **전이 순간**은 로드가 이미 끝난 뒤 캡처라 브라우저에서 직접 보지 못했다. node 테스트(G37-FLAGSHIP-DISPLAY)가 4가지 조합으로 잠갔다"
+  },
+
+  "파일": {
+    "360x800-220.png": "좁은 폭 — 캔버스 360x800",
+    "480x800-200.png": "기준 폭 · 배율 2.0",
+    "480x800-220.png": "기준 폭 · 배율 2.2 (200 과 동일 — 위 설명 참조)",
+    "480x800-180-transition.png": "전환 중간(1.8) — 2.0 이상과 다른 화면임을 보이는 대조군",
+    "800x600-220.png": "가로 넓은 창 — 게임은 3:5 를 유지해 캔버스 372x600 으로 레터박스",
+    "tier3-laser-220.png": "tier 3 · laser",
+    "tier5-missile-220.png": "tier 5 · missile — 무기 마운트 6문",
+    "lance-220.png": "차지빔 — 끝점 검증용",
+    "pointer-matrix.json": "포인터 54조합(dist 번들 직접 호출)",
+    "lance-endpoint.json": "차지빔 2D 목표 ↔ 3D 실제 끝점 오차",
+    "console.txt": "콘솔 기록"
+  }
+}

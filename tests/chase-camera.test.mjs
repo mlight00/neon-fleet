@@ -9,6 +9,8 @@ import {
 // §13 투영·입력 계약. 실제 수치로 검증(소스 문자열 검사 아님). 논리 480×800, 함대 (240,660) 기준.
 const W = 480, H = 800, SQX = 240, SQY = 660;
 const proj = (zoom, chaseBlend, squadX = SQX) => createChaseProjection({ zoom, chaseBlend, squadX, squadY: SQY, logicalW: W, logicalH: H });
+//  §G-34 §5: 카메라 위치까지 지정하는 변형(데드존 계약 검증용).
+const proj2 = (o) => createChaseProjection({ zoom: o.zoom, chaseBlend: o.blend, squadX: o.squadX, cameraWorldX: o.cameraWorldX, squadY: SQY, logicalW: W, logicalH: H });
 
 // 1. 100% chaseBlend=0 → 전술과 완전 동일(픽셀 차이 0)
 test('CH-01: 100% chaseBlend=0은 전술 확대와 동일', () => {
@@ -62,17 +64,22 @@ test('CH-06: 먼 평면의 좌우 간격이 근거리보다 좁다', () => {
   assert.ok((farR.x - farL.x) < (nearR.x - nearL.x), `far간격 ${farR.x - farL.x} < near간격 ${nearR.x - nearL.x}`);
 });
 
-// 7. 기함 부분 추종(이사): 추적 시점에서도 기함 좌우 이동이 화면에 보인다 — 중앙 완전 고정 금지, 화면 안 유지.
-test('CH-07: 기함 부분 추종 — 이동이 보이되 화면 안 하단', () => {
-  const f = PROJECTION.followFrac;
-  assert.ok(f > 0.2 && f < 0.7, `followFrac ${f} (0=이전 중앙고정, 과하면 가장자리 잘림)`);
-  const L = projectObject({ x: 100, y: SQY }, 'squad', proj(2.0, 1, 100));   // 함대가 월드 왼쪽(100)
-  const Rr = projectObject({ x: 380, y: SQY }, 'squad', proj(2.0, 1, 380));  // 함대가 월드 오른쪽(380)
-  assert.ok(Math.abs(L.x - (W / 2 + (100 - W / 2) * f)) < 1, `왼쪽 기함 화면 X ${L.x} = 중앙+이탈×${f}`);
-  assert.ok(Math.abs(Rr.x - (W / 2 + (380 - W / 2) * f)) < 1, `오른쪽 기함 화면 X ${Rr.x}`);
-  assert.ok(Rr.x - L.x > 80, `좌우 이동이 화면에서 보임(${(Rr.x - L.x).toFixed(1)}px)`);
-  assert.ok(L.x > W * 0.15 && Rr.x < W * 0.85, '기함이 화면 가장자리로 잘리지 않음');
-  assert.ok(L.y > H * 0.78 && L.y < H * 0.88, `기함 화면 Y ${L.y} 하단(80~86%)`);
+// 7. 기함 이동 가시성(이사) — §G-34 §5 에서 followFrac → **데드존 카메라**로 바뀌었다.
+//    계약의 뜻은 그대로다: 기함 좌우 이동이 화면에 보이고, 가장자리로 잘리지 않는다.
+//    달라진 것은 방법이다 — 데드존 **안**에서는 카메라가 멈춰 기함이 1:1로 움직인다.
+test('CH-07: 데드존 안에서 기함 이동이 화면에 그대로 보인다', () => {
+  //  카메라를 한 곳(240)에 고정해 두고 기함만 좌우로 옮긴다 = 데드존 안에 있는 상황.
+  const at = (sx) => projectObject({ x: sx, y: SQY }, 'squad',
+    proj2({ zoom: 2.0, blend: 1, squadX: sx, cameraWorldX: 240 })).x;
+  const L = at(180), C = at(240), Rr = at(300);
+  assert.ok(C > W / 2 - 1 && C < W / 2 + 1, `카메라와 같은 x 면 화면 중앙 — 실측 ${C.toFixed(1)}`);
+  assert.ok(Rr - L > 80, `좌우 이동이 화면에서 보인다 — 실측 ${(Rr - L).toFixed(1)}px`);
+  //  데드존 안에서는 **선형**이다(1:1 · 가로배율만큼). 중앙을 사이에 두고 대칭이어야 한다.
+  assert.ok(Math.abs((C - L) - (Rr - C)) < 0.01, '카메라 기준 좌우가 대칭이다');
+  //  카메라가 따라가면(=데드존 밖) 기함은 다시 화면 중앙 쪽으로 돌아온다 — 잘리지 않는다.
+  const followed = projectObject({ x: 420, y: SQY }, 'squad',
+    proj2({ zoom: 2.0, blend: 1, squadX: 420, cameraWorldX: 420 })).x;
+  assert.ok(Math.abs(followed - W / 2) < 1, `카메라가 따라잡으면 화면 중앙 — 실측 ${followed.toFixed(1)}`);
 });
 
 // 8. projectPoint 결과 유한
@@ -105,15 +112,19 @@ test('CH-10: reduced-motion이면 chaseBlend 즉시 목표', () => {
 });
 
 // 11. screen→world X 오차 ≤1px : 100/160/180/200/220% × 좌·중·우 왕복
-test('CH-11: 근거리 역변환 왕복 오차 ≤1px (전 배율×좌중우)', () => {
-  for (const zoom of [1.0, 1.6, 1.8, 2.0, 2.2]) {
-    const p = proj(zoom, chaseBlendForZoom(zoom));
-    for (const frac of [0.1, 0.5, 0.9]) {
-      const screenX = frac * W;
-      const worldX = screenToWorldXAtPlayer(screenX, p);
-      // 근거리 평면 순방향으로 되돌림: C0 + (worldX-squadX)*slope
-      const back = p.C0 + (worldX - p.squadX) * p.slope;
-      assert.ok(Math.abs(back - screenX) <= 1, `zoom ${zoom} frac ${frac}: back ${back} vs ${screenX}`);
+test('CH-11: 전술·추적 모두 렌더 affine 의 정확한 역함수다', () => {
+  //  §G-35 P0-2: A안(추적에서 트랙 절대 매핑)을 철회하고 **정확한 역함수**로 되돌렸다.
+  //   렌더와 입력이 같은 affine 을 쓴다 — `screenX = C0 + (worldX−squadX)·slope` 의 역.
+  for (const [zoom, blend] of [[1.0, 0], [1.5, 0], [1.8, 0.5], [2.0, 1], [2.2, 1]]) {
+    for (const camX of [200, 240, 280]) {
+      const p = proj2({ zoom, blend, squadX: 300, cameraWorldX: camX });
+      for (const frac of [0.1, 0.5, 0.9]) {
+        const screenX = frac * W;
+        const worldX = screenToWorldXAtPlayer(screenX, p);
+        const back = p.C0 + (worldX - p.squadX) * p.slope;
+        assert.ok(Math.abs(back - screenX) < 1e-9,
+          `zoom ${zoom} blend ${blend} cam ${camX} frac ${frac}: ${back} vs ${screenX}`);
+      }
     }
   }
 });

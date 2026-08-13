@@ -10,7 +10,20 @@ const ui = readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8');
 
 test('CW-01: main이 카메라 모듈을 쓰고 저장 view.zoom으로 카메라를 만든다', () => {
   assert.match(main, /from '\.\/camera-zoom\.js'/);
-  assert.match(main, /const camera = createCamera\(save\.get\(\)\.view\?\.zoom\)/);
+  //  §G-34 후속(2026-08-11): 저장 배율을 **읽는 것은 그대로**, 다만 **적용 시점**이 바뀌었다.
+  //   시작은 항상 100%(2D)로 열고, 3D 준비가 끝난 뒤 복원한다 — 그래야 무기 선택 화면에서
+  //   2D→절차모델→GLB 로 바뀌는 과정이 보이지 않는다(이사님 실기 제보).
+  //   ⚠️정규식 한 줄 대조는 이 리팩터링에서 또 깨졌다(여섯 번째) → **계약 요소**를 각각 확인한다.
+  assert.match(main, /save\.get\(\)\.view\?\.zoom/, '저장된 view.zoom 을 읽는다');
+  assert.match(main, /createCamera\(/, '카메라는 camera-zoom 모듈이 만든다');
+  assert.ok(main.includes('_restoreZoom'), '저장 배율은 복원 대기값으로 보관한다');
+  //  복원은 3D 승격 지점에서만 일어난다(그 전에 하면 로딩 과정이 보인다).
+  //  ⚠️자동 복원은 **하지 않는다**(2026-08-11 이사님: "휠을 건드리지도 않았는데 220%로 점프한다").
+  //   저장값은 프리페치 판단에만 쓰고, 배율은 플레이어가 직접 확대할 때만 바뀐다.
+  assert.ok(!main.includes('camera.target = safeZoom(_restoreZoom)'),
+    '저장 배율을 자동으로 되돌리지 않는다');
+  assert.ok(main.includes('Math.max(camera.target, _restoreZoom'),
+    '저장 배율은 프리페치 판단에만 쓴다');
 });
 
 test('CW-02: draw() — 함대 anchor 중심 카메라 변환(state==="play"일 때만)', () => {
@@ -69,7 +82,12 @@ test('CW-08: 키보드 -/+/0 + 입력창·Ctrl/Cmd·repeat 가드', () => {
 });
 
 test('CW-09: canWheelZoom = 전투 + 非오버레이(§3.2)', () => {
-  assert.match(main, /function canWheelZoom\(\) \{ return state === 'play' && !paused && !drafting && !betweenStages; \}/);
+  //  ⚠️한 줄 통째 대조는 조건 순서만 바꿔도 깨진다 → **조건이 다 있는지**로 확인한다.
+  //   계약: 휠 줌은 "전투 중이고, 어떤 오버레이도 열려 있지 않을 때"만 먹는다.
+  const fn = main.slice(main.indexOf('function canWheelZoom()'), main.indexOf('function canWheelZoom()') + 200);
+  for (const cond of ["state === 'play'", '!paused', '!drafting', '!betweenStages']) {
+    assert.ok(fn.includes(cond), `canWheelZoom 에 \`${cond}\` 조건이 있어야 한다`);
+  }
 });
 
 test('CW-10: applyZoom + debounce 저장 + 배율 표시', () => {

@@ -338,7 +338,16 @@ export function weaponMountSpriteId(weapon, evolutionId = null) {
   return evolutionId === 'vulcan_needle' ? 'MOUNT_VULCAN_NEEDLE' : evolutionId === 'vulcan_storm' ? 'MOUNT_VULCAN_STORM' : 'MOUNT_VULCAN_BASE';
 }
 
-export function weaponProjectileSpriteId(weapon, evolutionId = null) {
+/** 발사체 스프라이트 ID. §G-28 P0-3: **초진화가 있으면 그쪽이 이긴다** —
+ *  3D 는 발광 파트를 `weaponProjectileColor(evo, superId, ...)` 결과로 물들여 초진화색을 자동 표현하는데,
+ *  2D 는 base/needle/storm 3종 고정이라 템페스트·랜스에서 색이 어긋났다.
+ *  우선순위는 색 함수와 같다: 초진화 > 1단계 진화 > 기본. 프레임 중 문자열을 만들지 않으려고
+ *  분기 결과는 전부 리터럴 상수다(합성·캐시 불필요). */
+export function weaponProjectileSpriteId(weapon, evolutionId = null, superId = null) {
+  if (weapon === 'vulcan') {
+    if (superId === 'vulcan_tempest') return 'PROJ_VULCAN_TEMPEST';
+    if (superId === 'vulcan_lance') return 'PROJ_VULCAN_LANCE';
+  }
   return weaponMountSpriteId(weapon, evolutionId).replace('MOUNT_', 'PROJ_');
 }
 

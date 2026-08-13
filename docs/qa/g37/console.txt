@@ -1,0 +1,17 @@
+# §G-37 브라우저 QA — 콘솔 기록
+# 수집: 2026-08-12 · dist/crazygames-basic · http://127.0.0.1:8347 (no-store)
+# 수집 방법: Browser pane read_console_messages.
+#   ⚠️pane 이 화면에 표시되지 않아 rAF 가 멈춘 상태다 → 프레임은 window.__NF3D 훅으로 **손으로 구동**했다.
+#     따라서 이 기록은 "실플레이 중 콘솔"이 아니라 "모듈 로드 + 수동 프레임 구동 중 콘솔"이다.
+
+[info] [chase3d] 프리웜 {done: true, programsBefore: 0, programsAfter: 12, ms: 231}
+[info] [chase3d] 실제 3D 사용 가능(hero=true)
+[error] Failed to load resource: the server responded with a status of 403 (bad token)
+[info] [chase3d] 프리웜 {done: true, programsBefore: 0, programsAfter: 11, ms: 147}
+[info] [chase3d] 실제 3D 사용 가능(hero=true)
+
+## 판정
+- 게임 기인 error 0건. 에셋 404 0건(서버가 404 만 로깅하도록 켜 둔 상태에서도 무기록).
+- 위 403 은 **게임이 아니라 QA 도구**가 낸 것이다. 캡처 저장 엔드포인트(POST /__save)를
+  토큰 없이 한 번 찔러본 응답이며, 이후 토큰을 붙여 200 으로 저장했다.
+  → 게임 코드는 이 요청을 만들지 않는다. 회귀 판정에서 제외한다. (숨기지 않고 남긴다.)

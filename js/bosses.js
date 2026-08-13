@@ -298,7 +298,8 @@ export class Boss {
     if (this.hp <= 0 && !this.dead) {
       this.dead = true;
       this.dying = true; // 파괴 연출 시작 (큰 폭발/격파음은 main.js 시퀀스에서)
-      world.effects.burst(this.x, this.y, COLORS.danger, 40, 220);
+      //  §G39-R1 고우선: 일반 pool(480)이 차도 이 연출은 예약 슬롯(600)까지 살아남는다.
+      world.effects.burst(this.x, this.y, COLORS.danger, 40, 220, { priority: 'high', kind: 'bossDeath' });
       world.effects.flash(0.3);
     }
   }
@@ -488,7 +489,8 @@ export class HiveQueen extends Boss {
     if (next >= 2) this.minionT = Infinity; // 산란낭 파괴 뒤에는 소환 대신 직접 패턴으로 전환
     const labels = ['', '', '산란낭 파괴 · 왕관 방어', '왕관 파괴 · 심장 노출', '탈출 코어 분리'];
     world.effects.text(this.x, this.y - 72, labels[next], next >= 3 ? '#ff9c41' : '#ff79c8', 17);
-    world.effects.burst(this.x, this.y, '#ff4cd2', 28, 220);
+    //  §G39-R1 고우선: 일반 pool(480)이 차도 이 연출은 예약 슬롯(600)까지 살아남는다.
+    world.effects.burst(this.x, this.y, '#ff4cd2', 28, 220, { priority: 'high', kind: 'bossPhase' });
     world.effects.ring(this.x, this.y, '#ff9c41');
     world.effects.flash(next === 4 ? 0.32 : 0.2);
   }
@@ -625,7 +627,8 @@ export class NeonArbiter extends Boss {
     this.warning = null;                    // 진행 중 경고 취소
     world.effects.text(this.x, this.y - 40, '보스 무방비! 지금 집중 공격!', '#ffffff', 20);
     world.effects.ring(this.x, this.y, '#ffffff');
-    world.effects.burst(this.x, this.y, '#ffffff', 24, 200);
+    //  §G39-R1 고우선: 일반 pool(480)이 차도 이 연출은 예약 슬롯(600)까지 살아남는다.
+    world.effects.burst(this.x, this.y, '#ffffff', 24, 200, { priority: 'high', kind: 'bossStagger' });
     world.effects.flash(0.24);
   }
 

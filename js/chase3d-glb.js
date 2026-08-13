@@ -84,14 +84,39 @@ export function createGlbShowcase(THREE, defs) {
     group.add(holder); spinners.push(holder);
     loadEnemyGlbParts(THREE, defs[k].glb, defs[k]).then((parts) => {
       for (const p of parts) holder.add(new THREE.Mesh(p.geo, p.mat));
-    }).catch(() => {});
+      revision++;
+    }).catch((e) => { try { console.warn('[chase3d-lab] 진열 GLB 로드 실패:', defs[k].glb, (e && e.message) || e); } catch (x) {} });
   });
+  //  §G-22 §10: 메시가 붙을 때마다 올라가는 개정 번호 — 검사실이 "새 메시가 생겼다"를 개수 비교가 아니라
+  //  이 값으로 알 수 있다(같은 수의 메시가 교체되는 미래 경로도 잡힌다).
+  let revision = 0;
   function update(time) { for (let i = 0; i < spinners.length; i++) spinners[i].rotation.y = Math.PI + Math.sin(time * 0.6 + i * 0.5) * 0.6; }   // 얼굴(-z)이 진열 카메라(+z)를 향하게 π 오프셋 + 좌우 흔들 ±34°
+  /** §G-22 §10: 실제 삼각형 수와 텍스처 바이트를 센다. G21 은 `triangles: 0` 고정 + textureBytes 누락이라
+   *  검사실 통계가 `texMB NaN` 으로 떴다(0 도 거짓말이었다). 진열은 개발 전용이라 호출 시점에만 센다. */
+  function stats() {
+    let triangles = 0, textureBytes = 0;
+    const seenTex = new Set();
+    group.traverse((o) => {
+      if (!o.isMesh || !o.geometry) return;
+      const idx = o.geometry.index;
+      const pos = o.geometry.attributes && o.geometry.attributes.position;
+      triangles += idx ? idx.count / 3 : (pos ? pos.count / 3 : 0);
+      const m = o.material;
+      for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap']) {
+        const t = m && m[key];
+        if (!t || seenTex.has(t)) continue;
+        seenTex.add(t);
+        const img = t.image;
+        if (img && img.width && img.height) textureBytes += img.width * img.height * 4;   // RGBA8 기준 근사
+      }
+    });
+    return { lod: 0, triangles: Math.round(triangles), triByLod: { 0: Math.round(triangles) }, textureBytes, revision };
+  }
   return {
     group,
     setLOD() { return 0; },
     update,
-    stats() { return { lod: 0, triangles: 0, triByLod: { 0: 0 } }; },
+    stats,
     dispose() { for (const h of spinners) h.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); },
     get lod() { return 0; },
   };

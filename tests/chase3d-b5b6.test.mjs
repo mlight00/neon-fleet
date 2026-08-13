@@ -2,6 +2,11 @@
 //  자유 디자인(이사 8/2 "2D 제약 해제")이므로 IoU 원본 대조는 없다. 계약(버킷·전장·결정성)과 배선만 잠근다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+
+//  ⚠️§G-38: 아래 정규식은 **인자 목록 전체를 박지 않는다.**
+//   `placeSwarm` 에 인자가 하나 늘 때마다(§G-38 visDrop) 계약과 무관하게 깨졌다 —
+//   이번 세션에서만 이런 종류의 실패가 10번 났고, 매번 계약은 멀쩡했다.
+//   검증 대상은 "적 스웜을 eswarm[k]/sk 로 넘기고, glb면 face 모드, 기함 뒤(behindFlag=true)" 다.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -69,7 +74,7 @@ test('B56-05 renderer 배선: 빌보드 스웜(이사 제작 렌더) + placeSwar
   const r = read('js/chase3d-renderer.js');
   assert.match(r, /import { createBillboardParts } from '\.\/chase3d-billboards\.js'/);
   assert.match(r, /eswarm\[k\] = def\.glb \? makeGlbSwarm\(k, def\) : makeBillboardSwarm\(k, def\.cap\)/);
-  assert.match(r, /if \(sk\) placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, ENEMY3D\[k\]\.glb \? 'face' : 'wob', 0, Math\.PI, ENEMY3D\[k\]\.pitch \?\? -0\.12, true\)/);   // HW-13: 적=기함 뒤(behindFlag)
+  assert.match(r, /placeSwarm\(eswarm\[k\], sk\.buf, sk\.n, ENEMY3D\[k\]\.cap, ENEMY3D\[k\]\.glb \? 'face' : 'wob',[^)]*\btrue\b/);   // HW-13: 적=기함 뒤(behindFlag)
 });
 
 test('B56-07 빌보드 모듈: 텍스처 경로 존재 + 파트 계약 + 좌우 상쇄 회전', () => {
@@ -93,5 +98,5 @@ test('B56-06 main 수집: 적 12종 put3D 공용 헬퍼 — 비변이만·상한
   assert.match(m, /for \(const k in ENEMY3D\) _sw\[k\]\.n = 0;/);
   assert.match(m, /_in3dMap\.set\(e, _b1Stamp\)/);
   // 검사실 가드 9타깃
-  assert.match(m, /\['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
+  assert.match(m, /const CHASE3D_LAB_TARGETS = \['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'\]/);
 });

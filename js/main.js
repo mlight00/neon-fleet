@@ -1,9 +1,10 @@
 // 진입점: 캔버스 관리 + 게임 루프 + 상태 머신 + 트랙 생성
 import { BAL } from './balance.js';
 import { createInput } from './input.js';
-import { createStarfield, drawHUD, drawCoreLoopHud, drawSectorLoadoutHud, COLORS, glow, WEAPON_LABELS, WEAPON_LABELS_EN, WEAPON_COLORS } from './render.js';
-import { Squad, Crystal, Coin, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile, setEntityLang } from './entities.js';
+import { createStarfield, drawHUD, drawCoreLoopHud, drawSectorLoadoutHud, COLORS, glow, WEAPON_LABELS, WEAPON_LABELS_EN, WEAPON_COLORS, bossHudView, NO_BOSSES } from './render.js';
+import { Squad, Crystal, Coin, DronePod, GatePair, TriGate, Capsule, Pow, Creature, Meteor, Debris, PowerModule, Sniper, Turret, Weaver, Charger, Mine, Bomber, Zapper, Orbiter, Shielder, BroodCarrier, Blinker, MidBoss, Boss, makeBoss, createEffects, Bullet, HomingMissile, ChargeLance, setEntityLang, alternateHardpointX, noteShotOrigin, shotRenderX, shotOriginDX } from './entities.js';
 import { bossDefById, preloadBossArt, preloadSprites } from './sprites.js';
+import { SHIP_DEFS } from './ships.js';   // §G-34 §5: 데드존 여백에 쓰는 기함 시각 폭(visualWidth)
 import { createCutscene, tickCutscene, drawCutscene, drawCutsceneBackdrop, cutsceneReady, CUT } from './cutscene.js';
 import { maybeAffix, applyAffixes } from './affixes.js';
 import { computeMfx, draftOptions, moduleSummary } from './modules.js';
@@ -26,13 +27,21 @@ import { createCamera, advanceZoom, stepZoom, safeZoom, screenToWorldX, DEFAULT_
 // 휠 입력 정규화·누적(RC1 보정): 가로 휠 오인·정밀 터치패드 과민 방지. 순수 모듈로 분리해 실이벤트 테스트.
 import { createWheelStepAccumulator, resolveWheelZoom } from './wheel-input.js';
 // 2.5D 함미 추적 시점(작업지시서): 순수 투영 + 개체별 렌더. 렌더·입력 좌표에만 적용, 게임 규칙 불변.
-import { createChaseProjection, chaseBlendForZoom, advanceChaseBlend, screenToWorldXAtPlayer, projectPoint, projectObject, CHASE_FULL_ZOOM } from './chase-camera.js';
+import { createChaseProjection, chaseBlendForZoom, advanceChaseBlend, screenToWorldXAtPlayer, projectPoint, projectObject, CHASE_FULL_ZOOM,
+         PROJECTION, createChaseCameraState, updateChaseCameraX, visibleHalfWorld, deadZoneHalf, pointerCameraTarget, chaseCameraBounds } from './chase-camera.js';
 import { drawWorldProjected, collectEdgeWarnings } from './chase-render.js';
 import { drawWarpField } from './chase-backdrop.js';
-import { PROP_KEYS, PROP_CAPS, ENEMY3D } from './chase3d-prop-defs.js';   // 순수 상수 전용 모듈(의존 0) — 지오메트리·팩토리는 플래그 뒤 renderer 만 로드(Codex 재검토 P2)
-// 실제 3D 함미 추적(Phase 0, ?chase3d=1 전용). config/mapping은 순수(Three.js 미의존)라 정적 import 안전.
-//  renderer(Three.js 로드)는 플래그가 있을 때만 아래에서 동적 import 한다(§3.2: 플래그 없으면 three 미로드).
-import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, transitionT } from './chase3d-config.js';
+import { PROP_KEYS, PROP_CAPS, ENEMY3D, FLAG3D } from './chase3d-prop-defs.js';   // 순수 상수 전용 모듈(의존 0) — 지오메트리·팩토리는 플래그 뒤 renderer 만 로드(Codex 재검토 P2)
+// 실제 3D 함미 추적. config/mapping/shot-spec 은 순수(Three.js 미의존)라 정적 import 안전.
+//  renderer(Three.js + GLB 37종)는 **전투 중 확대가 사전 로드 경계를 넘을 때** 처음 동적 import 한다(§G-21 §3.2).
+//  → 타이틀·무기 선택·100% 플레이에서는 three 도 GLB 도 네트워크를 타지 않는다(실측: GLB 요청 0건).
+import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, transitionT, shouldInit3D, shouldPrefetch3D, createFpsGuard, performanceProfileForViewport, chase3dFrameGate, flagshipLayer, flagshipReadyForDisplay } from './chase3d-config.js';
+import { shotSpec, makeShotSpec } from './chase3d-shot-spec.js';   // 발사체 2D 시각 사양 → 3D 표시 사양(순수·무할당)
+import { createFeedbackClock } from './feedback-clock.js';   // §G-39: 피격 피드백 전용 게임 누적 시계(pause 중엔 멈춘다)
+import { emitProjectileImpactFeedback, hitWithFeedback } from './impact-feedback.js';   // §G-39: 발사체 명중 피드백 + §G39-R1: 연쇄·APEX 공용 피해 어댑터
+import { FEEDBACK, readDamageFlash } from './damage-feedback.js';   // §G-39: 피격 감쇠(2D 몸체 플래시용). 3D 색은 chase3d-collect 의 seam 이 쓴다
+import { writeEnemySlot } from './chase3d-collect.js';   // §G39-R1: 적 3D 슬롯 기록(위치+색 한 호출) — production · 테스트 공유 seam
+import { drawWithDamageFlash } from './damage-flash-2d.js';   // §G-39 Task 9: 2D 몸체 피격 플래시(body clip)
 // ── Gate 1: 8분 핵심 재미 (전면개편 §5). ?coreLoopTest=1 하네스에서 전체 스택을 구동. ──
 import { createRunMetrics } from './run-metrics.js';
 import { createRunDirector, tickDirector, elapsed, nextEvent } from './run-director.js';
@@ -175,7 +184,23 @@ const zoneBackdrop = createZoneBackdrop(LOGICAL_W);
 const save = createSave();
 
 // 전투 카메라(시각 배율). 저장된 view.zoom을 안전하게 백필해 시작. anchor는 매 프레임 함대 위치로 갱신(draw).
-const camera = createCamera(save.get().view?.zoom);
+//  §G-34 후속(이사님 결정 2026-08-11): **시작은 무조건 2D(100%)로 연다.**
+//
+//  예전에는 저장된 배율을 그대로 복원했다. 그런데 220% 를 쓰던 플레이어는 **페이지를 열자마자**
+//  추적 모드가 되고, 그 시점에는 3D 가 아직 준비되지 않았다(WebGL 컨텍스트·셰이더·GLB 파싱·GPU 업로드).
+//  그래서 무기 선택 화면에서 2D → 절차 모델 → GLB 로 **5초에 걸쳐 두 번** 바뀌는 것이 보였다.
+//  프리페치를 앞당기고 캔버스를 미리 만들어도, "복원 시점 < 준비 완료 시점"인 한 해결되지 않는다.
+//
+//  → 시작은 **항상 100%(2D)** 다. 저장값은 아래 `_restoreZoom` 에 두지만 **자동으로 되돌리지 않는다.**
+//    플레이어가 직접 확대하는 순간 이미 3D 가 준비돼 있게 하는 것이 목적이다(이사님 표현: "확대하는 순간").
+//  ⚠️자동 복원을 넣었다가 되돌렸다(2026-08-11): "휠을 건드리지도 않았는데 220% 로 점프한다"는
+//   지적을 받았고, 게다가 `_c3dPhase === 3` 은 **렌더러 준비**일 뿐 **GLB 로드 완료가 아니라서**
+//   복원 직후 절차 AURORA 폴백(큰 기함)이 잠깐 보였다가 EMBER 로 바뀌었다. 자동 복원은 답이 아니다.
+//  ⚠️저장값 자체는 건드리지 않는다 — `_restoreZoom` 은 **프리페치 판단에만** 쓴다
+//   (220% 를 쓰던 플레이어를 미리 준비시키는 신호).
+const _savedZoom = save.get().view?.zoom;
+const camera = createCamera(undefined);          // 항상 기본 배율(100%)로 출발
+let _restoreZoom = Number.isFinite(_savedZoom) && _savedZoom > 1 ? _savedZoom : 0;
 // 2.5D 추적 시점 blend(0=전술 .. 1=완전 추적). 줌과 별도로 350~500ms ease-out 보간(§3.3).
 const chase = { current: chaseBlendForZoom(camera.current), target: chaseBlendForZoom(camera.current) };
 let chaseProjection = null;   // 매 프레임(update) 최신 함대·줌·blend로 재생성. 입력 역변환·렌더가 공유.
@@ -186,11 +211,78 @@ function currentScreenToWorldX(sx) {
   return chaseProjection ? screenToWorldXAtPlayer(sx, chaseProjection) : screenToWorldX(sx, camera);
 }
 /** update()에서 input.tick 직전 호출: 최신 함대·줌·blend로 투영을 만든다(§3 anchor 동기화와 같은 프레임). */
+//  §G-34 §5(P0-2) 데드존 카메라 상태 — 이사님 아이디어(기함이 좌/우 경계를 넘으면 그쪽이 드러난다).
+//   ⚠️수명 경계: 전술 구간(chaseBlend=0)에서는 계속 기함에 붙여 둔다. 그래야 추적으로 넘어가는 순간
+//    카메라가 튀지 않는다. 게임 시작·부활도 같은 이유로 이 규칙 하나로 덮인다.
+const chaseCamX = createChaseCameraState(LOGICAL_W / 2);
+//  §G-39: 충돌 기록(update)과 렌더 읽기(draw)가 **같은 시간**을 본다.
+const feedbackClock = createFeedbackClock();
+//  §G-40: 2D 차지 빔의 실제 반폭(논리px). 엔티티가 사라진 프레임에도 3D 가 같은 폭을 유지하도록 기억한다.
+let _lastLanceHalfW = 0;
+//  §G-34 후속: 데드존 추종 스위치. 조준 피드백 루프(아래 주석)를 해결하기 전까지 false.
+const DEADZONE_ENABLED = true;   // 조준이 카메라와 독립(pointerCameraTarget)이라 피드백 루프가 없다
+
+/** 데드존 반폭과 카메라 한계를 이번 프레임 값으로 구해 카메라를 한 스텝 옮긴다. */
+function updateChaseCamera(dt) {
+  const sq = run && run.squad;
+  if (state !== 'play' || !sq) { chaseCamX.x = LOGICAL_W / 2; chaseCamX.active = false; return; }
+  const visHalf = visibleHalfWorld(LOGICAL_W, camera.current, PROJECTION);
+  //  편대가 화면 밖으로 밀리지 않을 만큼은 남긴다 — 트랙 여백 + 기함 시각 폭의 일부.
+  const shipW = (SHIP_DEFS[Math.min(sq.tier || 0, SHIP_DEFS.length - 1)]?.visualWidth) || 40;
+  const squadMargin = BAL.squad.laneMargin + shipW * 0.4;
+  //  ── 가장자리 스크롤 정책 — **최종 계약(§G-36 C안, 이사님 결정 2026-08-12)** ──────────────
+  //   카메라는 **트랙 밖을 비추지 않는다**(`edgeOverscanPx = 0`). 한계는 `chaseCameraBounds`.
+  //   "카메라가 움직여 가려진 곳이 드러나는" 체감은 **가시 폭을 줄여서**(nearLateral 2.0 → 반폭 120)
+  //   확보한다 → 카메라 이동 **240px**, 트랙 밖 표시 **0**, 포인터 앵커 오차 **0**.
+  //  ⚠️이력: §G-34 §6 은 이 정책을 B 로 정했고, §G-35 후속에서 오버스캔 120 으로 **뒤집었다가**,
+  //   그때 앵커 오차가 112~150px 로 벌어져(Codex 7차 §1) §G-36 에서 **다시 오버스캔 0** 으로 돌아왔다.
+  //   차이는 이번엔 이동 거리를 여백이 아니라 **가시 폭 축소**로 벌었다는 점이다.
+  //   80% 가시 + 트랙밖 0 + 이동 240px 은 480 트랙에서 동시에 불가능하다 — 80% 를 양보했다.
+  //  데드존 반폭은 두 상한 중 **좁은 쪽**이다.
+  //   ① 편대 여백 — 편대가 화면 밖으로 밀리지 않는 한계
+  //   ② 화면 비율 — 기함이 화면 중앙 근처(40~60%)에 머물게 하는 한계
+  //   ②가 없으면 데드존이 화면의 24% 까지 벌어져 기함이 구석에 붙은 것처럼 보인다(이사님 제보).
+  //  데드존 추종이 켜져 있는 근거: 카메라 목표를 **포인터에서 직접** 정하므로(`pointerCameraTarget`)
+  //   카메라가 기함을 따라가도 목표가 밀리지 않는다 — 조준↔카메라 폐루프가 구조적으로 없다.
+  //   ⚠️조준 역함수는 렌더와 **같은** affine 이어야 한다(`screenToWorldXAtPlayer`). 근사로 바꾸지 마라.
+  //  ⚠️비상 스위치: 조준 루프가 재발하면 이걸 false 로 두어 카메라를 트랙 중앙에 고정한다(튕김 없음).
+  if (!DEADZONE_ENABLED) { chaseCamX.x = LOGICAL_W / 2; chaseCamX.active = false; return; }
+  //  §G-35 P0-2/P0-3(Codex 6차 §1·§2): **입력 수단에 따라 카메라 정책이 갈린다.**
+  //   ⚠️두 정책을 동시에 걸면 카메라 목표가 둘이 되어 서로 싸운다 — 반드시 배타적으로 고른다.
+  const ctrl = (input.controlState && input.controlState()) || { mode: 'key', pointerDriven: false };
+  if (ctrl.pointerDriven && chase.current > 0) {
+    //  포인터(마우스·터치 드래그): 카메라 목표를 **화면 포인터 위치**에서 정한다.
+    //   기함과 독립이므로 카메라→조준→기함→카메라 폐루프가 생기지 않는다.
+    //   조준 자체는 정확한 역함수(`screenToWorldXAtPlayer`)를 그대로 쓴다 — 렌더와 같은 affine.
+    const desired = pointerCameraTarget(ctrl.screenX, LOGICAL_W, visHalf, PROJECTION);
+    const k = 1 - Math.exp(-Math.max(0, dt) / PROJECTION.deadZoneTau);
+    chaseCamX.x += (desired - chaseCamX.x) * Math.min(1, Math.max(0, k));
+    chaseCamX.active = true;
+    if (chase.current <= 0) chaseCamX.x = LOGICAL_W / 2;
+    const _b = chaseCameraBounds(LOGICAL_W, visHalf, PROJECTION);   // §G-36: 테스트와 같은 함수
+    chaseCamX.x = Math.min(_b.max, Math.max(_b.min, chaseCamX.x));
+    return;
+  }
+  //  키보드(또는 전술 구간): 화면 정합 문제가 없으므로 **기함 기반 데드존**을 쓴다.
+  const nearL = Math.max(1e-6, PROJECTION.nearLateral);   // §G-35 P0-1: 가로에 zoom 을 곱하지 않는다
+  const byScreen = (LOGICAL_W * PROJECTION.deadZoneScreenFrac) / nearL;
+  updateChaseCameraX(chaseCamX, sq.x, dt, {
+    deadHalf: Math.min(deadZoneHalf(visHalf, squadMargin), byScreen),
+    hysteresis: PROJECTION.deadZoneHys, tau: PROJECTION.deadZoneTau,
+    //  §G-36: 카메라 한계는 `chaseCameraBounds` 한 곳에서만 나온다(테스트도 같은 함수를 쓴다).
+    ...(() => { const b = chaseCameraBounds(LOGICAL_W, visHalf, PROJECTION); return { cameraMin: b.min, cameraMax: b.max }; })(),
+    snap: chase.current <= 0,        // 전술 구간 = 카메라를 기함에 붙여 둔다(전환 시 튐 방지)
+    //  §G-35 P0-3: 입력이 멈추고 기함이 느리면 느리게 중앙 복귀(TRACK → HOLD → RECENTER).
+    idleRecenter: true, tauRecenter: 0.9,
+  });
+}
+
 function rebuildChaseProjection() {
   if (state !== 'play' || !run || !run.squad) { chaseProjection = null; return; }
   chaseProjection = createChaseProjection({
     zoom: camera.current, chaseBlend: chase.current,
     squadX: run.squad.x, squadY: run.squad.y, logicalW: LOGICAL_W, logicalH,
+    cameraWorldX: chaseCamX.x,
   });
 }
 // 입력: 마우스/터치 화면 X를 카메라로 역변환해 월드 목표 X를 얻는다(§6). input이 카메라 모듈을 직접 import하지 않도록 콜백 주입.
@@ -203,9 +295,12 @@ const input = createInput(canvas, LOGICAL_W, { screenToWorldX: (sx) => currentSc
 const CHASE3D_ON = chase3dEnabled(location.search);
 const CHASE3D_TEST = chase3dTestEnabled(location.search);
 const CHASE3D_LAB = chase3dLabTarget(location.search);   // 'aurora' = 모델 검사실(Opus5 §8)
-// §G-14 소품(탄·픽업) 3D 상시(이사 "픽업도 3D 로 켜줘"). 기본 OFF 였던 이유는 2022년식 임시 조형이 "엉망"이라는
-//  실기 판정이었는데, §G-7 에서 픽업 4종이 이사 VARCO 실모델로 교체돼 전제가 사라졌다. 개발 플래그(chase3dProps)는 폐기.
-if (CHASE3D_ON) {
+const CHASE3D_LAB_TARGETS = ['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'];
+const CHASE3D_LAB_ON = CHASE3D_ON && CHASE3D_LAB_TARGETS.includes(CHASE3D_LAB);
+/** #game3d·#game-hud 캔버스 생성(멱등). §G-21 §3.2: 3D 를 실제로 쓰기 직전까지 미룬다 —
+ *  타이틀·무기 선택 화면에는 캔버스도, Three.js 도, GLB 도 만들지 않는다. */
+function ensureChase3DCanvases() {
+  if (canvas3d) return;
   const stage = document.getElementById('stage');
   canvas3d = document.createElement('canvas'); canvas3d.id = 'game3d';
   hudCanvas = document.createElement('canvas'); hudCanvas.id = 'game-hud';
@@ -217,7 +312,99 @@ if (CHASE3D_ON) {
   if (stage) { canvas.after(canvas3d); canvas3d.after(hudCanvas); }
   hudCtx = hudCanvas.getContext('2d');
   sizeChase3DCanvases();
-  if (['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'].includes(CHASE3D_LAB)) {
+}
+// §G-22 §4.2 3D 초기화 상태(세션 단위). 0=idle 1=module-loading 2=renderer-created/prewarming 3=ready 4=failed.
+//  ⚠️renderer 를 만든 직후에 `chase3d` 로 공개하면 **프리웜이 끝나기 전 프레임이 그 renderer 를 호출**한다
+//   (프리웜은 셰이더 컴파일을 미리 돌려 히치를 없애는 절차인데, 그 도중에 그리면 목적 자체가 무너진다).
+//   그래서 `_pendingChase3D` 에 담아 두었다가 프리웜 완료 시 한 번에 승격한다. 실패는 latch — 재시도하지 않는다.
+let _c3dPhase = 0, _c3dReason = '', _pendingChase3D = null;
+//  §G-22 §5.1 성능 프로필: renderer(픽셀비율·LOD)와 FPS 가드가 **같은 객체**를 쓴다. 세션 시작 시 1회 고정.
+const PERF_PROFILE = performanceProfileForViewport(window.innerWidth, window.innerHeight);
+//  §G-21 §5.2 저성능 폴백: 3D 가 실제로 보이는 구간의 지속 FPS 가 안전 하한 미만이면 그 세션은 2D 로 고정한다.
+const _c3dFps = createFpsGuard({ minFps: PERF_PROFILE.minFps });
+let _c3dPrevTs = 0;
+//  §G-22 §5.3: 탭 비활성·복귀 같은 "중단"은 dt 값 추정이 아니라 실제 이벤트로 안다 —
+//  그래야 화면이 보이는 채로 1~2fps 로 기어가는 진짜 저성능을 놓치지 않는다.
+let _c3dFpsInterrupted = true;   // 첫 프레임의 dt 는 페이지 로드 구간이라 표본에서 뺀다
+try { document.addEventListener('visibilitychange', () => { _c3dFpsInterrupted = true; }, false); } catch (e) {}
+/** 3D 를 처음 필요로 하는 순간에 딱 한 번 부트스트랩한다(동적 import → renderer → 프리웜 → 승격). */
+//  §G-34 후속 A안(이사님 선택): 확대를 한 번이라도 누르면 **유휴 시간에** 3D 자원을 미리 받아둔다.
+//   그래야 200% 로 올리는 순간 기함이 곧바로 3D 로 나온다(2D→3D 로 바뀌는 것이 눈에 띄지 않게).
+//  ⚠️`requestIdleCallback` 이 없는 브라우저(구 사파리 등)는 짧은 타이머로 대체한다 — 없다고 건너뛰면
+//   그 브라우저만 예전 동작(첫 전환에서 깜빡임)으로 남는다.
+/** 배율이 바뀔 때마다 호출 — 확대를 눌렀으면(100% 초과) 유휴 프리페치를 예약한다.
+ *  ⚠️`draw()` 안에 두면 **타이틀·무기 선택 화면에서 돌지 않는다**(그 블록에 도달하지 않는다).
+ *   이사님 실기(2026-08-11): 그래서 첫 판은 2D 였고 두 번째 판부터 3D 였다(그땐 캐시가 있어서).
+ *   가장 한가한 시점이 바로 무기 선택 화면이므로, **배율 변경 지점**에 걸어 화면 상태와 무관하게 돈다. */
+function maybePrefetch3D() {
+  //  ⚠️저장된 배율(`_restoreZoom`, 복원 대기 중)도 **확대 의사로 본다.**
+  //   시작을 100% 로 고정했으므로 `camera.target` 만 보면 220% 를 쓰던 플레이어에게도
+  //   프리페치가 걸리지 않는다 — 정작 준비가 가장 필요한 사람이 빠진다.
+  const want = Math.max(camera.target, _restoreZoom || 0);
+  if (CHASE3D_ON && !CHASE3D_TEST && !CHASE3D_LAB && shouldPrefetch3D(want)) schedulePrefetch3D();
+}
+
+let _c3dPrefetchQueued = false;
+function schedulePrefetch3D() {
+  if (_c3dPrefetchQueued || _c3dPhase) return;   // 이미 예약했거나 초기화가 시작됐으면 그만
+  _c3dPrefetchQueued = true;
+  //  §G-34 후속(이사님 결정 2026-08-11): **캔버스까지 미리 만든다.**
+  //
+  //  원래 §G-21 §3.2 는 "타이틀·무기 선택에는 캔버스도 Three.js 도 GLB 도 만들지 않는다"였다.
+  //  그 취지는 보고서에 적혀 있듯 **"100% 로만 노는 플레이어에게 GLB 를 지우지 마라"** 다.
+  //  지금 프리페치 조건은 이미 `shouldPrefetch3D` = **확대를 눌렀다(100% 초과)** 이므로
+  //  그 사람은 3D 를 쓸 사람이다 → 원래 취지를 해치지 않는다. 100% 전용 플레이어는 여전히 아무 비용도 없다.
+  //
+  //  ⚠️네트워크만 데우는 방식(모듈 import + GLB fetch)으로는 부족했다(이사님 실기 3회차):
+  //   WebGL 컨텍스트 생성·셰이더 컴파일·GLB 파싱·GPU 업로드는 **캔버스가 있어야** 시작된다.
+  //   그래서 2D → 절차 AURORA → GLB 로 두 번 바뀌는 것이 남았고 5초가 걸렸다.
+  //  ⚠️캔버스는 `opacity:0; visibility:hidden` 으로 만들어진다 — 만들어도 화면에 나타나지 않는다.
+  const go = () => requestChase3D();
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 3000 });
+  else setTimeout(go, 800);
+}
+
+//  §G-34 후속: 부팅 직후 한 번 — 저장 배율이 100% 초과면 타이틀에 머무는 동안 조용히 준비한다.
+//  ⚠️반드시 `_c3dPrefetchQueued` 선언(위)보다 **뒤에서** 불러야 한다. 앞에서 부르면
+//   `let` 의 TDZ 에 걸려 `ReferenceError` 로 게임 전체가 뜨지 않는다(실제로 한 번 그랬다).
+maybePrefetch3D();
+
+function requestChase3D() {
+  if (_c3dPhase) return;   // 진행중·완료·실패 모두 재진입 금지
+  _c3dPhase = 1;
+  ensureChase3DCanvases();
+  // 동적 import — 여기서만 Three.js가 로드된다(§3.2). 실패/미지원이면 chase3d=null 유지 → RC2 화면 그대로.
+  //  Opus5 hero(기본): 3D 는 AURORA 기함만(§9.1). chase3dTest 레거시 장면만 구 전체-3D dev fallback.
+  import('./chase3d-renderer.js').then((m) => {
+    let c = null;
+    try { c = m.createChase3D(canvas3d, { hero: !CHASE3D_TEST, profile: PERF_PROFILE }); }
+    catch (e) { _c3dPhase = 4; _c3dReason = 'init-exception'; console.warn('[chase3d] 초기화 예외 → RC2 유지:', e); return; }
+    if (!c || !c.available) { _c3dPhase = 4; _c3dReason = (c && c.reason) || 'unavailable'; console.warn('[chase3d] 사용 불가 → RC2 유지:', _c3dReason); return; }
+    _pendingChase3D = c; _c3dPhase = 2;
+    const promote = () => {
+      if (_pendingChase3D !== c) return;   // 그 사이 실패 처리됐으면 승격하지 않는다
+      chase3d = c; _pendingChase3D = null; _c3dPhase = 3;
+      if (CHASE3D_TEST) buildChase3DOverlay();
+      console.info('[chase3d] 실제 3D 사용 가능(hero=' + !CHASE3D_TEST + ')');
+    };
+    if (c.prewarmRun) {
+      c.prewarmRun(LOGICAL_W, logicalH, canvas.width, canvas.height)   // §10.2 셰이더 사전 준비
+        .then((p) => { console.info('[chase3d] 프리웜', p); promote(); })
+        .catch((e) => {
+          _c3dPhase = 4; _c3dReason = 'prewarm-failed'; _pendingChase3D = null;
+          try { c.dispose(); } catch (e2) {}
+          console.warn('[chase3d] 프리웜 실패 → RC2 유지:', e);
+        });
+    } else promote();
+  }).catch((e) => { _c3dPhase = 4; _c3dReason = 'module-load-failed'; console.warn('[chase3d] 모듈 로드 실패 → RC2 유지:', e); });
+}
+// §G-14 소품(탄·픽업) 3D 상시(이사 "픽업도 3D 로 켜줘"). 기본 OFF 였던 이유는 2022년식 임시 조형이 "엉망"이라는
+//  실기 판정이었는데, §G-7 에서 픽업 4종이 이사 VARCO 실모델로 교체돼 전제가 사라졌다. 개발 플래그(chase3dProps)는 폐기.
+if (CHASE3D_ON && (CHASE3D_LAB_ON || CHASE3D_TEST)) {
+  //  검사실·검증 장면은 `chase3d=1` 을 명시해야만 열리는 개발 전용 경로다 — 자체 rAF 루프가 즉시 3D 를 요구하므로
+  //  지연 로드 대상이 아니다. 일반 게임 경로는 draw() 에서 사전 로드 경계를 넘을 때 requestChase3D() 한다.
+  ensureChase3DCanvases();
+  if (CHASE3D_LAB_ON) {
     // ── 모델 검사실(Opus5 §8: aurora / B1 단독 / swarm=기함+B1 12) — 게임 렌더 대신 스튜디오. 기본 URL 미로드. ──
     canvas.style.visibility = 'hidden';
     const _ov = document.getElementById('overlay'); if (_ov) _ov.style.display = 'none';
@@ -237,19 +424,7 @@ if (CHASE3D_ON) {
       console.info('[chase3d-lab] AURORA 검사실 시작');
     }).catch((e) => console.warn('[chase3d-lab] 로드 실패:', e));
   } else {
-    // 동적 import — 여기서만 Three.js가 로드된다(§3.2). 실패/미지원이면 chase3d=null 유지 → RC2 화면 그대로.
-    //  Opus5 hero(기본): 3D 는 AURORA 기함만(§9.1). chase3dTest 레거시 장면만 구 전체-3D dev fallback.
-    import('./chase3d-renderer.js').then((m) => {
-      try {
-        const c = m.createChase3D(canvas3d, { hero: !CHASE3D_TEST });
-        if (c && c.available) {
-          chase3d = c;
-          if (c.prewarmRun) c.prewarmRun(LOGICAL_W, logicalH, canvas.width, canvas.height).then((p) => console.info('[chase3d] 프리웜', p));   // §10.2 셰이더 사전 준비
-          if (CHASE3D_TEST) buildChase3DOverlay();
-          console.info('[chase3d] 실제 3D 사용 가능(hero=' + !CHASE3D_TEST + ')');
-        } else { console.warn('[chase3d] 사용 불가 → RC2 유지:', c && c.reason); }
-      } catch (e) { console.warn('[chase3d] 초기화 예외 → RC2 유지:', e); }
-    }).catch((e) => console.warn('[chase3d] 모듈 로드 실패 → RC2 유지:', e));
+    requestChase3D();   // chase3dTest=1 검증 장면 — 자체 rAF 루프가 chase3d 를 바로 요구한다
   }
 }
 
@@ -276,7 +451,7 @@ function buildAuroraLabUI(lab) {
     const i = lab.info();
     stats.textContent = `AURORA lab  ${i.view}  [${i.mode}]  LOD${i.stats.lod}\n` +
       `tris ${i.triangles}  draws ${i.calls}  progs ${i.programs}\n` +
-      `geo ${i.geometries}  tex ${i.textures}  texMB ${(i.stats.textureBytes / 1048576).toFixed(1)}\n` +
+      `geo ${i.geometries}  tex ${i.textures}  texMB ${Number.isFinite(i.stats.textureBytes) ? (i.stats.textureBytes / 1048576).toFixed(1) : 'n/a'}\n` +
       `build ${i.buildMs}ms  freeze ${i.freeze ? 'ON' : 'off'}`;
   }
   lab._refreshUI = refresh; refresh();
@@ -349,6 +524,13 @@ function updateChase3DOverlay() {
 if (CHASE3D_ON) window.__NF3D = {
   ctl: () => chase3d,
   info: () => chase3d && chase3d.info(),
+  //  §G-21 §3.2 지연 로드 이후: 실플레이 없이 3D 를 구동하는 QA·검증 훅은 초기화를 직접 요구해야 한다.
+  init: () => { requestChase3D(); return { phase: _c3dPhase, reason: _c3dReason }; },
+  phase: () => ({
+    phase: _c3dPhase, reason: _c3dReason, pending: !!_pendingChase3D, profile: PERF_PROFILE,
+    fpsTripped: _c3dFps.tripped, fpsStrikes: _c3dFps.strikes, lastFps: +_c3dFps.lastFps.toFixed(1),
+    swaps: _swapCount, allyDrone: _c3dAllyDrone, allyCruiser: _c3dAllyCruiser, t3d: chase3dT,
+  }),
   setZoom: (z) => { _t3dZoom = z; },
   run: () => _t3dRun || (_t3dRun = buildChase3DTestRun()),
   step: (n = 1, zoom) => { const z = zoom ?? _t3dZoom; const r = _t3dRun || (_t3dRun = buildChase3DTestRun()); for (let k = 0; k < n; k++) chase3d && chase3d.frame(r, z, LOGICAL_W, logicalH, canvas.width, canvas.height, _t3dTime += 0.016); return chase3d && chase3d.info(); },
@@ -396,6 +578,7 @@ function applyZoom(dir) {
   camera.target = dir === 0 ? DEFAULT_ZOOM : stepZoom(camera.target, dir);
   showZoomIndicator();
   persistZoom();
+  maybePrefetch3D();
   updatePauseCameraUI();
 }
 /** 전술 시점(100%) ↔ 완전 함미 추적 시점(220%) 토글. C키·일시정지 버튼·모바일 버튼 공용(§8.2). */
@@ -403,6 +586,7 @@ function toggleChaseView() {
   camera.target = camera.target >= CHASE_FULL_ZOOM ? DEFAULT_ZOOM : MAX_ZOOM;
   showZoomIndicator();
   persistZoom();
+  maybePrefetch3D();
   updatePauseCameraUI();
 }
 /** 현재 목표가 추적 시점(≥200%)인가 — 버튼 문구 전환용. */
@@ -676,6 +860,7 @@ function newExpedition(mode = 'campaign', opts = {}) {
     spawnEntity(e) { this.entities.push(e); },
     spawnEnemyBullet(b) { if (this.enemyBullets.length < this.stageMods.shotCap) this.enemyBullets.push(b); },
     notifyEnemyKilled(e) { onEnemyKilled(e, this); },   // 랜스·메아리·시즈 등 entities.js 킬 경로가 호출하는 중앙 알림
+    feedbackClock,   // §G39-R1: entities.js 피해 경로(랜스·메아리·시즈)가 피격 기록 시각을 읽는다 — 벽시계 아닌 게임 누적 시간
     onPowCollect() { sectorWeaponUpgrade(); },          // 섹터 POW 수집 → 무기 강화 카드(S4)
     // 기함 등급 상승 → 함체 내구도 등급업 + 완전 재충전. 25분은 스케줄(campaignHullTier)이 담당하고,
     // 섹터는 순양함 흡수로 유기적으로 오르므로 여기서 받는다(이사: 25분 체력 시스템을 섹터에도).
@@ -1039,6 +1224,14 @@ function completeNode(node) {
 // (구 advanceStage 제거 — 섹터 맵의 onEncounterClear/completeNode가 진행을 담당)
 
 function startPlay(sameWeapon) {
+  //  §G-34 공통 룰(이사님 결정 2026-08-11): **출격은 언제나 100%(2D) 로 시작한다.**
+  //   마지막 전술 시점(저장된 배율)을 불러오지 않는다 — 3D 는 그때부터 준비돼 있으므로,
+  //   플레이어가 확대하는 순간 곧바로 3D 가 뜬다. 로딩 전환이 화면에 드러나지 않는다.
+  //  ⚠️저장값 자체는 그대로 둔다(`persistZoom`) — `_restoreZoom` 이 그것을 읽어 3D 프리페치를
+  //   미리 걸어 준다. "복원하지 않는다"와 "저장하지 않는다"는 다르다.
+  camera.target = DEFAULT_ZOOM;
+  feedbackClock.reset();   // §G-39: 새 출격은 피드백 시계도 0 부터
+  updatePauseCameraUI();
   drafting = false;
   betweenStages = false;
   hideConsentUI();
@@ -1275,14 +1468,20 @@ function coreLoopAutopilot(sq, w) {
 function spawnResonance(spec, sq, w) {
   const shotBase = Math.max(4, sq.flagPower * (w.stats?.damage ?? 1) * 0.06) * (sq.resonPowerMult || 1) * (run.campaign25?.resonBonus || 1);   // 한 발 기준 피해 근사(§7.3 T2+ 공명 증폭 + §7.1 두 번째 공명)
   if (spec.kind === 'rail') {
-    const hx = BAL.gate1.loadout.hardpointX.wing;
+    //  §G-42: 레일도 wing 하드포인트를 쓴다 — 보조무기와 **같은 규칙으로 좌우 번갈아** 쓴다.
+    //   예전엔 항상 +22 라 레일이 늘 기함 오른쪽에서만 나갔다(이사 제보 2026-08-13, 보조무기와 같은 원인).
+    //  ⚠️크기 22 는 게임 좌표라 그대로 둔다(§G-28 P0-1). 부호만 뒤집으며, 그것도 탄이 실제로 생기는
+    //   자리라 이사님 승인 아래 한 변경이다. 카운터는 기함에 두어 출격마다 초기화된다(전역 난수 미사용).
+    const hx = alternateHardpointX(sq, '_railSide', BAL.gate1.loadout.hardpointX.wing);
     const b = new Bullet(sq.x + hx, sq.y - 10, shotBase * spec.dmgFrac, {
       vy: -BAL.weapons.laser.speed * 1.15, kind: 'laser', pierce: spec.pierce, beamW: 9, lv: 3, color: '#79ecff',   // 레일 스톰 전용 렌더(drawResonanceRail)가 resonanceId로 분기 — 흰 네모박스 대신 시안 레일포. 관통 판정은 pierce
     });
     b.resonanceId = 'railStorm'; b.fromResonance = true; b.sourceWeaponId = null;
     w.bullets.push(b);
-    w.effects.muzzle(sq.x + hx, sq.y - 12, '#e9f7ff', 12);
-    w.effects.ring(sq.x + hx, sq.y - 10, '#9fe8ff');
+    //  §G-28 P0-1: 레일의 게임 시작 x 는 hx 를 포함한 그대로 두고, **보이는** 발사구만 기함 중심으로 당긴다.
+    noteShotOrigin(b, sq.x, sq.y - 10);
+    w.effects.muzzle(sq.x, sq.y - 12, '#e9f7ff', 12);
+    w.effects.ring(sq.x, sq.y - 10, '#9fe8ff');
     sfx('laser');
   } else if (spec.kind === 'missiles') {
     for (let k = 0; k < spec.count; k++) {
@@ -1871,7 +2070,7 @@ function triggerApex() {
     if (!e.isEnemy || e.dead || !e.hitByBullet || e.indestructible) continue;
     e.shieldCharges = 0;                    // 보호막 변이 무시 → 확정 소거(1발이 보호막만 까고 생존하던 문제, Codex 3차 P2)
     const before = e.hp || 0;
-    e.hitByBullet(99999, w);
+    hitWithFeedback(e, w, 99999);   // §G39-R1 (즉사하므로 실제 기록은 안 된다 — 사망 폭발이 담당)
     if (e.dead) {
       w.metrics?.weaponDamage('apex', Math.max(0, before));   // 소거한 실효 HP를 apex 기여로 기록(overkill 원값 아님 → avgDps/B7 스케일 정직, Codex 3차 P2)
       w.notifyEnemyKilled?.(e); w.entities.splice(i, 1);       // 중앙 킬 처리 + 즉시 제거(사망 후 접촉·발사 방지, Codex 2차 P2)
@@ -1880,7 +2079,7 @@ function triggerApex() {
   for (const bo of (r.bosses || [])) {
     if (bo.dead) continue;
     const before = bo.hp;
-    bo.hitByBullet((bo.maxHp || 3000) * G2.apexDamageFrac, w);
+    hitWithFeedback(bo, w, (bo.maxHp || 3000) * G2.apexDamageFrac);   // §G39-R1 보스는 생존 → 몸체 플래시 기록
     w.metrics?.weaponDamage('apex', Math.max(0, before - bo.hp));   // 실제 적용 Apex 피해 기록(Codex 2차 P2)
   }
   w.effects.flash(0.5); w.effects.halo(sq.x, sq.y, '#ffe17a'); w.effects.ring(LOGICAL_W / 2, logicalH * 0.4, '#ffe17a');
@@ -2202,7 +2401,7 @@ function onEnemyKilled(e, w) {
       if (o === e || o.dead || !o.hitByBullet) continue;
       const dx = o.x - e.x, dy = o.y - e.y;
       if (dx * dx + dy * dy <= (rr + (o.r || 0)) ** 2) {
-        o.hitByBullet(dmg, w);
+        hitWithFeedback(o, w, dmg);   // §G39-R1 몸체 플래시(실효 피해만) — 연쇄 전용 입자는 만들지 않는다
         if (o.dead) onEnemyKilled(o, w);   // 연쇄 처치도 집계 (각 1회, _killHandled로 재귀 안전)
       }
     }
@@ -2226,7 +2425,9 @@ function update(dt) {
   const w = r.world;
 
   syncCameraAnchor();          // §3: input.tick 직전에 현재 함대 좌표를 카메라 anchor에 반영(1프레임 지연 제거)
-  rebuildChaseProjection();    // 2.5D: 같은 프레임의 함대·줌·blend로 투영 갱신 → 마우스 역변환이 현재 시점 기준
+  //  §G-34 §4-1: 여기서는 **만들지 않는다.** 입력 역변환은 "사용자가 방금 본 화면"의 투영을 써야 하고,
+  //   그 화면은 직전 프레임 끝에서 확정된 스냅샷으로 그려졌다. 갱신은 이 함수 끝(월드 갱신 후) 1회뿐이다.
+  if (!chaseProjection) rebuildChaseProjection();   // 첫 프레임만 부트스트랩
   input.tick(dt);
   w.phase = r.phase;
   w.boss = r.boss; w.bosses = r.bosses;
@@ -2449,8 +2650,9 @@ function update(dt) {
       const ab = r.bosses[Math.floor(Math.random() * r.bosses.length)];  // 여러 보스 위로 폭발 분산
       const bx = ab.x + (Math.random() - 0.5) * ab.r * 2.4;
       const by = ab.y + (Math.random() - 0.5) * ab.r * 1.4;
-      r.effects.burst(bx, by, COLORS.danger, 18, 220);
-      r.effects.burst(bx, by, COLORS.reward, 10, 160);
+      //  §G39-R1 고우선: 일반 pool(480)이 차도 이 연출은 예약 슬롯(600)까지 살아남는다.
+      r.effects.burst(bx, by, COLORS.danger, 18, 220, { priority: 'high', kind: 'bossSink' });
+      r.effects.burst(bx, by, COLORS.reward, 10, 160, { priority: 'high', kind: 'bossSink' });
       r.effects.ring(bx, by, Math.random() < 0.5 ? COLORS.reward : COLORS.danger);
       r.effects.flash(0.22);
       sfx(Math.random() < 0.5 ? 'explode_s' : 'explode_l');
@@ -2458,7 +2660,8 @@ function update(dt) {
     r.squad.update(dt, w); // 우주선은 사격하며 대기
     if (r.seqT >= (r.isBossNode ? BD.sectorDuration : BD.duration)) {
       // 마지막 대폭발 → 통과 시작
-      for (const b of r.bosses) { r.effects.burst(b.x, b.y, COLORS.reward, 40, 320); r.effects.burst(b.x, b.y, '#ffffff', 20, 260); r.effects.ring(b.x, b.y, COLORS.reward); }
+      //  §G39-R1 고우선: 일반 pool(480)이 차도 이 연출은 예약 슬롯(600)까지 살아남는다.
+      for (const b of r.bosses) { r.effects.burst(b.x, b.y, COLORS.reward, 40, 320, { priority: 'high', kind: 'bossFinal' }); r.effects.burst(b.x, b.y, '#ffffff', 20, 260, { priority: 'high', kind: 'bossFinal' }); r.effects.ring(b.x, b.y, COLORS.reward); }
       r.effects.flash(0.6);
       sfx('explode_l');
       r.phase = 'flythrough';
@@ -2509,6 +2712,8 @@ function update(dt) {
           const hpBefore = bo.hp;
           bo.hitByBullet(bossDmg, w, b);
           if (w.metrics || w.reson?.activeId) tallyBulletDamage(w, b, Math.max(0, hpBefore - bo.hp), bo);   // 피해 집계(측정/캠페인) + 공명 충전(섹터 포함)
+          //  §G-39: 보스도 같은 helper 를 쓴다(일반 적 분기만 고치면 보스 불꽃이 빠진다).
+          emitProjectileImpactFeedback(bo, b, b.x, b.y, Math.max(0, hpBefore - bo.hp), w, feedbackClock.now());
           b.onHit?.(bo, w);            // 시즈 폭발(도탄/분열은 보스전에서 대상 없음)
           b.dead = true; hitBoss = true; // 보스는 관통 불가 (거대 표적)
           break;
@@ -2530,6 +2735,7 @@ function update(dt) {
         const hpBefore = e.hp ?? 0;
         e.hitByBullet(dealt, w, b); // 탄환 문맥 전달(프리즘 코어 등)
         if (w.metrics || w.reson?.activeId) tallyBulletDamage(w, b, Math.max(0, hpBefore - (e.hp ?? 0)), e);   // 피해 집계(측정/캠페인) + 공명 충전(섹터 포함)
+        emitProjectileImpactFeedback(e, b, b.x, b.y, Math.max(0, hpBefore - (e.hp ?? 0)), w, feedbackClock.now());
         b.onHit?.(e, w);   // 진화 온-히트(도탄/분열/폭발) — 각 1회, 비재귀
         if (wasAlive && e.dead) onEnemyKilled(e, w);
         if (b.kind === 'homing') w.effects.burst(b.x, b.y, '#ff9c41', 8, 120); // 미사일 폭발
@@ -2569,6 +2775,14 @@ function update(dt) {
     if (r.squad.pendingDoctrine) openDoctrine();
     else if (r.squad.pendingWeaponEvolution) openWeaponEvolution(r.squad.pendingWeaponEvolution);
   }
+
+  //  §G-34 §4-1 단일 투영 계약: **프레임당 여기 한 곳에서만** 투영을 확정한다.
+  //   월드 갱신이 끝난 뒤(함대 이동·줌·blend 확정 후)라 draw 가 그리는 그림과 정확히 같은 기준이고,
+  //   다음 프레임 `input.tick` 의 역변환도 "사용자가 방금 본 그 화면"을 기준으로 삼는다.
+  //   ⚠️여기서 만든 스냅샷 하나를 draw·3D 수집·followX·HUD·edge warning 이 전부 공유한다 —
+  //    한 프레임에 둘 이상의 투영이 생기면 조준과 그림이 어긋난다(Codex D-2).
+  updateChaseCamera(dt);          // §G-34 §5: 카메라를 먼저 옮기고
+  rebuildChaseProjection();
 }
 
 // 기함 교리 3택 (첫 업그레이드 1회). 게임 일시 정지.
@@ -2797,13 +3011,24 @@ function showHangar(entryPoint) {
 // 상단 진입 페이드(전술·추적 공용): y≈0 경계로 들어오는 개체가 딱딱하게 잘려 보이지 않게.
 function drawEntityFaded(ctx, e) {
   const fz = (e.r || 24) * 2;
-  if (e.y < fz) { const a = e.y / fz; if (a <= 0.02) return; ctx.save(); ctx.globalAlpha = a; e.draw(ctx); ctx.restore(); }
-  else e.draw(ctx);
+  //  §G-39: 피격 플래시를 공통 경계에서 얹는다(엔티티 클래스마다 흩뿌리지 않는다).
+  const fl = readDamageFlash(e, feedbackClock.now());
+  if (e.y < fz) {
+    const a = e.y / fz; if (a <= 0.02) return;
+    ctx.save(); ctx.globalAlpha = a;
+    drawWithDamageFlash(ctx, e, () => e.draw(ctx), fl, a);
+    ctx.restore();
+  } else drawWithDamageFlash(ctx, e, () => e.draw(ctx), fl, 1);
 }
 function drawBossFaded(ctx, b) {
   const fz = (b.r || 40) * 2;
-  if (b.y > 0 && b.y < fz) { ctx.save(); ctx.globalAlpha = Math.max(0.05, b.y / fz); b.draw(ctx); ctx.restore(); }
-  else b.draw(ctx);
+  const fl = readDamageFlash(b, feedbackClock.now());
+  if (b.y > 0 && b.y < fz) {
+    const a = Math.max(0.05, b.y / fz);
+    ctx.save(); ctx.globalAlpha = a;
+    drawWithDamageFlash(ctx, b, () => b.draw(ctx), fl, a);
+    ctx.restore();
+  } else drawWithDamageFlash(ctx, b, () => b.draw(ctx), fl, 1);
 }
 // 추적 시점 배경 전진감(§7): 소실점 글로우 + 항로선. chaseBlend 비례로만 강해지고 랜덤 없음(고정 레인 → 매 프레임 객체 생성 없음).
 const CHASE_LANES = [0.14, 0.32, 0.5, 0.68, 0.86];
@@ -2825,14 +3050,20 @@ function drawChaseBackdrop(ctx, proj, intensity) {
 function drawEdgeWarnings(ctx, r, proj) {
   const warns = collectEdgeWarnings(r, proj, { w: LOGICAL_W, h: logicalH });
   for (const w of warns) {
-    const color = w.danger === 'boss' ? '#ff5a6a' : w.danger === 'enemyBullet' ? '#ff8a3c' : '#ffb020';
+    //  §G-34 §6: 원거리 공격형(shooter) 추가. **색과 모양을 둘 다** 달리한다 — 색만으로 나누면
+    //   색각 이상에서 구분이 사라진다(§9). 보라 + 마름모라 빨강 삼각·주황 원·노랑 사각과 겹치지 않는다.
+    const color = w.danger === 'boss' ? '#ff5a6a'
+      : w.danger === 'enemyBullet' ? '#ff8a3c'
+        : w.danger === 'shooter' ? '#c98cff' : '#ffb020';
     ctx.save();
     ctx.globalAlpha = 0.92; ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineWidth = 2;
     ctx.translate(w.edgeX, w.edgeY);
     ctx.beginPath();
     if (w.danger === 'boss') { ctx.moveTo(0, -8); ctx.lineTo(7, 6); ctx.lineTo(-7, 6); ctx.closePath(); ctx.fill(); }        // 삼각형
     else if (w.danger === 'enemyBullet') { ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.stroke(); }                                 // 원
-    else { ctx.rect(-5, -5, 10, 10); ctx.stroke(); }                                                                         // 사각
+    else if (w.danger === 'shooter') {                                                                                       // 마름모
+      ctx.moveTo(0, -6); ctx.lineTo(6, 0); ctx.lineTo(0, 6); ctx.lineTo(-6, 0); ctx.closePath(); ctx.stroke();
+    } else { ctx.rect(-5, -5, 10, 10); ctx.stroke(); }                                                                       // 사각
     ctx.restore();
   }
   ctx.globalAlpha = 1;
@@ -2852,38 +3083,100 @@ const _in3dMap = new WeakMap();
 // ── 소품 3D(이사: "무기·배지") — 종별 화면 전장(논리px)·상한과 수집 버퍼. 레이저 빔·공명은 2D 스트릭 유지. ──
 const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], laser: [64, 150], crystal: [88, 200], coin: [22, 56], pow: [40, 92], pod: [64, 160], capsule: [44, 110] };
 const _sw = {
-  ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k, { buf: Array.from({ length: ENEMY3D[k].cap }, () => ({ sx: 0, sy: 0, px: 0, wob: 0 })), n: 0 }])),
+  //  §G-39 Task 6: cr/cg/cb(색 채널) 초기값은 반드시 1 — 0 이면 아직 색을 안 쓴 인스턴스가 검게 나온다.
+  ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k, { buf: Array.from({ length: ENEMY3D[k].cap }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, cr: 1, cg: 1, cb: 1 })), n: 0 }])),
   drone: { buf: _droneBuf, n: 0 }, cruiser: { buf: _cruBuf, n: 0 },
   //  §G-13 발사체는 화면좌표(sx/sy/px)가 아니라 월드좌표(wx/wy)로 3D 에 놓는다 — 2.5D 투영의 휨을 물려받지 않게.
-  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1, wx: 0, wy: 0, mul: 1 })), n: 0 }])),
+  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1, wx: 0, wy: 0, mul: 1, wmul: 1, core: 0 })), n: 0 }])),
 };
 // 픽업 정보 라벨(+N·▲N·무기명·POW)은 3D 위 HUD 계층에 유지 — 시각만 3D 로 바꾸고 게임 정보는 잃지 않는다.
 const _propLabels = Array.from({ length: 24 }, () => ({ x: 0, y: 0, str: '', col: '#eaf6ff', size: 15 }));
 let _propLabelN = 0;
-const _colCache = new Map();   // '#rrggbb' → int (탄 진화색 instanceColor)
-function colInt(hex, fallback) {
-  if (!hex || typeof hex !== 'string') return fallback;
-  let v = _colCache.get(hex);
-  if (v === undefined) { v = parseInt(hex.replace('#', ''), 16); if (!Number.isFinite(v)) v = fallback; _colCache.set(hex, v); }
-  return v;
-}
+// 발사체 표시 사양 스크래치 1개를 계속 덮어쓴다(프레임 중 할당 0). 색 변환·캐시는 chase3d-shot-spec 안에 있다.
+const _shotSpec = makeShotSpec();
 // 이번 프레임 3D 로 올라간 바로 그 개체만 2D 스킵(초과·변이 개체는 2D 유지) — 개체에 프레임 스탬프를 찍어 집합을 정확히 일치.
 //  sidecar 라 게임 객체·저장·직렬화에 절대 나타나지 않는다(§0.2 규칙 불변).
 const _isB13D = (e) => _in3dMap.get(e) === _b1Stamp;
+//  §G-22 §3.4: "3D 로 올렸다"와 "화면 밖이라 아예 안 그린다"는 **다른 판정**이다. 하나의 스탬프로 겸했더니
+//  기함을 통과했지만 아직 화면 안인 개체가 3D 수집에 실패했을 때(모델 미준비·버퍼 초과) 2D 도 스킵돼
+//  통째로 사라졌다. 컬은 별도 sidecar 로 분리한다.
+const _cullMap = new WeakMap();
+const _skip2D = (e) => _in3dMap.get(e) === _b1Stamp || _cullMap.get(e) === _b1Stamp;
+//  §G-22 §3.2 아군 종류별 3D 준비 상태(이번 프레임). 2D 드론·순양함 숨김을 종류별로 가른다.
+let _c3dAllyDrone = false, _c3dAllyCruiser = false;
+//  §G-39 Task 6: 이번 프레임의 피드백 시각·밝기 배수. draw() 초입에서 한 번만 갱신하고 put3D() 가 읽는다.
+//   (put3D 는 draw() 밖의 모듈 스코프 함수라 draw() 지역변수를 볼 수 없다 — §G-22 §9 와 같은 이유로 모듈 변수로 공유한다.)
+let _fbNow = 0, _fbBoost = FEEDBACK.boost;
+//  §G-22 §9 보스 HUD 뷰 재사용 버퍼 + 이름 매핑(둘 다 모듈 스코프 — 프레임마다 만들지 않는다).
+const _bossHudBuf = [];
+const _bossHudName = (b) => (EN ? (bossDefById(b.spriteId)?.name || b.korName) : b.korName);
+
+// ── 3D 수집 헬퍼(§G-22 §9: draw() 안 클로저를 모듈 스코프로 올려 프레임마다 새로 만들지 않는다) ──
+//  참조하는 값(chase3d·chaseProjection·logicalH·_sw·_b1Stamp)은 전부 모듈 변수라 동작은 이전과 같다.
+/** 기함을 통과해 화면 아래로 빠져나간 개체 — 2D·3D 어디에도 그리지 않는다(컬 스탬프만 찍는다). */
+function cullPassed(e, p) {
+  if (e.y > chaseProjection.squadY && p.y > logicalH + 60) { _cullMap.set(e, _b1Stamp); return false; }
+  return true;
+}
+/** 픽업·발사체 수집. 준비→용량→기록이 모두 성공한 **직후에만** 3D 스탬프를 찍는다(§3.4). */
+function putProp(key, cat, e, p, col, wob, mul = 1, wmul = 1, core = 0) {
+  if (!chase3d || !chase3d.ready || !chase3d.ready[cat](key)) return false;   // ①종류·키 등록 + ②모델/폴백 준비
+  const s = _sw.props[key];
+  if (s.n >= s.buf.length) return false;                                      // ③버퍼 용량
+  const [len, max] = PROP_LEN[key];
+  const o = s.buf[s.n++];                                                     // ④실제 슬롯 기록
+  o.sx = p.x; o.sy = p.y; o.px = Math.min(max, len * p.scale); o.wob = wob; o.col = col;
+  o.wx = e.x; o.wy = e.y; o.mul = mul; o.wmul = wmul; o.core = core;
+  _in3dMap.set(e, _b1Stamp);
+  return true;
+}
+/** 적·보스·위험물 수집. 같은 4단계 순서를 쓴다. */
+function put3D(key, e, wob) {
+  if (e.affixes && e.affixes.length) return null;                             // 변이=2D 유지(링·표식 보존)
+  if (!chase3d || !chase3d.ready || !chase3d.ready.enemy(key)) return null;    // ①②
+  const s3 = _sw[key];
+  if (!s3 || s3.n >= s3.buf.length) return null;                              // ③(로스터 밖 보스 포함)
+  const p = projectObject(e, 'enemy', chaseProjection);
+  if (!cullPassed(e, p)) return null;
+  const d = ENEMY3D[key];
+  const o = s3.buf[s3.n++];                                                   // ④
+  //  §G39-R1: 위치와 색을 **한 호출**로 기록한다 — 테스트도 바로 이 함수를 부른다.
+  //   색만 따로 지우는 회귀가 성립하지 않는다(지우면 위치도 같이 사라져 적이 원점에 몰린다).
+  writeEnemySlot(o, e, p, d, wob, _fbNow, _fbBoost);
+  _in3dMap.set(e, _b1Stamp);
+  return p;
+}
+/** 픽업 정보 라벨(+N·▲N·POW·무기명) — 본체가 3D 로 가도 숫자·이름은 HUD 계층에 남는다. */
+function putLabel(p, str, col, size) {
+  if (_propLabelN >= _propLabels.length || !str) return;
+  const L = _propLabels[_propLabelN++];
+  L.x = p.x; L.y = p.y; L.str = str; L.col = col; L.size = size;
+}
 
 // ── 기함 2D↔3D 스왑 워프 플래시(이사 3회 지적의 마감): 하드 컷의 형태 교체 순간을 "위상 전환" 섬광으로 가린다. ──
 //  규칙·판정·저장 불변 — 화면 연출 전용. reduced-motion 이면 발화하지 않는다(즉시 컷만).
-let _swapSide = -1, _swapFxAt = 0, _swapFxX = 0, _swapFxY = 0;
+let _swapSide = -1, _swapFxAt = 0, _swapFxX = 0, _swapFxY = 0, _swapCount = 0;
 function noteSwap(t3d, r, proj) {
-  const side = t3d >= 0.5 ? 1 : 0;
+  //  §G-22 §11.2: 레이어 판정은 production 과 테스트가 같은 함수(flagshipLayer)를 쓴다.
+  const side = flagshipLayer(t3d > 0, t3d) === '3d' ? 1 : 0;
   if (_swapSide === -1) { _swapSide = side; return; }   // 첫 관측은 기준만 잡고 발화 없음
   if (side === _swapSide) return;
-  _swapSide = side;
+  _swapSide = side; _swapCount++;   // 실제 2D↔3D 경계 횟수(브라우저 검증에서 읽는다)
   if (!proj || !r || !r.squad || r.squad.dead || prefersReducedMotion()) return;
   const p = projectPoint({ x: r.squad.x, y: r.squad.y }, proj);
   _swapFxAt = performance.now(); _swapFxX = p.x; _swapFxY = p.y;
 }
 /** 픽업 정보 라벨(+N·▲N·무기명·POW) — 본체는 3D, 숫자·이름은 HUD 계층(3D 위)에 그대로. 2D draw 와 같은 윤곽 스타일. */
+//  §G-34 §4-3: `drawLanceAfterglow` **삭제**.
+//   §G-31 은 "3D 빔은 소실점 너머로 못 가니 그 너머를 2D 잔광으로 잇자"였는데 전제가 틀렸다.
+//   finite top plane 계약(§4-1)에서 world y=0 은 **화면 안**에 있다 — 소실점 너머가 아니다.
+//   빔이 world y=0 까지 닿게 하니(§4-3, chase3d-renderer 발사 블록) 이을 구간 자체가 없어졌다.
+//
+//  ⚠️그리고 이 잔광은 틀린 그림이었다(Codex 5차 G-2[중대]). 월드 x 를 **화면 x 로 그대로** 썼다:
+//     `c.fillRect(e.x - w/2, ...)` — 추적 모드에서 월드 x 와 화면 x 는 다르다(투영을 거쳐야 한다).
+//     실측 기함 x=420 에서 **104.4px** 어긋났고, 폭도 월드 63px 을 그대로 써 투영값 30.49px 의 2배였다.
+//     즉 "판정 범위를 보여주려던 표시"가 실제 판정과 다른 자리를 가리키고 있었다.
+
 function drawPropLabels(c) {
   if (!_propLabelN) return;
   c.save();
@@ -2925,53 +3218,44 @@ function draw() {
   syncPlayButtons();   // 상태에 따라 일시정지·차지 버튼 표시/숨김 (draw는 headless step에서도 호출됨)
   // 방어: 치수가 비정상(NaN·0·음수)이면 렌더를 건너뛴다 — createLinearGradient 등이 비유한값에 예외를 던져 프리즈되는 것을 차단.
   if (!Number.isFinite(logicalH) || logicalH <= 0 || !Number.isFinite(scale) || scale <= 0) return;
+  //  §G-39 Task 6: reduced-motion 은 **프레임당 한 번**. 적마다 matchMedia 를 부르지 않는다.
+  //   ⚠️save.get().reducedMotion 필드는 이 코드베이스에 없다(save.js DEFAULTS 확인) — 기존에 이미 쓰던
+  //   prefersReducedMotion()(위 204행, matchMedia 기반)을 그대로 따른다.
+  _fbNow = feedbackClock.now();
+  _fbBoost = prefersReducedMotion() ? FEEDBACK.boostReduced : FEEDBACK.boost;
   // 실제 3D(선택): 살아있는 상태를 읽어 #game3d에 렌더하고 전환 t를 얻는다(§7·§8). 미지원/휴면/실패면 0 → RC2 화면 그대로.
   let t3d = 0;
   if (CHASE3D_ON && !CHASE3D_TEST && !CHASE3D_LAB) {   // 검증 장면·검사실은 별도 루프가 #game3d를 직접 구동 → 메인 draw가 캔버스를 만지면 안 됨(실 rAF에서 매 프레임 숨김 충돌)
+    //  §G-22 §4.1 지연 로드: **사용자가 200% 이상을 요청한 순간**(줌 목표 기준) 처음 초기화한다.
+    //   줌 정착 단계는 100/150/200/220 네 칸뿐이고 150% 는 3D 를 전혀 표시하지 않는다 —
+    //   G21 은 경계가 1.50 이라 150% 로만 노는 플레이어에게도 GLB 20MB 를 지웠다.
+    //   목표를 보므로 200% 로 보간되는 동안(=아직 3D 가 안 보이는 동안) 로드를 끝낼 여유가 생긴다.
+    //   requestChase3D 는 세션 latch — 실패해도 프레임마다 재시도하지 않는다.
+    if (state === 'play' && run && !_c3dFps.tripped && shouldInit3D(camera.target)) requestChase3D();
     // followX = 2D 기함의 화면 중앙 이탈(논리 px, 부분 추종) → 3D 카메라 트럭 이동으로 2D·3D 기함 화면 X 정합
     const followX = chaseProjection ? chaseProjection.C0 - chaseProjection.centerX : 0;
     // 실전 3D 스웜 수집(이사 승인): 크리처(B1·B2) + 소품(탄·픽업·배지) — 2.5D 투영 화면좌표·크기로 3D 인스턴스와 정합.
     //  변이(엘리트) 크리처는 제외(링·표식 유지), large(B3)·레이저 빔·공명 탄은 2D 유지. 버퍼 초과분도 2D 폴백.
     for (const k in ENEMY3D) _sw[k].n = 0;
     _propLabelN = 0; _b1Stamp++;
+    _c3dAllyDrone = false; _c3dAllyCruiser = false;   // 수집 블록이 안 돌면 아군은 전부 2D(§G-22 §3.2)
     for (const k of PROP_KEYS) _sw.props[k].n = 0;
     if (chase3d && state === 'play' && run && chaseProjection) {
-      const passGate = (e, p) => {   // 기함 통과: 투영이 아래로 외삽(depth 1.6 공통) — 화면 밖이면 어디에도 안 그림
-        if (e.y > chaseProjection.squadY) { _in3dMap.set(e, _b1Stamp); if (p.y > logicalH + 60) return false; }
-        return true;
-      };
-      const putProp = (key, e, p, col, wob) => {
-        const s = _sw.props[key];
-        if (s.n >= s.buf.length) return false;
-        const [len, max] = PROP_LEN[key];
-        const o = s.buf[s.n++];
-        o.sx = p.x; o.sy = p.y; o.px = Math.min(max, len * p.scale); o.wob = wob; o.col = col;
-        o.wx = e.x; o.wy = e.y; o.mul = 1;   // §G-13 월드 배치 + §G-20 종류별 크기 배율(발사체만)
-        _in3dMap.set(e, _b1Stamp);
-        return true;
-      };
-      const putLabel = (p, str, col, size) => {
-        if (_propLabelN >= _propLabels.length || !str) return;
-        const L = _propLabels[_propLabelN++];
-        L.x = p.x; L.y = p.y; L.str = str; L.col = col; L.size = size;
-      };
       // §G-4 적 12종 공용 수집(이사 제작 렌더 빌보드) — 비변이만(변이=2D 유지로 링·표식 보존), 초과분 2D 폴백.
-      const put3D = (key, e, wob) => {
-        if (e.affixes && e.affixes.length) return null;
-        const s3 = _sw[key];
-        if (!s3 || s3.n >= s3.buf.length) return null;   // 로스터 밖 보스 등 — 2D 유지
-        //  §G-16: 모델이 아직 없는 종(위험물 4종 등)은 3D 로 올리지 않는다 — 올렸다고 표시하면 2D 도 스킵돼 사라진다.
-        if (chase3d && chase3d.swarmReady && !chase3d.swarmReady(key)) return null;
-        const p = projectObject(e, 'enemy', chaseProjection);
-        if (!passGate(e, p)) return null;
-        const d = ENEMY3D[key];
-        const o = s3.buf[s3.n++];
-        o.sx = p.x; o.sy = p.y; o.px = Math.min(d.max, d.len * p.scale); o.wob = wob;
-        _in3dMap.set(e, _b1Stamp);
-        return p;
-      };
+      //  수집 헬퍼(put3D·putProp·putLabel·cullPassed)는 모듈 스코프에 있다(§G-22 §9 프레임 무할당).
       for (const e of run.world.entities) {
         if (e.dead) continue;
+        //  §G-23 차지 빔 이중 표시 교정(이사): 함미 시점의 발사 빔은 3D(소실점으로 뻗는 원통)가 담당한다.
+        //   2D ChargeLance 는 화면 상단으로 수직으로 뻗어 원근과 어긋나므로 3D 구간에서는 스킵한다.
+        //   스탬프만 찍고 수집 버퍼에는 넣지 않는다 — 3D 빔은 스웜이 아니라 기함 리그에 붙은 연출이기 때문.
+        if (e instanceof ChargeLance) {
+          _in3dMap.set(e, _b1Stamp);
+          //  §G-35 A안(이사님 판단): 3D 빔을 **발사체와 같은 규칙**으로 정합시킨다.
+          //   빔은 지금까지 3D 공간에서 +z 로 뻗어 2D 투영과 따로 놀았다. 2D 가로배율(nearLateral)과
+          //   3D 카메라 등가배율(근거리 4.393)이 3.5배 어긋나 있어 **빔만 짧아 보였다**(이사님 실기).
+          //   → 빔 끝을 world y=0 의 **2D 화면 위치**로 넘기면 renderer 가 placeOnRay 로 놓는다.
+          continue;
+        }
         if (e instanceof Creature) { put3D(e.size === 'small' ? 'b1' : e.size === 'mid' ? 'b2' : 'b3', e, e.wob || 0); continue; }
         if (e instanceof Sniper) { put3D('b4', e, e.wob || 0); continue; }
         if (e instanceof Turret) { put3D('b5', e, e.wob || 0); continue; }
@@ -3003,47 +3287,46 @@ function draw() {
         else if (e instanceof PowerModule) key = 'capsule';
         if (!key) continue;
         const p = projectObject(e, 'pickup', chaseProjection);
-        if (!passGate(e, p)) continue;
-        if (putProp(key, e, p, -1, 0) && label) putLabel(p, label, lcol, key === 'crystal' ? 16 : 13);
+        if (!cullPassed(e, p)) continue;
+        if (putProp(key, 'pickup', e, p, -1, 0) && label) putLabel(p, label, lcol, key === 'crystal' ? 16 : 13);
       }
-      // §G-13 발사체 3D 는 상시(이사 "발사체도 3D 모두 적용"). 픽업만 개발 플래그(chase3dProps=1) 유지.
+      // §G-13 발사체 3D 는 상시(이사 "발사체도 3D 모두 적용").
       {
+        //  §G-21 §6.2 색·크기·위계는 chase3d-shot-spec.js 한 곳에서만 계산한다(2D 실제 그림의 수치를 그대로 옮긴 표).
+        //   여기 인라인으로 흩어져 있어 드론 예광탄·레이저 레벨·진화색이 3D 에서 어긋났다.
         for (const b of run.world.bullets) {
           if (b.dead || b.resonanceId) continue;   // §G-2: 레이저 랜스도 3D(공명 레일만 2D 전용 렌더 유지)
-          const p = projectObject(b, 'playerBullet', chaseProjection);
-          if (!passGate(b, p)) continue;
+          //  §G-34 §7: 3D 도 **같은 규칙**으로 발사 원점을 보정한다. 예전엔 sidecar 를 읽지도 않아
+          //   2D 는 포구에서, 3D 는 기함 중심에서 탄이 나왔다(Codex G-1[중대]). `o.sx` 가 3D 배치의
+          //   입력(placeOnRay)이므로 투영 입력에서 보정하면 3D 위치까지 자동으로 따라온다.
+          const p = projectObject({ x: shotRenderX(b), y: b.y, r: b.r }, 'playerBullet', chaseProjection);
+          if (!cullPassed(b, p)) continue;
           const key = b.kind === 'laser' ? 'laser' : b instanceof HomingMissile ? 'missile' : 'pbullet';
-          // §G-15 색 일치(이사 "발칸이 2D 는 흰색인데 3D 는 다른 색"): 2D drawVulcan 과 같은 탄색을 그대로 넘긴다.
-          //  미사일만 원본 실모델 색(흰색=텍스처 원색) 유지.
-          //  §G-20 2D 와 색·크기를 종류별로 맞춘다(이사 "드론이 쏘는 발사체 색상이 2D·3D 가 다르다").
-          //   2D 실제 값: 드론 예광탄(tracer)=COLORS.ally 청록 2×8 작은 막대 / 기함 발칸=스프라이트+백열 코어(흰색으로 읽힘)
-          //   / 레이저=b.color 없으면 #8fe8ff. 미사일만 실모델 원색 유지.
-          //   ⚠️발칸은 b.color(=WEAPON_COLORS.vulcan 청록)를 쓰면 안 된다 — 2D 는 그 색을 쓰지 않고
-          //    스프라이트(PROJ_VULCAN_BASE) 위에 백열 코어를 덮어 그려서 화면에서는 흰색으로 읽힌다(실측).
-          const col = key === 'missile' ? 0xffffff
-            : b.kind === 'tracer' ? 0x3ff5e0
-            : b.kind === 'laser' ? colInt(b.color, 0x8fe8ff)
-            : 0xfffefb;
-          if (putProp(key, b, p, col, Math.atan2(b.vx || 0, -(b.vy || -1)))) {
-            //  드론 예광탄은 2D 에서 기함 발칸보다 확연히 작다(2×8 vs 스프라이트) — 3D 도 같은 위계로.
-            const sl = _sw.props[key]; sl.buf[sl.n - 1].mul = (b.kind === 'tracer') ? 0.55 : 1;
-          }
+          const sp = shotSpec(key, b, _shotSpec);
+          //  sp.core = 백열 심 유무 — 드론 예광탄(2D 에 심이 없다)에는 0 이 들어가 코어 파트가 꺼진다(§G-22 §6).
+          putProp(key, 'shot', b, p, sp.color, Math.atan2(b.vx || 0, -(b.vy || -1)), sp.lengthMul, sp.widthMul, sp.core);
         }
         for (const b of run.world.enemyBullets) {
           if (b.dead || b.kind === 'laser' || b.resonanceId) continue;
           const p = projectObject(b, 'enemyBullet', chaseProjection);
-          if (!passGate(b, p)) continue;
-          putProp('ebullet', b, p, colInt(b.color, 0xff7a5a), Math.atan2(b.vx || 0, -(b.vy || 1)));
+          if (!cullPassed(b, p)) continue;
+          const sp = shotSpec('ebullet', b, _shotSpec);
+          putProp('ebullet', 'shot', b, p, sp.color, Math.atan2(b.vx || 0, -(b.vy || 1)), sp.lengthMul, sp.widthMul, sp.core);
         }
       }
       // 아군 호위(§G-1): Squad 의 드론·순양함·호위기 위치(draw 와 동일 수식의 escortsFor3D)를 3D 인스턴스로.
       //  피격핵·HP바·플래시 링은 2D 유지(정보 보존) — 함선 본체만 3D 대체.
+      //  §G-22 §3.2: 드론(a1)·순양함(a2)의 준비 상태를 **따로** 본다. 아군은 sidecar 스탬프가 아니라
+      //   2D 숨김 플래그로 전환하므로, 준비된 종만 수집하고 숨김도 그 종에만 건다.
+      _c3dAllyDrone = !!(chase3d && chase3d.ready && chase3d.ready.ally('a1'));
+      _c3dAllyCruiser = !!(chase3d && chase3d.ready && chase3d.ready.ally('a2'));
       _sw.drone.n = 0; _sw.cruiser.n = 0;
       if (!run.squad.dead && typeof run.squad.escortsFor3D === 'function') {
         const en = run.squad.escortsFor3D(_escBuf);
         for (let i = 0; i < en; i++) {
           const e = _escBuf[i];
           const cru = e.kind === 1;
+          if (cru ? !_c3dAllyCruiser : !_c3dAllyDrone) continue;   // 모델 미준비 종은 2D 가 계속 그린다
           const s = cru ? _sw.cruiser : _sw.drone;
           if (s.n >= s.buf.length) continue;
           const p = projectPoint({ x: e.x, y: e.y }, chaseProjection);
@@ -3058,7 +3341,45 @@ function draw() {
     //  flythrough=기함이 화면 위로 빠져나가는 연출인데 3D 기함은 카메라에 고정돼 제자리에 남아 두 척이 된다.
     //  cutscene=전체화면 연출(게임 로직 정지). 둘 다 2D 전용 연출이라 3D 레이어를 통째로 내린다.
     const cinematic = !!run && (run.phase === 'flythrough' || run.phase === 'cutscene');
-    if (chase3d && state === 'play' && run && !cinematic) t3d = chase3d.frame(run, camera.current, LOGICAL_W, logicalH, canvas.width, canvas.height, performance.now() * 0.001, followX, _sw);
+    //  §G-21 §5.2 / §G-22 §5.2 저성능 폴백. 표본은 "3D 가 실제로 보이던 정상 프레임"만 —
+    //  chase3dT 는 직전 프레임의 t 라 방금 흘러간 dt 구간에 3D 가 떠 있었는지를 정확히 가리킨다.
+    //  선택 UI(드래프트·스테이지 요약)는 state 가 'play' 인 채로 게임만 멈추므로 명시적으로 뺀다.
+    //  중단(탭 전환)은 dt 값 추정이 아니라 visibilitychange 로 안다(§5.3) — 그래야 visible 1~2fps 를 놓치지 않는다.
+    const _now = performance.now();
+    const _dt = _c3dPrevTs ? _now - _c3dPrevTs : 0;
+    _c3dPrevTs = _now;
+    const _fpsSampling = chase3dT > 0 && state === 'play' && !paused && !drafting && !betweenStages && !cinematic
+      && !(typeof document !== 'undefined' && document.hidden);
+    const _interrupted = _c3dFpsInterrupted;
+    _c3dFpsInterrupted = false;
+    if (_c3dFps.sample(_dt, _fpsSampling, _interrupted) && chase3d) {
+      console.warn('[chase3d] 지속 저FPS(' + _c3dFps.lastFps.toFixed(1) + ') → 이 세션은 2D 로 고정');
+      try { chase3d.dispose(); } catch (e) {}
+      chase3d = null; _c3dPhase = 4; _c3dReason = 'low-fps';
+    }
+    //  §G-22 §7: 컨텍스트 손실·렌더 예외로 available 이 내려간 renderer 는 **다음 안전 프레임에** 자원을 풀고
+    //  참조를 놓는다(그리는 도중에 dispose 하지 않는다). 이후 프레임은 2D 만 그린다.
+    if (chase3d && !chase3d.available) {
+      _c3dPhase = 4; _c3dReason = chase3d.reason || 'unavailable';
+      try { chase3d.dispose(); } catch (e) {}
+      chase3d = null;
+      console.warn('[chase3d] renderer 사용 불가 → 자원 해제 후 2D 고정:', _c3dReason);
+    }
+    //  §G-35 A안: 빔 끝점을 **매 프레임** 기함 기준으로 넘긴다.
+    //   ⚠️처음엔 ChargeLance 엔티티가 있을 때만 설정했는데, 빔 렌더(`_lanceT`, 0.34초)와
+    //    엔티티 수명이 어긋나 대부분의 프레임에서 값이 없었다 → 빔이 옛 깊이식으로 짧게 그려졌다
+    //    (이사님 실기: "화면의 절반까지밖에 안 나간다").
+    if (chase3d && chaseProjection && run && run.squad) {
+      const _pe = projectObject({ x: run.squad.x, y: 0, r: 1 }, 'playerBullet', chaseProjection);
+      chase3d.lanceEndScreen = { x: _pe.x, y: _pe.y, wy: 0, sqy: run.squad.y };
+      //  §G-40(이사님 "차지샷 넓이가 완전 좁아"): **폭도** 넘긴다. 3D 는 고정 상수를 쓰고 있어서
+      //   기함이 커져도 빔이 안 넓어졌다(2D tier5·3단계 158px vs 3D ~61px).
+      //  ⚠️ChargeLance 엔티티 수명(0.34s)과 3D 빔 수명이 어긋나는 프레임이 있다(끝점과 같은 문제).
+      //   그래서 살아있을 때 값을 **기억해 두고** 없는 프레임에도 계속 넘긴다.
+      for (const _e of run.world.entities) if (_e instanceof ChargeLance) { _lastLanceHalfW = _e.halfW; break; }
+      if (_lastLanceHalfW > 0) chase3d.lanceWidthScreen = _lastLanceHalfW;
+    }
+    if (chase3dFrameGate(state, run && run.phase, !!run, !!chase3d, camera.target)) t3d = chase3d.frame(run, camera.current, LOGICAL_W, logicalH, canvas.width, canvas.height, _now * 0.001, followX, _sw);
     else if (canvas3d) { canvas3d.style.opacity = '0'; canvas3d.style.visibility = 'hidden'; }
   }
   chase3dT = t3d;
@@ -3113,18 +3434,44 @@ function draw() {
     // Opus5 하이브리드(§9): 적·보스·게이트·픽업·총알·이펙트·드론은 "전 구간" RC2 로 계속 그린다.
     //  3D 는 AURORA 기함 1척만 — 기함 본체는 2D alpha 1-t ↔ 3D alpha t 로 진짜 교차(§9.2). t=0 이면 기존 RC2 와 동일.
     if (useChase) {
-      chaseProj = createChaseProjection({ zoom: camera.current, chaseBlend: chase.current, squadX: r.squad.x, squadY: r.squad.y, logicalW: LOGICAL_W, logicalH });
+      //  §G-34 §4-1 단일 투영 계약(Codex D-2): draw 가 **새로 만들지 않는다.**
+      //   예전에는 update 시작(input.tick 직전)과 draw 에서 각각 만들어, 같은 프레임 안에서
+      //   입력 역변환은 "이동 전 함대", 화면 그림은 "이동 후 함대" 기준이었다. 카메라가 팬하기 시작하면
+      //   그 차이가 곧바로 조준 오차로 나타난다. 이제 update 끝에서 한 번 확정한 스냅샷을
+      //   입력·2.5D·3D 수집·HUD·edge warning 이 **함께** 쓴다.
+      chaseProj = chaseProjection;
+      if (!chaseProj) chaseProj = createChaseProjection({ zoom: camera.current, chaseBlend: chase.current, squadX: r.squad.x, squadY: r.squad.y, logicalW: LOGICAL_W, logicalH });
       // 소실점 방사 워프 별(전진 3D 감, 이사) — 항로선·글로우(drawChaseBackdrop)보다 아래 층에.
       drawWarpField(ctx, { W: LOGICAL_W, H: logicalH, cx: chaseProj.centerX, cy: chaseProj.horizonY, blend: chase.current, travel: scroll * 0.00115 });
       drawChaseBackdrop(ctx, chaseProj, chase.current);   // 배경 전진감(chaseBlend 비례)
       // 기함 스왑 최종형(이사 3회 지적): "겹침 0·공백 0" 하드 컷 — 2D 는 t<0.5 에서 완전 불투명, t≥0.5 에서 완전 소등.
       //  페이드 금지: 중간 반투명이 "함선 소멸 계곡"과 "반투명 두 척"을 만들었다. 스왑 팝은 워프 플래시(noteSwap)가 가린다.
       //  B1 실전(이사 승인): 3D 로 올라간 소형 B1(비변이)은 같은 하드 컷 규칙으로 2D 를 스킵 — 변이·초과분은 2D 유지.
+      //  §G-22 §11.2: 기함이 어느 레이어에 그려지는지는 production 과 테스트가 **같은 함수**(flagshipLayer)로 판정한다.
+      //  §G-34 후속(이사님 "큰 기함이 스친다"): 게이트에 **이 등급의 기함 GLB 준비 여부**를 넣는다.
+      //   렌더러가 준비된 것(`available`)과 기함 모델이 온 것은 다르다 — GLB 는 그 뒤 비동기로 온다.
+      //   그 사이 3D 로 넘기면 절차 AURORA 폴백(= 다른 배의 큰 모델)이 잠깐 보였다.
+      //   → GLB 가 올 때까지 **2D 기함을 유지**한다. 잘못된 모델을 스치느니 2D 가 정확하다.
+      //   ⚠️GLB 로드가 끝내 실패해도 2D 로 남는다(기함은 항상 보인다 — 원래 폴백 의도 그대로).
+      const _flagTier = Math.min((r.squad && r.squad.tier) | 0, 5);
+      //  §G-35 P0-4: 선체 **+ 선택 무기**를 묶어 본다. 하나만 준비된 순간에 넘기면
+      //   2D 무기는 기함과 함께 숨는데 3D 갑판은 비어 무기가 어디에도 없는 프레임이 생긴다.
+      const _wKey = r.squad && r.squad.weapon === 'laser' ? 'laser'
+        : r.squad && r.squad.weapon === 'homing' ? 'homing' : 'vulcan';
+      //  §G-37 P1: 레거시 fallback 제거 — `flagshipBundle` 이 없으면 **2D 유지**다(선체 전용 판정 금지).
+      const _flagGlbReady = flagshipReadyForDisplay(chase3d && chase3d.ready, _flagTier, _wKey);
+      const in3D = _flagGlbReady && flagshipLayer(t3d > 0, t3d) === '3d';
       drawWorldProjected(ctx, r, chaseProj, {
         drawEntity: drawEntityFaded, drawBoss: drawBossFaded, drawCampaignFleet,
-        flagshipAlpha: t3d < 0.5 ? 1 : 0,
-        hideEscorts: t3d >= 0.5,                   // §G-1: 드론·순양함 본체는 3D 로(HP바·플래시 링은 2D 유지)
-        skipEntity: t3d >= 0.5 ? _isB13D : null,   // 크리처·픽업·탄 — 이번 프레임 3D 로 올라간 개체만 스킵(스탬프)
+        flagshipAlpha: in3D ? 0 : 1,
+        //  §G-22 §3.2: 드론·순양함을 **종류별로** 숨긴다. 하나의 boolean 이면 a1 만 준비된 순간
+        //  순양함이 2D·3D 어디에도 없어 통째로 사라졌다(GLB 로딩 수 초 동안).
+        hideDroneBody: in3D && _c3dAllyDrone,
+        hideCruiserBody: in3D && _c3dAllyCruiser,
+        skipEntity: in3D ? _skip2D : null,   // 3D 로 올라간 개체 + 화면 밖 컬 개체만 스킵(§3.4 분리된 두 판정)
+        //  §G-34 §7: 발사 원점 보정(§G-28 sidecar)을 렌더 계층에 **주입**한다. 렌더는 entities 를 몰라야
+        //   하고(CW2-27), 보정은 한 규칙으로 모든 경로에 적용돼야 한다 — 이 한 줄이 그 접점이다.
+        shotOriginDX,
       });
     } else {
       if (camActive) {
@@ -3165,7 +3512,8 @@ function draw() {
     const needCruisers = r.squad.tier < maxTier ? Math.max(1, Math.round(cruisersNeededForTier(r.squad.tier, BAL.escort) * evc)) : 0;   // 등급별 필요 순양함(초반 저렴)
     drawHUD(hctx, LOGICAL_W, {
       progress: Math.min(1, r.traveled / r.totalTrack),
-      bosses: r.phase === 'boss' ? r.bosses.map((b) => ({ hp: Math.max(0, b.hp), maxHp: b.maxHp, name: EN ? (bossDefById(b.spriteId)?.name || b.korName) : b.korName, dead: b.dead, stagger: b.stagger, staggerMax: BAL.neonArbiter.staggerMax, breakT: b.breakT })) : [],
+      //  §G-22 §9: 보스전 매 프레임 새 배열+객체 N개를 만들던 map() 을 재사용 뷰로 교체(프레임 무할당).
+      bosses: r.phase === 'boss' ? bossHudView(r.bosses, _bossHudBuf, _bossHudName, BAL.neonArbiter.staggerMax) : NO_BOSSES,
       count: r.squad.count,
       cruisers: r.squad.cruisers || 0,
       tierName: EN
@@ -3313,7 +3661,8 @@ function frame(t) {
   playtestTick(dt);   // Prolific 240초 전투시간(§4.2)
   // update/draw에서 예외가 나도 rAF 재예약은 반드시 한다 → 한 프레임 오류가 게임을 영구 정지시키지 않게(회복형 루프).
   try {
-    if (!paused && !drafting && !betweenStages) update(dt);   // 일시정지·드래프트·요약 중엔 화면만 유지
+    //  §G-39 §12-3: 시간 증가는 **실제 update 안**에서만. frame() 상단에 두면 pause 중에도 흐른다.
+    if (state === 'play' && !paused && !drafting && !betweenStages) { feedbackClock.advance(dt); update(dt); }
     draw();
   } catch (e) {
     if (!_frameErrLogged) { console.error('[네온 함대] 프레임 처리 중 예외 — 무시하고 계속:', e); _frameErrLogged = true; }
@@ -3469,7 +3818,7 @@ window.__NF = {
   get chaseProjection() { return chaseProjection; },   // 현재 프레임 투영(입력 역변환·렌더 공유)
   zoom: applyZoom,                          // dir: +1 확대 / -1 축소 / 0 초기화
   toggleChase: toggleChaseView,             // QA: 100% ↔ 220% 함미 추적 토글
-  setZoomTarget(v) { camera.target = safeZoom(v); },   // QA: 목표 배율 직접 지정(보간은 frame이 진행)
+  setZoomTarget(v) { camera.target = safeZoom(v); maybePrefetch3D(); },   // QA: 목표 배율 직접 지정(보간은 frame이 진행)
   // 헤드리스 검증용: rAF 없이 시뮬레이션을 n프레임 전진 (탭이 hidden이어도 동작)
   step(frames = 1, dt = 1 / 60) {
     for (let i = 0; i < frames; i++) update(dt);

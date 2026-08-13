@@ -58,12 +58,14 @@ test('C3D-fallback-renderer: 미가용/degraded/휴면이면 frame() 0 반환(RC
 });
 
 test('C3D-fallback-main: 초기화 실패/미가용이면 chase3d 미설정 → RC2 유지(§3.3)', () => {
-  assert.match(main, /const c = m\.createChase3D\(canvas3d, \{ hero: !CHASE3D_TEST \}\);/);   // hero 기본(§9.1) — §G-14 로 소품 게이트 폐기
-  assert.match(main, /if \(c && c\.available\) \{\s*\n\s*chase3d = c;/);
-  assert.match(main, /catch \(e\) \{ console\.warn\('\[chase3d\] 초기화 예외/);
-  assert.match(main, /\.catch\(\(e\) => console\.warn\('\[chase3d\] 모듈 로드 실패/);
+  assert.match(main, /c = m\.createChase3D\(canvas3d, \{ hero: !CHASE3D_TEST, profile: PERF_PROFILE \}\);/);   // hero 기본(§9.1) — §G-14 로 소품 게이트 폐기
+  assert.match(main, /_pendingChase3D = c; _c3dPhase = 2;/);
+  assert.match(main, /catch \(e\) \{ _c3dPhase = 4; _c3dReason = 'init-exception'; console\.warn\('\[chase3d\] 초기화 예외/);
+  assert.match(main, /_c3dPhase = 4; _c3dReason = 'module-load-failed'; console\.warn\('\[chase3d\] 모듈 로드 실패/);
+  //  §G-21 §3.2: 실패는 세션 latch — 프레임마다 재시도하지 않는다.
+  assert.match(main, /if \(_c3dPhase\) return;/);
   // draw() 에서 chase3d 없으면 t3d=0 → 2D 월드 정상 렌더(RC2)
-  assert.match(main, /if \(chase3d && state === 'play' && run && !cinematic\) t3d = chase3d\.frame/);
+  assert.match(main, /if \(chase3dFrameGate\(state, run && run\.phase, !!run, !!chase3d, camera\.target\)\) t3d = chase3d\.frame/);   // ctl 없으면 게이트가 닫혀 t3d=0(§G-21 §10)
 });
 
 // ── §12.6 시각 계약 정적 ──
@@ -71,10 +73,24 @@ test('C3D-visual-layers: #game3d/#game-hud 계층 + pointer-events:none, 플래�
   assert.match(main, /canvas3d\.id = 'game3d'/);
   assert.match(main, /hudCanvas\.id = 'game-hud'/);
   assert.match(main, /pointer-events:none/);
-  // 캔버스 생성이 CHASE3D_ON 가드 안에 있음
+  //  §G-21 §3.2: 캔버스 생성은 ensureChase3DCanvases() 안으로 옮겼고, 그 호출은 (a)검사실·검증장면 부팅 또는
+  //  (b)전투 중 사전 로드 경계 통과 시의 requestChase3D() 뿐이다 — 타이틀·무기 선택에서는 #game3d 가 생기지 않는다.
   const i = main.indexOf("canvas3d = document.createElement('canvas')");
-  const guard = main.lastIndexOf('if (CHASE3D_ON) {', i);
-  assert.ok(guard > 0 && guard < i, '캔버스 생성은 CHASE3D_ON 가드 안');
+  const guard = main.lastIndexOf('function ensureChase3DCanvases() {', i);
+  assert.ok(guard > 0 && guard < i, '캔버스 생성은 ensureChase3DCanvases 안');
+  assert.match(main, /if \(canvas3d\) return;/);   // 멱등
+  const calls = (main.match(/ensureChase3DCanvases\(\)/g) || []).length;
+  assert.equal(calls, 3, 'ensure 호출 = 정의 1 + 검사실/검증장면 부팅 1 + requestChase3D 1');
+  //  ⚠️소스 문자열 대조를 **또** 깨뜨렸다(2026-08-11, 다섯 번째). §G-34 §10-2 의 교훈 그대로 —
+  //   계약(=전투 중 게이트 통과 시에만 3D 를 요청한다)은 멀쩡한데 코드 형태만 바뀌어 실패했다.
+  //   → 정규식 한 줄 대조 대신 **가드가 전부 살아 있는지**를 확인한다. 형태가 바뀌어도,
+  //     조건 하나가 사라지면 잡힌다.
+  const gi = main.indexOf('shouldInit3D(camera.target)');
+  assert.ok(gi > 0, '3D 요청 게이트를 찾는다');
+  const gate = main.slice(gi - 300, gi + 200);
+  for (const cond of ["state === 'play'", 'run', '_c3dFps.tripped', 'shouldInit3D(camera.target)']) {
+    assert.ok(gate.includes(cond), `3D 요청 게이트에 \`${cond}\` 조건이 있어야 한다`);
+  }
 });
 
 test('C3D-visual-overlay-guard: 개발 오버레이는 chase3dTest 에서만(§11)', () => {

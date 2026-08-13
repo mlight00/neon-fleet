@@ -73,7 +73,7 @@ test('B1-06: 디지타이즈 planform — 뿔 분리 런 존재(굽은 뿔의 �
 
 test('B1-07: 배선 — lab 타깃 가드(B2 추가로 4종)·Math.random 금지·기본 URL 미로드 유지', () => {
   const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
-  assert.match(main, /\['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm']\.includes\(CHASE3D_LAB\)/);
+  assert.match(main, /const CHASE3D_LAB_TARGETS = \['aurora', 'a0', 'flags', 'weapons', 'hazards', 'b1', 'b2', 'b4', 'b5', 'b6', 'models', 'allies', 'pickups', 'swarm'\]/);
   assert.match(main, /createAuroraLab\(canvas3d, \{ target: CHASE3D_LAB \}\)/);
   const b1src = readFileSync(new URL('../js/chase3d-b1.js', import.meta.url), 'utf8');
   assert.ok(!/Math\.random\s*\(/.test(b1src), 'chase3d-b1 에 Math.random 없음');

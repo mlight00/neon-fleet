@@ -165,7 +165,30 @@ export function createStarfield(logicalW, count = 120) {
 }
 
 /** 상단 HUD: 진행 바 + 보스 HP + 티어/진화 게이지/무기 상태 */
-export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '', loadoutHud = false, coins = 0, en = false }) {
+/** 보스 HUD 가 읽을 뷰(§G-22 §9 프레임 무할당). 배열·엔트리를 **재사용**해 매 프레임 새로 만들지 않는다.
+ *  게임 객체를 그대로 넘기지 않는 이유: HUD 는 표시용 이름(EN/한글)이 필요하고, 그 매핑은 main 에 있다.
+ *  @param bosses 원본 보스 배열(읽기만)  @param out 재사용 배열  @param nameOf (boss)=>표시 이름  @param staggerMax
+ */
+export function bossHudView(bosses, out, nameOf, staggerMax) {
+  //  엔트리 객체는 out 이 아니라 **풀**에 보관한다 — out.length 를 줄여도 풀은 남아,
+  //  보스가 줄었다가 다시 늘어나도 같은 객체를 재사용한다(다음 보스전에서도 할당 0).
+  const pool = out._pool || (out._pool = []);
+  const n = bosses ? bosses.length : 0;
+  for (let i = 0; i < n; i++) {
+    const b = bosses[i];
+    let v = pool[i];
+    if (!v) { v = { hp: 0, maxHp: 1, name: '', dead: true, stagger: undefined, staggerMax: 0, breakT: 0 }; pool[i] = v; }
+    v.hp = Math.max(0, b.hp); v.maxHp = b.maxHp; v.name = nameOf(b); v.dead = !!b.dead;
+    v.stagger = b.stagger; v.staggerMax = staggerMax; v.breakT = b.breakT;
+    out[i] = v;
+  }
+  out.length = n;
+  return out;
+}
+/** 보스가 없는 프레임에 넘기는 공유 빈 배열 — `[]` 리터럴을 매 프레임 만들지 않는다. */
+export const NO_BOSSES = Object.freeze([]);
+
+export function drawHUD(ctx, logicalW, { progress, bosses = NO_BOSSES, count, cruisers = 0, tierName, shipName, doctrine = '', tierPower, upgradeCur = 0, upgradeMax = 0, scheduledTier = false, stage, weapon, weaponLv, weaponEvo, shield, modules = [], logicalH = 776, flow = 0, flowMax = 100, rushT = 0, keystoneIcon = '', loadoutHud = false, coins = 0, en = false }) {
   ctx.save();
   // 진행 바 (최상단 — 아래 텍스트와 겹치지 않게 y=8)
   const barW = logicalW - 80;
@@ -177,13 +200,18 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
   // 보스 HP — 다중 보스면 상단에 나란히 (각 보스 HP바), 1기면 이름·수치까지 표시
   //  §G-15 파괴된 보스는 바에서 뺀다(이사 "보스 2개 중 먼저 파괴된 보스 영역이 붉은 사각형으로 남는다").
   //   죽은 보스는 hp 0 이라 채움이 0 → 배경(rgba(255,61,113,0.25))만 빈 붉은 칸으로 남아 있었다.
-  const liveBosses = bosses.filter((b) => b && !b.dead);
-  if (liveBosses.length) {
-    const n = liveBosses.length;
+  //  §G-21 §7 프레임 무할당: filter() 는 보스전 매 프레임 새 배열을 만든다. 두 번 순회로 대체 —
+  //   1패스에서 살아있는 수와 첫 보스를 세고, 2패스에서 죽은 보스를 건너뛰며 그린다(모두 죽으면 아무것도 안 그린다).
+  let n = 0, first = null;
+  for (let i = 0; i < bosses.length; i++) { const b = bosses[i]; if (b && !b.dead) { n++; if (!first) first = b; } }
+  if (n) {
     const totalW = logicalW - 120, gap = 6;
     const bw = (totalW - gap * (n - 1)) / n;
-    for (let i = 0; i < n; i++) {
-      const bo = liveBosses[i], bx = 60 + i * (bw + gap);
+    let slot = 0;
+    for (let i = 0; i < bosses.length; i++) {
+      const bo = bosses[i];
+      if (!bo || bo.dead) continue;
+      const bx = 60 + slot * (bw + gap); slot++;
       ctx.fillStyle = 'rgba(255,61,113,0.25)';
       ctx.fillRect(bx, 30, bw, 10);
       ctx.fillStyle = COLORS.danger;
@@ -193,17 +221,17 @@ export function drawHUD(ctx, logicalW, { progress, bosses = [], count, cruisers 
     ctx.fillStyle = COLORS.text;
     if (n === 1) {
       ctx.textAlign = 'left';
-      ctx.fillText(liveBosses[0].name || 'BOSS', 60, 51);
+      ctx.fillText(first.name || 'BOSS', 60, 51);
       ctx.textAlign = 'right';
       ctx.fillStyle = '#ff8080';
-      ctx.fillText(`${Math.ceil(liveBosses[0].hp).toLocaleString()} / ${liveBosses[0].maxHp.toLocaleString()}`, logicalW - 60, 51);
+      ctx.fillText(`${Math.ceil(first.hp).toLocaleString()} / ${first.maxHp.toLocaleString()}`, logicalW - 60, 51);
     } else {
       ctx.textAlign = 'center';
-      ctx.fillText(`${en ? 'Boss' : '보스'} ×${n} · ${liveBosses[0].name}`, logicalW / 2, 51);
+      ctx.fillText(`${en ? 'Boss' : '보스'} ×${n} · ${first.name}`, logicalW / 2, 51);
     }
     // 네온 아비터 전용 STAGGER/BREAK 보조 바 (다른 보스엔 표시 안 함)
     // 보스 이름·HP(y=51)와 모듈 줄(y=83) 사이에 배치 — 라벨 y=64, 바 y=68~73, BREAK y=70 (중첩 방지)
-    const bo = liveBosses[0];
+    const bo = first;
     if (n === 1 && bo.stagger !== undefined && bo.staggerMax) {
       const sbw = logicalW - 120;
       if (bo.breakT > 0) {

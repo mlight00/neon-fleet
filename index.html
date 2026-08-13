@@ -11,12 +11,37 @@
   <title>네온 함대 — Neon Fleet</title>
   <link rel="icon" type="image/webp" href="assets/art2-webp/branding/app_icon.webp">
   <link rel="stylesheet" href="css/style.css">
+
+  <!-- §G-38: 출격 직후 즉시 보이는 아트만 HTML 파싱 단계에서 **최우선**으로 받는다.
+       JS 가 요청하면 main.js(266KB) 그래프를 다 받은 뒤라 늦다(실측 5,101ms).
+       preload 는 파싱 중에 시작하고 우선순위도 높아 three.js 와 슬롯을 다투지 않는다.
+       ⚠️여기 목록은 `sprites.js` 의 `INSTANT_ART` + `RASTER_ART.C` 와 **같아야 한다.**
+         `tests/g38-preload-waves.test.mjs` 의 `G38-HTML-PRELOAD-MATCHES` 가 대조한다.
+       ⚠️`fetchpriority="high"` 가 **핵심이다.** Chrome 은 `as="image"` preload 를 기본 Low 로 잡고
+         모듈 스크립트는 High 로 잡는다 → JS 56개(1.06MB) 뒤로 밀려 적 스프라이트가 5.3초에 도착했다
+         (실측: JS 마지막 완료 5,316ms · A2.webp 완료 5,315ms — 정확히 같이 끝났다).
+       ⚠️§G-41(2026-08-13): **발사체 볼트가 빠져 있었다.** 출격하면 첫 프레임부터 쏘는데
+         탄 아트가 없어 폴백 도형이 나왔다(이사님 제보 "레이저가 예전 형태로 나온다").
+         실측 레이저 볼트 완료 7,199ms vs 게임 코드 5,686ms → 1.5초간 폴백.
+         적(A1~A3)을 빼고 볼트 3종을 넣었다 — 적은 몇 초 뒤 등장하지만 볼트는 즉시 필요하다.
+       ⚠️많이 넣지 마라 — preload 끼리 슬롯을 다투면 효과가 사라진다. -->
+  <link rel="preload" as="image" fetchpriority="high" type="image/webp" href="assets/art2-webp/ships/frames/H2_base_aligned.webp">
+  <link rel="preload" as="image" fetchpriority="high" type="image/webp" href="assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_base.webp">
+  <link rel="preload" as="image" fetchpriority="high" type="image/webp" href="assets/art2-webp/weapons/projectiles/nf2_proj_laser_base.webp">
+  <link rel="preload" as="image" fetchpriority="high" type="image/webp" href="assets/art2-webp/weapons/projectiles/nf2_proj_homing_base.webp">
+  <link rel="preload" as="image" fetchpriority="high" type="image/webp" href="assets/art2-webp/props/nf2_prop_p1_crystal.webp">
+  <link rel="preload" as="image" fetchpriority="high" type="image/webp" href="assets/art2-webp/props/nf2_prop_p2_pod.webp">
 </head>
 <body>
   <div id="stage">
     <canvas id="game"></canvas>
     <div id="overlay"></div>
   </div>
+  <!-- §G-38: 아트 선로딩을 main.js 그래프와 **분리**해 먼저 띄운다.
+       main.js(266KB)+three.js(670KB)를 다 받아야 본문이 실행되므로, 그 안에 두면
+       아트 요청이 5.1초까지 시작조차 못 한다 → 시작 직후 폴백 도형이 보인다.
+       ⚠️순서를 지켜라. main.js 뒤로 내리면 효과가 사라진다. -->
+  <script type="module" src="js/preload-boot.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

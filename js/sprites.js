@@ -33,6 +33,11 @@ export const ART_PATHS = Object.freeze({
   PROJ_VULCAN_BASE: 'assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_base.webp',
   PROJ_VULCAN_NEEDLE: 'assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_needle.webp',
   PROJ_VULCAN_STORM: 'assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_storm.webp',
+  //  §G-28 P0-3 초진화 2종. 3D 는 발광 파트를 런타임 색으로 물들여 초진화색을 자동 표현하는데
+  //  2D 는 3종 고정이라 템페스트·랜스에서 색이 어긋났다 → 전용 스프라이트로 맞춘다.
+  //  색은 제작기가 `EVO_PROJECTILE_COLOR` 를 직접 읽어 굽고, G28-EVOCOLOR 가 이미지↔상수를 대조한다.
+  PROJ_VULCAN_TEMPEST: 'assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_tempest.webp',
+  PROJ_VULCAN_LANCE: 'assets/art2-webp/weapons/projectiles/nf2_proj_vulcan_lance.webp',
   PROJ_LASER_BASE: 'assets/art2-webp/weapons/projectiles/nf2_proj_laser_base.webp',
   PROJ_LASER_CUTTER: 'assets/art2-webp/weapons/projectiles/nf2_proj_laser_cutter.webp',
   PROJ_LASER_PRISM: 'assets/art2-webp/weapons/projectiles/nf2_proj_laser_prism.webp',
@@ -74,7 +79,19 @@ const REMODEL_V2_BOSSES = Object.fromEntries(
 export const RASTER_ART = {
   C: {
     ...ART_PATHS,
-    C1: 'assets/styleC/C1.png', C2: 'assets/styleC/C2.png', C5: 'assets/styleC/C5.png',
+    C2: 'assets/styleC/C2.png',   // 캡슐(레거시 — 현 모드에서는 스폰되지 않는다)
+    // §G-26 위험물·픽업 8종 = 이사 VARCO 실모델(h1~h4·p1~p4)을 게임 시점으로 렌더해 만든 스프라이트.
+    //  2D 가 잔해·돌격기·기뢰·코인·파워를 코드 도형으로 그려 3D 와 전혀 다른 물체로 보였다 → 같은 모델로 통일.
+    //  아래 4개는 기존 ID 를 **덮어써** 벡터/구 PNG 대신 실모델 렌더를 쓰게 한다(draw 코드는 그대로).
+    C1: 'assets/art2-webp/props/nf2_prop_p1_crystal.webp',   // 크리스탈
+    C3: 'assets/art2-webp/props/nf2_prop_p4_pow.webp',       // 파워업
+    C4: 'assets/art2-webp/props/nf2_prop_h1_meteor.webp',    // 운석
+    C5: 'assets/art2-webp/props/nf2_prop_p2_pod.webp',       // 보급 수송선
+    //  아래 4개는 2D 에 스프라이트가 아예 없던 종 — ID 신설.
+    PROP_COIN: 'assets/art2-webp/props/nf2_prop_p3_coin.webp',
+    PROP_DEBRIS: 'assets/art2-webp/props/nf2_prop_h2_debris.webp',
+    PROP_CHARGER: 'assets/art2-webp/props/nf2_prop_h3_charger.webp',
+    PROP_MINE: 'assets/art2-webp/props/nf2_prop_h4_mine.webp',
     // 섹터 클리어 컷신 배경(전체화면 일러스트). 파일이 없으면 getSprite가 null → 인게임 연출로 자동 폴백.
     CUT_SECTOR_CLEAR: 'assets/art2-webp/story/nf2_cut_sector_clear.webp',
     ...REMODEL_V2_ENEMIES,     // B1~B6, B16~B21 (B4/B6 포함 — 벡터 폴백 해제)
@@ -107,30 +124,12 @@ export function bossDefById(id) {
   return BOSS_ROSTER.find((b) => b.id === id) || BOSS_ROSTER[0];
 }
 
-// 스타일별 배경 이미지 배열 (스테이지 진행에 따라 전환. 없으면 스타필드만)
-const BG_ART = { C: ['assets/styleC/bg1.png', 'assets/styleC/bg2.png', 'assets/styleC/bg3.png'] };
-const bgCache = new Map();
-
-/** 스테이지 1~3 → 배경1, 4~6 → 배경2, 7+ → 배경3 */
-export function getBackground(style = artStyle, stage = 1) {
-  const idx = Math.min(2, Math.floor((Math.max(1, stage) - 1) / 3));
-  return bgCache.get(style + ':' + idx) || bgCache.get(style + ':0') || null;
-}
-
-function loadBackground(style) {
-  const urls = BG_ART[style];
-  if (!urls) return Promise.resolve();
-  return Promise.all(urls.map((url, idx) => {
-    const key = style + ':' + idx;
-    if (bgCache.has(key)) return Promise.resolve();
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => { bgCache.set(key, img); resolve(); };
-      img.onerror = () => { bgCache.set(key, null); resolve(); };
-      img.src = url;
-    });
-  }));
-}
+//  §G-35 P0-6(Codex 6차 §5): `BG_ART` / `getBackground()` / `loadBackground()` **삭제**.
+//   `assets/styleC/bg1~3.png` 를 참조했지만 **호출부가 한 곳도 없었다**(전 소스 검색 0건).
+//   빌드 자동수집이 이 경로를 못 봐서 dist 에 없었고, 코드를 다시 연결하면 즉시 404 가 났을 것이다.
+//   ⚠️무작정 빌드에 넣으면 약 0.803MiB 가 늘어 49.467 → 50.270MiB 로 **50MiB 게이트를 넘는다.**
+//   → 미사용 코드이므로 참조 자체를 제거하는 쪽이 맞다(Codex 판단과 동일).
+//   배경이 다시 필요해지면 그때 `ASSET_FAMILIES` 에 선언형으로 등록하고 되살린다.
 
 // 에셋별 인게임 크기(px, 논리 좌표) — viewBox 100 기준 전체가 이 크기로 스케일된다
 export const SPRITE_SIZES = {
@@ -143,12 +142,16 @@ export const SPRITE_SIZES = {
   B12: 340, B13: 340, B14: 340, B15: 340,      // 신규 보스 4종 — 위압감 확대
   B22: 380,
   B16: 92, B17: 96, B18: 92, B19: 96, B20: 96, B21: 92, // 신규 일반 적 6종(봄버/전격/궤도/방패/모선/점멸) — 슈터 전반 통일 확대(이사)
-  C1: 56, C2: 30, C3: 34, C4: 46, C5: 56,      // 크리스탈/캡슐/파워/운석/보급수송선
+  C1: 56, C2: 30, C3: 36, C4: 48, C5: 56,      // 크리스탈/캡슐/파워/운석/보급수송선(§G-26 실모델 — 발광 여백만큼 +2)
+  //  §G-26 신설. 논리 긴 변 = 개체 반경×2 + 발광 여백. 반경은 balance.js 가 진실이다.
+  //   코인 r 10~19 / 잔해 rBig 44 / 돌격기 r 24(세로로 긴 쐐기) / 기뢰 r 13(가시 포함)
+  PROP_COIN: 30, PROP_DEBRIS: 96, PROP_CHARGER: 60, PROP_MINE: 36,
   H2_BASE_FRAME: 68, H2_ASSAULT: 68, H2_CARRIER: 68,
   MOUNT_VULCAN_BASE: 42, MOUNT_VULCAN_NEEDLE: 42, MOUNT_VULCAN_STORM: 42,
   MOUNT_LASER_BASE: 42, MOUNT_LASER_CUTTER: 42, MOUNT_LASER_PRISM: 42,
   MOUNT_HOMING_BASE: 42, MOUNT_HOMING_WASP: 42, MOUNT_HOMING_SIEGE: 42,
   PROJ_VULCAN_BASE: 32, PROJ_VULCAN_NEEDLE: 34, PROJ_VULCAN_STORM: 32,
+  PROJ_VULCAN_TEMPEST: 32, PROJ_VULCAN_LANCE: 34,   // §G-28 P0-3 (광역=storm 급 / 관통=needle 급)
   PROJ_LASER_BASE: 40, PROJ_LASER_CUTTER: 40, PROJ_LASER_PRISM: 40,
   PROJ_HOMING_BASE: 30, PROJ_HOMING_WASP: 30, PROJ_HOMING_SIEGE: 34,
   B22_CHASSIS: 190, B22_RING: 190, B22_ARM_LEFT: 190, B22_ARM_RIGHT: 190, B22_CORE: 190, B22_CRACK: 190,
@@ -221,22 +224,76 @@ export function preloadSprites(ids, style = artStyle) {
   return Promise.all(ids.map((id) => loadSprite(id, style, SPRITE_SIZES[id] || 64)));
 }
 
-const CORE_PRELOAD = [
-  'A1', 'A2', 'A3', 'A4', 'A5', 'A6',
-  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'C1', 'C2', 'C3', 'C4', 'C5',
-  'B16', 'B17', 'B18', 'B19', 'B20', 'B21',
-  'H2_BASE_FRAME', 'H2_ASSAULT', 'H2_CARRIER',
-  ...Object.keys(SPRITE_SIZES).filter((id) => id.startsWith('MOUNT_') || id.startsWith('PROJ_') || id.startsWith('VFX_')),
+//  §G-38: 선로딩을 **2파로 나눈다.**
+//
+//  왜: 예전엔 43개를 `Promise.all` 로 한꺼번에 던졌다. 브라우저는 호스트당 6개만 동시에 받으므로
+//  나머지는 **큐에서 대기**한다. 그 결과 픽업 크리스탈(4.5KB)이 **1,618ms** 걸렸다 —
+//  전송 시간이 아니라 순번 대기다. 그 사이에 출격하면 스프라이트가 없어 폴백(코드 도형)이 그려지고,
+//  이사님이 "시작할 때 5각형 크리스탈"로 보신 것이 정확히 이 상태다.
+//
+//  → 출격 직후 **몇 초 안에 화면에 뜨는 것**을 1파로 먼저 받는다(6슬롯을 이들이 쓴다).
+//    1파가 끝난 뒤 2파를 받는다. 총 로드량은 같고 순서만 바뀐다.
+//  ⚠️게임 로직·스폰·밸런스는 건드리지 않는다. 이건 **받는 순서**만의 문제다.
+
+/** 출격 직후 **몇 초 안에** 반드시 필요한 최소 집합.
+ *  index.html 이 `<link rel="preload">` 로 HTML 파싱 단계에서 직접 받는다 —
+ *  JS 가 요청하는 것보다 빠르고 우선순위도 높다. 그래서 여기는 **작게 유지**한다(6개).
+ *  ⚠️여기에 많이 넣으면 preload 끼리 슬롯을 다퉈 효과가 사라진다. */
+export const INSTANT_ART = [
+  'H2_BASE_FRAME',                                        // 2D 기함 선체 — 출격 순간부터 화면에 있다
+  //  §G-41(이사님 제보 2026-08-13): "레이저 무기 선택하고 출격하면 레이저가 예전 형태로 나온다".
+  //   §G-38 에서 이 목록에 **발사체를 빠뜨렸다.** 출격하면 바로 쏘는데 정작 탄 아트가 없었다.
+  //   실측: 크리스탈(preload 걸림) 664ms 완료 vs 레이저 볼트 **7,199ms** — 그 사이 폴백 도형이 그려진다.
+  //   시작 무기 3종의 **기본 볼트만** 넣는다(진화형은 나중에 얻으므로 2파로 충분).
+  'PROJ_VULCAN_BASE', 'PROJ_LASER_BASE', 'PROJ_HOMING_BASE',
+  'C1', 'C5',                                             // 픽업(크리스탈) · 보급 수송선
+  //  ⚠️A1~A3(적)은 여기서 뺐다 — preload 는 6개 안팎을 넘으면 서로 슬롯을 다퉈 효과가 사라진다.
+  //   적은 출격 직후 몇 초 뒤에 나오지만 발사체는 **첫 프레임부터** 나온다. 우선순위가 다르다.
+  //   적은 1파(FIRST_CONTACT)에 그대로 있어 곧바로 이어서 받는다.
 ];
+
+/** 1파 — 출격 직후 즉시 보이는 것: 기함 선체·무기 마운트·아군 발사체·초기 적·픽업. */
+const FIRST_CONTACT = [
+  'H2_BASE_FRAME',                       // 2D 기함 선체 — 출격 순간부터 화면에 있다
+  'A1', 'A2', 'A3',                      // 섹터 1 초반 적
+  'C1', 'C5',                            // 픽업(크리스탈) · 보급 수송선 ← 이번 제보 대상
+  ...Object.keys(SPRITE_SIZES).filter((id) => id.startsWith('MOUNT_') || id.startsWith('PROJ_')),
+];
+
+/** 2파 — 조금 뒤에 등장하는 것. 1파가 끝난 뒤 받는다. */
+const REST_PRELOAD = [
+  'A4', 'A5', 'A6',
+  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'C2', 'C3', 'C4',
+  'B16', 'B17', 'B18', 'B19', 'B20', 'B21',
+  'H2_ASSAULT', 'H2_CARRIER',
+  //  §G-26: PROP_ 도 선로딩에 포함해야 한다 — 위험물·픽업은 전투 중 갑자기 나타나므로
+  //  그때 로드하면 첫 개체가 폴백(코드 도형)으로 한 번 그려졌다가 바뀐다.
+  ...Object.keys(SPRITE_SIZES).filter((id) => id.startsWith('VFX_') || id.startsWith('PROP_')),
+];
+
+/** 두 파를 합친 전체 — 커버리지 테스트가 "빠진 id 가 없는지" 볼 때 쓴다. */
+const CORE_PRELOAD = [...FIRST_CONTACT, ...REST_PRELOAD];
 
 /** 스프라이트 캐시 비우기 — SPRITE_SIZES를 바꾼 뒤 다시 로드해야 새 크기로 그려진다(밸런스 튜너). */
 export function invalidateSpriteCache() {
   cache.clear();
 }
 
-/** 타이틀에서는 전투 공통 자산만 로드한다. 보스 레이어는 등장 예고 시 별도 지연 로드한다. */
+/** 타이틀에서는 전투 공통 자산만 로드한다. 보스 레이어는 등장 예고 시 별도 지연 로드한다.
+ *  1파(즉시 보이는 것) → 2파 순서로 받는다. 반환 Promise 는 **둘 다** 끝나야 resolve 된다. */
 export function preloadStyle(style = artStyle) {
-  return preloadSprites(CORE_PRELOAD, style);
+  return preloadSprites(FIRST_CONTACT, style)
+    .then((first) => preloadSprites(REST_PRELOAD, style).then((rest) => [...first, ...rest]));
+}
+
+/** 1파만 기다리고 싶을 때(출격 직전 확인용). 실패해도 게임을 막지 않는다 — 폴백 도형이 있다. */
+export function preloadFirstContact(style = artStyle) {
+  return preloadSprites(FIRST_CONTACT, style);
+}
+
+/** 선로딩 구성 조회 — 테스트가 목록을 **다시 적지 않고** 검증하기 위한 것. */
+export function preloadWaves() {
+  return { first: [...FIRST_CONTACT], rest: [...REST_PRELOAD], all: [...CORE_PRELOAD] };
 }
 
 export function preloadBossArt(id, style = artStyle) {
