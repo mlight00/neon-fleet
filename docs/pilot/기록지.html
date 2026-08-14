@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>네온 함대 — 관찰 테스트 기록지</title>
+<style>
+  /* A4 1인 1장. 인쇄하면 딱 한 장에 들어가도록 맞췄다. */
+  /* A4 1장 수납이 목적이다. 여백·행높이를 줄여 넘침을 막는다(2장 넘침 실측 후 조정). */
+  @page { size: A4; margin: 9mm 10mm 7mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Malgun Gothic", "맑은 고딕", Pretendard, sans-serif;
+    font-size: 9.6px; line-height: 1.32; color: #111; margin: 0;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  h1 { font-size: 14px; margin: 0 0 1px; letter-spacing: -.3px; }
+  .sub { font-size: 8.8px; color: #555; margin-bottom: 5px; }
+  .head { display: flex; gap: 5px; margin-bottom: 6px; }
+  .head div { flex: 1; border: 1px solid #333; padding: 2px 4px; }
+  .head b { font-size: 8.4px; color: #444; display: block; }
+  .line { border-bottom: 1px solid #999; height: 11px; }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+  th, td { border: 1px solid #666; padding: 2px 4px; vertical-align: top; }
+  th { background: #e9edf2; font-size: 8.8px; text-align: left; font-weight: 700; }
+  .n { width: 16px; text-align: center; background: #f4f6f8; font-weight: 700; }
+  /* 시각 칸: 좁으면 "__ 초" 의 단위가 아래로 떨어진다. 폭을 확보하고 줄바꿈을 막는다. */
+  .t { width: 72px; white-space: nowrap; }
+  .memo { min-height: 21px; }
+  td small { color: #666; font-size: 8px; display: block; }
+
+  .sec { background: #222; color: #fff; padding: 1.5px 5px; font-weight: 700;
+         font-size: 9.4px; margin: 6px 0 3px; }
+  .warn { border: 1.2px solid #b00; background: #fff4f4; padding: 3px 6px;
+          margin: 4px 0; font-size: 8.8px; line-height: 1.35; }
+  .warn b { color: #b00; }
+  .chk { font-family: monospace; letter-spacing: .5px; white-space: nowrap; }
+  ol.q { margin: 0; padding-left: 15px; }
+  ol.q li { margin-bottom: 2px; }
+  .ans { border-bottom: 1px solid #aaa; height: 11px; margin-top: 1px; }
+  .pass td { font-size: 9px; }
+  .foot { margin-top: 4px; font-size: 8px; color: #666; border-top: 1px solid #ccc; padding-top: 3px; }
+  @media screen { body { max-width: 800px; margin: 20px auto; padding: 0 16px; } }
+</style>
+</head>
+<body>
+
+<h1>네온 함대 — 관찰 테스트 기록지</h1>
+<div class="sub">1인 1장 · 진행자는 설명하지 않는다 · 시간은 "출격하기"를 누른 순간부터</div>
+
+<div class="head">
+  <div><b>참가자</b><div class="line"></div></div>
+  <div><b>날짜 / 시각</b><div class="line"></div></div>
+  <div><b>관찰자</b><div class="line"></div></div>
+  <div><b>슈팅게임 경험</b><div class="chk" style="padding-top:2px">□ 거의 없음 □ 가끔 □ 자주</div></div>
+</div>
+
+<div class="sec">A. 관찰 기록 — 플레이 중에 적는다</div>
+<table>
+  <tr><th class="n">#</th><th>관찰 항목</th><th class="t">시각</th><th>본 대로 적기 (참가자가 한 말 그대로)</th></tr>
+
+  <tr><td class="n">1</td>
+    <td><b>출격까지</b><small>타이틀 → "출격하기"</small>
+        <div class="chk">□ 바로 □ 두리번거림 □ 못 찾음</div></td>
+    <td class="t">__ 초</td><td class="memo"></td></tr>
+
+  <tr><td class="n">2</td>
+    <td><b>무기 선택</b><small>3개 중 고르기</small>
+        <div class="chk">□ 설명 읽음 □ 그냥 누름</div></td>
+    <td class="t">__ 초</td><td class="memo"></td></tr>
+
+  <tr><td class="n">3</td>
+    <td><b>조작 이해</b><small>셋을 따로 표시</small>
+        <div class="chk">이동 □ / 자동발사 □ / 차지 □</div></td>
+    <td class="t">이동 __초<br>발사 __초<br>차지 __초</td><td class="memo"></td></tr>
+
+  <tr><td class="n">4</td>
+    <td><b>성장 게이트</b><small>청록·자홍, ×2 의 뜻을<br><b>말로</b> 설명하는가</small>
+        <div class="chk">□ 설명함 □ 못 함 □ 반대로 앎</div></td>
+    <td class="t">__ 초</td><td class="memo"></td></tr>
+
+  <tr><td class="n">5</td>
+    <td><b>첫 성장 반응</b><small>편대가 늘어난 순간</small>
+        <div class="chk">□ 소리냄 □ 표정변화 □ 무반응</div></td>
+    <td class="t">__ 초</td><td class="memo"></td></tr>
+
+  <tr><td class="n">6</td>
+    <td><b>첫 피격 원인</b><small>왜 맞았는지 아는가</small>
+        <div class="chk">□ 앎 □ 모름 □ 틀리게 앎</div></td>
+    <td class="t">__ 초</td><td class="memo"></td></tr>
+
+  <tr><td class="n">7</td>
+    <td><b>3D 발견</b><small>확대해서 함미 시점을<br><b>스스로</b> 찾는가</small>
+        <div class="chk">□ 스스로 □ 우연히 □ 못 찾음</div></td>
+    <td class="t">__ 분</td><td class="memo"></td></tr>
+
+  <tr><td class="n">8</td>
+    <td><b>죽은 뒤</b><small>다시 누르는가</small>
+        <div class="chk">□ 바로 다시 □ 망설임 □ 그만둠</div></td>
+    <td class="t">__ 분</td><td class="memo"></td></tr>
+</table>
+
+<div class="warn">
+  <b>⚠️설명해 버린 항목이 있으면 번호를 적는다:</b> ______________
+  &nbsp; — 그 항목은 이 참가자에 한해 <b>무효</b>로 처리한다.
+</div>
+
+<div class="sec">B. 막힌 곳 — 생길 때마다 바로 적는다</div>
+<table>
+  <tr><th class="t">시각</th><th>무슨 일이 있었나</th><th style="width:150px">참가자가 한 말</th></tr>
+  <tr><td class="t">__ : __</td><td class="memo"></td><td></td></tr>
+  <tr><td class="t">__ : __</td><td class="memo"></td><td></td></tr>
+  <tr><td class="t">__ : __</td><td class="memo"></td><td></td></tr>
+</table>
+
+<div class="sec">C. 플레이 후 질문 — 순서대로 묻는다</div>
+<ol class="q">
+  <li>안 해 본 친구에게 <b>한 문장으로</b> 설명한다면?<div class="ans"></div></li>
+  <li>가장 재미있던 순간은? <span style="color:#b00">("없다"도 그대로 적는다)</span><div class="ans"></div></li>
+  <li>제일 답답하거나 헷갈린 순간은?<div class="ans"></div></li>
+  <li>화면에서 끝까지 뭔지 몰랐던 것은? <span style="color:#666">(손으로 가리키게 한다)</span><div class="ans"></div></li>
+  <li>죽었을 때 왜 죽었는지 아셨나요?<div class="ans"></div></li>
+  <li>한 번 더 하고 싶으신가요? &nbsp;<span class="chk">□ 예 □ 아니오</span> &nbsp;이유:<div class="ans"></div></li>
+</ol>
+
+<div class="sec">D. 판정 (3명 다 끝난 뒤 한 장에 모아서)</div>
+<table class="pass">
+  <tr><th>통과 기준</th><th style="width:120px">결과</th></tr>
+  <tr><td>① 설명 없이 첫 전투 진입 — <b>3명 전원</b></td><td class="chk">□ 통과 □ 미달</td></tr>
+  <tr><td>② 45초 안에 이동·성장게이트·차지 이해 — <b>2명 이상</b></td><td class="chk">□ 통과 □ 미달</td></tr>
+  <tr><td>③ 진행 차단·글자 안 보임·조작 불능 — <b>0건</b></td><td class="chk">□ 통과 □ 미달</td></tr>
+  <tr><td>④ 피격 원인을 설명 못 하는 <b>반복</b> 사례 — 없을 것</td><td class="chk">□ 통과 □ 미달</td></tr>
+</table>
+
+<div class="warn">
+  <b>⚠️여기서는 "3명이 같은 말을 해야 고친다" 규칙을 쓰지 않는다.</b><br>
+  진행 차단 · 조작 불능 · 글자 안 보임 · 멀미 → <b>한 명이면 고친다.</b><br>
+  난이도 · 밸런스 · 취향 → 여러 명이 같은 말을 할 때만. &nbsp;<b>밸런스 수치 변경은 이사님 승인 후.</b>
+</div>
+
+<div class="foot">
+  주소 <b>https://mlight00.github.io/neon-fleet/</b> &nbsp;·&nbsp;
+  ⚠️<b>?playtest=prolific 주소는 쓰지 않는다</b>(4분 제한 실험용) &nbsp;·&nbsp;
+  시나리오 전문 = docs/2026-08-14-3인-관찰테스트-시나리오.md
+</div>
+
+</body>
+</html>
