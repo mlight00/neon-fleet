@@ -177,7 +177,11 @@ export const ui = {
   },
 
   /** 첫 출격 조작 안내 (루트 노드 자동 진입 직전 1회만 표시).
-   *  combo=true(섹터 무기 조합)면 막대 게이트가 없으므로 그 설명 대신 실제 성장 경로(POW·크리스탈)를 안내한다. */
+   *  combo=true(섹터 무기 조합)면 **무기 선택 게이트**가 없으므로 그 대신 실제 성장 경로(POW·크리스탈)를 안내한다.
+   *  ⚠️게이트는 두 종류다. 없앤 것은 weaponGate(무기 선택 막대) 하나뿐이고,
+   *   성장/손실 게이트(gatePair · 청록 ×2 / 자홍 ÷2)는 그대로 남아 있다 — 두 번째 노드부터 86% 등장(시드 400 실측).
+   *   그래서 combo 판에도 청록/자홍 한 줄이 반드시 있어야 한다. 예전에 이 줄이 빠져서
+   *   "설명은 못 듣고 물건은 만나는" 상태였다(§첫90초 설계서 §2-3, 이사 결정 '가'). */
   showFirstGuide({ onStart, combo = false, lang = 'ko' }) {
     if (lang === 'en') {
       // Prolific 첫인상 테스트 전용 영어 간이 가이드(작업지시서 §4.2·§4.3).
@@ -194,6 +198,7 @@ export const ui = {
     }
     const body = combo ? `
       <p style="font-size:14px;color:#dbe8ff;margin:14px 0 6px">좌우로 움직여 피하고, 사격은 자동입니다.</p>
+      <p style="font-size:13px;color:#9fb8d8;margin:0 0 6px">갈림길에서 <b style="color:#3ff5e0">청록</b>은 성장, <b style="color:#ff3d71">자홍</b>은 손실입니다.</p>
       <p style="font-size:13px;color:#9fb8d8;margin:0 0 6px"><b style="color:#ffd93d">POW</b>는 무기 강화, <b style="color:#6fe3ff">크리스탈</b>은 드론 보급입니다.</p>
       <p style="font-size:13px;color:#9fb8d8;margin:0 0 6px">교전 중반의 <b style="color:#ff9c41">중간 보스</b>를 잡으면 POW가 떨어집니다.<br>첫 POW로 <b>보조 무기</b>를 골라 무기 조합을 완성하세요.</p>
       <p style="font-size:12px;color:#7f93b0;margin:0 0 4px">PC: Space·마우스 홀드 · 모바일: ⚡ 버튼 홀드</p>
