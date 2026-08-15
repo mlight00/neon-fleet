@@ -109,11 +109,16 @@ test('페이즈 전환 연출 진입점이 있다 — 지금 광폭화는 아무
 
 test('전환은 격파보다 크게 터진다 — 단계가 뒤로 갈수록 강하게', () => {
   const R = readFileSync(join(ROOT, 'js/chase3d-renderer.js'), 'utf8');
-  const drain = R.slice(R.indexOf('const bMul'), R.indexOf('const bMul') + 420);
+  //  ⚠️창을 넉넉히 잡는다 — 주석이 늘면 실제 코드 줄이 창 밖으로 밀린다(실제로 그렇게 깨졌다).
+  const drain = R.slice(R.indexOf('const bMul'), R.indexOf('_killQ.length = 0'));
   assert.ok(/k\.boss \? 1\.0 \+ k\.boss \* 0\.4 : 1/.test(drain), '전환 세기 배수가 없다');
   //  일반 격파(boss 없음)는 배수 1 이어야 한다 — 전환 코드가 격파를 바꾸면 안 된다
   assert.ok(/: 1;/.test(drain), '격파 경로가 그대로 1 이 아니다');
   assert.ok(/debrisBudget\('kill'\) \* bMul/.test(drain), '개수에 세기를 안 곱한다');
+  //  ⚠️크기도 bMul 이어야 한다. `k.boss ? 1.5 : 1` 로 고정하면 1단계·2단계가 같아진다(실측 확인).
+  //   개수는 프레임 상한 12 에 걸려 구분이 안 되므로, 크기·속도가 유일한 단계 신호다.
+  assert.ok(/\(0\.55 \+ scl \* 0\.7\) \* bMul/.test(drain),
+    '크기가 단계와 무관하게 고정돼 있다 — 1단계와 2단계가 구분되지 않는다');
 });
 
 test('⚠️전환 연출도 아직 아무도 부르지 않는다 — 승인 전이다', () => {

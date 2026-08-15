@@ -1184,8 +1184,13 @@ function createHero3D(canvas3d, opts = {}) {
           //  §G-47: 페이즈 전환은 격파보다 **크고 넓게** 터뜨린다 — 단계가 넘어간 것을 눈으로 알린다.
           //   단계가 뒤로 갈수록 강해진다(1단계 ×1.4 · 2단계 ×1.8). 예산 상한은 그대로 적용된다.
           const bMul = k.boss ? 1.0 + k.boss * 0.4 : 1;
+          //  ⚠️개수로는 단계를 구분할 수 없다 — 프레임 상한(DEBRIS_PER_FRAME=12)에 걸려
+          //   격파도 1단계도 2단계도 전부 12로 붙는다(실측 확인). 상한을 올리면 §G-45 로 고친
+          //   저FPS 문제가 되살아나므로 **크기와 속도로 구분한다.**
+          //  ⚠️크기 배수를 `k.boss ? 1.5 : 1` 로 고정했더니 1단계와 2단계가 같아졌다(실측:
+          //   0.437 vs 0.403 — 차이는 난수 잡음이었다). bMul 을 써야 단계가 뒤로 갈수록 커진다.
           emitDebris(_sPos.x, _sPos.y, _sPos.z, Math.round(debrisBudget('kill') * bMul),
-            (2.6 + scl * 0.8) * bMul, (0.55 + scl * 0.7) * (k.boss ? 1.5 : 1),
+            (2.6 + scl * 0.8) * bMul, (0.55 + scl * 0.7) * bMul,
             _bioCol[0], _bioCol[1], _bioCol[2]);
         }
         _killQ.length = 0;
