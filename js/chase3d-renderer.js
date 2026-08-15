@@ -1271,6 +1271,20 @@ function createHero3D(canvas3d, opts = {}) {
     lanceCore.material.opacity = 0; lanceGlow.material.opacity = 0;
     chargeRig.visible = false;
     chargeCore.material.opacity = 0; chargeHalo.material.opacity = 0;
+    chargeRingA.material.opacity = 0; chargeRingB.material.opacity = 0;
+    chargeRingA.visible = false; chargeRingB.visible = false;
+    //  §G-46 6차(이사 실기 "기함이 지나간 뒤에도 레이저 발사 위치의 빛이 남는다 · 파괴됐을 때도").
+    //   ⚠️여기서 **기함에 붙은 리그를 전부** 내린다. 지금까지는 랜스·차지만 지웠고
+    //    제트·갑판 포탑·선체 홀더는 `visible=true` + `count>0` 인 채로 남았다(사망 상태 재현으로 실측:
+    //    Cone×4 · Cone×4 · Sphere×4 · 포탑 4 · 선체 메시 9 가 그대로 살아 있었다).
+    //   캔버스를 숨기는 것만으로는 부족하다 — 다음에 캔버스가 다시 보이는 순간 **옛 자세 그대로** 한 프레임
+    //   튀어나온다. 상태를 남기지 않는 것이 유일하게 안전한 방법이다.
+    jetRig.visible = false;
+    for (const im of [jetShell, jetCore, jetGlow]) { im.count = 0; im.visible = false; }
+    mountRig.visible = false;
+    for (const k of Object.keys(mounts3)) for (const m of mounts3[k].meshes) { m.count = 0; m.visible = false; }
+    for (const k of Object.keys(flags)) flags[k].holder.visible = false;
+    ctl._flagTier = -1; ctl._mountKey = '';
     flagRig.position.set(0, 0, 0); flagRig.rotation.set(0, 0, 0);
   }
   function hide() {

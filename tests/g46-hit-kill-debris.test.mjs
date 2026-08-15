@@ -299,3 +299,28 @@ test('⚠️파편 색이 조각마다 다르다 — 한 색이면 플라스틱 
   const noComment = em.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.ok(!/Math\.random/.test(noComment), '색 변주가 전역 난수를 쓴다');
 });
+
+// ── §G-46 6차 — 기함이 사라진 뒤 잔상 ────────────────────────────────────────────────
+
+test('⚠️기함이 내려가면 붙어 있던 리그도 전부 내린다 — 잔상 방지', () => {
+  //  이사 실기: "섹터 보스 컷신에서 기함이 지나갔는데 레이저 발사 위치의 빛 두 개가 남아 있다.
+  //   기함이 파괴됐을 때도 똑같다."
+  //  ⚠️사망 상태를 만들어 씬을 훑어 재현했다 — 차지는 정상적으로 꺼졌는데
+  //   제트(Cone×4·Cone×4·Sphere×4)·갑판 포탑(×4)·선체 메시 9개가 visible 인 채로 남아 있었다.
+  //  캔버스를 숨기는 것만으로는 부족하다. 다시 보이는 순간 옛 자세로 한 프레임 튀어나온다.
+  const fx = R.slice(R.indexOf('function clearTransientFx()'), R.indexOf('function hide()'));
+  assert.ok(/jetRig\.visible = false/.test(fx), '제트 리그를 안 내린다');
+  assert.ok(/jetShell.*jetCore.*jetGlow/.test(fx), '제트 인스턴스 3종을 비우지 않는다');
+  assert.ok(/mountRig\.visible = false/.test(fx), '갑판 포탑 리그를 안 내린다');
+  assert.ok(/mounts3\[k\]\.meshes/.test(fx), '포탑 인스턴스를 비우지 않는다');
+  assert.ok(/flags\[k\]\.holder\.visible = false/.test(fx), '선체 홀더를 안 내린다 — 기함이 그대로 남는다');
+  assert.ok(/chargeRingA\.visible = false/.test(fx), '충전 링을 안 내린다');
+  //  count 를 0 으로 만들어야 실제로 안 그려진다 — visible 만 내리면 다음 프레임에 되살아난다
+  assert.ok(/count = 0/.test(fx), '인스턴스 count 를 0 으로 만들지 않는다');
+});
+
+test('hide() 가 그 정리를 실제로 부른다', () => {
+  const h = R.slice(R.indexOf('function hide()'), R.indexOf('function hide()') + 260);
+  assert.ok(/clearTransientFx\(\)/.test(h), 'hide() 가 정리 함수를 부르지 않는다');
+  assert.ok(/visibility = 'hidden'/.test(h), '캔버스를 숨기지 않는다');
+});
