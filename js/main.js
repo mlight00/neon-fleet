@@ -35,7 +35,7 @@ import { PROP_KEYS, PROP_CAPS, ENEMY3D, FLAG3D } from './chase3d-prop-defs.js'; 
 // 실제 3D 함미 추적. config/mapping/shot-spec 은 순수(Three.js 미의존)라 정적 import 안전.
 //  renderer(Three.js + GLB 37종)는 **전투 중 확대가 사전 로드 경계를 넘을 때** 처음 동적 import 한다(§G-21 §3.2).
 //  → 타이틀·무기 선택·100% 플레이에서는 three 도 GLB 도 네트워크를 타지 않는다(실측: GLB 요청 0건).
-import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, transitionT, shouldInit3D, shouldPrefetch3D, createFpsGuard, performanceProfileForViewport, chase3dFrameGate, flagshipLayer, flagshipReadyForDisplay } from './chase3d-config.js';
+import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, transitionT, shouldInit3D, shouldPrefetch3D, createFpsGuard, performanceProfileForViewport, chase3dFrameGate, flagshipLayer, flagshipReadyForDisplay, degradeProfile } from './chase3d-config.js';
 import { shotSpec, makeShotSpec } from './chase3d-shot-spec.js';   // 발사체 2D 시각 사양 → 3D 표시 사양(순수·무할당)
 import { createFeedbackClock } from './feedback-clock.js';   // §G-39: 피격 피드백 전용 게임 누적 시계(pause 중엔 멈춘다)
 import { emitProjectileImpactFeedback, hitWithFeedback } from './impact-feedback.js';   // §G-39: 발사체 명중 피드백 + §G39-R1: 연쇄·APEX 공용 피해 어댑터
@@ -529,6 +529,8 @@ if (CHASE3D_ON) window.__NF3D = {
   phase: () => ({
     phase: _c3dPhase, reason: _c3dReason, pending: !!_pendingChase3D, profile: PERF_PROFILE,
     fpsTripped: _c3dFps.tripped, fpsStrikes: _c3dFps.strikes, lastFps: +_c3dFps.lastFps.toFixed(1),
+    //  §G-45 진단: 지금까지 몇 칸 낮췄나 · 현재 품질. 실기 제보 때 이 값만 있으면 원인이 갈린다.
+    qualityStep: PERF_PROFILE.qualityStep | 0, pixelRatioCap: PERF_PROFILE.pixelRatioCap, lod: PERF_PROFILE.lod,
     swaps: _swapCount, allyDrone: _c3dAllyDrone, allyCruiser: _c3dAllyCruiser, t3d: chase3dT,
   }),
   setZoom: (z) => { _t3dZoom = z; },
@@ -3352,10 +3354,27 @@ function draw() {
       && !(typeof document !== 'undefined' && document.hidden);
     const _interrupted = _c3dFpsInterrupted;
     _c3dFpsInterrupted = false;
+    //  §G-45(이사 "품질 낮추는 쪽으로"): 저FPS 라고 3D 를 바로 버리지 않는다. **먼저 낮춘다.**
+    //   전에는 한 번 걸리면 그 판 내내 2D 였다 — 전투가 끝나 프레임이 돌아와도 그대로(실기 확인).
+    //   픽셀비율 → LOD 순으로 한 칸 내리고 다시 잰다. 사다리가 바닥나면 그때 2D 로 접는다.
     if (_c3dFps.sample(_dt, _fpsSampling, _interrupted) && chase3d) {
-      console.warn('[chase3d] 지속 저FPS(' + _c3dFps.lastFps.toFixed(1) + ') → 이 세션은 2D 로 고정');
-      try { chase3d.dispose(); } catch (e) {}
-      chase3d = null; _c3dPhase = 4; _c3dReason = 'low-fps';
+      const _fps = _c3dFps.lastFps.toFixed(1);
+      const _next = degradeProfile(PERF_PROFILE);
+      if (_next) {
+        //  ⚠️프로필 객체를 **갈아끼우지 않고 안의 값만 바꾼다** — 렌더러가 `ctl._profile` 을
+        //   생성 시점에 붙잡고 매 프레임 읽기 때문이다(chase3d-renderer.js:638·841).
+        //   새 객체를 대입하면 main 쪽만 바뀌고 화면은 그대로다.
+        Object.assign(PERF_PROFILE, _next);
+        if (chase3d._profile && chase3d._profile !== PERF_PROFILE) Object.assign(chase3d._profile, _next);
+        _c3dFps.reset();   // 낮춘 뒤 다시 잰다(품질을 실제로 내렸을 때만 부른다)
+        _c3dReason = 'low-fps-degraded-' + PERF_PROFILE.qualityStep;
+        console.warn('[chase3d] 저FPS(' + _fps + ') → 품질 강등 '
+          + PERF_PROFILE.qualityStep + '단계 (픽셀비율 ' + PERF_PROFILE.pixelRatioCap + ' · LOD ' + PERF_PROFILE.lod + ')');
+      } else {
+        console.warn('[chase3d] 저FPS(' + _fps + ') · 더 낮출 품질 없음 → 이 세션은 2D 로 고정');
+        try { chase3d.dispose(); } catch (e) {}
+        chase3d = null; _c3dPhase = 4; _c3dReason = 'low-fps';
+      }
     }
     //  §G-22 §7: 컨텍스트 손실·렌더 예외로 available 이 내려간 renderer 는 **다음 안전 프레임에** 자원을 풀고
     //  참조를 놓는다(그리는 도중에 dispose 하지 않는다). 이후 프레임은 2D 만 그린다.

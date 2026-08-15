@@ -120,6 +120,37 @@ export function performanceProfileForViewport(width, height) {
   };
 }
 
+/**
+ * §G-45 — 프레임이 모자랄 때 **끄기 전에 낮춘다**(이사 결정 2026-08-14).
+ *
+ *  ## 왜 만들었나
+ *  전에는 지속 저FPS 한 번이면 `chase3d` 를 통째로 버리고 `_c3dPhase=4` 로 잠갔다.
+ *  그 판이 끝날 때까지 3D 가 돌아오지 않는다 — 전투가 끝나 프레임이 회복돼도 그대로다.
+ *  이사님 실기(스테이지 3 부근): 기함이 2D 로 굳어 다시는 3D 가 되지 않았다. 원인은
+ *  `reason:'low-fps'` 로 확정됐다.
+ *
+ *  ## 사다리
+ *  픽셀비율을 먼저 내리고(가장 싸고 티가 덜 난다), 그 다음 LOD 를 낮춘다.
+ *      데스크톱 1.5 → 1.0 → 0.85+LOD1 → 0.7 → (더 없음 = 2D)
+ *      모바일   1.0(LOD1) → 0.7 → (더 없음 = 2D)
+ *  단조 감소라 재측정이 유한하게 끝난다 — 진동하지 않는다.
+ *
+ *  ⚠️`minFps`·`mobile` 은 건드리지 않는다. 판정 기준까지 같이 내리면 사다리가 무의미해진다.
+ *
+ *  @param profile 현재 프로필
+ *  @returns 한 칸 낮춘 새 프로필. **더 낮출 것이 없으면 null**(호출자가 2D 로 내린다).
+ */
+export function degradeProfile(profile) {
+  if (!profile) return null;
+  const px = +profile.pixelRatioCap || 0;
+  const lod = profile.lod | 0;
+  const step = (profile.qualityStep | 0) + 1;
+  if (px > 1.0)  return { ...profile, pixelRatioCap: 1.0,  lod,    qualityStep: step };
+  if (lod < 1)   return { ...profile, pixelRatioCap: 0.85, lod: 1, qualityStep: step };
+  if (px > 0.7)  return { ...profile, pixelRatioCap: 0.7,  lod: 1, qualityStep: step };
+  return null;   // 바닥 — 여기서도 못 버티면 3D 를 접는다
+}
+
 /** 저성능 폴백 감시기(§G-21 §5.2 · §G-22 §5.3). 순수 로직 — 시간·표본을 주입받아 판정만 한다.
  *  계약:
  *   · 3D 가 실제로 보이는 정상 구간의 프레임만 센다(sampling=false 면 진행 중인 창을 버린다).
@@ -143,6 +174,13 @@ export function createFpsGuard(opts = {}) {
     get strikes() { return strikes; },
     get lastFps() { return lastFps; },
     get warmedUp() { return activeMs >= warmupMs; },
+    /**
+     * §G-45 — 품질을 실제로 낮춘 뒤 **다시 재기 위해** latch 를 푼다.
+     *  ⚠️호출자는 반드시 품질을 먼저 내린 뒤에 부를 것. 그냥 부르면 원래 막으려던
+     *   2D↔3D 진동이 되살아난다. 사다리(degradeProfile)가 단조 감소라 재측정은 유한하게 끝난다.
+     *  warm-up 도 되돌린다 — 픽셀비율을 바꾼 직후 몇 프레임은 재할당 비용이라 표본이 못 된다.
+     */
+    reset() { activeMs = 0; winMs = 0; winFrames = 0; strikes = 0; tripped = false; },
     /**
      * 한 프레임 보고. 반환=이제부터 2D 고정인가.
      *  @param dtMs       직전 프레임과의 간격
