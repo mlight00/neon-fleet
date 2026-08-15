@@ -465,8 +465,18 @@ function createHero3D(canvas3d, opts = {}) {
   //  화면 정합 배치라 항상 보여야 하므로 컬링을 끈다.
   lanceCore.frustumCulled = false; lanceGlow.frustumCulled = false;
   scene.add(lanceRig);
+  //  §G-46 4차(이사 실기 "충전 이펙트가 너무 2D 같다 — 입체감을 주자").
+  //   원인: 코어·헤일로 둘 다 **구**라 정면에서 보면 납작한 원반으로 읽힌다. 어느 각도에서 봐도 원이다.
+  //  → 기울어진 **회전 링**을 두 개 넣는다. 원근에서 타원으로 눌리고, 돌면서 그 눌림이 계속 바뀌어
+  //   "이건 공간에 있는 물건"이 즉시 읽힌다. 구를 아무리 밝혀도 안 생기는 단서다.
+  //  ⚠️서로 반대로 돌린다 — 같은 방향이면 한 덩어리로 보여 링이 두 개인 의미가 없다.
+  const chargeRingGeo = new THREE.TorusGeometry(1, 0.055, 8, 40);
+  const chargeRingA = new THREE.Mesh(chargeRingGeo,
+    new THREE.MeshBasicMaterial({ color: 0x7fe9ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const chargeRingB = new THREE.Mesh(chargeRingGeo,
+    new THREE.MeshBasicMaterial({ color: 0xbfd4ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
   const chargeRig = new THREE.Group();
-  chargeRig.add(chargeCore, chargeHalo);
+  chargeRig.add(chargeCore, chargeHalo, chargeRingA, chargeRingB);
   chargeRig.visible = false;
   flagRig.add(chargeRig);
   //  §G-28 P0-2 포구 앵커: 빔 시작점을 **실제 포구의 월드 좌표**로 잡기 위한 빈 노드.
@@ -1039,8 +1049,24 @@ function createHero3D(canvas3d, opts = {}) {
         chargeHalo.position.copy(chargeCore.position);
         chargeHalo.scale.setScalar((0.4 + chg * 1.5) * puff);
         chargeHalo.material.opacity = 0.12 + chg * 0.3;
+        //  §G-46 4차: 기울어진 두 링을 반대로 돌린다. 충전이 찰수록 조여들며(반지름 ↓) 밝아진다 —
+        //   "에너지가 한 점으로 모인다"가 크기 변화만으로 읽힌다.
+        //  ⚠️품질 강등 시엔 끈다(§G-45 사다리). 링 2개 = 드로우콜 +2 다.
+        const ringOn = ((ctl._profile && ctl._profile.qualityStep) | 0) === 0 && !prefersReducedMotion3D();
+        const rr = (1.35 - chg * 0.55) * puff;
+        for (const [ring, dir, tilt] of [[chargeRingA, 1, 0.55], [chargeRingB, -1, -0.95]]) {
+          ring.visible = ringOn;
+          if (!ringOn) { ring.material.opacity = 0; continue; }
+          ring.position.copy(chargeCore.position);
+          ring.scale.setScalar(rr * (dir > 0 ? 1 : 0.72));
+          //  x 축으로 기울여 **정면에서도 타원**이 되게 하고, z 축 회전으로 그 타원을 돌린다.
+          ring.rotation.set(tilt, time * 0.7 * dir, time * 2.2 * dir);
+          ring.material.opacity = (0.10 + chg * 0.5) * (dir > 0 ? 1 : 0.7);
+        }
       } else {
         chargeCore.material.opacity = 0; chargeHalo.material.opacity = 0;
+        chargeRingA.material.opacity = 0; chargeRingB.material.opacity = 0;
+        chargeRingA.visible = false; chargeRingB.visible = false;
       }
       //  §G-12 차지 포구(W5): 집속 코어를 감싸는 금색 조리개 링. 충전 중 천천히 돌아 "가동" 느낌을 준다.
       //  ⚠️조리개(금색 입)를 전방(+z)으로 두면 함미 추적 카메라에는 뚫린 뒷면만 보여 검은 덩어리가 된다(실측).

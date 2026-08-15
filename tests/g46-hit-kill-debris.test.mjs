@@ -251,3 +251,28 @@ test('제트가 청보라 계열이다 (이사: 더 푸른 빛)', () => {
   assert.ok(b > g, `제트 셸이 청색 우위가 아니다 (r${r} g${g} b${b}) — 청록이면 g>=b 가 된다`);
   assert.ok(b > r, `제트 셸의 청색이 적색보다 낮다 (r${r} b${b})`);
 });
+
+// ── §G-46 4차 — 충전 이펙트 입체감 ────────────────────────────────────────────────────
+
+test('충전에 기울어진 회전 링이 있다 — 구만으로는 정면에서 납작하다', () => {
+  //  이사 실기: "충전 이펙트가 너무 2D 효과처럼 느껴진다".
+  //  원인은 코어·헤일로가 둘 다 구라 어느 각도에서든 원으로 보인다는 것. 링은 원근에서 타원이 된다.
+  assert.ok(/chargeRingA/.test(R) && /chargeRingB/.test(R), '충전 링이 없다');
+  assert.ok(/TorusGeometry/.test(R), '링이 토러스가 아니다 — 원반이면 입체 단서가 안 생긴다');
+  const blk = R.slice(R.indexOf('const ringOn'), R.indexOf('const ringOn') + 900);
+  //  기울기가 있어야 정면에서도 타원으로 보인다
+  assert.ok(/\[chargeRingA, 1, [\d.]+\], \[chargeRingB, -1, -[\d.]+\]/.test(blk),
+    '두 링이 반대로 돌지 않거나 기울기가 없다 — 한 덩어리로 보인다');
+  assert.ok(/ring\.rotation\.set\(tilt/.test(blk), '링 기울기를 회전에 안 쓴다');
+  //  품질 사다리 연동 (드로우콜 +2)
+  assert.ok(/qualityStep\) \| 0\) === 0/.test(blk), '품질 강등 시 링을 끄지 않는다');
+  assert.ok(/prefersReducedMotion3D\(\)/.test(blk), 'reduced-motion 을 무시한다');
+});
+
+test('충전이 풀리면 링이 확실히 꺼진다 — 잔상 방지', () => {
+  const off = R.slice(R.indexOf('chargeCore.material.opacity = 0; chargeHalo.material.opacity = 0;'),
+    R.indexOf('chargeCore.material.opacity = 0; chargeHalo.material.opacity = 0;') + 400);
+  assert.ok(/chargeRingA\.material\.opacity = 0/.test(off), '충전 해제 시 링 A 가 안 꺼진다');
+  assert.ok(/chargeRingB\.material\.opacity = 0/.test(off), '충전 해제 시 링 B 가 안 꺼진다');
+  assert.ok(/chargeRingA\.visible = false/.test(off), '링을 opacity 만 내리고 visible 을 안 끈다');
+});
