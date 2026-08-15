@@ -57,6 +57,20 @@ test('판정 기준(minFps)과 mobile 은 강등해도 그대로다', () => {
   }
 });
 
+test('망가진 입력에도 안전하다 — 강등 실패가 게임을 멈추면 안 된다', () => {
+  //  이 함수는 draw() 루프 안에서 불린다. 예외가 나면 프레임이 통째로 죽는다.
+  assert.equal(degradeProfile(null), null);
+  assert.equal(degradeProfile(undefined), null);
+  //  픽셀비율이 없는 프로필: px=0 으로 읽혀 lod 분기 → 최소한 한 칸은 내려간다
+  const noPx = degradeProfile({ lod: 0 });
+  assert.equal(noPx.pixelRatioCap, 0.85);
+  assert.equal(noPx.lod, 1);
+  //  이미 바닥인 프로필은 null (더 내릴 것이 없다)
+  assert.equal(degradeProfile({ pixelRatioCap: 0.7, lod: 1 }), null);
+  //  qualityStep 이 없어도 1 부터 센다
+  assert.equal(degradeProfile({ pixelRatioCap: 1.5, lod: 0 }).qualityStep, 1);
+});
+
 test('가드 reset(): 품질을 낮춘 뒤 다시 잴 수 있다', () => {
   const g = createFpsGuard({ minFps: 45 });
   const dt = 1000 / 30;   // 30fps — 기준 미달
