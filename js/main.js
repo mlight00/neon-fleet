@@ -2398,7 +2398,7 @@ function onEnemyKilled(e, w) {
       if (p.x > -80 && p.x < LOGICAL_W + 80 && p.y > -80 && p.y < logicalH + 80) {
         //  ⚠️정확한 3D 키를 다시 구하지 않는다 — 키는 호출부마다 타입 분기로 정해져(3272~) 여기서
         //   복제하면 종류가 늘 때마다 두 곳을 고쳐야 한다. 파편은 깊이·크기만 쓰므로 투영 배율이면 충분하다.
-        chase3d.killBurst(p.x, p.y, Math.min(320, 150 * p.scale), 1, 0.72, 0.5);
+        chase3d.killBurst(p.x, p.y, Math.min(320, 150 * p.scale), _kind3d.get(e) || null);
       }
     } catch (err) { /* 연출 실패는 게임 진행에 영향 없음 */ }
   }
@@ -3096,6 +3096,8 @@ const _escBuf = Array.from({ length: 72 }, () => ({ x: 0, y: 0, kind: 0, roll: 0
 let _b1Stamp = 0;
 // 3D 포함 여부는 게임 객체에 쓰지 않고 sidecar(WeakMap)로 관리(Codex P2) — 저장·직렬화·디버깅과의 결합 원천 차단.
 const _in3dMap = new WeakMap();
+//  §G-46: 개체 → 3D 종류 키(b1·h1·crystal…). 격파 파편 색 선택에만 쓴다(표시 전용).
+const _kind3d = new WeakMap();
 // ── 소품 3D(이사: "무기·배지") — 종별 화면 전장(논리px)·상한과 수집 버퍼. 레이저 빔·공명은 2D 스트릭 유지. ──
 const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], laser: [64, 150], crystal: [88, 200], coin: [22, 56], pow: [40, 92], pod: [64, 160], capsule: [44, 110] };
 const _sw = {
@@ -3169,6 +3171,9 @@ function put3D(key, e, wob) {
   //   색만 따로 지우는 회귀가 성립하지 않는다(지우면 위치도 같이 사라져 적이 원점에 몰린다).
   writeEnemySlot(o, e, p, d, wob, _fbNow, _fbBoost);
   _in3dMap.set(e, _b1Stamp);
+  //  §G-46 3차: 격파 파편 색을 종류에 맞추려면 키가 필요한데, onEnemyKilled 은 키를 모른다
+  //   (키는 호출부마다 타입 분기로 정해진다). 여기서 사이드카에 남겨 둔다 — 죽으면 WeakMap 이 자동 회수.
+  _kind3d.set(e, key);
   return p;
 }
 /** 픽업 정보 라벨(+N·▲N·POW·무기명) — 본체가 3D 로 가도 숫자·이름은 HUD 계층에 남는다. */

@@ -190,3 +190,64 @@ test('⚠️제트가 선체에서 높이를 뽑는다 — 보정식이 아니�
   //  포탑과 같은 방식인가 — x 보정 계수가 같아야 좌우 정렬이 맞는다
   assert.ok(/p\[0\] \* sx \* S \* 0\.88/.test(pj), '제트 x 가 포탑(0.88)과 다른 기준을 쓴다');
 });
+
+// ── §G-46 3차 — 이사 실기 지적 3건 ────────────────────────────────────────────────────
+
+test('파편 크기가 한 곳에서 조절된다 (이사: 20% 로)', () => {
+  const m = R.match(/const DEBRIS_SIZE_MULT\s*=\s*([\d.]+)/);
+  assert.ok(m, '전역 크기 배수가 없다 — 방출부마다 흩어져 있으면 조절이 불가능하다');
+  assert.ok(+m[1] <= 0.25, `크기 배수가 ${m[1]} — 이사 요청은 0.2 다`);
+  assert.ok(/\* DEBRIS_SIZE_MULT/.test(R), '배수를 실제 크기 계산에 안 쓴다');
+});
+
+test('⚠️파편 색이 피사체를 따른다 — 보급선이 붉으면 안 된다', () => {
+  assert.ok(/const DEBRIS_TINT\s*=/.test(R), '피사체별 색표가 없다');
+  assert.ok(/function debrisTintFor\(/.test(R), '색 선택 함수가 없다');
+  const tint = R.slice(R.indexOf('const DEBRIS_TINT'), R.indexOf('function debrisTintFor(') + 700);
+  //  적(b*)만 생체 붉은색이어야 한다
+  assert.ok(/isBioKey/.test(tint), '생체 판정이 없다 — 전부 붉어진다');
+  //  ⚠️정규식 안의 정규식이라 이스케이프가 꼬이기 쉽다 — 문자열 포함 검사로 단순화한다.
+  assert.ok(R.includes('/^b') && /isBioKey = \(k\)/.test(R), '생체 키 판정이 적 로스터(b*)에 한정되지 않는다');
+  //  보급선·크리스탈·운석이 각자 색을 갖는가
+  //  ⚠️템플릿 리터럴 안에서 정규식을 조립하면 \b 가 백스페이스 문자가 된다 — 문자열 포함으로 검사한다.
+  for (const k of ['pod', 'crystal', 'h1']) {
+    assert.ok(tint.includes(`${k}: [`), `${k} 파편 색이 없다 — 그 물건이 붉게 터진다`);
+  }
+  //  모르는 키는 회색 — 생체로 보내면 안 된다
+  assert.ok(/모르는 종류 = 회색|else \{ out\[0\] = 0\.6/.test(tint), '알 수 없는 키의 안전 기본값이 없다');
+});
+
+test('색 선택에 필요한 키가 실제로 전달된다 — 피격·격파 양쪽', () => {
+  //  피격: placeSwarm 이 키를 받고 호출부가 넘기는가
+  assert.ok(/function placeSwarm\([^)]*debrisKey/.test(R), 'placeSwarm 이 키를 안 받는다');
+  assert.ok(/WORLD_OBJ_VIS_DROP, k\)/.test(R), 'placeSwarm 호출부가 키를 안 넘긴다 — 전부 회색이 된다');
+  //  격파: killBurst 가 키를 받고 main 이 사이드카에서 꺼내 넘기는가
+  assert.ok(/ctl\.killBurst = \([^)]*key\)/.test(R), 'killBurst 가 키를 안 받는다');
+  assert.ok(/_kind3d\.set\(e, key\)/.test(M), 'put3D 가 종류 키를 기록하지 않는다');
+  //  ⚠️`[^)]*` 는 인자 안의 Math.min(...) 괄호를 못 넘는다 — 같은 줄에서 둘의 공존만 본다.
+  const kbLine = M.split(/\r?\n/).find((l) => l.includes('chase3d.killBurst(')) || '';
+  assert.ok(/_kind3d\.get\(e\)/.test(kbLine), '격파가 종류 키를 안 넘긴다: ' + kbLine.trim());
+});
+
+test('⚠️EMBER 분사구가 2개다 — 화면의 분사구 수와 맞아야 한다', async () => {
+  const { NOZZLE_POINTS } = await import('../js/chase3d-prop-defs.js');
+  assert.equal(NOZZLE_POINTS[0].length, 2, 'EMBER(t0) 분사구가 2개가 아니다 — 실기 캡처는 2개다');
+  //  좌우 대칭이어야 한 쪽으로 쏠리지 않는다
+  const [a, b] = NOZZLE_POINTS[0];
+  assert.ok(Math.abs(a[0] + b[0]) < 1e-9, `t0 분사구가 좌우 대칭이 아니다 (${a[0]}, ${b[0]})`);
+  assert.ok(Math.abs(a[0]) > 0, 't0 분사구가 둘 다 중앙에 있다');
+  //  모든 등급이 최소 1개는 있어야 한다
+  for (let t = 0; t < NOZZLE_POINTS.length; t++) {
+    assert.ok(NOZZLE_POINTS[t].length >= 1, `t${t} 분사구가 없다`);
+  }
+});
+
+test('제트가 청보라 계열이다 (이사: 더 푸른 빛)', () => {
+  const jm = R.slice(R.indexOf('const jetShell = '), R.indexOf('const jetShell = ') + 500);
+  const hex = jm.match(/jetMat\(0x([0-9a-f]{6})/i);
+  assert.ok(hex, '제트 셸 색을 찾지 못했다');
+  const v = parseInt(hex[1], 16);
+  const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+  assert.ok(b > g, `제트 셸이 청색 우위가 아니다 (r${r} g${g} b${b}) — 청록이면 g>=b 가 된다`);
+  assert.ok(b > r, `제트 셸의 청색이 적색보다 낮다 (r${r} b${b})`);
+});

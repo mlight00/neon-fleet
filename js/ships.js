@@ -142,7 +142,9 @@ function drawCarrier(ctx) {
 const SHIP_DEFS_RAW = [
   {
     name: 'scout', w: 34, h: 34, draw: drawScout,
-    nozzles: [{ x: 0, y: 12, len: 6 }],
+    //  §G-46 3차(이사 실기 캡처): 함선 그림의 분사구는 **2개**인데 중앙 1개만 불을 뿜고 있었다.
+    //   2D·3D 가 같은 표를 쓰므로(NOZZLE_POINTS 는 이 값을 w·h 로 나눈 것) 여기만 고치면 둘 다 맞는다.
+    nozzles: [{ x: -6, y: 12, len: 6 }, { x: 6, y: 12, len: 6 }],
     mounts: [{ x: 0, y: -12 }],
     clearR: 12,
   },

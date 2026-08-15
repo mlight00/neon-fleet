@@ -49,8 +49,10 @@ test('G38-VIS-DROP-SCOPE: 적·운석·잔해·픽업에 **같은 값**이 가�
   const src = readFileSync(new URL('../js/chase3d-renderer.js', import.meta.url), 'utf8');
 
   //  placeSwarm 호출 중 보정을 받는 것 = 적 스웜(eswarm) + 픽업(props). 둘 다 있어야 한다.
-  const enemyCall = /placeSwarm\(eswarm\[k\][^)]*WORLD_OBJ_VIS_DROP\)/.test(src);
-  const propCall = /placeSwarm\(props\[k\][^)]*WORLD_OBJ_VIS_DROP\)/.test(src);
+  //  ⚠️`WORLD_OBJ_VIS_DROP\)` 로 닫는 괄호까지 고정하면 뒤에 인자가 하나만 붙어도 깨진다
+  //   (§G-46 에서 파편 색용 key 를 추가하며 실제로 발생). 상수가 **전달되는지**만 본다.
+  const enemyCall = /placeSwarm\(eswarm\[k\][^)]*WORLD_OBJ_VIS_DROP/.test(src);
+  const propCall = /placeSwarm\(props\[k\][^)]*WORLD_OBJ_VIS_DROP/.test(src);
   assert.ok(enemyCall, '적 스웜(운석 h1·잔해 h2 포함)이 보정을 못 받는다');
   assert.ok(propCall, '픽업(크리스탈·보급선·코인·POW)이 보정을 못 받는다 — "다 동일하게" 요구 위반');
 

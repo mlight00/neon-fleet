@@ -355,12 +355,15 @@ function createHero3D(canvas3d, opts = {}) {
     color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
   });
   //  2D 와 같은 2겹: 바깥 청록 외피(COLORS.ally 대역) + 안쪽 흰 코어.
-  const jetShell = new THREE.InstancedMesh(jetGeo, jetMat(0x3ff5e0, 0.42), JET_MAX);
-  const jetCore = new THREE.InstancedMesh(jetGeo, jetMat(0xffffff, 0.55), JET_MAX);
+  //  §G-46 3차(이사 "제트도 좀 더 푸른 빛을"): 청록(0x3ff5e0) → **청보라 플라스마**.
+  //   실제 우주 추진은 추진제로 색이 갈린다 — 케로신은 주황, 수소는 거의 투명한 옅은 파랑,
+  //   제논 이온·홀 추력기는 **청보라**다. 네온 함대의 결에는 이온 쪽이 맞다.
+  const jetShell = new THREE.InstancedMesh(jetGeo, jetMat(0x2f6cff, 0.44), JET_MAX);
+  const jetCore = new THREE.InstancedMesh(jetGeo, jetMat(0xd8e8ff, 0.58), JET_MAX);   // 심은 순백이 아니라 청백
   //  ⚠️함미모드는 플룸을 **끝에서** 본다 — 원뿔만으로는 단축돼 거의 안 보인다(§G-43 1차 실측).
   //   그래서 노즐 자리에 시점 무관한 발광 구를 하나 더 둔다. 이것이 실제로 "분사구가 타는" 그림을 만든다.
   const jetGlowGeo = new THREE.SphereGeometry(1, 12, 8);
-  const jetGlow = new THREE.InstancedMesh(jetGlowGeo, jetMat(0x9ff8ff, 0.34), JET_MAX);
+  const jetGlow = new THREE.InstancedMesh(jetGlowGeo, jetMat(0x6f9cff, 0.36), JET_MAX);
   for (const im of [jetShell, jetCore, jetGlow]) { im.count = 0; im.frustumCulled = false; jetRig.add(im); }
 
   /** 분사구 제트 배치. `placeMounts` 와 같은 좌표 규약을 쓴다(box=기함 GLB 바운딩, S=홀더 배율). */
@@ -513,6 +516,9 @@ function createHero3D(canvas3d, opts = {}) {
   const _rnd = () => ((_lcg = (_lcg * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
 
   //  §G-46 프레임당 방출 총량. 적 60기가 동시에 맞아도 폭주하지 않게 막는다(사양서 §4).
+  //  §G-46 3차(이사 실기 "파편 크기가 너무 크다 — 20% 로"): 전역 크기 배수.
+  //   개별 방출부의 scale 인자는 **상대 비율**로 두고 최종 크기는 여기서 한 번에 조절한다.
+  const DEBRIS_SIZE_MULT = 0.2;
   const DEBRIS_PER_FRAME = 12;
   let _debFrameBudget = DEBRIS_PER_FRAME;
   //  instanceColor 는 첫 setColorAt 에 지연 할당된다. 실패하면 색만 포기하고 파편은 계속 보인다.
@@ -546,7 +552,7 @@ function createHero3D(canvas3d, opts = {}) {
         vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.8 + 0.5 * sp, vz: 0.7 * sp + _rnd() * 1.4 * sp,   // +z=카메라 쪽
         rx: (_rnd() - 0.5) * 11, ry: (_rnd() - 0.5) * 11, rz: (_rnd() - 0.5) * 11,
         ax: _rnd() * 6.28, ay: _rnd() * 6.28, az: _rnd() * 6.28,
-        life: 0.45 + _rnd() * 0.45, t: 0, s: scale * (0.6 + _rnd() * 0.7),
+        life: 0.45 + _rnd() * 0.45, t: 0, s: scale * (0.6 + _rnd() * 0.7) * DEBRIS_SIZE_MULT,
         //  §G-46 2차: 조각마다 다른 비율로 눌러 **타원체**로 만든다(구가 그대로면 구슬처럼 보인다).
         ex: 0.7 + _rnd() * 0.8, ey: 0.5 + _rnd() * 0.6, ez: 0.8 + _rnd() * 0.9,
         cr: cr === undefined ? 1 : cr, cg: cg === undefined ? 1 : cg, cb: cb === undefined ? 1 : cb,
@@ -574,6 +580,34 @@ function createHero3D(canvas3d, opts = {}) {
     return out;
   }
   const _bioCol = [1, 1, 1];
+
+  /**
+   * §G-46 3차(이사 "보급선 파편도 붉은 건 이상하잖아") — **피사체별** 파편 색.
+   *  적은 전부 생체 외계인이라 붉게, 그 외는 그 물건의 재질색으로 낸다.
+   *  ⚠️키가 없으면(모르는 종류) 생체로 보내지 않는다 — 회색 파편이 안전한 기본값이다.
+   */
+  const DEBRIS_TINT = {
+    h1: [0.62, 0.52, 0.42],   // 운석 — 흙·암석
+    h2: [0.58, 0.60, 0.64],   // 잔해 — 회색 금속
+    h4: [0.95, 0.55, 0.20],   // 기뢰 — 주황 경고색
+    crystal: [0.35, 0.85, 1.00],   // 크리스탈 — 청록 결정
+    pod: [0.45, 0.95, 0.82],       // 보급선 — 청록 선체
+    capsule: [0.80, 0.86, 0.92],   // 캡슐 — 흰 금속
+    coin: [1.00, 0.82, 0.30],      // 코인 — 금색
+    pow: [1.00, 0.86, 0.25],       // POW — 노랑
+  };
+  /** 이 키가 생체(=붉은 파편)인가. 적 로스터(b*)만 생체다. */
+  const isBioKey = (k) => typeof k === 'string' && /^b\d+$/.test(k);
+
+  /** 키에 맞는 파편 색을 out 에 쓴다(무할당). @param hp 0..1 */
+  function debrisTintFor(key, hp, out) {
+    if (isBioKey(key)) return bioDebrisColor(hp, out);
+    const t = DEBRIS_TINT[key];
+    const j = 0.85 + _rnd() * 0.3;   // 조각마다 밝기 변주 — 한 색이면 플라스틱처럼 보인다
+    if (t) { out[0] = t[0] * j; out[1] = t[1] * j; out[2] = t[2] * j; }
+    else { out[0] = 0.62 * j; out[1] = 0.64 * j; out[2] = 0.68 * j; }   // 모르는 종류 = 회색
+    return out;
+  }
 
   /** §G-46 품질 사다리 연동(§G-45). 프레임이 모자라면 **파편이 먼저 줄고**, 그 다음 해상도가 내려간다. */
   function debrisBudget(kind) {
@@ -796,7 +830,7 @@ function createHero3D(canvas3d, opts = {}) {
     } catch (e) { /* 복구도 실패 — 색만 포기하고 행렬·count 갱신과 3D 렌더는 계속 간다 */ }
     sw.colored = false;
   }
-  function placeSwarm(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math.PI, pitchBase = -0.12, behindFlag = false, visDrop = 0) {
+  function placeSwarm(sw, buf, n, cap, mode = 'wob', time = 0, yawBase = Math.PI, pitchBase = -0.12, behindFlag = false, visDrop = 0, debrisKey = null) {
     if (!sw) return;
     const count = Math.min(n | 0, cap);
     const fpx = focalPx(ctl._lastLogH, camera.fov);   // 논리px 초점거리
@@ -831,7 +865,8 @@ function createHero3D(canvas3d, opts = {}) {
       //    한 번 맞을 때마다 프레임 수만큼 쏟아진다.
       //   ⚠️적 스웜에만 적용한다 — 픽업·탄은 slot 에 spark 를 쓰지 않으므로 자연히 걸러진다.
       if (o.spark) {
-        bioDebrisColor(o.hp === undefined ? 1 : o.hp, _bioCol);
+        //  §G-46 3차: 피사체별 색. 적(b*)만 생체 붉은색, 운석·크리스탈·보급선은 각자 재질색.
+        debrisTintFor(debrisKey, o.hp === undefined ? 1 : o.hp, _bioCol);
         emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('hit'), 1.5 + scl * 0.5, 0.45 + scl * 0.5,
           _bioCol[0], _bioCol[1], _bioCol[2]);
       } else if (o.hp !== undefined && o.hp <= 0.3 && o.hp > 0 && _rnd() < 0.02) {
@@ -1112,8 +1147,8 @@ function createHero3D(canvas3d, opts = {}) {
           placeOnRay(camera, _sFwd, toNdcX(k.sx, ctl._lastLogW), toNdcY(k.sy, ctl._lastLogH), depth, _sPos, _sV, _sDir);
           _sPos.y -= WORLD_OBJ_VIS_DROP;   // 적과 같은 시각 중심 보정(§G-38) — 안 하면 파편만 떠 보인다
           const scl = (k.px * depth) / fpxK;
-          //  §G-46 2차: 격파도 생체 팔레트로. 터질 때는 가장 짙은 적색(hp=0 취급).
-          bioDebrisColor(0, _bioCol);
+          //  §G-46 3차: 격파도 피사체 색으로. 적(b*)은 가장 짙은 적색(hp=0), 그 외는 재질색.
+          debrisTintFor(k.key, 0, _bioCol);
           emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('kill'), 2.6 + scl * 0.8, 0.55 + scl * 0.7,
             _bioCol[0], _bioCol[1], _bioCol[2]);
         }
@@ -1156,7 +1191,7 @@ function createHero3D(canvas3d, opts = {}) {
         for (let ki = 0; ki < ENEMY_KEYS.length; ki++) {
           const k = ENEMY_KEYS[ki];
           const sk = swarms[k];
-          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, ENEMY3D[k].glb ? 'face' : 'wob', 0, Math.PI, ENEMY3D[k].pitch ?? -0.12, true, WORLD_OBJ_VIS_DROP);   // 적·운석·잔해=기함 뒤(§G-26) + 시각 중심 보정(§G-38)
+          if (sk) placeSwarm(eswarm[k], sk.buf, sk.n, ENEMY3D[k].cap, ENEMY3D[k].glb ? 'face' : 'wob', 0, Math.PI, ENEMY3D[k].pitch ?? -0.12, true, WORLD_OBJ_VIS_DROP, k);   // 적·운석·잔해=기함 뒤(§G-26) + 시각 중심 보정(§G-38)
           else placeSwarm(eswarm[k], null, 0, ENEMY3D[k].cap);
         }
         if (swarms.drone) placeSwarm(drone, swarms.drone.buf, swarms.drone.n, DRONE_INSTANCE_MAX, 'direct', 0, 0);     // 아군: 노즈가 소실점(전진 방향)
@@ -1166,7 +1201,7 @@ function createHero3D(canvas3d, opts = {}) {
           const s = swarms.props[k];
           //  §G-38(이사님: "날아오는 모든 오브젝트 위치를 다 동일하게"): 픽업도 적과 **같은 보정**을 받는다.
           //  ⚠️발사체(SHOT_KEYS)는 여기 없다 — 포구·명중 정합이 깨지므로 제외한다.
-          if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], 'spin', time, Math.PI, -0.12, true, WORLD_OBJ_VIS_DROP);   // 픽업=기함 뒤(수송선·크리스탈·코인·POW)
+          if (s) placeSwarm(props[k], s.buf, s.n, PROP_CAPS[k], 'spin', time, Math.PI, -0.12, true, WORLD_OBJ_VIS_DROP, k);   // 픽업=기함 뒤(수송선·크리스탈·코인·POW)
         }
         // §G-13 발사체(상시 3D) — 탄은 기함 앞 유지(발사·명중 연출)
         if (shots) for (let ki = 0; ki < SHOT_KEYS.length; ki++) {
@@ -1352,13 +1387,13 @@ function createHero3D(canvas3d, opts = {}) {
    * §G-46 — 적 격파를 3D 연출 큐에 넣는다. main 의 중앙 킬 알림이 부른다.
    *  @param sx,sy 투영된 화면 좌표(적이 3D 로 그려지던 그 좌표계)
    *  @param px    화면 전장(px) — 깊이 환산에 쓴다. 큰 적이 크게 터진다
-   *  @param cr,cg,cb 파편 색 0..1 (적 종류색)
+   *  @param key   3D 종류 키(b1·h1·crystal…). 파편 색을 여기서 고른다 — 모르면 회색
    *  ⚠️여기서 파편을 만들지 않는다. 카메라가 이번 프레임 값으로 확정되기 전이라
    *   좌표 변환이 한 프레임 어긋난다 — frame() 안에서 변환한다.
    */
-  ctl.killBurst = (sx, sy, px, cr, cg, cb) => {
+  ctl.killBurst = (sx, sy, px, key) => {
     if (_killQ.length >= KILL_Q_MAX) return;
-    _killQ.push({ sx, sy, px: px > 0 ? px : 40, cr: cr ?? 1, cg: cg ?? 1, cb: cb ?? 1 });
+    _killQ.push({ sx, sy, px: px > 0 ? px : 40, key: key || null });
   };
   ctl.frame = frame; ctl.prewarmRun = prewarm; ctl.screenXToWorldX = screenXToWorldX; ctl.info = info;
   ctl.dispose = dispose; ctl.forceContextLoss = forceContextLoss; ctl.renderer = renderer; ctl.model = model; ctl.scene = { scene, camera };
