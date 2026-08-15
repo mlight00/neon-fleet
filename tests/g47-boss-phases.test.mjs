@@ -93,3 +93,32 @@ test('⚠️아직 배선되지 않았다 — 승인 전이므로 게임 동작�
   //  기존 광폭화 경로는 그대로 살아 있어야 한다
   assert.ok(/get enraged\(\)/.test(bosses), '기존 enraged 경로가 사라졌다 — 표 없는 보스 9종이 무방비가 된다');
 });
+
+// ── §G-47 4단계 — 전환 연출(표시 전용, 미배선) ────────────────────────────────────────
+
+test('페이즈 전환 연출 진입점이 있다 — 지금 광폭화는 아무 신호가 없다', () => {
+  //  사양서 §2-2: 전환을 못 느끼면 페이즈를 나눈 의미가 없다.
+  const R = readFileSync(join(ROOT, 'js/chase3d-renderer.js'), 'utf8');
+  assert.ok(/ctl\.phaseBurst\s*=/.test(R), '전환 연출 진입점이 없다');
+  //  격파 큐를 재사용해야 좌표 변환·예산·품질 사다리를 다시 안 만든다
+  const pb = R.slice(R.indexOf('ctl.phaseBurst'), R.indexOf('ctl.killBurst'));
+  assert.ok(/_killQ\.push/.test(pb), '격파 큐를 재사용하지 않는다 — 좌표 변환을 중복 구현하게 된다');
+  assert.ok(/KILL_Q_MAX/.test(pb), '큐 상한을 안 본다');
+  assert.ok(/boss:/.test(pb), '격파와 구분할 표식이 없다 — 세기를 다르게 못 준다');
+});
+
+test('전환은 격파보다 크게 터진다 — 단계가 뒤로 갈수록 강하게', () => {
+  const R = readFileSync(join(ROOT, 'js/chase3d-renderer.js'), 'utf8');
+  const drain = R.slice(R.indexOf('const bMul'), R.indexOf('const bMul') + 420);
+  assert.ok(/k\.boss \? 1\.0 \+ k\.boss \* 0\.4 : 1/.test(drain), '전환 세기 배수가 없다');
+  //  일반 격파(boss 없음)는 배수 1 이어야 한다 — 전환 코드가 격파를 바꾸면 안 된다
+  assert.ok(/: 1;/.test(drain), '격파 경로가 그대로 1 이 아니다');
+  assert.ok(/debrisBudget\('kill'\) \* bMul/.test(drain), '개수에 세기를 안 곱한다');
+});
+
+test('⚠️전환 연출도 아직 아무도 부르지 않는다 — 승인 전이다', () => {
+  const M = readFileSync(join(ROOT, 'js/main.js'), 'utf8');
+  const B = readFileSync(join(ROOT, 'js/bosses.js'), 'utf8');
+  assert.ok(!/phaseBurst\(/.test(M), 'main.js 가 전환 연출을 부른다 — 배선은 승인 후다');
+  assert.ok(!/phaseBurst\(/.test(B), 'bosses.js 가 전환 연출을 부른다 — 배선은 승인 후다');
+});

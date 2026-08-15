@@ -1181,7 +1181,11 @@ function createHero3D(canvas3d, opts = {}) {
           const scl = (k.px * depth) / fpxK;
           //  §G-46 3차: 격파도 피사체 색으로. 적(b*)은 가장 짙은 적색(hp=0), 그 외는 재질색.
           debrisTintFor(k.key, 0, _bioCol);
-          emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('kill'), 2.6 + scl * 0.8, 0.55 + scl * 0.7,
+          //  §G-47: 페이즈 전환은 격파보다 **크고 넓게** 터뜨린다 — 단계가 넘어간 것을 눈으로 알린다.
+          //   단계가 뒤로 갈수록 강해진다(1단계 ×1.4 · 2단계 ×1.8). 예산 상한은 그대로 적용된다.
+          const bMul = k.boss ? 1.0 + k.boss * 0.4 : 1;
+          emitDebris(_sPos.x, _sPos.y, _sPos.z, Math.round(debrisBudget('kill') * bMul),
+            (2.6 + scl * 0.8) * bMul, (0.55 + scl * 0.7) * (k.boss ? 1.5 : 1),
             _bioCol[0], _bioCol[1], _bioCol[2]);
         }
         _killQ.length = 0;
@@ -1440,6 +1444,27 @@ function createHero3D(canvas3d, opts = {}) {
    *  ⚠️여기서 파편을 만들지 않는다. 카메라가 이번 프레임 값으로 확정되기 전이라
    *   좌표 변환이 한 프레임 어긋난다 — frame() 안에서 변환한다.
    */
+  /**
+   * §G-47 — 보스 **페이즈 전환** 연출(표시 전용). 사양서 §2-2 의 4단계.
+   *
+   *  ⚠️지금 광폭화(체력 50%)는 **아무 신호가 없다.** 어느 순간 빨라져 있을 뿐이라
+   *   플레이어가 변화를 인지조차 못 한다 — 바뀐 걸 못 느끼면 바꾼 의미가 없다.
+   *  껍질이 벗겨지듯 파편을 크게 터뜨려 "단계가 넘어갔다"를 눈으로 알린다.
+   *
+   *  ⚠️**아직 아무도 부르지 않는다.** 페이즈 판정 배선은 이사님 승인 사항이라
+   *   연출만 먼저 만들어 둔 것이다(사양서 §4: 1·4·7 은 규칙 무관).
+   *  ⚠️게임 규칙을 건드리지 않는다 — 무적·피해·패턴은 여기서 손대지 않는다.
+   *
+   *  @param sx,sy 보스의 투영 화면 좌표
+   *  @param px    화면 전장(px) — 클수록 크게 터진다
+   *  @param phase 새 페이즈 번호(0-based). 뒤로 갈수록 강하게
+   */
+  ctl.phaseBurst = (sx, sy, px, phase) => {
+    if (_killQ.length >= KILL_Q_MAX) return;
+    //  격파 큐를 그대로 쓴다 — 좌표 변환·예산·품질 사다리가 이미 그 경로에 있다.
+    //  ⚠️`boss` 표식으로 격파와 구분한다. 같은 큐를 쓰되 세기가 다르다.
+    _killQ.push({ sx, sy, px: px > 0 ? px : 120, key: 'b1', boss: 1 + (phase | 0) });
+  };
   ctl.killBurst = (sx, sy, px, key) => {
     if (_killQ.length >= KILL_Q_MAX) return;
     _killQ.push({ sx, sy, px: px > 0 ? px : 40, key: key || null });
