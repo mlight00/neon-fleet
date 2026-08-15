@@ -103,6 +103,22 @@ export function readDamageFlash(entity, now) {
   return frac < 1e-10 ? 0 : Math.min(1, frac);
 }
 
+/**
+ * §G-46 — 이 피격에 대한 **파편 1회분**을 청구한다. 같은 기록으로 두 번 나오지 않는다.
+ *
+ *  ⚠️`readDamageFlash` 로는 상승 에지를 못 잡는다. 감쇠값이라 여러 프레임 0 이 아니어서,
+ *   "0 이 아니면 방출" 로 하면 한 번 맞을 때마다 파편이 프레임 수만큼 쏟아진다.
+ *  ⚠️소비 주체를 하나로 강제하지 않는다 — 먼저 부른 쪽이 가져간다. 3D 렌더만 부르는 전제다.
+ *   2D 도 쓰게 되면 그때 소비자별 표식으로 나눠야 한다.
+ *  @returns 새 피격이 있었으면 true (그 기록에 대해 딱 한 번)
+ */
+export function consumeHitSpark(entity) {
+  const rec = HIT.get(entity);
+  if (!rec || rec.sparkT === rec.t) return false;
+  rec.sparkT = rec.t;
+  return true;
+}
+
 /** 마지막 명중 지점(불꽃 위치용). 없으면 null. */
 export function readLastHitPoint(entity) {
   const rec = HIT.get(entity);

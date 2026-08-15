@@ -2388,6 +2388,20 @@ function recomputeMfx() {
 //   멱등: e._killHandled 플래그로 중복/재귀 안전. 폭발 처리 전에 플래그를 먼저 세워 재귀 이중 처리 차단.
 function onEnemyKilled(e, w) {
   if (!claimKill(e)) return;   // 비적대·미사망·중복 차단 (개체당 1회, 폭발 재귀 안전)
+  //  §G-46 격파 3D 파편(표시 전용 — 게임 규칙 무관). 여기가 **적이 사라지기 직전 마지막 지점**이다.
+  //   바로 다음 줄에서 splice 되므로(2078) 3D 가 나중에 목록을 훑어서는 좌표를 알 수 없다.
+  //  ⚠️try 로 감싼다 — 연출이 실패해도 킬 처리(보상·진행)는 그대로 가야 한다.
+  if (chase3d && chase3d.killBurst && chaseProjection) {
+    try {
+      const p = projectObject(e, 'enemy', chaseProjection);
+      //  화면 밖에서 죽은 적은 건너뛴다(폭발이 엉뚱한 데서 보이지 않게).
+      if (p.x > -80 && p.x < LOGICAL_W + 80 && p.y > -80 && p.y < logicalH + 80) {
+        //  ⚠️정확한 3D 키를 다시 구하지 않는다 — 키는 호출부마다 타입 분기로 정해져(3272~) 여기서
+        //   복제하면 종류가 늘 때마다 두 곳을 고쳐야 한다. 파편은 깊이·크기만 쓰므로 투영 배율이면 충분하다.
+        chase3d.killBurst(p.x, p.y, Math.min(320, 150 * p.scale), 1, 0.72, 0.5);
+      }
+    } catch (err) { /* 연출 실패는 게임 진행에 영향 없음 */ }
+  }
   // 섹터 무기 조합(S4): 중간 정예몹 처치 → POW 배지 드롭 → 수집 시 무기 강화(이사). 25분·coreLoop 제외(자체 강화).
   //  대상 = 미니보스(=이사가 말한 '중간 정예몹', 확정) + 정예 변이몹(★, 보너스).
   //  미니보스를 빼먹어서 섹터 1(변이 확률 0%)에선 POW가 하나도 안 나왔다 → 무기 조합이 영영 안 열림.
@@ -3086,7 +3100,10 @@ const _in3dMap = new WeakMap();
 const PROP_LEN = { pbullet: [24, 60], ebullet: [20, 56], missile: [30, 76], laser: [64, 150], crystal: [88, 200], coin: [22, 56], pow: [40, 92], pod: [64, 160], capsule: [44, 110] };
 const _sw = {
   //  §G-39 Task 6: cr/cg/cb(색 채널) 초기값은 반드시 1 — 0 이면 아직 색을 안 쓴 인스턴스가 검게 나온다.
-  ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k, { buf: Array.from({ length: ENEMY3D[k].cap }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, cr: 1, cg: 1, cb: 1 })), n: 0 }])),
+  //  §G-46: spark(이번 프레임 새 피격) · hp(체력 비율)를 **사전 할당에 포함**한다.
+  //   writeEnemySlot 에서 처음 붙이면 슬롯마다 히든클래스가 바뀌어 매 프레임 도는 경로가 느려진다
+  //   (G39R1-SEAM-NO-ALLOC 이 지키는 계약).
+  ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k, { buf: Array.from({ length: ENEMY3D[k].cap }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, cr: 1, cg: 1, cb: 1, spark: 0, hp: 1 })), n: 0 }])),
   drone: { buf: _droneBuf, n: 0 }, cruiser: { buf: _cruBuf, n: 0 },
   //  §G-13 발사체는 화면좌표(sx/sy/px)가 아니라 월드좌표(wx/wy)로 3D 에 놓는다 — 2.5D 투영의 휨을 물려받지 않게.
   props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1, wx: 0, wy: 0, mul: 1, wmul: 1, core: 0 })), n: 0 }])),

@@ -12,7 +12,9 @@ import { readFileSync } from 'node:fs';
 import { FEEDBACK, recordDamageFeedback } from '../js/damage-feedback.js';
 import { writeEnemySlot } from '../js/chase3d-collect.js';
 
-const freshSlot = () => ({ sx: 0, sy: 0, px: 0, wob: 0, cr: 1, cg: 1, cb: 1 });
+//  §G-46: spark·hp 추가. 슬롯 모양은 main.js 사전 할당(3103)과 **같아야** 한다 —
+//  다르면 이 테스트가 지키려는 히든클래스 계약이 실제 경로와 어긋난다.
+const freshSlot = () => ({ sx: 0, sy: 0, px: 0, wob: 0, cr: 1, cg: 1, cb: 1, spark: 0, hp: 1 });
 const PROJ = { x: 240, y: 500, scale: 1.5 };
 const DEF = { len: 60, max: 120 };
 const rgb = (s) => [s.cr, s.cg, s.cb].join();
@@ -46,7 +48,9 @@ test('G39R1-SEAM-NO-ALLOC: 새 객체를 만들지 않고 넘겨받은 슬롯을
   const slot = freshSlot();
   const out = writeEnemySlot(slot, { hp: 1, maxHp: 1 }, PROJ, DEF, 0, 0, FEEDBACK.boost);
   assert.equal(out, slot, '같은 객체 정체성이어야 한다(새로 만들면 안 된다)');
-  assert.equal(Object.keys(slot).length, 7, '슬롯에 없던 필드가 새로 생기면 안 된다');
+  //  개수가 아니라 **키 집합**으로 고정한다 — 개수만 보면 이름이 바뀌어도 통과한다.
+  assert.deepEqual(Object.keys(slot).sort(), ['cb','cg','cr','hp','px','spark','sx','sy','wob'],
+    '슬롯 모양이 바뀌었다 — main.js 사전 할당(3103)과 함께 고쳐야 한다');
 });
 
 test('G39R1-SEAM-PIPELINE: 체력·피격이 슬롯 색으로 이어진다', () => {

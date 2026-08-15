@@ -489,7 +489,9 @@ function createHero3D(canvas3d, opts = {}) {
   const _lnEnd = new THREE.Vector3(), _sFwd0 = new THREE.Vector3();
   ctl.lanceScreen = { active: false, x0: 0, y0: 0, x1: 0, y1: 0, w1: 0, alpha: 0, stage: 1 };
 
-  const DEBRIS_MAX = 16;
+  //  §G-46(이사 "적 피탄이 빨간 번쩍뿐이라 밋밋하다"): 기함 전용이던 파편을 **적 피격·격파**까지 쓴다.
+  //   16 → 48. 드로우콜은 그대로 1개다(InstancedMesh) — 늘어나는 건 인스턴스 상한뿐.
+  const DEBRIS_MAX = 48;
   const debris = new THREE.InstancedMesh(
     new THREE.BoxGeometry(0.30, 0.08, 0.44),
     new THREE.MeshStandardMaterial({ color: 0xe3e6ea, roughness: 0.55, metalness: 0.12, emissive: 0x17191d }),
@@ -498,6 +500,57 @@ function createHero3D(canvas3d, opts = {}) {
   const _deb = [];
   let _shakeT = 0, _prevFlash = 0, _lcg = 7;
   const _rnd = () => ((_lcg = (_lcg * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+
+  //  §G-46 프레임당 방출 총량. 적 60기가 동시에 맞아도 폭주하지 않게 막는다(사양서 §4).
+  const DEBRIS_PER_FRAME = 12;
+  let _debFrameBudget = DEBRIS_PER_FRAME;
+  //  instanceColor 는 첫 setColorAt 에 지연 할당된다. 실패하면 색만 포기하고 파편은 계속 보인다.
+  let _debColored = true;
+  //  §G-46 격파 큐. main 의 중앙 킬 알림이 화면좌표로 채우고, frame() 이 3D 좌표로 바꿔 비운다.
+  //   ⚠️상한을 둔다 — 3D 가 꺼져 있거나 frame 이 안 도는 동안 무한히 쌓이면 안 된다.
+  const KILL_Q_MAX = 8;
+  const _killQ = [];
+
+  /**
+   * §G-46 — 파편 방출(공용). 기함 피격·적 피격·적 격파가 **같은 InstancedMesh** 를 쓴다.
+   *
+   *  ⚠️난수는 `_rnd`(LCG)만 쓴다. 전역 `Math.random()` 은 치명타·탄 분산·스폰과 공유돼
+   *   연출이 소비하면 **전투 결과가 달라진다**(§G-39 계약).
+   *  ⚠️프레임 예산과 버퍼 상한을 둘 다 본다 — 둘 중 작은 쪽까지만 낸다.
+   *
+   *  @param x,y,z  월드 좌표(방출 중심)
+   *  @param n      요청 개수(예산에 따라 줄어든다)
+   *  @param sp     초기 속도 배수(격파는 크게)
+   *  @param scale  파편 크기 배수(대형 적은 큰 조각)
+   *  @param cr,cg,cb 파편 색(0..1). 생략하면 세라믹 흰색
+   *  @returns 실제로 낸 개수
+   */
+  function emitDebris(x, y, z, n, sp, scale, cr, cg, cb) {
+    const room = Math.min(n | 0, DEBRIS_MAX - _deb.length, _debFrameBudget);
+    if (room <= 0) return 0;
+    for (let i = 0; i < room; i++) {
+      const a = _rnd() * Math.PI * 2, v = sp * (0.55 + _rnd() * 0.9);
+      _deb.push({
+        x: x + (_rnd() - 0.5) * 0.5 * scale, y: y + (_rnd() - 0.5) * 0.5 * scale, z: z + (_rnd() - 0.5) * 0.5 * scale,
+        vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.8 + 0.5 * sp, vz: 0.7 * sp + _rnd() * 1.4 * sp,   // +z=카메라 쪽
+        rx: (_rnd() - 0.5) * 11, ry: (_rnd() - 0.5) * 11, rz: (_rnd() - 0.5) * 11,
+        ax: _rnd() * 6.28, ay: _rnd() * 6.28, az: _rnd() * 6.28,
+        life: 0.45 + _rnd() * 0.45, t: 0, s: scale * (0.6 + _rnd() * 0.7),
+        cr: cr === undefined ? 1 : cr, cg: cg === undefined ? 1 : cg, cb: cb === undefined ? 1 : cb,
+      });
+    }
+    _debFrameBudget -= room;
+    return room;
+  }
+
+  /** §G-46 품질 사다리 연동(§G-45). 프레임이 모자라면 **파편이 먼저 줄고**, 그 다음 해상도가 내려간다. */
+  function debrisBudget(kind) {
+    if (prefersReducedMotion3D()) return 0;
+    const step = (ctl._profile && ctl._profile.qualityStep) | 0;
+    if (kind === 'kill') return step <= 0 ? 12 : step === 1 ? 8 : step === 2 ? 4 : 2;
+    if (kind === 'ember') return step <= 0 ? 1 : 0;         // 빈사 잔불 — 정상 품질에서만
+    return step <= 0 ? 5 : step === 1 ? 3 : step === 2 ? 1 : 0;   // 'hit'
+  }
   // ── 픽업 스웜(§G-14 상시, 이사 "픽업도 3D 로 켜줘") — 기본 OFF 였던 전제(임시 조형 "엉망")는
   //  §G-7 VARCO 실모델 교체로 사라졌다. 발사체는 §G-13 의 shots 가 따로 담당한다.
   let props = null;
@@ -741,6 +794,18 @@ function createHero3D(canvas3d, opts = {}) {
       }
       _sM.compose(_sPos, _sQ, _sScl.setScalar(scl));
       for (const im of sw.meshes) im.setMatrixAt(i, _sM);
+      //  §G-46 적 피격 파편 — **여기가 적의 월드 좌표가 확정된 유일한 지점**이라 추가 계산이 0이다.
+      //   ⚠️`spark` 는 chase3d-collect 가 상승 에지로 딱 한 번 세운 값이다. 감쇠값(flash)으로 하면
+      //    한 번 맞을 때마다 프레임 수만큼 쏟아진다.
+      //   ⚠️적 스웜에만 적용한다 — 픽업·탄은 slot 에 spark 를 쓰지 않으므로 자연히 걸러진다.
+      if (o.spark) {
+        emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('hit'), 1.5 + scl * 0.5, 0.45 + scl * 0.5,
+          o.cr === undefined ? 1 : Math.min(1, o.cr * 0.7), o.cg === undefined ? 1 : Math.min(1, o.cg * 0.7),
+          o.cb === undefined ? 1 : Math.min(1, o.cb * 0.7));
+      } else if (o.hp !== undefined && o.hp <= 0.3 && o.hp > 0 && _rnd() < 0.02) {
+        //  빈사 잔불 — 확률로 드문드문. "곧 터진다"를 색이 아니라 움직임으로 알린다.
+        emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('ember'), 0.7, 0.3 + scl * 0.25, 1, 0.55, 0.25);
+      }
       //  §G-39: 적·픽업의 피해 색(Task 6 의 cr/cg/cb, 또는 기존 픽업 col). ⚠️setHex 는 24비트라
       //   1 을 넘는 값(피격 번쩍)을 못 담는다 → setRGB. 색 쓰기가 실패해도 여기서 국소 격리한다 —
       //   밖으로 새면 frame() 의 render-exception 폴백(§5.1)이 이 세션의 3D 전체를 꺼버린다.
@@ -872,18 +937,9 @@ function createHero3D(canvas3d, opts = {}) {
       const fl = sq.flash || 0;
       if (fl > _prevFlash + 0.1 && !prefersReducedMotion3D()) {
         _shakeT = 0.42;
-        const n = Math.min(7, DEBRIS_MAX - _deb.length);
-        for (let i = 0; i < n; i++) {
-          const a = _rnd() * Math.PI * 2, sp = 1.6 + _rnd() * 2.4;
-          //  기함 전장 FLAG_LEN(≈4.8) 기준 — 기수 앞·갑판 위에서 튀어나와야 함체에 파묻히지 않는다(실측).
-          _deb.push({
-            x: (_rnd() - 0.5) * 2.4, y: 0.5 + _rnd() * 0.9, z: 1.6 + _rnd() * 1.2,
-            vx: Math.cos(a) * sp, vy: 1.6 + _rnd() * 2.4, vz: 1.6 + _rnd() * 3.0,     // +z=카메라 쪽(뒤로 흩어짐)
-            rx: (_rnd() - 0.5) * 9, ry: (_rnd() - 0.5) * 9, rz: (_rnd() - 0.5) * 9,
-            ax: _rnd() * 6.28, ay: _rnd() * 6.28, az: _rnd() * 6.28,
-            life: 0.85 + _rnd() * 0.45, t: 0, s: 1.1 + _rnd() * 1.1,
-          });
-        }
+        //  §G-46: 공용 방출기로 통일. 기함은 **예산에서 먼저 가져간다**(플레이어 피격이 가장 중요한 신호).
+        //   기수 앞·갑판 위 오프셋은 함체에 파묻히지 않게 실측으로 잡은 값이라 그대로 둔다.
+        emitDebris((_rnd() - 0.5) * 2.4, 0.5 + _rnd() * 0.9, 1.9, 7, 2.4, 1.6);
       }
       _prevFlash = fl;
       if (_shakeT > 0) {
@@ -1010,6 +1066,25 @@ function createHero3D(canvas3d, opts = {}) {
         ctl.lanceScreen.active = false;
       }
       chargeRig.visible = chg > 0;
+      //  §G-46 격파 연출 — 큐를 비운다.
+      //   ⚠️일반 적은 죽는 프레임에 배열에서 제거된다(main.js:2078 splice). 3D 가 목록을 훑는 방식으로는
+      //    "터지는 중"을 볼 프레임이 없다 → main 의 중앙 킬 알림이 여기로 좌표를 넘긴다.
+      //   ⚠️"목록에서 사라진 것"을 감지하는 대안은 쓰지 않는다 — 화면 밖 이탈·컬링과 구분이 안 돼
+      //    멀쩡한 적이 폭발한다.
+      if (_killQ.length) {
+        const fpxK = focalPx(ctl._lastLogH, camera.fov);
+        camera.getWorldDirection(_sFwd);
+        for (let i = 0; i < _killQ.length; i++) {
+          const k = _killQ[i];
+          const depth = Math.min(60, Math.max(6, fpxK / Math.max(1e-3, k.px)));
+          placeOnRay(camera, _sFwd, toNdcX(k.sx, ctl._lastLogW), toNdcY(k.sy, ctl._lastLogH), depth, _sPos, _sV, _sDir);
+          _sPos.y -= WORLD_OBJ_VIS_DROP;   // 적과 같은 시각 중심 보정(§G-38) — 안 하면 파편만 떠 보인다
+          const scl = (k.px * depth) / fpxK;
+          emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('kill'), 2.6 + scl * 0.8, 0.55 + scl * 0.7,
+            Math.min(1, k.cr * 0.8), Math.min(1, k.cg * 0.8), Math.min(1, k.cb * 0.8));
+        }
+        _killQ.length = 0;
+      }
       // 파편 적분(중력 없음 — 우주) + 수명 소멸. 인스턴스 행렬 갱신은 살아있는 것만.
       let dn = 0;
       for (let i = 0; i < _deb.length; i++) {
@@ -1023,11 +1098,21 @@ function createHero3D(canvas3d, opts = {}) {
         _sEul.set(d.ax, d.ay, d.az); _sQ.setFromEuler(_sEul);
         _sM.compose(_sPos.set(d.x, d.y, d.z), _sQ, _sScl.setScalar(d.s * (0.45 + k * 0.55)));
         debris.setMatrixAt(dn++, _sM);
+        //  §G-46: 적 파편은 그 적의 색을 띤다 — 안 그러면 기함 장갑(세라믹 흰색)이 튄 것처럼 보인다.
+        //   ⚠️색 쓰기 실패를 국소 격리한다. 밖으로 새면 frame() 의 render-exception 폴백이
+        //    이 세션의 3D 를 통째로 꺼버린다(placeSwarm 의 sw.colored 와 같은 이유).
+        if (_debColored) {
+          try { debris.setColorAt(dn - 1, _sCol.setRGB(d.cr, d.cg, d.cb)); }
+          catch (e) { _debColored = false; }
+        }
         _deb[dn - 1] = d;   // 살아있는 것만 앞으로 압축(별도 배열 할당 없이)
       }
       _deb.length = dn;
       debris.count = dn;
       if (dn) debris.instanceMatrix.needsUpdate = true;
+      if (dn && _debColored && debris.instanceColor) debris.instanceColor.needsUpdate = true;
+      //  §G-46 프레임 예산 초기화 — 다음 프레임이 다시 12개를 쓴다.
+      _debFrameBudget = DEBRIS_PER_FRAME;
       // 기체 흔들림: 감쇠 진동(피격 방향 무관 — 충격 직후 크게, 0.42s 안에 잦아든다). 카메라는 건드리지 않는다(멀미 방지).
       // 실전 스웜(크리처+소품) — t≥0.5 에서만 이 지점에 도달 = 2D 스킵과 같은 하드 컷
       //  §G-22 §9: 아래 루프의 키 목록은 전부 모듈 초기화 때 만든 고정 배열이다(프레임 중 새 배열 0).
@@ -1227,6 +1312,18 @@ function createHero3D(canvas3d, opts = {}) {
       else seen.set(k, cat);
     }
   } catch (e) {}
+  /**
+   * §G-46 — 적 격파를 3D 연출 큐에 넣는다. main 의 중앙 킬 알림이 부른다.
+   *  @param sx,sy 투영된 화면 좌표(적이 3D 로 그려지던 그 좌표계)
+   *  @param px    화면 전장(px) — 깊이 환산에 쓴다. 큰 적이 크게 터진다
+   *  @param cr,cg,cb 파편 색 0..1 (적 종류색)
+   *  ⚠️여기서 파편을 만들지 않는다. 카메라가 이번 프레임 값으로 확정되기 전이라
+   *   좌표 변환이 한 프레임 어긋난다 — frame() 안에서 변환한다.
+   */
+  ctl.killBurst = (sx, sy, px, cr, cg, cb) => {
+    if (_killQ.length >= KILL_Q_MAX) return;
+    _killQ.push({ sx, sy, px: px > 0 ? px : 40, cr: cr ?? 1, cg: cg ?? 1, cb: cb ?? 1 });
+  };
   ctl.frame = frame; ctl.prewarmRun = prewarm; ctl.screenXToWorldX = screenXToWorldX; ctl.info = info;
   ctl.dispose = dispose; ctl.forceContextLoss = forceContextLoss; ctl.renderer = renderer; ctl.model = model; ctl.scene = { scene, camera };
   //  §G-39 Task 8 테스트 전용 — 배치된 적 메시를 들여다본다(다중 파트·instanceColor 실행 검증용).
