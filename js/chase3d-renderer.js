@@ -565,7 +565,13 @@ function createHero3D(canvas3d, opts = {}) {
         life: 0.45 + _rnd() * 0.45, t: 0, s: scale * (0.6 + _rnd() * 0.7) * DEBRIS_SIZE_MULT,
         //  §G-46 2차: 조각마다 다른 비율로 눌러 **타원체**로 만든다(구가 그대로면 구슬처럼 보인다).
         ex: 0.7 + _rnd() * 0.8, ey: 0.5 + _rnd() * 0.6, ez: 0.8 + _rnd() * 0.9,
-        cr: cr === undefined ? 1 : cr, cg: cg === undefined ? 1 : cg, cb: cb === undefined ? 1 : cb,
+        //  §G-46 5차(실행 검증에서 발견): 색을 **조각마다** 흔든다.
+        //   ⚠️앞서는 방출 1회당 색을 한 번만 뽑아 12개가 전부 같은 값이었다(실측:
+        //    b1 파편 3개가 모두 0.93,0.20,0.20). 주석에는 "조각마다 다른 색조"라고 써 놓고
+        //    코드는 그렇지 않았다 — 한 색이면 플라스틱 덩어리로 보인다.
+        cr: (cr === undefined ? 1 : cr) * (0.78 + _rnd() * 0.44),
+        cg: (cg === undefined ? 1 : cg) * (0.78 + _rnd() * 0.44),
+        cb: (cb === undefined ? 1 : cb) * (0.78 + _rnd() * 0.44),
       });
     }
     _debFrameBudget -= room;

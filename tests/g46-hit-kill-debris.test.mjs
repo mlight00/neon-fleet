@@ -276,3 +276,26 @@ test('충전이 풀리면 링이 확실히 꺼진다 — 잔상 방지', () => {
   assert.ok(/chargeRingB\.material\.opacity = 0/.test(off), '충전 해제 시 링 B 가 안 꺼진다');
   assert.ok(/chargeRingA\.visible = false/.test(off), '링을 opacity 만 내리고 visible 을 안 끈다');
 });
+
+// ── §G-46 5차 — 실행 검증에서 발견 ────────────────────────────────────────────────────
+
+test('⚠️파편 색이 조각마다 다르다 — 한 색이면 플라스틱 덩어리로 보인다', () => {
+  //  실측(라이브 instanceColor 직접 판독): 한 번에 튄 12개가 전부 0.93,0.20,0.20 로 동일했다.
+  //  원인은 방출 1회당 색을 한 번만 뽑고 12개에 그대로 복사한 것.
+  //  주석에는 "조각마다 다른 색조"라고 써 놓고 코드가 그렇지 않았다.
+  const em = R.slice(R.indexOf('function emitDebris('), R.indexOf('function debrisBudget('));
+  //  cr/cg/cb 대입에 난수가 곱해져야 한다
+  assert.ok(/cr:\s*\(cr === undefined \? 1 : cr\)\s*\*\s*\(0\.\d+ \+ _rnd\(\)/.test(em),
+    '파편 색에 조각별 변주가 없다 — 한 번에 튄 조각이 전부 같은 색이 된다');
+  //  ⚠️템플릿 리터럴로 정규식을 조립하지 마라 — `\(` 가 `(` 로 삼켜져 "Unterminated group" 이 난다
+  //   (실제로 이 테스트가 그렇게 깨졌다). 문자열 포함 검사면 충분하고 깨지지 않는다.
+  for (const ch of ['cg', 'cb']) {
+    assert.ok(em.includes(`${ch}: (${ch} === undefined ? 1 : ${ch}) * (0.`),
+      `${ch} 채널에 조각별 변주가 없다`);
+  }
+  //  ⚠️변주도 LCG 여야 한다 — 전역 Math.random 이면 전투 결과가 달라진다.
+  //   ⚠️`//` 만 지우면 안 된다 — emitDebris 의 **블록 주석**이 "전역 Math.random() 은 …" 이라고
+  //    설명하고 있어 그 언급에 걸린다(실제로 이 테스트가 그렇게 오탐했다).
+  const noComment = em.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.ok(!/Math\.random/.test(noComment), '색 변주가 전역 난수를 쓴다');
+});
