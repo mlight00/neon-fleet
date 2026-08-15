@@ -39,7 +39,7 @@ import { chase3dEnabled, chase3dTestEnabled, chase3dLabTarget, transitionT, shou
 import { shotSpec, makeShotSpec } from './chase3d-shot-spec.js';   // 발사체 2D 시각 사양 → 3D 표시 사양(순수·무할당)
 import { createFeedbackClock } from './feedback-clock.js';   // §G-39: 피격 피드백 전용 게임 누적 시계(pause 중엔 멈춘다)
 import { emitProjectileImpactFeedback, hitWithFeedback } from './impact-feedback.js';   // §G-39: 발사체 명중 피드백 + §G39-R1: 연쇄·APEX 공용 피해 어댑터
-import { FEEDBACK, readDamageFlash } from './damage-feedback.js';   // §G-39: 피격 감쇠(2D 몸체 플래시용). 3D 색은 chase3d-collect 의 seam 이 쓴다
+import { FEEDBACK, readDamageFlash, consumeHitSpark } from './damage-feedback.js';   // §G-39: 피격 감쇠(2D 몸체 플래시용). 3D 색은 chase3d-collect 의 seam 이 쓴다. §G-46: 소품 파편용 상승 에지
 import { writeEnemySlot } from './chase3d-collect.js';   // §G39-R1: 적 3D 슬롯 기록(위치+색 한 호출) — production · 테스트 공유 seam
 import { drawWithDamageFlash } from './damage-flash-2d.js';   // §G-39 Task 9: 2D 몸체 피격 플래시(body clip)
 // ── Gate 1: 8분 핵심 재미 (전면개편 §5). ?coreLoopTest=1 하네스에서 전체 스택을 구동. ──
@@ -3106,7 +3106,9 @@ const _sw = {
   ...Object.fromEntries(Object.keys(ENEMY3D).map((k) => [k, { buf: Array.from({ length: ENEMY3D[k].cap }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, cr: 1, cg: 1, cb: 1, spark: 0, hp: 1 })), n: 0 }])),
   drone: { buf: _droneBuf, n: 0 }, cruiser: { buf: _cruBuf, n: 0 },
   //  §G-13 발사체는 화면좌표(sx/sy/px)가 아니라 월드좌표(wx/wy)로 3D 에 놓는다 — 2.5D 투영의 휨을 물려받지 않게.
-  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1, wx: 0, wy: 0, mul: 1, wmul: 1, core: 0 })), n: 0 }])),
+  //  §G-46 2차(이사 "보급선·운석도 피격 파편"): 소품 슬롯에도 spark/hp 자리를 **사전 할당**한다.
+  //   운석·기뢰는 적 경로(put3D)라 이미 되고, 크리스탈·보급선(DronePod)이 이 경로다.
+  props: Object.fromEntries(PROP_KEYS.map((k) => [k, { buf: Array.from({ length: PROP_CAPS[k] }, () => ({ sx: 0, sy: 0, px: 0, wob: 0, col: -1, wx: 0, wy: 0, mul: 1, wmul: 1, core: 0, spark: 0, hp: 1 })), n: 0 }])),
 };
 // 픽업 정보 라벨(+N·▲N·무기명·POW)은 3D 위 HUD 계층에 유지 — 시각만 3D 로 바꾸고 게임 정보는 잃지 않는다.
 const _propLabels = Array.from({ length: 24 }, () => ({ x: 0, y: 0, str: '', col: '#eaf6ff', size: 15 }));
@@ -3146,6 +3148,10 @@ function putProp(key, cat, e, p, col, wob, mul = 1, wmul = 1, core = 0) {
   const o = s.buf[s.n++];                                                     // ④실제 슬롯 기록
   o.sx = p.x; o.sy = p.y; o.px = Math.min(max, len * p.scale); o.wob = wob; o.col = col;
   o.wx = e.x; o.wy = e.y; o.mul = mul; o.wmul = wmul; o.core = core;
+  //  §G-46 2차: 파괴 가능한 소품(크리스탈·보급선)도 피격 파편을 낸다.
+  //   ⚠️탄·레이저에는 HIT 기록이 없어 consumeHitSpark 가 즉시 false 다 — 별도 분기가 필요 없다.
+  o.spark = consumeHitSpark(e) ? 1 : 0;
+  o.hp = e.maxHp > 0 ? e.hp / e.maxHp : 1;
   _in3dMap.set(e, _b1Stamp);
   return true;
 }

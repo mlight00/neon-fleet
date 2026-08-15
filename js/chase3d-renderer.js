@@ -338,8 +338,13 @@ function createHero3D(canvas3d, opts = {}) {
   const JET_MAX = 8;                       // 등급 최대 노즐 수(t4 = 5) 여유
   //  함미 카메라 구도 상수(월드 단위 — 등급 배율과 무관). §G-43 실측에서 나온 값이다.
   //  ⚠️카메라 각도·화각이 바뀌면 다시 재야 한다. 화면 어디에 놓을지를 정하는 값이지 게임 좌표가 아니다.
-  const JET_PITCH_COMP = 0.75;             // 뒤로 1 갈 때 올려야 하는 월드 y(카메라 내려다봄 기울기)
-  const JET_Y_BASE = -0.90;                // 그 보정선의 높이 — 셋 다 선체 하단부에 오도록 맞춘 값
+  //  §G-46 2차(이사 실기 "분사구와 전혀 다른 엉뚱한 위치에서 로켓추진 효과가 나타난다").
+  //   §G-43 은 y 를 **카메라 기울기 보정식**(0.75·−jz − 0.90)으로만 잡았다 — 모델과 아무 관계가 없다.
+  //   화면 밖으로 떨어지는 것만 막았지, 분사구에 맞춘 적이 없다.
+  //  → 포탑(placeMounts)이 쓰는 방식과 같게 **모델 박스에서** 높이를 뽑는다.
+  //     포탑: `topY * S * 0.66` (box.max.y 기준) · 제트: 아래 JET_Y_FRAC (box 세로 범위의 비율)
+  //  ⚠️보정식으로 되돌리지 말 것. 그러면 등급마다 선체와 어긋난다.
+  const JET_Y_FRAC = 0.42;   // 선체 세로 범위에서 분사구 높이 비율(0=바닥, 1=천장). 엔진은 중심보다 약간 아래.
   const jetRig = new THREE.Group();
   jetRig.visible = false;
   flagRig.add(jetRig);
@@ -395,7 +400,9 @@ function createHero3D(canvas3d, opts = {}) {
       //   실측(§G-43): 화면 y 는 월드 z 1당 51~65px 내려가고 월드 y 1당 72~82px 올라간다
       //   → 기울기 0.71/0.75/0.79 (t0/t3/t5) 로 거의 일정. 0.75 로 보정하면 등급이 달라도 같은 높이에 온다.
       //   보정 전 실측: t3 화면 y 802 · t5 850(둘 다 화면 800 밖) → 보정 후 셋 다 725 부근.
-      _sPos.set(p[0] * sx * S * 0.88, JET_PITCH_COMP * -jz + JET_Y_BASE, jz);
+      //  §G-46 2차: 높이를 **선체에서** 뽑는다(포탑과 같은 방식). 보정식이 아니다.
+      const jy = (box ? box.min.y + (box.max.y - box.min.y) * JET_Y_FRAC : 0) * S;
+      _sPos.set(p[0] * sx * S * 0.88, jy, jz);
       _sScl.set(rad, rad, len);
       _sM.compose(_sPos, _sQ, _sScl);
       jetShell.setMatrixAt(i, _sM);
@@ -492,9 +499,13 @@ function createHero3D(canvas3d, opts = {}) {
   //  §G-46(이사 "적 피탄이 빨간 번쩍뿐이라 밋밋하다"): 기함 전용이던 파편을 **적 피격·격파**까지 쓴다.
   //   16 → 48. 드로우콜은 그대로 1개다(InstancedMesh) — 늘어나는 건 인스턴스 상한뿐.
   const DEBRIS_MAX = 48;
+  //  §G-46 2차(이사 실기): "파편이 너무 사각형이라 생체 파편이 파손되는 느낌이 없다".
+  //   적은 전부 생체 외계인이다 → 상자를 **저폴리 구체**로 바꾸고 인스턴스마다 눌러 타원체로 만든다.
+  //   Icosahedron(detail 0) = 20면. 상자(12면)보다 살짝 무겁지만 인스턴스 1드로우라 실질 비용은 같다.
+  //  ⚠️금속 광택을 뺀다 — 금속기가 남으면 장갑판 조각으로 읽힌다. 살점은 거칠고 약간 발광한다.
   const debris = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.30, 0.08, 0.44),
-    new THREE.MeshStandardMaterial({ color: 0xe3e6ea, roughness: 0.55, metalness: 0.12, emissive: 0x17191d }),
+    new THREE.IcosahedronGeometry(0.5, 0),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.0, emissive: 0x2a0406 }),
     DEBRIS_MAX);
   debris.count = 0; debris.frustumCulled = false; scene.add(debris);
   const _deb = [];
@@ -536,12 +547,33 @@ function createHero3D(canvas3d, opts = {}) {
         rx: (_rnd() - 0.5) * 11, ry: (_rnd() - 0.5) * 11, rz: (_rnd() - 0.5) * 11,
         ax: _rnd() * 6.28, ay: _rnd() * 6.28, az: _rnd() * 6.28,
         life: 0.45 + _rnd() * 0.45, t: 0, s: scale * (0.6 + _rnd() * 0.7),
+        //  §G-46 2차: 조각마다 다른 비율로 눌러 **타원체**로 만든다(구가 그대로면 구슬처럼 보인다).
+        ex: 0.7 + _rnd() * 0.8, ey: 0.5 + _rnd() * 0.6, ez: 0.8 + _rnd() * 0.9,
         cr: cr === undefined ? 1 : cr, cg: cg === undefined ? 1 : cg, cb: cb === undefined ? 1 : cb,
       });
     }
     _debFrameBudget -= room;
     return room;
   }
+
+  /**
+   * §G-46 2차(이사 실기 "파편 색상이 흰색이다") — 생체 파편 색.
+   *
+   *  ⚠️1차에서 적 슬롯 색(`o.cr/cg/cb`)을 썼는데 **그건 종류색이 아니라 체력 틴트**였다.
+   *   만피면 (1,1,1) 흰색이고, 피격 순간엔 전 채널 같은 배수(3.74)라 여전히 무채색이다 —
+   *   ×0.7 해도 회색이라 화면에서 흰 조각으로 보였다(실측 확인).
+   *  → 슬롯에서 가져오지 않고 **붉은 팔레트에서 뽑는다.** 체력이 낮을수록 짙은 적색으로.
+   *  @param hp 0..1 남은 체력(모르면 1). @param out 3칸 배열에 rgb 를 쓴다(무할당)
+   */
+  function bioDebrisColor(hp, out) {
+    const t = _rnd();                       // 조각마다 다른 색조 — 한 색이면 플라스틱처럼 보인다
+    const dark = 1 - Math.min(1, Math.max(0, hp)) * 0.35;   // 빈사일수록 짙게
+    out[0] = (0.85 + t * 0.15) * (0.75 + dark * 0.25);      // 적: 항상 높게
+    out[1] = (0.10 + t * 0.20) * dark;                      // 녹: 낮게 — 붉음을 만든다
+    out[2] = (0.12 + t * 0.16) * dark;                      // 청: 낮게 (약간 보라기)
+    return out;
+  }
+  const _bioCol = [1, 1, 1];
 
   /** §G-46 품질 사다리 연동(§G-45). 프레임이 모자라면 **파편이 먼저 줄고**, 그 다음 해상도가 내려간다. */
   function debrisBudget(kind) {
@@ -799,9 +831,9 @@ function createHero3D(canvas3d, opts = {}) {
       //    한 번 맞을 때마다 프레임 수만큼 쏟아진다.
       //   ⚠️적 스웜에만 적용한다 — 픽업·탄은 slot 에 spark 를 쓰지 않으므로 자연히 걸러진다.
       if (o.spark) {
+        bioDebrisColor(o.hp === undefined ? 1 : o.hp, _bioCol);
         emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('hit'), 1.5 + scl * 0.5, 0.45 + scl * 0.5,
-          o.cr === undefined ? 1 : Math.min(1, o.cr * 0.7), o.cg === undefined ? 1 : Math.min(1, o.cg * 0.7),
-          o.cb === undefined ? 1 : Math.min(1, o.cb * 0.7));
+          _bioCol[0], _bioCol[1], _bioCol[2]);
       } else if (o.hp !== undefined && o.hp <= 0.3 && o.hp > 0 && _rnd() < 0.02) {
         //  빈사 잔불 — 확률로 드문드문. "곧 터진다"를 색이 아니라 움직임으로 알린다.
         emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('ember'), 0.7, 0.3 + scl * 0.25, 1, 0.55, 0.25);
@@ -1080,8 +1112,10 @@ function createHero3D(canvas3d, opts = {}) {
           placeOnRay(camera, _sFwd, toNdcX(k.sx, ctl._lastLogW), toNdcY(k.sy, ctl._lastLogH), depth, _sPos, _sV, _sDir);
           _sPos.y -= WORLD_OBJ_VIS_DROP;   // 적과 같은 시각 중심 보정(§G-38) — 안 하면 파편만 떠 보인다
           const scl = (k.px * depth) / fpxK;
+          //  §G-46 2차: 격파도 생체 팔레트로. 터질 때는 가장 짙은 적색(hp=0 취급).
+          bioDebrisColor(0, _bioCol);
           emitDebris(_sPos.x, _sPos.y, _sPos.z, debrisBudget('kill'), 2.6 + scl * 0.8, 0.55 + scl * 0.7,
-            Math.min(1, k.cr * 0.8), Math.min(1, k.cg * 0.8), Math.min(1, k.cb * 0.8));
+            _bioCol[0], _bioCol[1], _bioCol[2]);
         }
         _killQ.length = 0;
       }
@@ -1096,7 +1130,9 @@ function createHero3D(canvas3d, opts = {}) {
         d.ax += d.rx * dt; d.ay += d.ry * dt; d.az += d.rz * dt;
         const k = 1 - d.t / d.life;
         _sEul.set(d.ax, d.ay, d.az); _sQ.setFromEuler(_sEul);
-        _sM.compose(_sPos.set(d.x, d.y, d.z), _sQ, _sScl.setScalar(d.s * (0.45 + k * 0.55)));
+        //  §G-46 2차: 균일 배율(setScalar) 대신 조각별 비율 — 구슬이 아니라 찢긴 살점으로 보이게.
+        const ks = d.s * (0.45 + k * 0.55);
+        _sM.compose(_sPos.set(d.x, d.y, d.z), _sQ, _sScl.set(ks * d.ex, ks * d.ey, ks * d.ez));
         debris.setMatrixAt(dn++, _sM);
         //  §G-46: 적 파편은 그 적의 색을 띤다 — 안 그러면 기함 장갑(세라믹 흰색)이 튄 것처럼 보인다.
         //   ⚠️색 쓰기 실패를 국소 격리한다. 밖으로 새면 frame() 의 render-exception 폴백이

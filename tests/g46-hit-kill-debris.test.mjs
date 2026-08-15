@@ -135,3 +135,58 @@ test('색 쓰기 실패가 3D 전체를 끄지 않는다 — 국소 격리', () 
   assert.ok(/catch/.test(region), 'setColorAt 이 try/catch 로 감싸이지 않았다');
   assert.ok(/_debColored\s*=\s*false/.test(region), '실패 시 색만 포기하고 계속 가는 경로가 없다');
 });
+
+// ── §G-46 2차 — 이사 실기 지적 3건 ────────────────────────────────────────────────────
+
+test('파편이 생체처럼 보인다 — 둥근 지오메트리 + 붉은 팔레트', () => {
+  //  ⚠️1차는 상자(BoxGeometry) + 적 슬롯 색이었다. 슬롯 색은 **체력 틴트**라 만피면 (1,1,1) 흰색이고
+  //   피격 순간엔 전 채널 같은 배수라 여전히 무채색 — 화면에서 흰 사각 조각으로 보였다(이사 실기).
+  assert.ok(!/new THREE\.BoxGeometry\([^)]*\),\s*\n\s*new THREE\.MeshStandardMaterial\(\{ color: 0xe3e6ea/.test(R),
+    '파편이 아직 세라믹 상자다');
+  const dbg = R.slice(R.indexOf('const DEBRIS_MAX'), R.indexOf('const DEBRIS_MAX') + 700);
+  assert.ok(/IcosahedronGeometry|SphereGeometry/.test(dbg), '파편 지오메트리가 둥글지 않다');
+  assert.ok(/metalness:\s*0(\.0)?\b/.test(dbg), '금속기가 남아 있으면 장갑판 조각으로 읽힌다');
+  assert.ok(/function bioDebrisColor\(/.test(R), '생체 파편 색 함수가 없다');
+  //  슬롯 색을 다시 쓰지 않는지 — 회귀 방지
+  assert.ok(!/o\.cr \* 0\.7/.test(R), '파편이 다시 적 슬롯 틴트를 쓴다(무채색이 된다)');
+});
+
+test('bioDebrisColor: 항상 붉다 — 적 채널이 가장 크다', async () => {
+  //  런타임 함수라 직접 못 부른다 → 소스에서 계약만 고정한다.
+  const f = R.slice(R.indexOf('function bioDebrisColor('), R.indexOf('function bioDebrisColor(') + 700);
+  assert.ok(/out\[0\]/.test(f) && /out\[1\]/.test(f) && /out\[2\]/.test(f), 'rgb 3채널을 안 쓴다');
+  //  적(0)에 0.8 이상 계수, 녹·청(1·2)은 0.4 미만 계수여야 붉게 보인다
+  const r0 = f.match(/out\[0\]\s*=\s*\(([\d.]+)/);
+  const g0 = f.match(/out\[1\]\s*=\s*\(([\d.]+)/);
+  assert.ok(r0 && +r0[1] >= 0.8, `적 채널 기저가 ${r0 && r0[1]} — 너무 낮으면 회색이 된다`);
+  assert.ok(g0 && +g0[1] <= 0.4, `녹 채널 기저가 ${g0 && g0[1]} — 높으면 흰색으로 간다`);
+});
+
+test('파편이 조각마다 다른 비율로 눌린다 — 구슬이 아니라 살점', () => {
+  assert.ok(/ex:\s|ey:\s|ez:\s/.test(R), '조각별 축 비율(ex/ey/ez)이 없다');
+  assert.ok(!/_sScl\.setScalar\(d\.s \*/.test(R), '아직 균일 배율이라 완벽한 구로 보인다');
+});
+
+test('피격 가능한 소품(크리스탈·보급선)도 파편을 낸다', () => {
+  //  운석·기뢰는 적 경로(put3D)라 이미 되고, 이 둘은 소품 경로(putProp)다.
+  const pp = M.slice(M.indexOf('function putProp('), M.indexOf('function putProp(') + 900);
+  assert.ok(/consumeHitSpark\(e\)/.test(pp), 'putProp 이 상승 에지를 안 본다 — 소품은 파편이 안 나온다');
+  assert.ok(/o\.hp\s*=/.test(pp), '소품 슬롯에 체력 비율이 안 들어간다');
+  //  사전 할당에도 자리가 있어야 히든클래스가 안 바뀐다(G39R1-SEAM-NO-ALLOC 과 같은 계약)
+  const alloc = M.slice(M.indexOf('props: Object.fromEntries'), M.indexOf('props: Object.fromEntries') + 400);
+  assert.ok(/spark:\s*0/.test(alloc) && /hp:\s*1/.test(alloc), '소품 슬롯 사전 할당에 spark/hp 가 없다');
+});
+
+test('⚠️제트가 선체에서 높이를 뽑는다 — 보정식이 아니다', () => {
+  //  이사 실기: "분사구와 전혀 다른 엉뚱한 위치에서 로켓추진 효과가 나타난다".
+  //  원인은 y 를 모델과 무관한 카메라 기울기 보정식으로만 잡은 것(§G-43).
+  assert.ok(!/JET_PITCH_COMP/.test(R), '카메라 보정식이 아직 남아 있다 — 선체와 어긋난다');
+  assert.ok(!/JET_Y_BASE/.test(R), '고정 높이 상수가 아직 남아 있다');
+  //  ⚠️슬라이스 창을 넉넉히 잡는다 — 주석이 길어 2000자로는 실제 `_sPos.set` 줄에 못 닿아
+  //   코드가 맞는데도 실패했다(1차 작성 시 실제 발생).
+  const pjStart = R.indexOf('function placeJets(');
+  const pj = R.slice(pjStart, R.indexOf('function ', pjStart + 10) > 0 ? R.indexOf('jetShell.setMatrixAt') + 200 : pjStart + 4000);
+  assert.ok(/box\.min\.y/.test(pj) && /box\.max\.y/.test(pj), '제트 높이가 모델 박스에서 오지 않는다');
+  //  포탑과 같은 방식인가 — x 보정 계수가 같아야 좌우 정렬이 맞는다
+  assert.ok(/p\[0\] \* sx \* S \* 0\.88/.test(pj), '제트 x 가 포탑(0.88)과 다른 기준을 쓴다');
+});
