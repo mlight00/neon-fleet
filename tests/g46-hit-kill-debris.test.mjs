@@ -317,6 +317,8 @@ test('⚠️기함이 내려가면 붙어 있던 리그도 전부 내린다 — 
   assert.ok(/chargeRingA\.visible = false/.test(fx), '충전 링을 안 내린다');
   //  count 를 0 으로 만들어야 실제로 안 그려진다 — visible 만 내리면 다음 프레임에 되살아난다
   assert.ok(/count = 0/.test(fx), '인스턴스 count 를 0 으로 만들지 않는다');
+  //  ⚠️GLB 홀더만 내리면 **절차 AURORA 폴백 선체가 대신 남는다**(사망 상태 실측: AURORA_LOD0 메시 8개).
+  assert.ok(/model\.group\.visible = false/.test(fx), '절차 AURORA 폴백 선체를 안 내린다');
 });
 
 test('hide() 가 그 정리를 실제로 부른다', () => {

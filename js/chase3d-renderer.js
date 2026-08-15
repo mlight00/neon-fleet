@@ -1284,6 +1284,9 @@ function createHero3D(canvas3d, opts = {}) {
     mountRig.visible = false;
     for (const k of Object.keys(mounts3)) for (const m of mounts3[k].meshes) { m.count = 0; m.visible = false; }
     for (const k of Object.keys(flags)) flags[k].holder.visible = false;
+    //  ⚠️절차 AURORA(폴백 선체)도 내린다. GLB 홀더만 내리면 **이 배가 대신 남는다** —
+    //   사망 상태 실측에서 AURORA_LOD0 메시 8개가 그대로 보이고 있었다.
+    if (model && model.group) model.group.visible = false;
     ctl._flagTier = -1; ctl._mountKey = '';
     flagRig.position.set(0, 0, 0); flagRig.rotation.set(0, 0, 0);
   }
