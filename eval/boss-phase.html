@@ -88,7 +88,9 @@
 </div>
 
 <div class="bar">
-  <span class="prog" id="prog">0 / 12</span>
+  <!-- ⚠️문항 수를 여기 적어 두지 않는다. 항목을 늘리면 이 숫자만 남아 거짓말을 한다
+       (실제로 12 로 적어 뒀는데 문항은 13 이었다). JS 가 채운다. -->
+  <span class="prog" id="prog">…</span>
   <span class="saved" id="saved"></span>
   <button class="ghost" id="reset">초기화</button>
   <button id="copy">결과 복사</button>
@@ -178,6 +180,8 @@ const load = () => {
   const done = Object.keys(d.r || {}).length;
   document.getElementById('prog').textContent = `${done} / ${TOTAL}`;
 };
+//  ⚠️저장된 게 없어도 진행도를 한 번 그린다 — 안 그리면 '…' 이 그대로 남는다.
+document.getElementById('prog').textContent = `0 / ${TOTAL}`;
 document.addEventListener('change', save);
 document.addEventListener('input', save);
 load();
