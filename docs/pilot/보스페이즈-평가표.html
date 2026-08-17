@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>네온 함대 — 보스 페이즈 평가표 (§G-47)</title>
+<style>
+  /* A4 1장. 플레이하면서 옆에 두고 체크하는 용도라 글자를 너무 줄이지 않는다. */
+  @page { size: A4; margin: 10mm 11mm 8mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Malgun Gothic", "맑은 고딕", Pretendard, sans-serif;
+    font-size: 10px; line-height: 1.4; color: #111; margin: 0;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: -.3px; }
+  .sub { font-size: 9px; color: #555; margin-bottom: 6px; }
+  .head { display: flex; gap: 5px; margin-bottom: 7px; }
+  .head div { flex: 1; border: 1px solid #333; padding: 2px 4px; }
+  .head b { font-size: 8.5px; color: #444; display: block; }
+  .line { border-bottom: 1px solid #999; height: 12px; }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  th, td { border: 1px solid #666; padding: 3px 5px; vertical-align: top; }
+  th { background: #e9edf2; font-size: 9px; text-align: left; font-weight: 700; }
+  .memo { min-height: 22px; }
+  td small { color: #666; font-size: 8px; display: block; margin-top: 1px; }
+  .chk { font-family: monospace; letter-spacing: .5px; white-space: nowrap; font-size: 10px; }
+
+  .sec { background: #222; color: #fff; padding: 2px 6px; font-weight: 700;
+         font-size: 9.5px; margin: 7px 0 3px; }
+  .warn { border: 1.2px solid #b00; background: #fff4f4; padding: 4px 6px;
+          margin: 5px 0; font-size: 9px; line-height: 1.35; }
+  .warn b { color: #b00; }
+  .info { border: 1px solid #2a6; background: #f2fbf6; padding: 4px 6px; margin: 5px 0; font-size: 9px; }
+  .phase { display: flex; gap: 4px; margin: 4px 0 7px; }
+  .phase div { flex: 1; border: 1.4px solid #333; padding: 4px 6px; }
+  .phase b { display: block; font-size: 10px; margin-bottom: 1px; }
+  .phase span { font-size: 8.5px; color: #444; }
+  .foot { margin-top: 5px; font-size: 8px; color: #666; border-top: 1px solid #ccc; padding-top: 3px; }
+  @media screen { body { max-width: 820px; margin: 20px auto; padding: 0 16px; } }
+</style>
+</head>
+<body>
+
+<h1>네온 함대 — 보스 페이즈 평가표 <span style="font-size:11px;color:#666">§G-47</span></h1>
+<div class="sub">
+  대상 = <b>섹터 1 보스 B8</b> (지금은 이 보스만 페이즈가 적용됨) ·
+  나머지 9종은 종전 그대로 · 배포 <b>b57d596</b>
+</div>
+
+<div class="head">
+  <div><b>플레이 일시</b><div class="line"></div></div>
+  <div><b>무기 조합</b><div class="line"></div></div>
+  <div><b>보스전 소요</b><div class="line"></div></div>
+  <div><b>결과</b><div class="chk" style="padding-top:2px">□ 클리어 □ 사망</div></div>
+</div>
+
+<div class="phase">
+  <div><b>1단계 — 체력 100~66%</b><span>부채꼴(크레센트)</span></div>
+  <div><b>2단계 — 66~33%</b><span>부채꼴 + <u>전방위</u> 교대</span></div>
+  <div><b>3단계 — 33~0%</b><span>전방위 + <u>나선</u>, 발사 <u>1.7배</u></span></div>
+</div>
+
+<div class="sec">A. 전환이 느껴지는가 — 이게 이번 작업의 핵심</div>
+<div class="info">
+  전환 순간에 <b>후광 + 화면 플래시 + 3D 파편</b>이 터지고 <b>0.4초 무적</b>이 걸립니다.
+  ⚠️예전 광폭화(체력 50%)는 <b>아무 신호가 없었습니다</b> — 그래서 변화를 인지조차 못 했습니다.
+</div>
+<table>
+  <tr><th style="width:14px">#</th><th>확인 항목</th><th style="width:150px">판정</th><th>느낀 대로 적기</th></tr>
+  <tr><td>1</td><td><b>2단계 전환(66%)을 알아챘는가</b><small>보지 않고 있어도 느껴졌는지</small></td>
+      <td class="chk">□ 확실히 □ 그런가보다<br>□ 전혀 모름</td><td class="memo"></td></tr>
+  <tr><td>2</td><td><b>3단계 전환(33%)을 알아챘는가</b></td>
+      <td class="chk">□ 확실히 □ 그런가보다<br>□ 전혀 모름</td><td class="memo"></td></tr>
+  <tr><td>3</td><td>전환 연출이 <b>과한가 / 약한가</b><small>파편·플래시 세기</small></td>
+      <td class="chk">□ 적당 □ 과함 □ 약함</td><td class="memo"></td></tr>
+  <tr><td>4</td><td><b>0.4초 무적</b>이 답답한가<small>그 순간 피해가 안 들어감</small></td>
+      <td class="chk">□ 못 느낌 □ 적당<br>□ 답답함</td><td class="memo"></td></tr>
+</table>
+
+<div class="sec">B. 공격이 실제로 달라지는가 — 지루함의 원인이 해소됐는가</div>
+<table>
+  <tr><th style="width:14px">#</th><th>확인 항목</th><th style="width:150px">판정</th><th>느낀 대로 적기</th></tr>
+  <tr><td>5</td><td><b>2단계에서 대응이 달라졌는가</b><small>부채꼴만 피하던 방식이 안 통하는지</small></td>
+      <td class="chk">□ 달라짐 □ 비슷<br>□ 똑같음</td><td class="memo"></td></tr>
+  <tr><td>6</td><td><b>3단계가 확실히 다른가</b></td>
+      <td class="chk">□ 다름 □ 비슷 □ 똑같음</td><td class="memo"></td></tr>
+  <tr><td>7</td><td>⚠️<b>탄이 과밀해서 피할 곳이 없는 순간</b>이 있었나<small>두 패턴이 겹치는 때</small></td>
+      <td class="chk">□ 없음 □ 가끔<br>□ 자주(문제)</td><td class="memo"></td></tr>
+  <tr><td>8</td><td><b>전보다 덜 지루한가</b><small>이번 작업의 목적</small></td>
+      <td class="chk">□ 확실히 □ 조금<br>□ 그대로</td><td class="memo"></td></tr>
+</table>
+
+<div class="sec">C. 난이도 — 수치를 바꿀지 판단</div>
+<table>
+  <tr><th style="width:14px">#</th><th>확인 항목</th><th style="width:150px">판정</th><th>느낀 대로 적기</th></tr>
+  <tr><td>9</td><td><b>3단계 발사 1.7배</b>가 감당되는가</td>
+      <td class="chk">□ 적당 □ 너무 빠름<br>□ 더 빨라도 됨</td><td class="memo"></td></tr>
+  <tr><td>10</td><td><b>임계 66% / 33%</b> 가 적절한가<small>너무 이르거나 늦은 느낌</small></td>
+      <td class="chk">□ 적당 □ 조정 필요</td><td class="memo"></td></tr>
+  <tr><td>11</td><td><b>보스전 길이</b>가 변했는가<small>수치상 총량은 그대로 뒀음</small></td>
+      <td class="chk">□ 그대로 □ 길어짐<br>□ 짧아짐</td><td class="memo"></td></tr>
+  <tr><td>12</td><td>버그·이상 동작<small>탄이 안 나옴 · 연출 끊김 · 프레임 하락 등</small></td>
+      <td class="chk">□ 없음 □ 있음(→)</td><td class="memo"></td></tr>
+</table>
+
+<div class="sec">D. 결론 — 다음에 무엇을 할지</div>
+<table>
+  <tr><th>선택</th><th>뜻</th><th style="width:170px">고른 것</th></tr>
+  <tr><td><b>확대</b></td><td>좋다 — 나머지 보스 9종에도 적용한다</td><td class="chk">□</td></tr>
+  <tr><td><b>조절 후 확대</b></td><td>방향은 맞다 — 아래 수치만 손보고 확대</td><td class="chk">□</td></tr>
+  <tr><td><b>B8 만 유지</b></td><td>더 보고 결정한다</td><td class="chk">□</td></tr>
+  <tr><td><b>되돌림</b></td><td>전보다 나쁘다 — 표에서 B8 을 빼면 즉시 원상복구</td><td class="chk">□</td></tr>
+</table>
+
+<div class="warn">
+  <b>⚠️바꿀 수치가 있으면 여기에 적어 주십시오.</b> 한 줄이면 제가 바로 반영합니다.<br>
+  임계 ______% / ______% &nbsp;·&nbsp; 3단계 발사 배수 ______ &nbsp;·&nbsp;
+  무적 ______초 &nbsp;·&nbsp; 전환 연출 세기 ______<br>
+  기타: ________________________________________________________________________
+</div>
+
+<div class="foot">
+  주소 <b>https://mlight00.github.io/neon-fleet/</b> &nbsp;·&nbsp;
+  B8 = <b>섹터 1 보스</b>라 한 판만 해도 3단계까지 다 볼 수 있습니다 &nbsp;·&nbsp;
+  사양서 = docs/2026-08-14-G47-보스-페이즈-사양서.md
+</div>
+
+</body>
+</html>
