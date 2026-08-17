@@ -1,7 +1,7 @@
 // §G-47 — 보스 페이즈 순수 판정.
 //
-// ⚠️이 단계에서는 **아직 배선되지 않았다.** 표만 만들고 게임 동작은 그대로다.
-//  그래서 여기서 지키는 것은 "배선했을 때 안전한가" 다 — 경계·현행유지·전환 1회성.
+// ✅이사님 승인(2026-08-18)으로 **배선됨**: 3단계 · 66/33% · 전환 무적 0.4s · B8 우선 · 길이 유지.
+//  지키는 것: 경계 판정 · **표 없는 보스 9종 현행 유지** · 전환 1회성 · rate 이중적용 금지.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -84,17 +84,35 @@ test('전환 감지: 넘어간 프레임에만 1회 — 매 프레임 터지면 
   assert.equal(consumePhaseChange(other, 2), false, '다른 보스의 첫 관측이 전환으로 샌다');
 });
 
-test('⚠️아직 배선되지 않았다 — 승인 전이므로 게임 동작이 그대로여야 한다', () => {
-  //  이 테스트는 **일부러** 미배선을 고정한다. 이사님 승인(사양서 §3) 전에 몰래 켜지면 잡힌다.
-  //  승인 후 배선할 때 이 테스트를 함께 뒤집어라 — 그게 "승인됐다"는 기록이 된다.
+test('✅배선됨 — 이사님 승인 2026-08-18(3단계 · 66/33% · 무적 0.4s · B8 우선 · 길이 유지)', () => {
+  //  ⚠️이 테스트는 원래 **미배선을 고정**하고 있었다. 승인이 나서 뒤집었다 —
+  //   이 뒤집힘 자체가 "승인됐다"는 기록이다(사양서 §3).
   const bosses = readFileSync(join(ROOT, 'js/bosses.js'), 'utf8');
-  assert.ok(!/boss-phases\.js/.test(bosses),
-    'bosses.js 가 페이즈 모듈을 import 했다 — 게임 규칙 변경은 이사님 승인 후다(사양서 §3)');
-  //  기존 광폭화 경로는 그대로 살아 있어야 한다
-  assert.ok(/get enraged\(\)/.test(bosses), '기존 enraged 경로가 사라졌다 — 표 없는 보스 9종이 무방비가 된다');
+  assert.ok(/boss-phases\.js/.test(bosses), 'bosses.js 가 페이즈 모듈을 안 쓴다');
+  assert.ok(/tickPhase\(dt, world\)/.test(bosses), 'update 에서 페이즈를 갱신하지 않는다');
+  //  ⚠️기존 광폭화 경로는 **반드시 살아 있어야** 한다 — 표에 없는 보스 9종이 그걸 쓴다
+  assert.ok(/get enraged\(\)/.test(bosses), '기존 enraged 경로가 사라졌다 — 표 없는 9종이 무방비가 된다');
+  //  전환 무적(이사 결정 3)
+  assert.ok(/phaseInvulnT = 0\.4/.test(bosses), '전환 무적 0.4초가 없다');
+  assert.ok(/if \(this\.phaseInvulnT > 0\) return;/.test(bosses), '무적이 피해를 안 막는다');
 });
 
-// ── §G-47 4단계 — 전환 연출(표시 전용, 미배선) ────────────────────────────────────────
+test('⚠️페이즈 rate 가 광폭화와 곱해지지 않는다 — 마지막 단계가 폭주하면 안 된다', () => {
+  const bosses = readFileSync(join(ROOT, 'js/bosses.js'), 'utf8');
+  const iv = bosses.slice(bosses.indexOf('interval(base) {'), bosses.indexOf('interval(base) {') + 500);
+  assert.ok(/ph \? ph\.rate : \(this\.enraged/.test(iv),
+    '페이즈 rate 와 광폭화 배수가 함께 걸린다 — 3단계에서 발사 간격이 두 번 줄어든다');
+});
+
+test('주·보조 패턴이 볼리마다 교대한다 — 한 가지 대응으로 굳지 않게', () => {
+  const bosses = readFileSync(join(ROOT, 'js/bosses.js'), 'utf8');
+  assert.ok(/_volley \| 0\) % 2 === 1/.test(bosses), '패턴 교대 기준이 없다');
+  assert.ok(/this\._volley = \(this\._volley \| 0\) \+ 1/.test(bosses), '볼리 카운터가 안 늘어난다');
+  assert.ok(/findPatternByKind\(BAL\.bossPatterns, kind\)/.test(bosses),
+    '보조 패턴 수치를 기존 표에서 빌려오지 않는다 — 새로 만들면 안 된다');
+});
+
+// ── §G-47 4단계 — 전환 연출 ──────────────────────────────────────────────────────────
 
 test('페이즈 전환 연출 진입점이 있다 — 지금 광폭화는 아무 신호가 없다', () => {
   //  사양서 §2-2: 전환을 못 느끼면 페이즈를 나눈 의미가 없다.
@@ -121,9 +139,12 @@ test('전환은 격파보다 크게 터진다 — 단계가 뒤로 갈수록 강
     '크기가 단계와 무관하게 고정돼 있다 — 1단계와 2단계가 구분되지 않는다');
 });
 
-test('⚠️전환 연출도 아직 아무도 부르지 않는다 — 승인 전이다', () => {
+test('✅전환 연출이 실제로 배선됐다 — 전환을 눈으로 알린다', () => {
   const M = readFileSync(join(ROOT, 'js/main.js'), 'utf8');
   const B = readFileSync(join(ROOT, 'js/bosses.js'), 'utf8');
-  assert.ok(!/phaseBurst\(/.test(M), 'main.js 가 전환 연출을 부른다 — 배선은 승인 후다');
-  assert.ok(!/phaseBurst\(/.test(B), 'bosses.js 가 전환 연출을 부른다 — 배선은 승인 후다');
+  assert.ok(/chase3d\.phaseBurst\(/.test(M), 'main.js 가 전환 연출을 안 부른다');
+  assert.ok(/notifyPhaseChange/.test(M) && /notifyPhaseChange/.test(B), '전환 알림 통로가 끊겼다');
+  //  ⚠️연출 실패가 전투를 멈추면 안 된다
+  const nf = M.slice(M.indexOf('notifyPhaseChange(boss'), M.indexOf('notifyPhaseChange(boss') + 500);
+  assert.ok(/try\s*\{/.test(nf), '전환 연출 호출이 try 로 감싸이지 않았다');
 });

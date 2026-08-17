@@ -1,6 +1,7 @@
 // 보스: 스테이지별 로스터 + 고유 공격 패턴 + 격파 연출.
 // (entities.js에서 분리 — 신규 보스 추가 대비. EnemyShot 등 공용 개체는 entities.js에서 import)
 import { BAL } from './balance.js';
+import { BOSS_PHASES, bossPhaseAt, consumePhaseChange, findPatternByKind } from './boss-phases.js';   // §G-47 체력별 페이즈(이사 승인)
 import { COLORS, glow, blit } from './render.js';
 import { bossDefFor, bossDefById, getSprite } from './sprites.js';
 import { EnemyShot, Creature } from './entities.js';
@@ -47,7 +48,11 @@ export class Boss {
     this.name = def.name;
     this.korName = def.korName;
     // 보스별 고유 공격 패턴 (부채꼴 슬롯이 kind별 서명기로 대체된다)
-    this.pattern = BAL.bossPatterns[def.id] ?? { kind: 'brood' };
+    this.basePattern = BAL.bossPatterns[def.id] ?? { kind: 'brood' };
+    this.pattern = this.basePattern;
+    //  §G-47(이사 승인 2026-08-18): 체력별 페이즈. 표에 없는 보스는 null → 기존 광폭화 그대로.
+    this.phases = BOSS_PHASES[def.id] || null;
+    this.phaseInvulnT = 0;
     // 보스별 난이도 미세조정(튜너). dmg=발사체 데미지 배수, fire=발사 빈도 배수. hp는 main.js가 TTK에 적용.
     const bt = BAL.bossTune?.[def.id] || {};
     this._dmgMult = bt.dmg ?? 1;
@@ -97,7 +102,37 @@ export class Boss {
     }));
   }
   get enraged() { return this.variantAlwaysEnrage || this.hp <= this.maxHp * BAL.boss.enrageRatio; }
-  interval(base) { return base * this.rateMult * this.variantFaster * (this.enraged ? BAL.boss.enrageRate : 1) / (this._fireMult || 1); }
+  /** §G-47 현재 페이즈(표에 없으면 null = 현행 유지). */
+  get phase() { return bossPhaseAt(this.hp, this.maxHp, this.phases); }
+  interval(base) {
+    const ph = this.phase;
+    //  ⚠️페이즈 rate 는 기존 광폭화 배수와 **곱해지지 않는다** — 둘 다 걸면 마지막 단계가 너무 빨라진다.
+    //   페이즈가 있으면 페이즈 rate 가 광폭화를 대신한다.
+    const speed = ph ? ph.rate : (this.enraged ? BAL.boss.enrageRate : 1);
+    return base * this.rateMult * this.variantFaster * speed / (this._fireMult || 1);
+  }
+  /**
+   * §G-47 페이즈 전환 처리 — update 초입에서 매 프레임 부른다.
+   *  ⚠️전환 순간 짧은 무적(0.4초)을 준다. 그래야 "무언가 바뀌었다"가 손에 잡힌다(이사 승인).
+   *  ⚠️패턴은 주 패턴과 보조 패턴을 **번갈아** 쓴다 — 새 공격을 만들지 않고 조합만 바꾼다.
+   */
+  tickPhase(dt, world) {
+    if (this.phaseInvulnT > 0) this.phaseInvulnT = Math.max(0, this.phaseInvulnT - dt);
+    const ph = this.phase;
+    if (!ph) return;
+    if (consumePhaseChange(this, ph.index)) {
+      this.phaseInvulnT = 0.4;
+      world.effects.halo(this.x, this.y, COLORS.danger);
+      world.effects.flash(0.18);
+      world.notifyPhaseChange?.(this, ph.index);   // 3D 전환 파편(표시 전용)
+    }
+    //  주/보조 패턴 교대 — 볼리마다 번갈아 나가 대응이 한 가지로 굳지 않는다.
+    const useAdd = ph.add && (this._volley | 0) % 2 === 1;
+    const kind = useAdd ? ph.add : ph.kind;
+    this.pattern = kind === this.basePattern.kind
+      ? this.basePattern
+      : { ...(findPatternByKind(BAL.bossPatterns, kind) || this.basePattern), kind };
+  }
   /** 발사체 opts의 데미지를 이 보스의 튜너 배수로 조정 (dmgPct·dmgMin) */
   _scaleDmg(o) { const m = this._dmgMult || 1; if (m !== 1) { if (o.dmgPct != null) o.dmgPct *= m; if (o.dmgMin != null) o.dmgMin *= m; } return o; }
   phaseColor() {
@@ -130,6 +165,7 @@ export class Boss {
     if (this.y < this.targetY) { this.y += 120 * dt; return; }
     // 광폭화하면 더 크게, 빠르게 흔든다 — 단, 스프라이트가 화면 밖으로 나가지 않게 클램프
     // (참격형 보스는 swayMult로 더 사납게 움직인다)
+    this.tickPhase(dt, world);   // §G-47: 페이즈 전환·패턴 교대(표에 없는 보스는 즉시 반환)
     const sway = this.enraged ? 0.22 : 0.16;
     const swayHz = (this.enraged ? 1.1 : 0.7) * (this.pattern.swayMult ?? 1);
     const margin = L.halfW + 10;
@@ -150,6 +186,7 @@ export class Boss {
     this.shotT -= dt;
     if (this.shotT <= 0) {
       this.shotT = this.interval(BAL.boss.shotInterval) * (this.pattern.shotMult ?? 1);
+      this._volley = (this._volley | 0) + 1;   // §G-47 주/보조 패턴 교대 기준
       world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, this._scaleDmg({ r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin, color: this.shotStyle().color })));
     }
     if (this.rainWarnT > 0) this.rainWarnT = Math.max(0, this.rainWarnT - dt);   // 융단 폭격 예고 타이머
@@ -287,6 +324,8 @@ export class Boss {
     }
   }
   hitByBullet(dmg, world) {
+    //  §G-47 전환 직후 짧은 무적 — 페이즈가 넘어가는 순간을 플레이어가 인지할 틈을 준다.
+    if (this.phaseInvulnT > 0) return;
     this.hp -= dmg;
     // 피해량 플로팅 숫자 (0.15초 묶음 집계 — 탄막 스팸 방지, 긴장감 연출)
     this.dmgAcc = (this.dmgAcc || 0) + dmg;

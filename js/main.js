@@ -862,6 +862,15 @@ function newExpedition(mode = 'campaign', opts = {}) {
     spawnEntity(e) { this.entities.push(e); },
     spawnEnemyBullet(b) { if (this.enemyBullets.length < this.stageMods.shotCap) this.enemyBullets.push(b); },
     notifyEnemyKilled(e) { onEnemyKilled(e, this); },   // 랜스·메아리·시즈 등 entities.js 킬 경로가 호출하는 중앙 알림
+    //  §G-47 보스 페이즈 전환 → 3D 파편(표시 전용, 게임 규칙 무관).
+    //   ⚠️try 로 감싼다 — 연출 실패가 전투를 멈추면 안 된다.
+    notifyPhaseChange(boss, phaseIndex) {
+      if (!chase3d || !chase3d.phaseBurst || !chaseProjection) return;
+      try {
+        const p = projectObject(boss, 'enemy', chaseProjection);
+        chase3d.phaseBurst(p.x, p.y, Math.min(480, 260 * p.scale), phaseIndex);
+      } catch (err) { /* 연출 실패는 전투에 영향 없음 */ }
+    },
     feedbackClock,   // §G39-R1: entities.js 피해 경로(랜스·메아리·시즈)가 피격 기록 시각을 읽는다 — 벽시계 아닌 게임 누적 시간
     onPowCollect() { sectorWeaponUpgrade(); },          // 섹터 POW 수집 → 무기 강화 카드(S4)
     // 기함 등급 상승 → 함체 내구도 등급업 + 완전 재충전. 25분은 스케줄(campaignHullTier)이 담당하고,
