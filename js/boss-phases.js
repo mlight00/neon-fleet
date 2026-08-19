@@ -27,10 +27,24 @@
  */
 export const BOSS_PHASES = {
   //  B8 크레센트: 부채꼴만 피하던 대응이 2페이즈부터 안 통하게 한다.
+  //
+  //  §G-47 2차(이사 실기 2026-08-18). 1차 평가 결과와 그에 따른 판단:
+  //   · "2·3단계 대응이 **비슷**" — 각도·속도만 바꿔서다. 세 페이즈가 **같은 탄**을 쐈다.
+  //     → `shot` 신설. 유도탄·창(needle)으로 **피하는 방법 자체**를 바꾼다.
+  //   · "탄이 과밀한 순간이 **가끔**" + "보스전이 **길어짐**" — 둘은 같은 원인이다.
+  //     탄이 많으면 피하느라 못 쏜다. → `countMult` 로 후반 탄 수를 **줄인다**.
+  //     ⚠️종류를 늘리면서 수까지 늘리면 화면이 막힌다. **같은 양을 다른 종류로**가 이번 원칙이다.
+  //   · 임계 66/33 → **70/30**, 3단계 발사 1.7배 → **1.8배** (이사 지정값)
   B8: [
     { at: 1.00, kind: 'crescent' },
-    { at: 0.66, kind: 'crescent', add: 'ring' },
-    { at: 0.33, kind: 'ring', add: 'spiral', rate: 0.6 },
+    //  2단계: 부채꼴 + 유도탄. 옆으로 흘리는 회피가 안 통한다 — 끊어 줘야 한다.
+    { at: 0.70, kind: 'crescent', add: 'ring',
+      //  ⚠️shape 은 그 보스의 **기본 모양과 달라야** 한다. B8 기본이 needle 이라
+      //   needle 을 또 쓰면 유도가 붙어도 눈으로는 같은 탄이다(1차 실측에서 확인).
+      shot: { homing: 1.5, shape: 'orb', r: 7 }, countMult: 0.85 },
+    //  3단계: 큰 창 + 약한 유도. 굵고 느슨해 "뚫고 지나가는" 압박을 준다.
+    { at: 0.30, kind: 'ring', add: 'spiral', rate: 0.555,
+      shot: { homing: 0.7, shape: 'ring', r: 11 }, countMult: 0.7 },
   ],
 };
 
@@ -53,7 +67,11 @@ export function bossPhaseAt(hp, maxHp, phases) {
     if (frac <= phases[i].at) idx = i;
   }
   const p = phases[idx];
-  return { index: idx, at: p.at, kind: p.kind, add: p.add ?? null, rate: p.rate ?? 1 };
+  return {
+    index: idx, at: p.at, kind: p.kind, add: p.add ?? null, rate: p.rate ?? 1,
+    //  §G-47 2차: 탄의 **종류**와 **수 배수**. 없으면 각각 기본탄·등배(현행 유지).
+    shot: p.shot ?? null, countMult: p.countMult ?? 1,
+  };
 }
 
 /**

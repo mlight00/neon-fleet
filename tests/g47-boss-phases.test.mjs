@@ -23,12 +23,14 @@ test('⚠️표에 없는 보스는 현행 유지 — 10종을 한 번에 바꾸
 test('임계 경계에서 정확히 넘어간다', () => {
   const P = BOSS_PHASES.B8;
   const at = (frac) => bossPhaseAt(frac * 3500, 3500, P).index;
+  //  §G-47 2차: 임계가 이사 지정으로 70/30 이 됐다. 값을 여기 하드코딩하면 또 깨지므로 표에서 읽는다.
+  const [, t2, t3] = BOSS_PHASES.B8.map((x) => x.at);
   assert.equal(at(1.00), 0, '만피는 1페이즈');
-  assert.equal(at(0.67), 0, '66% 직전은 아직 1페이즈');
-  assert.equal(at(0.66), 1, '66% 정각에 2페이즈 — 경계 포함');
-  assert.equal(at(0.50), 1, '50% 는 2페이즈');
-  assert.equal(at(0.34), 1, '33% 직전은 아직 2페이즈');
-  assert.equal(at(0.33), 2, '33% 정각에 3페이즈');
+  assert.equal(at(t2 + 0.01), 0, '2단계 임계 직전은 아직 1페이즈');
+  assert.equal(at(t2), 1, '2단계 임계 정각에 넘어간다 — 경계 포함');
+  assert.equal(at((t2 + t3) / 2), 1, '두 임계 사이는 2페이즈');
+  assert.equal(at(t3 + 0.01), 1, '3단계 임계 직전은 아직 2페이즈');
+  assert.equal(at(t3), 2, '3단계 임계 정각에 넘어간다');
   assert.equal(at(0.01), 2, '빈사는 3페이즈');
 });
 
@@ -147,4 +149,106 @@ test('✅전환 연출이 실제로 배선됐다 — 전환을 눈으로 알린�
   //  ⚠️연출 실패가 전투를 멈추면 안 된다
   const nf = M.slice(M.indexOf('notifyPhaseChange(boss'), M.indexOf('notifyPhaseChange(boss') + 500);
   assert.ok(/try\s*\{/.test(nf), '전환 연출 호출이 try 로 감싸이지 않았다');
+});
+
+// ── §G-47 2차 — 이사 실기 평가 반영 (2026-08-18) ──────────────────────────────────────
+//
+// 1차 평가: 전환 인지 "그런가보다" · 대응 "비슷" · 과밀 "가끔" · 보스전 "길어짐".
+// 진단: 세 페이즈가 **같은 탄**을 각도만 바꿔 쐈다 — 피하는 방법이 안 바뀌니 대응도 안 바뀐다.
+
+import { Boss } from '../js/bosses.js';
+
+/** 실제 발사를 돌려 탄 구성을 본다(정적 검사로는 '탄이 달라졌는가'를 증명 못 한다). */
+function fireAt(frac) {
+  const shots = [];
+  const w = { squad: { x: 240, y: 700, count: 8 }, entities: [], enemyBullets: [],
+    spawnEnemyBullet: (b) => shots.push(b), spawnEntity() {},
+    effects: { halo() {}, flash() {}, burst() {}, text() {} }, notifyPhaseChange() {} };
+  const b = new Boss(480, 1, 1, 1, 'B8');
+  b.hp = b.maxHp * frac;
+  b.tickPhase(0.016, w);
+  b.fireSignature(w);
+  return { shots, phase: b.phase, boss: b };
+}
+
+test('G47R2-THRESHOLDS: 임계가 이사 지정값 70% / 30% 다', () => {
+  const at = BOSS_PHASES.B8.map((p) => p.at);
+  assert.deepEqual(at, [1.00, 0.70, 0.30], `임계가 ${at} — 이사 지정은 70/30 이다`);
+});
+
+test('G47R2-RATE: 3단계 발사가 1.8배다', () => {
+  const rate = BOSS_PHASES.B8[2].rate;
+  assert.ok(Math.abs(1 / rate - 1.8) < 0.02, `발사 배수가 ${(1 / rate).toFixed(2)} — 이사 지정은 1.8 이다`);
+});
+
+test('⚠️G47R2-SHOT-VARIETY: 페이즈마다 **탄이 실제로 다르다**', () => {
+  //  이번 작업의 핵심. 1차에서 '대응이 비슷' 했던 직접 원인이다.
+  const sig = (frac) => {
+    const { shots } = fireAt(frac);
+    assert.ok(shots.length > 0, `hp ${frac}: 탄이 안 나간다`);
+    const s = shots[0];
+    return `${s.shape}/${s.r}/${s.homing || 0}`;
+  };
+  const p1 = sig(1.0), p2 = sig(0.5), p3 = sig(0.15);
+  assert.notEqual(p1, p2, `1·2단계 탄이 같다 (${p1}) — 각도만 바꾸면 대응이 안 바뀐다`);
+  assert.notEqual(p2, p3, `2·3단계 탄이 같다 (${p2})`);
+  assert.notEqual(p1, p3, `1·3단계 탄이 같다 (${p1})`);
+});
+
+test('G47R2-HOMING: 후반 페이즈에 유도탄이 실제로 붙는다', () => {
+  //  유도가 붙어야 '옆으로 흘리는' 회피가 안 통한다 = 대응이 바뀐다.
+  assert.equal(fireAt(1.0).shots[0].homing || 0, 0, '1단계부터 유도가 붙으면 초반이 가혹하다');
+  assert.ok(fireAt(0.5).shots[0].homing > 0, '2단계에 유도가 없다');
+  assert.ok(fireAt(0.15).shots[0].homing > 0, '3단계에 유도가 없다');
+});
+
+test('⚠️G47R2-SHAPE-DIFFERS-FROM-BASE: 모양이 그 보스 기본과 달라야 눈에 보인다', () => {
+  //  실측 교훈: B8 기본 모양이 needle 인데 페이즈에도 needle 을 줬더니
+  //  유도가 붙어도 **눈으로는 같은 탄**이었다.
+  const base = fireAt(1.0).shots[0].shape;
+  for (const f of [0.5, 0.15]) {
+    assert.notEqual(fireAt(f).shots[0].shape, base,
+      `hp ${f} 의 모양이 기본(${base})과 같다 — 유도만 붙고 시각 변화가 없다`);
+  }
+});
+
+test('⚠️G47R2-SIZE-NOT-CLOBBERED: 케이스의 r 하드코딩이 페이즈 크기를 덮지 않는다', () => {
+  //  실측: ring 케이스가 `{ ...fanOpts, r: 6 }` 로 덮어써 3단계 r11 이 r6 으로 나갔다.
+  const want = BOSS_PHASES.B8[2].shot.r;
+  const got = fireAt(0.15).shots[0].r;
+  assert.equal(got, want, `3단계 탄 크기가 ${got} — 표는 ${want} 다. 케이스 하드코딩이 이겼다`);
+});
+
+test('⚠️G47R2-COUNT-DOWN: 후반일수록 탄 수가 준다 (과밀·길어짐 대응)', () => {
+  //  이사 실기: 과밀 '가끔' + 보스전 '길어짐'. 둘 다 탄이 많아 못 쏘는 데서 온다.
+  //  종류를 늘리면서 수까지 늘리면 화면이 막힌다 — **같은 양을 다른 종류로**가 원칙이다.
+  const mult = BOSS_PHASES.B8.map((p) => p.countMult ?? 1);
+  assert.ok(mult[1] < 1 && mult[2] < mult[1], `탄 수 배수가 ${mult} — 후반으로 갈수록 줄어야 한다`);
+  //  ⚠️표만 보면 배선이 끊겨도 통과한다(돌연변이 P2 로 실제 확인 — countMult 를 무시해도 통과했다).
+  //   **실제 발사 수**로 검증한다. 패턴이 달라 절대 수는 못 비교하니, 같은 패턴에 배수만 뺀 값과 대조한다.
+  const n2 = fireAt(0.5).shots.length;            // 2단계 crescent, 배수 0.85
+  const raw = BOSS_PHASES.B8[0];                  // 1단계도 crescent — 같은 패턴의 원본 수
+  const base = fireAt(1.0).shots.length;
+  assert.ok(n2 < base,
+    `2단계 탄이 ${n2} 발로 1단계 ${base} 발보다 적지 않다 — countMult 배선이 끊겼다`);
+  assert.equal(n2, Math.max(3, Math.round(base * mult[1])),
+    `2단계 탄 수가 배수와 안 맞는다 (${n2})`);
+  //  다만 0 이 되면 안 된다
+  for (const f of [1.0, 0.5, 0.15]) assert.ok(fireAt(f).shots.length >= 3, `hp ${f}: 탄이 3발 미만`);
+});
+
+test('G47R2-FX-STRONGER: 전환 연출이 1차보다 강하다 (이사: 약함)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../js/bosses.js', import.meta.url), 'utf8');
+  const i = src.indexOf('consumePhaseChange(this, ph.index)');
+  const blk = src.slice(i, i + 900);
+  const m = blk.match(/effects\.flash\(([\d.]+)\)/);
+  assert.ok(m && +m[1] >= 0.3, `플래시가 ${m && m[1]} — 1차의 0.18 은 전투 중에 묻혔다`);
+  assert.ok((blk.match(/effects\.halo\(/g) || []).length >= 2, '후광이 하나뿐이다');
+  assert.ok(/effects\.burst\(/.test(blk), '전환에 파편이 없다');
+});
+
+test('G47R2-OTHERS-UNTOUCHED: B8 외 보스는 여전히 종전 그대로', () => {
+  //  표에 없으면 null = 현행 유지. 한 번에 10종을 바꾸지 않는다는 원칙이 유지되는지.
+  assert.deepEqual(Object.keys(BOSS_PHASES), ['B8'], '표에 B8 외 보스가 들어왔다 — 승인 범위 밖');
 });

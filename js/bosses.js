@@ -122,8 +122,13 @@ export class Boss {
     if (!ph) return;
     if (consumePhaseChange(this, ph.index)) {
       this.phaseInvulnT = 0.4;
+      //  §G-47 2차(이사 실기 "전환 연출이 **약함**", 인지도 "그런가보다"):
+      //   후광 한 번 + 플래시 0.18 로는 전투 중에 묻혔다. 링을 겹치고 파편을 더해 화면을 확실히 끊는다.
       world.effects.halo(this.x, this.y, COLORS.danger);
-      world.effects.flash(0.18);
+      world.effects.halo(this.x, this.y, COLORS.enemyHigh);
+      world.effects.flash(0.34);
+      //  ⚠️burst 는 kind 를 준다 — 이펙트 예산에서 고우선으로 잡혀 다른 파티클에 밀리지 않는다.
+      world.effects.burst(this.x, this.y, COLORS.danger, 22, 260, { priority: 'high', kind: 'bossPhase' });
       world.notifyPhaseChange?.(this, ph.index);   // 3D 전환 파편(표시 전용)
     }
     //  주/보조 패턴 교대 — 볼리마다 번갈아 나가 대응이 한 가지로 굳지 않는다.
@@ -187,7 +192,9 @@ export class Boss {
     if (this.shotT <= 0) {
       this.shotT = this.interval(BAL.boss.shotInterval) * (this.pattern.shotMult ?? 1);
       this._volley = (this._volley | 0) + 1;   // §G-47 주/보조 패턴 교대 기준
-      world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, this._scaleDmg({ r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin, color: this.shotStyle().color })));
+      //  §G-47 2차: 조준탄도 페이즈 종류를 따른다 — 부채꼴만 바뀌면 "가끔 이상한 탄" 으로 읽힌다.
+      const _ph = this.phase;
+      world.spawnEnemyBullet(EnemyShot.aimed(this.x, this.y + this.r, world.squad.x, world.squad.y, BAL.boss.shotSpeed, this._scaleDmg({ r: BAL.boss.shotRadius, dmgPct: BAL.boss.shotDamagePct, dmgMin: BAL.boss.shotDamageMin, color: this.shotStyle().color, ...(_ph && _ph.shot ? _ph.shot : null) })));
     }
     if (this.rainWarnT > 0) this.rainWarnT = Math.max(0, this.rainWarnT - dt);   // 융단 폭격 예고 타이머
     // 서명 공격: 보스 종류별 고유 패턴 (기존 부채꼴 슬롯)
@@ -216,11 +223,24 @@ export class Boss {
     const B = BAL.boss;
     const fb = this.variantFanBonus || 0;   // 변주판 추가 탄 수
     const st = this.shotStyle();
-    const fanOpts = this._scaleDmg({ r: 7, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin, color: st.color, shape: st.shape });
+    //  §G-47 2차: 페이즈가 지정한 **탄 종류**를 여기서 한 번만 합친다 —
+    //   fanOpts 는 모든 패턴(crescent·ring·spiral…)이 공유하므로 이 한 줄이 전부에 적용된다.
+    //  ⚠️1차에서 대응이 "비슷"했던 이유가 이것이다. 각도만 바꾸고 탄은 같았다.
+    //   homing 이 붙으면 옆으로 흘리는 회피가 안 통하고, needle 은 굵기·길이가 달라 읽는 법이 바뀐다.
+    const ph47 = this.phase;
+    const fanOpts = this._scaleDmg({ r: 7, dmgPct: B.fanDamagePct, dmgMin: B.fanDamageMin, color: st.color, shape: st.shape,
+      ...(ph47 && ph47.shot ? ph47.shot : null) });
+    //  §G-47 2차: 후반 탄 **수를 줄인다**(이사 실기 "과밀 가끔" · "보스전 길어짐").
+    //   탄이 많으면 피하느라 못 쏘고, 그래서 전투가 길어진다. 종류를 늘리는 대신 수를 줄여 상쇄한다.
+    //  ⚠️최소 3 발은 남긴다 — 0 이 되면 그 페이즈에 공격이 사라진다.
+    const phN = (n) => Math.max(3, Math.round(n * (ph47 ? ph47.countMult : 1)));
+    //  ⚠️일부 케이스가 `{ ...fanOpts, r: phR(6) }` 로 크기를 **덮어쓴다** — 페이즈가 지정한 크기가 지워진다.
+    //   (실측: 3페이즈 r11 을 지정했는데 화면엔 r6 로 나갔다.) 페이즈 값이 있으면 그걸 우선한다.
+    const phR = (d) => (ph47 && ph47.shot && ph47.shot.r != null ? ph47.shot.r : d);
     switch (P.kind) {
       case 'crescent': { // 리퍼 로드: 아래로 넓게 베어내리는 참격 볼리
         this.fanT = this.interval(B.fanInterval);
-        const n = P.volley + fb;
+        const n = phN(P.volley + fb);
         for (let i = 0; i < n; i++) {
           const a = ((i - (n - 1) / 2) * P.volleyDeg * Math.PI) / 180;
           world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r, Math.sin(a) * P.speed, Math.cos(a) * P.speed, fanOpts));
@@ -232,7 +252,7 @@ export class Boss {
         const arms = 1 + Math.floor(fb / 3);   // 변주판은 나선 팔 수 증가
         for (let k = 0; k < arms; k++) {
           const a = (Math.sin(this.t * P.sweepHz * Math.PI * 2) * P.sweepDeg * Math.PI) / 180 + (k / arms) * Math.PI * 2;
-          world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r * 0.5, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y + this.r * 0.5, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: phR(6) }));
         }
         break;
       }
@@ -250,10 +270,10 @@ export class Boss {
       }
       case 'ring': { // 보이드 세라프: 회전 위상이 도는 깃털 원형탄
         this.fanT = this.interval(B.fanInterval);
-        const n = P.count + fb;
+        const n = phN(P.count + fb);
         for (let i = 0; i < n; i++) {
           const a = (i / n) * Math.PI * 2 + this.t;
-          world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: phR(6) }));
         }
         break;
       }
@@ -263,7 +283,7 @@ export class Boss {
         const base = this.t * (P.spinHz || 0.5) * Math.PI * 2;
         for (let k = 0; k < arms; k++) {
           const a = base + (k / arms) * Math.PI * 2;
-          world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+          world.spawnEnemyBullet(new EnemyShot(this.x, this.y, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: phR(6) }));
         }
         break;
       }
@@ -273,7 +293,7 @@ export class Boss {
         for (let i = 0; i < n; i++) {
           const px = this.x + ((i - (n - 1) / 2) / Math.max(1, n - 1)) * P.spanW;
           const a = Math.sin(this.t * P.waveHz * Math.PI * 2 + i * P.phase) * P.amp;
-          world.spawnEnemyBullet(new EnemyShot(px, this.y + this.r * 0.4, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: 6 }));
+          world.spawnEnemyBullet(new EnemyShot(px, this.y + this.r * 0.4, Math.sin(a) * P.speed, Math.cos(a) * P.speed, { ...fanOpts, r: phR(6) }));
         }
         break;
       }
@@ -309,7 +329,7 @@ export class Boss {
         this.fanT = this.interval(P.interval);
         const px = world.logicalW / 2 + Math.sin(this.t * P.sweepHz * Math.PI * 2) * P.sweepW;
         for (let i = 0; i < P.stack + fb; i++) {
-          world.spawnEnemyBullet(new EnemyShot(px, this.y + this.r * 0.5 + i * 10, 0, P.speed, { ...fanOpts, r: 6 }));
+          world.spawnEnemyBullet(new EnemyShot(px, this.y + this.r * 0.5 + i * 10, 0, P.speed, { ...fanOpts, r: phR(6) }));
         }
         break;
       }
