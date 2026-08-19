@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>네온 함대 — 3인 관찰 테스트</title>
+<style>
+  :root{--bg:#0b1017;--card:#131c27;--line:#2a3a4d;--tx:#e6eef8;--dim:#8ea3bd;
+        --cy:#3ff5e0;--warn:#ff6b6b;--ok:#5ce08a;--gold:#ffd166}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-size:15px;line-height:1.5;
+       font-family:"Malgun Gothic","맑은 고딕",Pretendard,system-ui,sans-serif}
+  .wrap{max-width:820px;margin:0 auto;padding:16px 14px 92px}
+  h1{font-size:20px;margin:0 0 3px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:12px}
+  h2{font-size:15px;margin:22px 0 8px;padding:6px 10px;background:#1b2735;
+     border-left:3px solid var(--cy);border-radius:0 5px 5px 0}
+
+  .tabs{display:flex;gap:6px;margin:12px 0 4px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
+  .tabs button{flex:1;background:#0e1620;color:var(--dim);border:1px solid var(--line);
+    border-radius:7px;padding:9px 6px;font:inherit;font-size:13.5px;cursor:pointer}
+  .tabs button.on{background:var(--cy);color:#04121a;font-weight:700;border-color:var(--cy)}
+
+  .note{background:#10251c;border:1px solid #235c3f;border-radius:6px;padding:9px 11px;
+        font-size:13px;color:#bfe6cf;margin:0 0 10px}
+  .note.warn{background:#2a1416;border-color:#6b2b2f;color:#f3c9cc}
+  .note.gold{background:#2a2410;border-color:#6b5a2b;color:#f0e3bd}
+  .note b{color:#fff}
+
+  .chk{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+  .chk label{display:flex;gap:8px;align-items:flex-start;cursor:pointer;padding:4px 0}
+  .chk input{margin-top:4px;accent-color:var(--cy);flex:none}
+  .chk small{color:var(--dim);display:block;font-size:12.5px}
+
+  .q{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:11px 12px;margin-bottom:9px}
+  .q .t{font-weight:700;font-size:14.5px}
+  .q .h{color:var(--dim);font-size:12.5px;margin-top:2px}
+  .row{display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap}
+  .opts{display:flex;flex-wrap:wrap;gap:6px}
+  .opts label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;background:#0e1620;
+    border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-size:13.5px;user-select:none}
+  .opts label:hover{border-color:var(--cy)}
+  .opts input{accent-color:var(--cy);margin:0}
+  .opts input:checked+span{color:var(--cy);font-weight:700}
+  .sec{width:88px;background:#0e1620;color:var(--tx);border:1px solid var(--line);
+    border-radius:6px;padding:6px 8px;font:inherit;font-size:13.5px}
+  textarea{width:100%;margin-top:8px;background:#0e1620;color:var(--tx);border:1px solid var(--line);
+    border-radius:6px;padding:7px 9px;font:inherit;font-size:13.5px;resize:vertical;min-height:36px}
+
+  .say{background:#0e1620;border:1px dashed var(--line);border-radius:7px;padding:9px 11px;margin:6px 0;font-size:13.5px}
+  .say b{color:var(--gold)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  th{background:#1b2735}
+
+  .bar{position:fixed;left:0;right:0;bottom:0;background:#0e1620ee;backdrop-filter:blur(6px);
+    border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:8px;align-items:center}
+  .bar .prog{flex:1;font-size:13px;color:var(--dim)}
+  button.act{background:var(--cy);color:#04121a;border:0;border-radius:7px;padding:10px 15px;
+    font:inherit;font-weight:700;font-size:14px;cursor:pointer}
+  button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line);
+    border-radius:7px;padding:10px 13px;font:inherit;cursor:pointer}
+  .saved{color:var(--ok);font-size:12.5px}
+  @media print{.bar,.tabs{display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>3인 관찰 테스트</h1>
+  <div class="sub">관찰자용 한 장 — 사전 점검 · 진행 대본 · 기록이 전부 여기 있습니다. 자동 저장됩니다.</div>
+
+  <h2>준비 — 시작 전 반드시</h2>
+  <div class="note warn">
+    ⚠️<b>저장 기록이 있으면 인트로와 첫 안내가 안 뜹니다.</b> 그 두 가지가 이번 테스트의 핵심입니다.<br>
+    → <b>반드시 시크릿 창(Ctrl+Shift+N)</b>으로 여세요. 참가자마다 새 시크릿 창을 씁니다.
+  </div>
+  <div class="chk" id="pre"></div>
+
+  <h2>진행자 대본 — 이 말만 합니다</h2>
+  <div class="say">
+    "새로 만든 웹 게임인데, 처음 하시는 분이 어떻게 느끼는지 보려고 합니다.<br>
+    제가 옆에 있지만 <b>설명은 안 드립니다.</b> 편하게 해 보세요.<br>
+    하시면서 <b>생각나는 걸 소리 내서 말해 주시면</b> 큰 도움이 됩니다."
+  </div>
+  <table>
+    <tr><th style="width:42%">참가자가 물으면</th><th>이렇게만</th></tr>
+    <tr><td>"이거 어떻게 해요?"</td><td>"화면에 있는 대로 편하게 해 보세요."</td></tr>
+    <tr><td>"이거 누르면 되나요?"</td><td>"해 보셔도 됩니다."</td></tr>
+    <tr><td>"제가 잘못하고 있나요?"</td><td>"틀린 건 없습니다."</td></tr>
+    <tr><td>"이게 무슨 뜻이에요?"</td><td>"어떻게 보이세요?" (되묻고 답을 적는다)</td></tr>
+  </table>
+  <div class="note warn">
+    ⚠️<b>한 번이라도 설명하면 그 항목은 무효</b>입니다. 아래 8번 항목에 번호를 적어 두세요.<br>
+    ⚠️죽었다고 멈추지 않습니다 — <b>다시 누르는지</b>가 관찰 항목입니다.
+  </div>
+
+  <h2>참가자</h2>
+  <div class="tabs" id="tabs"></div>
+  <div class="q">
+    <div class="row">
+      <input class="sec" id="pname" placeholder="이름/별칭" style="width:150px">
+      <div class="opts" id="pexp"></div>
+    </div>
+  </div>
+
+  <div id="form"></div>
+
+  <h2>플레이 후 질문 — 순서대로</h2>
+  <div class="note">앞 질문이 뒤 질문의 답을 흘리지 않도록 짠 순서입니다. 순서를 바꾸지 마세요.</div>
+  <div id="post"></div>
+</div>
+
+<div class="bar">
+  <span class="prog" id="prog">…</span>
+  <span class="saved" id="saved"></span>
+  <button class="ghost" id="reset">이 참가자 지우기</button>
+  <button class="act" id="copy">3명 결과 복사</button>
+</div>
+
+<script>
+const URL_GAME = 'https://mlight00.github.io/neon-fleet/';
+
+const PRE = [
+  ['시크릿 창으로 게임 주소를 열어 두었다', URL_GAME + ' — 참가자마다 새 창'],
+  ['소리가 나오는지 확인했다', '효과음·BGM이 이 게임의 큰 부분입니다'],
+  ['마우스와 키보드가 둘 다 연결돼 있다', '조작이 두 가지라 둘 다 필요합니다'],
+  ['스톱워치를 준비했다', '"출격하기"를 누른 순간 시작'],
+  ['참가자가 이 게임을 본 적 없음을 확인했다', '개발 과정을 아는 사람은 제외'],
+];
+
+//  §기록 항목 — 인쇄본(docs/pilot/기록지.html)과 **같은 내용**이다. 한쪽만 고치지 말 것.
+const OBS = [
+  { t:'출격까지', h:'타이틀에서 "출격하기"를 누르기까지', sec:1, o:['바로','두리번거림','못 찾음'] },
+  { t:'무기 선택', h:'3개 중 고르기', sec:1, o:['설명 읽음','그냥 누름'] },
+  { t:'이동을 이해', h:'좌우로 움직인다', sec:1, o:['이해','헤맴'] },
+  { t:'자동 발사를 이해', h:'따로 안 쏴도 나간다는 걸 아는가', sec:1, o:['이해','계속 누름'] },
+  { t:'차지를 이해', h:'길게 눌러 강한 공격', sec:1, o:['스스로 발견','못 씀'] },
+  { t:'성장 게이트를 이해', h:'청록=성장 / 자홍=손실. 말로 설명할 수 있나', sec:1, o:['설명함','못 함','반대로 앎'] },
+  { t:'첫 성장 반응', h:'편대가 늘어난 순간 소리·표정 변화', sec:1, o:['소리냄','표정변화','무반응'] },
+  { t:'첫 피격 원인', h:'왜 맞았는지 아는가 — 모르면 그게 문제다', sec:1, o:['앎','모름','틀리게 앎'] },
+  { t:'3D 발견', h:'확대해서 함미 시점을 스스로 찾는가', sec:1, o:['스스로','우연히','못 찾음'] },
+  { t:'보스 페이즈를 느꼈나', h:'§G-47 — 체력이 줄면 공격이 바뀐다', sec:1, o:['느낌','모름','보스 못 만남'] },
+  { t:'죽은 뒤', h:'다시 누르는가', sec:1, o:['바로 다시','망설임','그만둠'] },
+  { t:'⚠️설명해 버린 항목', h:'있으면 번호. 그 항목은 이 참가자에 한해 무효', o:['없음','있음'] },
+];
+
+const POST = [
+  { t:'안 해 본 친구에게 한 문장으로 설명한다면?' },
+  { t:'가장 재미있던 순간은?', h:'"없다"도 그대로 적습니다 — 중요한 신호입니다' },
+  { t:'제일 답답하거나 헷갈린 순간은?' },
+  { t:'화면에서 끝까지 뭔지 몰랐던 것은?', h:'손으로 가리키게 하고, 무엇을 가리켰는지 적습니다' },
+  { t:'죽었을 때 왜 죽었는지 아셨나요?' },
+  { t:'한 번 더 하고 싶으신가요? 이유는?' },
+];
+
+const KEY = 'nf-pilot3';
+let cur = 0;
+const store = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } };
+const put = (d) => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} };
+
+// ── 사전 점검 (참가자 무관, 한 번만) ──
+document.getElementById('pre').innerHTML = PRE.map((p, i) =>
+  `<label><input type="checkbox" data-pre="${i}"><span>${p[0]}<small>${p[1]}</small></span></label>`).join('');
+
+// ── 탭 ──
+const tabs = document.getElementById('tabs');
+for (let i = 0; i < 3; i++) {
+  const b = document.createElement('button');
+  b.textContent = `${i + 1}번 참가자`; b.dataset.p = i;
+  b.addEventListener('click', () => { cur = i; render(); });
+  tabs.appendChild(b);
+}
+
+const EXP = ['슈팅 거의 안 함', '가끔', '자주'];
+document.getElementById('pexp').innerHTML = EXP.map((e) =>
+  `<label><input type="radio" name="pexp" value="${e}"><span>${e}</span></label>`).join('');
+
+// ── 관찰·질문 폼 ──
+document.getElementById('form').innerHTML = OBS.map((q, i) => `
+  <div class="q">
+    <div class="t">${i + 1}. ${q.t}</div>${q.h ? `<div class="h">${q.h}</div>` : ''}
+    <div class="row">
+      ${q.sec ? `<input class="sec" data-sec="${i}" placeholder="초/분">` : ''}
+      <div class="opts">${q.o.map((o) =>
+        `<label><input type="radio" name="o${i}" value="${o}"><span>${o}</span></label>`).join('')}</div>
+    </div>
+    <textarea data-memo="${i}" placeholder="본 대로 · 참가자가 한 말 그대로 (선택)"></textarea>
+  </div>`).join('');
+
+document.getElementById('post').innerHTML = POST.map((q, i) => `
+  <div class="q"><div class="t">${i + 1}. ${q.t}</div>${q.h ? `<div class="h">${q.h}</div>` : ''}
+  <textarea data-post="${i}" placeholder="답 그대로"></textarea></div>`).join('');
+
+// ── 저장·복원 ──
+function collect() {
+  const d = store();
+  d.pre = {}; document.querySelectorAll('[data-pre]').forEach((x) => { if (x.checked) d.pre[x.dataset.pre] = 1; });
+  d.p = d.p || [{}, {}, {}];
+  const P = { obs: {}, sec: {}, memo: {}, post: {} };
+  P.name = document.getElementById('pname').value.trim();
+  const ex = document.querySelector('input[name=pexp]:checked'); P.exp = ex ? ex.value : '';
+  document.querySelectorAll('input[name^=o]:checked').forEach((x) => P.obs[x.name.slice(1)] = x.value);
+  document.querySelectorAll('[data-sec]').forEach((x) => { if (x.value.trim()) P.sec[x.dataset.sec] = x.value.trim(); });
+  document.querySelectorAll('[data-memo]').forEach((x) => { if (x.value.trim()) P.memo[x.dataset.memo] = x.value.trim(); });
+  document.querySelectorAll('[data-post]').forEach((x) => { if (x.value.trim()) P.post[x.dataset.post] = x.value.trim(); });
+  d.p[cur] = P;
+  put(d);
+  const done = Object.keys(P.obs).length;
+  document.getElementById('prog').textContent = `${cur + 1}번 참가자 · ${done} / ${OBS.length}`;
+  const s = document.getElementById('saved'); s.textContent = '저장됨';
+  clearTimeout(collect._t); collect._t = setTimeout(() => s.textContent = '', 1100);
+}
+function render() {
+  const d = store(); const P = (d.p || [])[cur] || {};
+  [...tabs.children].forEach((b, i) => b.classList.toggle('on', i === cur));
+  document.querySelectorAll('[data-pre]').forEach((x) => x.checked = !!(d.pre || {})[x.dataset.pre]);
+  document.getElementById('pname').value = P.name || '';
+  document.querySelectorAll('input[name=pexp]').forEach((x) => x.checked = x.value === P.exp);
+  document.querySelectorAll('input[name^=o]').forEach((x) => x.checked = (P.obs || {})[x.name.slice(1)] === x.value);
+  document.querySelectorAll('[data-sec]').forEach((x) => x.value = (P.sec || {})[x.dataset.sec] || '');
+  document.querySelectorAll('[data-memo]').forEach((x) => x.value = (P.memo || {})[x.dataset.memo] || '');
+  document.querySelectorAll('[data-post]').forEach((x) => x.value = (P.post || {})[x.dataset.post] || '');
+  document.getElementById('prog').textContent = `${cur + 1}번 참가자 · ${Object.keys(P.obs || {}).length} / ${OBS.length}`;
+  window.scrollTo({ top: 0 });
+}
+document.addEventListener('change', collect);
+document.addEventListener('input', collect);
+render();
+
+document.getElementById('reset').addEventListener('click', () => {
+  if (!confirm(`${cur + 1}번 참가자의 기록만 지웁니다. 계속할까요?`)) return;
+  const d = store(); d.p = d.p || [{}, {}, {}]; d.p[cur] = {}; put(d); render();
+});
+
+//  ⚠️3명 전체를 한 번에 낸다 — 참가자별로 따로 주면 대조가 안 된다.
+document.getElementById('copy').addEventListener('click', async () => {
+  const d = store(); const L = ['# 3인 관찰 테스트 결과 — 네온 함대', ''];
+  (d.p || []).forEach((P, i) => {
+    if (!P || !P.obs || !Object.keys(P.obs).length) { L.push(`## ${i + 1}번 참가자 — (기록 없음)`, ''); return; }
+    L.push(`## ${i + 1}번 참가자${P.name ? ' · ' + P.name : ''}${P.exp ? ' · 슈팅 ' + P.exp : ''}`);
+    OBS.forEach((q, k) => {
+      const v = P.obs[k]; if (!v && !(P.memo || {})[k]) return;
+      const t = (P.sec || {})[k] ? ` [${P.sec[k]}]` : '';
+      L.push(`- ${q.t}${t}: ${v || '(미응답)'}${(P.memo || {})[k] ? ' — ' + P.memo[k] : ''}`);
+    });
+    const po = P.post || {};
+    if (Object.keys(po).length) { L.push('', '### 질문'); POST.forEach((q, k) => { if (po[k]) L.push(`- ${q.t} → ${po[k]}`); }); }
+    L.push('');
+  });
+  const text = L.join('\n');
+  try { await navigator.clipboard.writeText(text); alert('복사했습니다. 클로드에게 붙여넣어 주세요.'); }
+  catch (e) {
+    const w = window.open('', '_blank');
+    if (w) { w.document.write('<pre style="white-space:pre-wrap;font:14px monospace;padding:16px">'
+      + text.replace(/[<&]/g, (c) => c === '<' ? '&lt;' : '&amp;') + '</pre>'); w.document.close(); }
+    else alert('복사 실패 — 화면을 직접 선택해 복사해 주세요.');
+  }
+});
+</script>
+</body>
+</html>
