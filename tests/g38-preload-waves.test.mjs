@@ -46,12 +46,14 @@ test('G38-FIRST-WAVE-HAS-PICKUPS: 이번 제보 대상(C1·C5)이 1파에 있고
   assert.ok(first.includes('C1'), '크리스탈 픽업(C1)이 1파에 없다 — 시작 직후 폴백 오각형이 다시 보인다');
   assert.ok(first.includes('C5'), '보급 수송선(C5)이 1파에 없다');
   //  ② 기함 선체 — 출격 순간부터 화면에 있다.
-  assert.ok(first.includes('H2_BASE_FRAME'), '2D 기함 선체가 1파에 없다');
+  //  ⚠️§G-48 전에는 여기가 H2_BASE_FRAME(옛 T2 전용 선체)이었다. 그런데 플레이어는 **T0 로 출격**한다 —
+  //   정작 처음 보이는 배가 아니라 나중에나 쓸 그림을 1번으로 받고 있었다. 이제 T0 선체(A1)를 본다.
+  assert.ok(first.includes('A1'), '2D 기함 선체(T0)가 1파에 없다');
 
   //  ③ ⭐**앞순번**이어야 실효가 있다. 브라우저는 호스트당 6개만 동시에 받는다 —
   //   1파 안에서도 7번째 뒤로 밀리면 다시 큐에서 기다린다.
   const BROWSER_PARALLEL = 6;
-  for (const id of ['H2_BASE_FRAME', 'C1', 'C5']) {
+  for (const id of ['A1', 'C1', 'C5']) {
     const at = first.indexOf(id);
     assert.ok(at < BROWSER_PARALLEL,
       `${id} 가 1파의 ${at + 1}번째다 — 동시 연결 ${BROWSER_PARALLEL}개 안에 들어야 즉시 받는다`);

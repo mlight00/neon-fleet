@@ -19,9 +19,19 @@ test('AL-00: planform 단일 진실 — 모듈 상수 = fixture(원본 A1/A2.web
   assert.deepEqual(A1_HALF, outer(fx.a1.rows), 'A1 반폭 64행 = fixture 최외곽 유도값');
   assert.deepEqual(A2_HALF, outer(fx.a2.rows), 'A2 반폭 64행 = fixture 최외곽 유도값');
   assert.equal(A1_ASPECT, fx.a1.aspect); assert.equal(A2_ASPECT, fx.a2.aspect);
-  // 원본 정체성: 노즈 뾰족 → 델타/나셀 최대(행 ~53) → 종료 급감 → 쌍발 꼬리
-  assert.ok(a1Half(0.02) < 0.15 && a1Half(0.84) > 0.9 && a1Half(0.97) < 0.5, `A1 델타(${a1Half(0.02)}→${a1Half(0.84)}→${a1Half(0.97)})`);
-  assert.ok(a2Half(0.02) < 0.15 && a2Half(0.84) > 0.9 && a2Half(0.95) < 0.45, `A2 나셀(${a2Half(0.02)}→${a2Half(0.84)}→${a2Half(0.95)})`);
+  //  §G-48 원본 정체성: **기수 뾰족 → 중후반(0.5~0.7)에서 최대폭 → 꼬리 급격히 가늘어짐**.
+  //  ⚠️1차 작성 때는 "행 ~53 에서 최대"라고 위치를 못박았다. 그건 **옛 아트의 델타 날개** 이야기라
+  //   그림을 갈아 끼우자마자 깨졌다. 지켜야 할 것은 좌표가 아니라 **뾰족-불룩-가늘어짐 순서**다.
+  for (const [tag, f] of [['A1', a1Half], ['A2', a2Half]]) {
+    assert.ok(f(0.02) < 0.15, `${tag} 기수가 안 뾰족하다 (${f(0.02)})`);
+    //  최대폭이 중후반에 있는가 — 앞쪽이면 화살촉이 뒤집힌 모양이 된다
+    let peak = 0, peakAt = 0;
+    for (let i = 0; i <= 100; i++) { const v = f(i / 100); if (v > peak) { peak = v; peakAt = i / 100; } }
+    assert.ok(peakAt > 0.45 && peakAt < 0.75, `${tag} 최대폭 위치가 ${peakAt} — 중후반이 아니다`);
+    assert.ok(peak > 0.9, `${tag} 최대폭이 ${peak} — 정규화가 깨졌다`);
+    //  꼬리로 갈수록 가늘어지는가
+    assert.ok(f(0.95) < 0.5, `${tag} 꼬리가 안 가늘어진다 (${f(0.95)})`);
+  }
   for (let i = 0; i <= 100; i++) { assert.ok(Number.isFinite(a1Half(i / 100)) && Number.isFinite(a2Half(i / 100))); }
 });
 

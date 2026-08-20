@@ -1,0 +1,56 @@
+[
+  {
+    "tier": "T0_EMBER",
+    "file": "T0_EMBER.png",
+    "tight_file": "T0_EMBER_tight.png",
+    "object_size": [
+      176,
+      320
+    ]
+  },
+  {
+    "tier": "T1_FLARE",
+    "file": "T1_FLARE.png",
+    "tight_file": "T1_FLARE_tight.png",
+    "object_size": [
+      247,
+      430
+    ]
+  },
+  {
+    "tier": "T2_ARCLIGHT",
+    "file": "T2_ARCLIGHT.png",
+    "tight_file": "T2_ARCLIGHT_tight.png",
+    "object_size": [
+      254,
+      545
+    ]
+  },
+  {
+    "tier": "T3_AURORA",
+    "file": "T3_AURORA.png",
+    "tight_file": "T3_AURORA_tight.png",
+    "object_size": [
+      286,
+      665
+    ]
+  },
+  {
+    "tier": "T4_ZENITH",
+    "file": "T4_ZENITH.png",
+    "tight_file": "T4_ZENITH_tight.png",
+    "object_size": [
+      344,
+      790
+    ]
+  },
+  {
+    "tier": "T5_QUASAR",
+    "file": "T5_QUASAR.png",
+    "tight_file": "T5_QUASAR_tight.png",
+    "object_size": [
+      456,
+      920
+    ]
+  }
+]

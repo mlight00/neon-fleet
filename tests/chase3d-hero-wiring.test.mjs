@@ -253,7 +253,10 @@ test('HW-15: §G-12 기함 무기 실모델(이사 VARCO 5종) — 갑판 포탑
   const grab = (src, name) => {
     const i = src.indexOf(name);
     const s = src.indexOf('[', i), e = src.indexOf('];', s);
-    return JSON.parse(src.slice(s, e + 1).replace(/\s+/g, '').replace(/,\]/g, ']'));   // 트레일링 콤마 제거
+    return JSON.parse(src.slice(s, e + 1)
+      .replace(/\/\/[^\n]*/g, '')          // ⚠️줄 끝 주석 제거 — 등급 이름을 달면 JSON 이 깨진다
+      .replace(/\s+/g, '')
+      .replace(/,\]/g, ']'));               // 트레일링 콤마 제거
   };
   assert.deepEqual(grab(defs, 'export const MOUNT_POINTS'), grab(ships, 'const NORMALIZED_MOUNTS'), '2D·3D 장착점 표 동기');
   // renderer 배선: 무기 1종만 켜는 스왑 + 2D 와 같은 개수 규칙 + 기함 롤 공유

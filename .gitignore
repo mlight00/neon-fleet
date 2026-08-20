@@ -45,3 +45,6 @@ scratch_*.mjs
 docs/qa/chase3d-opus5-aurora/sprite_*.png
 docs/qa/chase3d-opus5-aurora/fin_*.png
 scripts/__pycache__/
+
+# §G-48: 납품 원화 zip 은 PNG 와 중복(4.2MB) — 마스터 PNG 만 보관한다
+assets/remodel-v2/fleet/*.zip

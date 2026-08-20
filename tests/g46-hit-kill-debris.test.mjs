@@ -229,16 +229,24 @@ test('색 선택에 필요한 키가 실제로 전달된다 — 피격·격파 �
   assert.ok(/_kind3d\.get\(e\)/.test(kbLine), '격파가 종류 키를 안 넘긴다: ' + kbLine.trim());
 });
 
-test('⚠️EMBER 분사구가 2개다 — 화면의 분사구 수와 맞아야 한다', async () => {
+test('⚠️분사구 배치가 아트와 어긋나지 않는다', async () => {
+  //  §G-48: 아트가 바뀌면 분사구 **개수**도 바뀐다(신규 아트는 T0~T3 이 1개, T4~T5 가 3개).
+  //   그래서 특정 개수를 못박지 않는다 — 1차 작성 때 "T0 은 2개" 로 고정했다가
+  //   아트 교체 하루 만에 깨졌다. 지켜야 할 것은 **개수가 아니라 아래 세 가지**다.
   const { NOZZLE_POINTS } = await import('../js/chase3d-prop-defs.js');
-  assert.equal(NOZZLE_POINTS[0].length, 2, 'EMBER(t0) 분사구가 2개가 아니다 — 실기 캡처는 2개다');
-  //  좌우 대칭이어야 한 쪽으로 쏠리지 않는다
-  const [a, b] = NOZZLE_POINTS[0];
-  assert.ok(Math.abs(a[0] + b[0]) < 1e-9, `t0 분사구가 좌우 대칭이 아니다 (${a[0]}, ${b[0]})`);
-  assert.ok(Math.abs(a[0]) > 0, 't0 분사구가 둘 다 중앙에 있다');
-  //  모든 등급이 최소 1개는 있어야 한다
   for (let t = 0; t < NOZZLE_POINTS.length; t++) {
-    assert.ok(NOZZLE_POINTS[t].length >= 1, `t${t} 분사구가 없다`);
+    const pts = NOZZLE_POINTS[t];
+    //  ① 최소 하나는 있어야 한다 — 없으면 그 등급만 추진 연출이 통째로 사라진다
+    assert.ok(pts.length >= 1, `t${t} 분사구가 없다`);
+    //  ② 좌우 대칭 — 비대칭이면 한쪽으로 쏠려 보인다
+    const xs = pts.map((p) => p[0]).sort((a, b) => a - b);
+    for (let k = 0; k < xs.length; k++) {
+      const mirror = -xs[xs.length - 1 - k];
+      assert.ok(Math.abs(xs[k] - mirror) < 0.004,
+        `t${t} 분사구가 좌우 대칭이 아니다: ${JSON.stringify(xs)}`);
+    }
+    //  ③ 함미(+y) 쪽에 있어야 한다 — 기수 쪽이면 앞으로 불을 뿜는다
+    for (const p of pts) assert.ok(p[1] > 0.15, `t${t} 분사구가 함미가 아니다 (y=${p[1]})`);
   }
 });
 

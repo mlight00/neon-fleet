@@ -49,18 +49,16 @@ test('G43-NOZZLE-MIRROR: 분사구 배치가 좌우 대칭이다', () => {
 
 test('G43-NOZZLE-MATCHES-2D: 좌표가 2D drawFlames 의 노즐과 같은 자리다', () => {
   //  ⭐2D 와 3D 가 **다른 자리**에서 불을 뿜으면 시점을 바꿀 때 어긋난다.
-  //   `ships.js` 원본 노즐을 등급 크기로 나눈 값과 일치해야 한다.
-  const src = readFileSync(new URL('../js/ships.js', import.meta.url), 'utf8');
-  const raw = src.match(/const SHIP_DEFS_RAW = \[([\s\S]*?)\n\];/);
-  assert.ok(raw, 'SHIP_DEFS_RAW 를 찾지 못했다 — 구조가 바뀌었으면 이 테스트부터 고쳐라');
-  const defs = [...raw[1].matchAll(/w: (\d+), h: (\d+)[\s\S]*?nozzles: \[(.*?)\],/g)];
-  assert.equal(defs.length, NOZZLE_POINTS.length, `등급 수가 맞아야 한다 — 원본 ${defs.length}`);
-  defs.forEach((d, t) => {
-    const w = +d[1], h = +d[2];
-    const nz = [...d[3].matchAll(/x: (-?[\d.]+), y: (-?[\d.]+), len: (-?[\d.]+)/g)];
+  //  ⚠️§G-48 전에는 이 검사가 `SHIP_DEFS_RAW` 를 정규식으로 읽었다. 그런데 게임이 실제로 그리는 노즐은
+  //   RAW 가 아니라 **NORMALIZED_ENGINES 에서 유도된 SHIP_DEFS[t].nozzles** 다 —
+  //   즉 아무도 안 보는 표를 지키느라, 3D 가 진짜 2D 와 어긋나도 통과하고 있었다. 이제 실물을 본다.
+  assert.equal(SHIP_DEFS.length, NOZZLE_POINTS.length, `등급 수가 맞아야 한다 — 원본 ${SHIP_DEFS.length}`);
+  SHIP_DEFS.forEach((d, t) => {
+    const w = d.visualWidth, h = d.visualSize;
+    const nz = d.nozzles;
     assert.equal(nz.length, NOZZLE_POINTS[t].length, `tier ${t}: 노즐 개수`);
     nz.forEach((n, i) => {
-      const want = [+n[1] / w, +n[2] / h, +n[3] / h];
+      const want = [n.x / w, n.y / h, n.len / h];
       const got = NOZZLE_POINTS[t][i];
       want.forEach((v, k) => assert.ok(Math.abs(v - got[k]) < 0.002,
         `tier ${t} 노즐 ${i} 성분 ${k}: 2D 환산 ${v.toFixed(3)} vs 표 ${got[k]}`));

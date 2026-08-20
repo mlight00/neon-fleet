@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>네온 함대 — 2D 기함 6등급</title>
+<style>
+  :root{--bg:#070b11;--card:#111a25;--line:#22303f;--tx:#e6eef8;--dim:#8ea3bd;--cy:#3ff5e0}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+       font-family:"Malgun Gothic","맑은 고딕",Pretendard,system-ui,sans-serif;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:16px 14px 40px}
+  h1{font-size:19px;margin:0 0 3px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:12px}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  label{color:var(--dim);font-size:13px;display:inline-flex;gap:6px;align-items:center}
+  input[type=range]{background:#0e1620;border:1px solid var(--line);border-radius:6px}
+  canvas{display:block;width:100%;background:#05080e;border:1px solid var(--line);border-radius:9px}
+  .note{background:#10251c;border:1px solid #235c3f;border-radius:6px;padding:9px 11px;
+        font-size:13px;color:#bfe6cf;margin:12px 0;line-height:1.6}
+  .note.warn{background:#2a1416;border-color:#6b2b2f;color:#f3c9cc}
+  b.cy{color:var(--cy)} b.gd{color:#ffcf5a}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>2D 기함 6등급 — 실제 게임 크기</h1>
+  <div class="sub">게임이 그리는 그림·크기·좌표를 그대로 씁니다. 바닥선을 맞춰 놓아 성장이 한눈에 보입니다.</div>
+
+  <div class="bar">
+    <label>확대 <input type="range" id="z" min="1" max="5" step="0.2" value="2.4"><span id="zv">2.4배</span></label>
+    <label><input type="checkbox" id="pts" checked> 분사구·장착점 표시</label>
+    <label><input type="checkbox" id="sil"> 실루엣만 보기</label>
+  </div>
+
+  <canvas id="c" width="1400" height="820"></canvas>
+
+  <div class="note">
+    <b class="cy">청록 점</b> = 분사구(제트가 나오는 자리) · <b class="gd">금색 점</b> = 무기 장착점.
+    두 점이 그림의 실제 위치와 어긋나면 게임에서 <b>없는 자리에서 불이 나거나 허공에 포탑이 붙습니다</b>.
+  </div>
+  <div class="note warn">
+    ⚠️<b>실루엣만 보기</b>를 켜고 판정하십시오. 색과 디테일을 지우면 여섯 척이 정말로 구분되는지,
+    그리고 <b>자라나는 순서로 읽히는지</b>가 드러납니다. 색이 있으면 다르게 보여도 실루엣은 같을 수 있습니다.
+  </div>
+</div>
+
+<script type="module">
+import { SHIP_DEFS, shipSprite } from '../js/ships.js';
+import { preloadSprites, RASTER_ART } from '../js/sprites.js';
+
+//  ⚠️`sprites.js` 의 그림 경로는 **문서 기준 상대 경로**('assets/...')다. 이 페이지는 /eval/ 안에 있어서
+//   그대로 두면 /eval/assets/... 를 찾다가 404 → SVG 벡터 폴백이 그려진다.
+//   1차에는 그걸 모르고 "새 아트가 이상하다"고 판단할 뻔했다 — 실제로는 아트가 아니라 **경로** 문제였다.
+//   게임 본체(index.html)는 최상단에 있어 영향이 없다. 여기서만 앞에 '../' 를 붙인다.
+for (const style of Object.keys(RASTER_ART)) {
+  for (const [id, path] of Object.entries(RASTER_ART[style])) {
+    if (typeof path === 'string' && !path.startsWith('/') && !path.startsWith('.')) {
+      RASTER_ART[style][id] = '../' + path;
+    }
+  }
+}
+
+const NAMES = ['T0 EMBER', 'T1 FLARE', 'T2 ARCLIGHT', 'T3 AURORA', 'T4 ZENITH', 'T5 QUASAR'];
+const c = document.getElementById('c');
+const g = c.getContext('2d');
+const $z = document.getElementById('z'), $zv = document.getElementById('zv');
+const $pts = document.getElementById('pts'), $sil = document.getElementById('sil');
+
+function draw() {
+  const S = +$z.value;
+  $zv.textContent = S.toFixed(1) + '배';
+  const defs = [0, 1, 2, 3, 4, 5].map((t) => SHIP_DEFS[t]);
+  const gap = 26, base = 60;
+  c.width = Math.round(defs.reduce((a, d) => a + d.visualWidth * S + gap, gap));
+  c.height = Math.round(defs[5].visualSize * S + base + 34);
+  const H = c.height, floor = H - base;
+
+  g.fillStyle = '#05080e'; g.fillRect(0, 0, c.width, H);
+  g.strokeStyle = '#1d2a38'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(0, floor + .5); g.lineTo(c.width, floor + .5); g.stroke();
+
+  let x = gap;
+  for (let t = 0; t < 6; t++) {
+    const d = defs[t], w = d.visualWidth * S, h = d.visualSize * S;
+    const sp = shipSprite(t, 'vulcan');
+    const cx = x + w / 2, cy = floor - h / 2;
+    if (sp) {
+      if ($sil.checked) {
+        //  실루엣 = 알파만 남긴 검은 형상. 색·디테일이 지워져야 형태가 보인다.
+        const off = document.createElement('canvas');
+        off.width = Math.max(1, Math.round(w)); off.height = Math.max(1, Math.round(h));
+        const og = off.getContext('2d');
+        og.drawImage(sp, 0, 0, off.width, off.height);
+        og.globalCompositeOperation = 'source-in';
+        og.fillStyle = '#dfe9f5'; og.fillRect(0, 0, off.width, off.height);
+        g.drawImage(off, x, floor - h);
+      } else {
+        g.drawImage(sp, x, floor - h, w, h);
+      }
+    } else {
+      g.strokeStyle = '#b33'; g.strokeRect(x, floor - h, w, h);
+      g.fillStyle = '#b33'; g.fillText('그림 없음', cx, cy);
+    }
+    if ($pts.checked) {
+      g.fillStyle = '#3ff5e0';
+      for (const n of d.nozzles) { g.beginPath(); g.arc(cx + n.x * S, cy + n.y * S, 3.2, 0, 7); g.fill(); }
+      g.fillStyle = '#ffcf5a';
+      for (const m of d.mounts) { g.beginPath(); g.arc(cx + m.x * S, cy + m.y * S, 3.2, 0, 7); g.fill(); }
+    }
+    g.textAlign = 'center';
+    g.fillStyle = '#e6eef8'; g.font = '13px "Malgun Gothic", sans-serif';
+    g.fillText(NAMES[t], cx, floor + 22);
+    g.fillStyle = '#8ea3bd'; g.font = '11.5px "Malgun Gothic", sans-serif';
+    g.fillText(d.visualWidth + '×' + d.visualSize + ' · 분사구 ' + d.nozzles.length, cx, floor + 39);
+    x += w + gap;
+  }
+}
+
+await preloadSprites(['A1', 'A2', 'A3', 'A4', 'A5', 'A6'], 'C');
+draw();
+for (const el of [$z, $pts, $sil]) el.addEventListener('input', draw);
+window.__redraw = draw;
+</script>
+</body>
+</html>

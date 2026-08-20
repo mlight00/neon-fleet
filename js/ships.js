@@ -144,25 +144,25 @@ const SHIP_DEFS_RAW = [
     name: 'scout', w: 34, h: 34, draw: drawScout,
     //  §G-46 3차(이사 실기 캡처): 함선 그림의 분사구는 **2개**인데 중앙 1개만 불을 뿜고 있었다.
     //   2D·3D 가 같은 표를 쓰므로(NOZZLE_POINTS 는 이 값을 w·h 로 나눈 것) 여기만 고치면 둘 다 맞는다.
-    nozzles: [{ x: -6, y: 12, len: 6 }, { x: 6, y: 12, len: 6 }],
+    nozzles: [{ x: 0, y: 9, len: 4 }],
     mounts: [{ x: 0, y: -12 }],
     clearR: 12,
   },
   {
     name: 'interceptor', w: 60, h: 60, draw: drawInterceptor,
-    nozzles: [{ x: -6, y: 21, len: 9 }, { x: 6, y: 21, len: 9 }],
+    nozzles: [{ x: 0, y: 20, len: 7 }],
     mounts: [{ x: -9, y: -12 }, { x: 9, y: -12 }],
     clearR: 24,
   },
   {
     name: 'striker', w: 78, h: 78, draw: drawStriker,
-    nozzles: [{ x: -12, y: 31, len: 10 }, { x: 12, y: 31, len: 10 }],
+    nozzles: [{ x: 0, y: 28, len: 10 }],
     mounts: [{ x: -20, y: -8 }, { x: -8, y: -23 }, { x: 8, y: -23 }, { x: 20, y: -8 }],
     clearR: 34,
   },
   {
     name: 'carrier', w: 104, h: 104, draw: drawCarrier,
-    nozzles: [{ x: -23, y: 44, len: 9 }, { x: -8, y: 44, len: 9 }, { x: 8, y: 44, len: 9 }, { x: 23, y: 44, len: 9 }],
+    nozzles: [{ x: 0, y: 40, len: 14 }],
     mounts: [{ x: -31, y: -5 }, { x: -16, y: -26 }, { x: 0, y: -36 }, { x: 16, y: -26 }, { x: 31, y: -5 }],
     clearR: 48,
     deckLights: [[-31, -10], [-31, 2], [-31, 14], [31, -10], [31, 2], [31, 14]],
@@ -170,14 +170,14 @@ const SHIP_DEFS_RAW = [
   {
     // T5 드레드노트 (페인티드 아트 전용 — 폴백은 커리어 확대)
     name: 'dreadnought', w: 132, h: 110, draw: drawCarrier,
-    nozzles: [{ x: -52, y: 46, len: 10 }, { x: -26, y: 50, len: 11 }, { x: 0, y: 52, len: 12 }, { x: 26, y: 50, len: 11 }, { x: 52, y: 46, len: 10 }],
+    nozzles: [{ x: -13, y: 45, len: 14 }, { x: 0, y: 45, len: 15 }, { x: 13, y: 45, len: 14 }],
     mounts: [{ x: -38, y: -38 }, { x: -14, y: -46 }, { x: 14, y: -46 }, { x: 38, y: -38 }, { x: -58, y: -6 }, { x: 58, y: -6 }],
     clearR: 58,
   },
   {
     // T6 타이탄 (최종 기함 — 쌍동체 + 중앙 대구경포)
     name: 'titan', w: 120, h: 172, draw: drawCarrier,
-    nozzles: [{ x: -30, y: 76, len: 12 }, { x: 0, y: 82, len: 14 }, { x: 30, y: 76, len: 12 }],
+    nozzles: [{ x: -13, y: 81, len: 23 }, { x: 0, y: 81, len: 26 }, { x: 13, y: 81, len: 23 }],
     mounts: [{ x: 0, y: -84 }, { x: -20, y: -70 }, { x: 20, y: -70 }, { x: -40, y: -34 }, { x: 40, y: -34 }, { x: -48, y: 6 }, { x: 48, y: 6 }, { x: 0, y: -34 }],
     clearR: 64,
   },
@@ -193,7 +193,13 @@ const SHIP_DEFS_RAW = [
 //  formationRadius    : 호위 대형 이격
 //  weaponMounts       : 포대 장착 좌표 / engineMounts : 엔진 위치
 export const SHIP_VISUAL_SIZE = [34, 50, 68, 88, 112, 140]; // 새 래스터 아트의 긴 변 기준
-const SHIP_ART_ASPECT = [257 / 512, 478 / 512, 533 / 768, 356 / 512, 249 / 512, 336 / 512];
+//  §G-48: 신규 기함 아트의 비율. **assets/art2-webp/styleC/A1~A6.webp 의 실제 크기**다.
+//  ⚠️여기가 진실이다 — SHIP_DEFS_RAW 의 w/h 는 절차 폴백용이라 아트와 무관하다.
+//  ⚠️처음엔 납품받은 `_tight.png` 크기를 그대로 썼는데, 그 파일은 흐린 발광까지 포함해 잘려 있어
+//   webp 로 구우면 알파가 0 이 되면서 **최대 20%가 빈 여백**이 됐다(A1 좌우 각 10%).
+//   그러면 배가 선언 크기보다 작게 그려지고 분사구·장착점 좌표도 전부 어긋난다.
+//   그래서 1024 원본에서 α>=8 경계로 **좌우 대칭을 유지한 채** 다시 잘라 구웠다.
+const SHIP_ART_ASPECT = [256 / 512, 278 / 512, 224 / 512, 203 / 512, 227 / 512, 254 / 512];
 const SHIP_HIT_CORE = [11, 12, 13, 14, 15, 16];      // 피격 핵: 시각 폭이 4.1배 커져도 1.45배만
 
 /**
@@ -207,22 +213,37 @@ export const DRONE_VISUAL_SIZE = 18;
 export const CRUISER_VISUAL_W = CRUISER_VISUAL_SIZE;
 export const DRONE_VISUAL_W = DRONE_VISUAL_SIZE;
 
+//  §G-48: 새 실루엣에서 **직접 잡았다**. 규칙은 세 가지다.
+//   ① 바깥쌍 = 앞쪽 절반에서 가장 넓은 행의 반폭 62% 지점(날개 위)
+//   ② 안쪽쌍 = 그보다 12% 앞, 반폭의 55%
+//   ③ 중앙 = 기수에서 10% 안쪽
+//  ⚠️각 점이 **불투명 화소 위에 있는지 검사**해서, 아니면 선체에 닿을 때까지 안쪽으로 당겼다.
+//   눈대중으로 넣었을 때 T5 의 중앙 장착점이 기수 **바깥 허공**에 떠 있었다 — 허공에 포탑이 붙는다.
+//  ⚠️최대폭 행을 그냥 쓰면 안 된다. T1·T4 는 가장 넓은 곳이 **함미**라, 포탑이 분사구 옆에 붙고
+//   G43-NOZZLE-NOT-MOUNTS(장착점은 −y) 가 잡아냈다. 그래서 앞쪽 절반으로 한정한다.
 const NORMALIZED_MOUNTS = [
-  [[0, -0.24]],
-  [[-0.22, -0.12], [0.22, -0.12]],
-  [[-0.28, -0.08], [0.28, -0.08], [0, -0.30]],
-  [[-0.3, -0.12], [0.3, -0.12], [-0.16, -0.3], [0.16, -0.3]],
-  [[-0.3, -0.08], [0.3, -0.08], [-0.16, -0.28], [0.16, -0.28], [0, -0.36]],
-  [[-0.32, -0.05], [0.32, -0.05], [-0.2, -0.24], [0.2, -0.24], [0, -0.38]],
+  [[0, -0.369]],                                                                      // T0 EMBER — 기수 1문
+  [[-0.277, -0.027], [0.277, -0.027]],                                                // T1 FLARE — 날개 1쌍
+  [[-0.302, -0.043], [0.302, -0.043], [0, -0.386]],                                   // T2 ARCLIGHT
+  [[-0.31, -0.049], [0.31, -0.049], [-0.253, -0.169], [0.253, -0.169]],               // T3 AURORA — 2쌍
+  [[-0.261, -0.033], [0.261, -0.033], [-0.181, -0.153], [0.181, -0.153], [0, -0.392]],  // T4 ZENITH
+  [[-0.29, -0.09], [0.29, -0.09], [-0.174, -0.21], [0.174, -0.21], [0, -0.371]],      // T5 QUASAR
 ];
 
+//  §G-48: 신규 아트에서 **직접 측정**했다.
+//   x = 선체보다 아래(배기만 있는 구간)의 열별 발광 합에서 봉우리를 잡고 좌우 대칭으로 보정.
+//   y = 중앙 하부 장갑이 끝나는 줄(= 분사구 목). 화염은 이 자리에서 아래로 뻗는다.
+//  ⚠️T0~T3 은 분사구가 **1개**다. 예전 표는 2개였는데 새 그림은 중앙 하나로 뿜는다 —
+//   개수를 안 맞추면 없는 자리에서 불이 난다.
+//  ⚠️청록 발광만 찾으면 **조종석 트림**에 걸린다. 반드시 함미 구간으로 한정할 것.
+//  ⚠️T3 만 쌍동체라 중앙 장갑 줄이 안 잡힌다 → 앞뒤(T2 0.279 / T4 0.291) 사이로 놓았다.
 const NORMALIZED_ENGINES = [
-  [[0, 0.36]],
-  [[-0.18, 0.36], [0.18, 0.36]],
-  [[-0.2, 0.38], [0.2, 0.38]],
-  [[-0.26, 0.38], [0.26, 0.38], [0, 0.42]],
-  [[-0.25, 0.39], [0.25, 0.39], [0, 0.43]],
-  [[-0.28, 0.39], [0.28, 0.39], [0, 0.44]],
+  [[0, 0.215]],                                                   // T0 EMBER — 중앙 1문
+  [[0, 0.248]],                                                   // T1 FLARE — 중앙 1문
+  [[0, 0.279]],                                                   // T2 ARCLIGHT — 중앙 1문
+  [[0, 0.285]],                                                   // T3 AURORA — 중앙 1문(쌍동체 사이)
+  [[-0.105, 0.291], [0, 0.291], [0.105, 0.291]],                  // T4 ZENITH — 3문
+  [[-0.113, 0.328], [0, 0.328], [0.113, 0.328]],                  // T5 QUASAR — 3문
 ];
 
 export const SHIP_DEFS = SHIP_DEFS_RAW.map((d, t) => {
@@ -295,8 +316,10 @@ function drawCapitalBase(ctx, d, tier) {
 
 /** 무기 그림이 합쳐지지 않은 중립 함체. 기함은 이 위에 지휘 프레임과 무기 장착물을 조립한다. */
 export function shipBaseSprite(tier) {
-  // H2는 프레임 정렬용 공통 캔버스를 사용해야 오버레이 원점이 정확히 일치한다.
-  const gem = tier === 2 ? (getSprite('H2_BASE_FRAME') || getSprite('A3')) : getSprite('A' + (tier + 1));
+  //  §G-48: 6등급을 A1~A6 로 통일했다. 예전엔 T2 만 H2_BASE_FRAME(533×768)을 썼는데,
+  //   그 특례를 남겨 두면 **새로 그린 T2 ARCLIGHT 가 화면에 영영 안 나온다**(A3 는 폴백이라 도달 불가).
+  //   오버레이 정렬이 이유였으나 그 오버레이(HULL_FRAME_OVERLAY)는 §G-9 에서 이미 꺼졌다.
+  const gem = getSprite('A' + (tier + 1));
   if (gem) return gem;
   if (!baseSpriteCache[tier]) {
     const d = SHIP_DEFS[tier];
@@ -306,7 +329,7 @@ export function shipBaseSprite(tier) {
 }
 
 export function shipSprite(tier, weapon) {
-  const gem = tier === 2 ? (getSprite('H2_BASE_FRAME') || getSprite('A3')) : getSprite('A' + (tier + 1));
+  const gem = getSprite('A' + (tier + 1));   // §G-48: T2 특례 제거(위 shipBaseSprite 주석 참조)
   if (gem) return gem;
   if (!spriteCache[tier]) {
     const d = SHIP_DEFS[tier];
