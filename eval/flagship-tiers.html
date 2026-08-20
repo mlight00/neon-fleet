@@ -75,7 +75,7 @@ const grid = document.getElementById('grid');
 const st = document.getElementById('status');
 TIERS.forEach(([n, d], i) => {
   const c = document.createElement('div'); c.className = 'cell';
-  c.innerHTML = `<canvas id="c${i}" width="300" height="480"></canvas>
+  c.innerHTML = `<canvas id="c${i}" width="360" height="297"></canvas>
     <div class="cap"><b>${n}</b><span>${d}</span></div>`;
   grid.appendChild(c);
 });
@@ -102,13 +102,26 @@ async function render() {
 
   say('3D 초기화 중… (모델 내려받는 중이면 몇 초 걸립니다)');
   w.__NF3D.init();
-  //  phase 3 = 승격 완료. 최대 20초 기다린다.
+  //  phase 3 = 렌더러 승격. 최대 20초.
   for (let i = 0; i < 40; i++) {
     if (w.__NF3D.phase().phase === 3) break;
     await new Promise((r) => setTimeout(r, 500));
   }
   const ph = w.__NF3D.phase();
   if (ph.phase !== 3) { say(`3D 를 띄우지 못했습니다 (phase ${ph.phase} · ${ph.reason || '이유 없음'})`); return; }
+
+  //  ⚠️렌더러가 준비된 것과 **기함 모델이 온 것은 다르다**. GLB 는 그 뒤 비동기로 온다(§G-34).
+  //   여기를 안 기다려서 1차에는 배경 행성만 찍혔다 — 실제로 겪은 오류다.
+  //   `flagTier` 는 그 등급 GLB 가 실제로 붙었을 때만 -1 이 아니게 된다.
+  say('기함 모델 기다리는 중…');
+  const rr = w.__NF3D.run();
+  rr.squad.tier = 0;
+  let got = false;
+  for (let i = 0; i < 60; i++) {
+    if (w.__NF3D.step(2, +document.getElementById('z').value).flagTier >= 0) { got = true; break; }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  if (!got) { say('기함 모델(GLB)이 30초 안에 오지 않았습니다. "다시 불러오기" 후 재시도해 주세요.'); return; }
 
   const zoom = +document.getElementById('z').value;
   const weapon = document.getElementById('w').value;
@@ -129,7 +142,9 @@ async function render() {
     const g = dst.getContext('2d');
     g.fillStyle = '#04070c'; g.fillRect(0, 0, dst.width, dst.height);
     //  기함은 화면 하단 중앙에 온다 — 그 부분만 잘라 확대
-    g.drawImage(src, 60, 280, 360, 500, 0, 0, dst.width, dst.height);
+    //  ⚠️실측(2026-08-18): 기함은 x 16~464 · y 484~799 에 그려진다. 자르기가 위로 치우쳐 있으면
+    //   배경 행성만 나온다. 아래 값은 그 실측에서 나온 것이다.
+    g.drawImage(src, 40, 470, 400, 330, 0, 0, dst.width, dst.height);
     say(`렌더 중… ${t + 1}/6`);
     await new Promise((r) => setTimeout(r, 16));
   }
