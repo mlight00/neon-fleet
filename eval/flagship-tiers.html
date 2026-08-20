@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>네온 함대 — 함미모드 기함 6등급</title>
+<style>
+  :root{--bg:#070b11;--card:#111a25;--line:#22303f;--tx:#e6eef8;--dim:#8ea3bd;--cy:#3ff5e0}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-size:15px;
+       font-family:"Malgun Gothic","맑은 고딕",Pretendard,system-ui,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:16px 14px 40px}
+  h1{font-size:19px;margin:0 0 3px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:12px}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  button{background:var(--cy);color:#04121a;border:0;border-radius:7px;padding:9px 15px;
+         font:inherit;font-weight:700;cursor:pointer}
+  button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line);font-weight:400}
+  label{color:var(--dim);font-size:13px;display:inline-flex;gap:6px;align-items:center}
+  select,input[type=range]{background:#0e1620;color:var(--tx);border:1px solid var(--line);
+    border-radius:6px;padding:5px 8px;font:inherit;font-size:13px}
+  #status{color:var(--dim);font-size:13px;margin-bottom:10px;min-height:19px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media(max-width:820px){.grid{grid-template-columns:repeat(2,1fr)}}
+  .cell{background:var(--card);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .cell canvas{display:block;width:100%;background:#04070c}
+  .cap{padding:7px 10px;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+  .cap b{color:var(--cy)}
+  .cap span{color:var(--dim);font-size:11.5px}
+  iframe{position:fixed;left:-3000px;top:0;width:480px;height:800px;border:0}
+  .note{background:#10251c;border:1px solid #235c3f;border-radius:6px;padding:9px 11px;
+        font-size:13px;color:#bfe6cf;margin:12px 0}
+  .note.warn{background:#2a1416;border-color:#6b2b2f;color:#f3c9cc}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>함미모드 기함 6등급</h1>
+  <div class="sub">플레이로 뒷단계까지 못 가도 여기서 전부 볼 수 있습니다. 실제 3D 렌더러를 그대로 씁니다.</div>
+
+  <div class="bar">
+    <button id="go">6등급 렌더</button>
+    <label>무기
+      <select id="w"><option value="vulcan">발칸</option><option value="laser">레이저</option><option value="homing">유도</option></select>
+    </label>
+    <label>확대 <input type="range" id="z" min="2" max="5" step="0.25" value="3"><span id="zv">3.0</span></label>
+    <label><input type="checkbox" id="chg"> 차지 중</label>
+    <button class="ghost" id="reload">다시 불러오기</button>
+  </div>
+  <div id="status">준비 — "6등급 렌더"를 누르세요.</div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="note">
+    등급은 <b>순양함을 흡수</b>하며 오릅니다(T0 EMBER → T5 QUASAR). 등급마다 선체 GLB·갑판 포탑·분사구 수가 다릅니다.
+  </div>
+  <div class="note warn">
+    ⚠️이 페이지는 <b>개발 확인용</b>입니다. 게임을 숨겨 놓고 프레임만 수동으로 돌려 그림을 가져옵니다 —
+    실제 플레이와 조명·배경이 같지만 <b>움직임은 없습니다</b>.
+  </div>
+</div>
+
+<iframe id="game" src="../index.html?chase3d=1"></iframe>
+
+<script>
+const TIERS = [
+  ['T0 EMBER', '드론 원화 · 분사구 2'],
+  ['T1 FLARE', '순양함 원화 · 분사구 2'],
+  ['T2 ARCLIGHT', '분사구 2'],
+  ['T3 AURORA', '분사구 4'],
+  ['T4 ZENITH', '분사구 5'],
+  ['T5 QUASAR', '분사구 3'],
+];
+const grid = document.getElementById('grid');
+const st = document.getElementById('status');
+TIERS.forEach(([n, d], i) => {
+  const c = document.createElement('div'); c.className = 'cell';
+  c.innerHTML = `<canvas id="c${i}" width="300" height="480"></canvas>
+    <div class="cap"><b>${n}</b><span>${d}</span></div>`;
+  grid.appendChild(c);
+});
+document.getElementById('z').addEventListener('input', (e) =>
+  document.getElementById('zv').textContent = (+e.target.value).toFixed(1));
+document.getElementById('reload').addEventListener('click', () =>
+  document.getElementById('game').src = '../index.html?chase3d=1&r=' + Date.now());
+
+const say = (t) => st.textContent = t;
+
+async function render() {
+  const f = document.getElementById('game');
+  const w = f.contentWindow;
+  if (!w || !w.__NF3D) { say('게임이 아직 안 떴습니다. 잠시 뒤 다시 누르거나 "다시 불러오기".'); return; }
+
+  //  ⚠️iframe 은 화면 밖이라 레이아웃이 0 이 될 수 있다. 캔버스 크기를 강제로 준다.
+  const D = w.document;
+  const stg = D.getElementById('stage'); if (stg) { stg.style.width = '480px'; stg.style.height = '800px'; }
+  for (const id of ['game', 'game3d', 'game-hud']) {
+    const c = D.getElementById(id);
+    if (c) { c.width = 480; c.height = 800; c.style.width = '480px'; c.style.height = '800px'; }
+  }
+  w.dispatchEvent(new Event('resize'));
+
+  say('3D 초기화 중… (모델 내려받는 중이면 몇 초 걸립니다)');
+  w.__NF3D.init();
+  //  phase 3 = 승격 완료. 최대 20초 기다린다.
+  for (let i = 0; i < 40; i++) {
+    if (w.__NF3D.phase().phase === 3) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  const ph = w.__NF3D.phase();
+  if (ph.phase !== 3) { say(`3D 를 띄우지 못했습니다 (phase ${ph.phase} · ${ph.reason || '이유 없음'})`); return; }
+
+  const zoom = +document.getElementById('z').value;
+  const weapon = document.getElementById('w').value;
+  const charging = document.getElementById('chg').checked;
+  const run = w.__NF3D.run();
+  const src = D.getElementById('game3d');
+
+  for (let t = 0; t <= 5; t++) {
+    run.squad.tier = t;
+    run.squad.weapon = weapon;
+    run.squad.weaponLv = 1 + t;
+    //  차지 연출은 누적 초(charge)로 켠다 — charging 플래그는 검사용 합성 run 의 필드다.
+    run.squad.charge = charging ? 1.4 : 0;
+    run.squad.chargeStage = charging ? 3 : 0;
+    w.__NF3D.setZoom(zoom);
+    w.__NF3D.step(12, zoom);
+    const dst = document.getElementById('c' + t);
+    const g = dst.getContext('2d');
+    g.fillStyle = '#04070c'; g.fillRect(0, 0, dst.width, dst.height);
+    //  기함은 화면 하단 중앙에 온다 — 그 부분만 잘라 확대
+    g.drawImage(src, 60, 280, 360, 500, 0, 0, dst.width, dst.height);
+    say(`렌더 중… ${t + 1}/6`);
+    await new Promise((r) => setTimeout(r, 16));
+  }
+  say(`완료 — 무기 ${weapon} · 확대 ${zoom.toFixed(1)}배${charging ? ' · 차지 중' : ''}`);
+}
+document.getElementById('go').addEventListener('click', () => render().catch((e) => say('오류: ' + e.message)));
+</script>
+</body>
+</html>
