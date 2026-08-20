@@ -33,7 +33,8 @@ export function shouldOfferConsent(config = ANALYTICS_CONFIG) {
 }
 
 // 개발/측정 진입 URL·런 플래그(작업지시서 §2.5, §16). 하나라도 걸리면 GA4 전송 0.
-const DEV_URL_PARAMS = ['coreLoopTest', 'coreLoopMeasure', 'campaign25', 'bosslab'];
+//  ⚠️§G-48: `fleetlab` 이 빠져 있었다 — 개발용 함대 프리뷰인데 **공개 런으로 집계**되고 있었다.
+const DEV_URL_PARAMS = ['coreLoopTest', 'coreLoopMeasure', 'campaign25', 'bosslab', 'fleetlab'];
 
 /** URL 쿼리가 개발/측정 진입인지. (문자열·URLSearchParams·location.search 모두 허용) */
 export function isDevUrl(search) {

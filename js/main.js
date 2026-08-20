@@ -72,6 +72,9 @@ const CORE_MEASURE = _clParams.has('coreLoopMeasure');  // 자동 측정 재생(
 const CAMPAIGN25 = _clParams.has('campaign25');         // Gate 2: 25분 6지역 시간 캠페인(측정·개발용 진입)
 const BOSSLAB = _clParams.has('bosslab');               // 보스 패턴 프리뷰: ?bosslab=1&boss=B14 (개발/테스트용)
 const FLEETLAB = _clParams.has('fleetlab') && !BOSSLAB; // 함대 프리뷰: ?fleetlab=1 — 드론·순양함을 갖춘 채 즉시 전투(§G-1 아군 3D 확인용, 개발/테스트 전용)
+//  §G-48: 개발/측정 진입 여부. 여기서만 기함 등급 전환 키([ ])가 산다.
+//  ⚠️일반 플레이에서는 이 값이 false 라 키가 아예 붙지 않는다 — 성장 규칙은 손대지 않았다.
+const DEV_ENTRY = CORE_LOOP || CORE_MEASURE || CAMPAIGN25 || BOSSLAB || FLEETLAB;
 // CrazyGames 포털 배포(?distribution=crazygames 또는 crazygames.com 호스트). Prolific·개발보다 우선(§3.2).
 const DIST = detectDistribution({ hostname: location.hostname, search: location.search });
 const PORTAL_MODE = isPortalMode(DIST);                 // 포털: 영어·빠른 시작·GA4/동의/Prolific UI 없음(§3)
@@ -631,7 +634,30 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '+' || e.key === '=') { applyZoom(+1); e.preventDefault(); }
   else if (e.key === '0') { applyZoom(0); e.preventDefault(); }
   else if (e.key === 'c' || e.key === 'C') { toggleChaseView(); e.preventDefault(); }   // §8.2: 100% ↔ 220% 함미 추적 토글
+  //  §G-48 개발 전용: [ ] 로 기함 등급을 즉시 오르내린다. 여섯 기함을 한 판에서 다 본다.
+  //  ⚠️`DEV_ENTRY` 가 아니면 아예 동작하지 않는다 — 일반 플레이의 성장 규칙은 그대로다.
+  else if (DEV_ENTRY && (e.key === '[' || e.key === ']')) { devStepTier(e.key === ']' ? +1 : -1); e.preventDefault(); }
 });
+
+/** 개발 진입에서만 부르는 기함 등급 즉시 변경. 정상 승급 경로(내구도 등급업)와 같은 뒤처리를 한다. */
+function devStepTier(dir) {
+  const sq = run && run.squad;
+  if (!sq) return;
+  const max = SHIP_DEFS.length - 1;
+  const next = Math.max(0, Math.min(max, (sq.tier || 0) + dir));
+  if (next === sq.tier) return;
+  sq.tier = next;
+  //  내구도는 등급마다 최대치가 다르다. 안 맞추면 T5 인데 T0 체력으로 다니게 된다.
+  //  ⚠️`survTierUp` 은 **누적 증가**라 그냥 부르면 오르내릴 때마다 최대치가 불어난다
+  //   (실측: 5↔4 를 아홉 번 오간 뒤 364 → 628). 그래서 새로 만들어 등급 수만큼 다시 올린다.
+  if (sq.surv) {
+    sq.surv = createSurvivability(BAL.gate1.survivability);
+    for (let k = 0; k < next; k++) survTierUp(sq.surv, BAL.gate1.survivability);
+    sq.surv.hull = sq.surv.hullMax;
+  }
+  if (sq._syncCruiserHp) sq._syncCruiserHp();
+  console.log('[devTier] 기함 ' + (BAL.evolution.names[next] || 'T' + next) + ' (' + next + '/' + max + ')');   // 화면 좌상단 HUD 에 등급 이름이 이미 뜬다
+}
 
 // ── Stage 1 분석 스택 ─────────────────────────────────────────
 // 개발/측정 진입(coreLoopTest·campaign25·bosslab 등)이면 GA4 전송 0(어댑터 dev 게이트). analyticsDebug면 로컬 디버그.
@@ -1280,7 +1306,11 @@ function startFleetLab() {
   //  초기화하므로 무기 지정보다 먼저 부른다(정상 경로와 같은 순서).
   sq.installGate1({ surv: createSurvivability(BAL.gate1.survivability), reson: createResonanceState(), mainWeapon: sq.weapon });
   r.world.reson = sq.reson;
-  sq.tier = 2; sq.count = 60; sq.cruisers = 2; sq.banked = 120;   // 관찰용: 드론 링이 기함 밖까지 + 순양함 2척
+  //  §G-48: `&tier=N` 으로 시작 등급 지정(기본 2). 여섯 기함을 눈으로 보려고 매번 처음부터
+  //   순양함을 모으는 것은 비현실적이라, 개발 진입에서만 바로 앉힌다.
+  const t0 = Number.parseInt(_clParams.get('tier') ?? '', 10);
+  sq.tier = Number.isFinite(t0) ? Math.max(0, Math.min(SHIP_DEFS.length - 1, t0)) : 2;
+  sq.count = 60; sq.cruisers = 2; sq.banked = 120;   // 관찰용: 드론 링이 기함 밖까지 + 순양함 2척
   const w = _clParams.get('weapon');   // &weapon=laser|homing 으로 무기 3D 관찰 대상 선택(기본 vulcan)
   sq.weapon = (w === 'laser' || w === 'homing') ? w : 'vulcan'; sq.weaponLv = 2;
   if (sq.reson) resonSetLoadout(sq.reson, [sq.weapon, null]);
