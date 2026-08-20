@@ -634,29 +634,78 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '+' || e.key === '=') { applyZoom(+1); e.preventDefault(); }
   else if (e.key === '0') { applyZoom(0); e.preventDefault(); }
   else if (e.key === 'c' || e.key === 'C') { toggleChaseView(); e.preventDefault(); }   // §8.2: 100% ↔ 220% 함미 추적 토글
-  //  §G-48 개발 전용: [ ] 로 기함 등급을 즉시 오르내린다. 여섯 기함을 한 판에서 다 본다.
-  //  ⚠️`DEV_ENTRY` 가 아니면 아예 동작하지 않는다 — 일반 플레이의 성장 규칙은 그대로다.
-  else if (DEV_ENTRY && (e.key === '[' || e.key === ']')) { devStepTier(e.key === ']' ? +1 : -1); e.preventDefault(); }
 });
 
-/** 개발 진입에서만 부르는 기함 등급 즉시 변경. 정상 승급 경로(내구도 등급업)와 같은 뒤처리를 한다. */
+//  §G-48 개발 전용: [ ] 로 기함 등급을 즉시 오르내린다. 여섯 기함을 한 판에서 다 본다.
+//  ⚠️**별도 리스너**여야 한다. 위 줌 핸들러 안에 두었더니 두 가지 이유로 안 먹었다(이사 제보):
+//   ① 그 핸들러는 `canWheelZoom()`(전투 중·일시정지 아님)을 먼저 통과해야 한다 — 카드 선택이나
+//     일시정지 중에 누르면 조용히 무시됐다.
+//   ② 한글 IME 가 켜져 있으면 크롬이 `e.key` 를 'Process' 로 준다. 그래서 **`e.code`**
+//     (BracketLeft/BracketRight)를 함께 본다 — 자판 배열·IME 와 무관한 물리 키 값이다.
+//  ⚠️`DEV_ENTRY` 가 아니면 리스너 자체를 달지 않는다 — 일반 플레이의 성장 규칙은 그대로다.
+if (DEV_ENTRY) {
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    const el = document.activeElement, tag = (el && el.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (el && el.isContentEditable)) return;
+    const down = e.code === 'BracketLeft' || e.key === '[';
+    const up = e.code === 'BracketRight' || e.key === ']';
+    if (!down && !up) return;
+    devStepTier(up ? +1 : -1);
+    e.preventDefault();
+  });
+}
+
+/** 개발 전용 등급 표시. HUD 는 전투 중에만 보이므로, 키를 눌렀는지 **눈으로** 확인할 수단이 따로 필요하다. */
+function devTierBanner(text) {
+  let el = document.getElementById('dev-tier-banner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'dev-tier-banner';
+    el.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:99999;'
+      + 'background:rgba(6,12,20,.92);color:#3ff5e0;border:1px solid #2c5f6b;border-radius:8px;'
+      + 'padding:7px 14px;font:600 14px/1.3 "Malgun Gothic","맑은 고딕",system-ui,sans-serif;'
+      + 'pointer-events:none;white-space:nowrap';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.style.opacity = '1';
+  clearTimeout(devTierBanner._t);
+  devTierBanner._t = setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .4s'; }, 1400);
+}
+
+/** 개발 진입 전용: 기함을 그 등급에 **앉힌다**(내구도 포함).
+ *  ⚠️시작 경로(`?tier=N`)와 키 경로(`[` `]`)가 **반드시 같은 함수**를 써야 한다.
+ *   처음엔 키 경로에만 내구도 보정을 넣었더니, `?fleetlab=1&tier=3` 으로 들어가면
+ *   등급은 T3 인데 내구도는 T0(100)인 상태로 시작했다(라이브 실측에서 잡혔다). */
+function devSetTier(sq, tier) {
+  if (!sq) return;
+  const max = SHIP_DEFS.length - 1;
+  const t = Math.max(0, Math.min(max, Number.isFinite(tier) ? tier : 0));
+  sq.tier = t;
+  //  내구도는 등급마다 최대치가 다르다. 안 맞추면 T5 인데 T0 체력으로 다니게 된다.
+  //  ⚠️`survTierUp` 은 **누적 증가**라 그냥 부르면 오르내릴 때마다 최대치가 불어난다
+  //   (실측: 5↔4 를 아홉 번 오간 뒤 364 → 628). 그래서 새로 만들어 등급 수만큼 다시 올린다.
+  if (sq.surv) {
+    sq.surv = createSurvivability(BAL.gate1.survivability);
+    for (let k = 0; k < t; k++) survTierUp(sq.surv, BAL.gate1.survivability);
+    sq.surv.hull = sq.surv.hullMax;
+  }
+  if (sq._syncCruiserHp) sq._syncCruiserHp();
+  return t;
+}
+
+/** 개발 진입에서만 부르는 기함 등급 한 칸 이동. */
 function devStepTier(dir) {
   const sq = run && run.squad;
   if (!sq) return;
   const max = SHIP_DEFS.length - 1;
   const next = Math.max(0, Math.min(max, (sq.tier || 0) + dir));
   if (next === sq.tier) return;
-  sq.tier = next;
-  //  내구도는 등급마다 최대치가 다르다. 안 맞추면 T5 인데 T0 체력으로 다니게 된다.
-  //  ⚠️`survTierUp` 은 **누적 증가**라 그냥 부르면 오르내릴 때마다 최대치가 불어난다
-  //   (실측: 5↔4 를 아홉 번 오간 뒤 364 → 628). 그래서 새로 만들어 등급 수만큼 다시 올린다.
-  if (sq.surv) {
-    sq.surv = createSurvivability(BAL.gate1.survivability);
-    for (let k = 0; k < next; k++) survTierUp(sq.surv, BAL.gate1.survivability);
-    sq.surv.hull = sq.surv.hullMax;
-  }
-  if (sq._syncCruiserHp) sq._syncCruiserHp();
-  console.log('[devTier] 기함 ' + (BAL.evolution.names[next] || 'T' + next) + ' (' + next + '/' + max + ')');   // 화면 좌상단 HUD 에 등급 이름이 이미 뜬다
+  devSetTier(sq, next);
+  const label = 'T' + next + ' ' + (BAL.evolution.names[next] || '') + ' · 내구도 ' + (sq.surv ? sq.surv.hullMax : '-');
+  console.log('[devTier] ' + label);
+  devTierBanner(label);
 }
 
 // ── Stage 1 분석 스택 ─────────────────────────────────────────
@@ -1309,7 +1358,7 @@ function startFleetLab() {
   //  §G-48: `&tier=N` 으로 시작 등급 지정(기본 2). 여섯 기함을 눈으로 보려고 매번 처음부터
   //   순양함을 모으는 것은 비현실적이라, 개발 진입에서만 바로 앉힌다.
   const t0 = Number.parseInt(_clParams.get('tier') ?? '', 10);
-  sq.tier = Number.isFinite(t0) ? Math.max(0, Math.min(SHIP_DEFS.length - 1, t0)) : 2;
+  devSetTier(sq, Number.isFinite(t0) ? t0 : 2);      // 등급 + 그 등급의 내구도를 함께 앉힌다
   sq.count = 60; sq.cruisers = 2; sq.banked = 120;   // 관찰용: 드론 링이 기함 밖까지 + 순양함 2척
   const w = _clParams.get('weapon');   // &weapon=laser|homing 으로 무기 3D 관찰 대상 선택(기본 vulcan)
   sq.weapon = (w === 'laser' || w === 'homing') ? w : 'vulcan'; sq.weaponLv = 2;
