@@ -43,6 +43,20 @@ test('GATE-PAIR: 쌍은 항상 두 연산이 다르고 값이 양수·진행도�
   assert.ok(late > early, '후반 게이트 값이 더 크다');
 });
 
+test('TRACK-DET: 같은 시드는 같은 트랙, 정렬·보스 보장', async () => {
+  const { buildTrack } = await import('../rush/track.js');
+  const a = buildTrack(42), b = buildTrack(42), c = buildTrack(43);
+  assert.deepEqual(a, b);
+  assert.notDeepEqual(a.events, c.events);
+  for (let i = 1; i < a.events.length; i++) assert.ok(a.events[i].z >= a.events[i - 1].z, 'z 정렬');
+  assert.equal(a.events[a.events.length - 1].type, 'boss');
+  assert.equal(a.length, 2600);
+  const gates = a.events.filter((e) => e.type === 'gatepair');
+  assert.ok(gates.length >= 6, '게이트쌍이 최소 6개: ' + gates.length);
+  const kinds = new Set(a.events.filter((e) => e.type === 'wave').map((e) => e.data.kind));
+  assert.ok(kinds.size >= 3, '적 종류가 3종 이상 섞인다');
+});
+
 test('BAL-SHAPE: 계획이 쓰는 키가 전부 있다', () => {
   for (const k of ['track', 'squad', 'tiers', 'gates', 'enemies', 'boss', 'coins', 'fx', 'upgrades']) {
     assert.ok(BAL[k], 'BAL.' + k + ' 누락');
