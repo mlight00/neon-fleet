@@ -58,8 +58,12 @@ def run(only=None):
     for name in NAMES:
         if only and name != only:
             continue
-        #  M-01.png / M01_clean.png 같은 변형 이름도 받아준다
+        #  M-01.png / M01_clean.png / e-01·b-01·bg-01 같은 변형 이름도 받아준다
         cands = [name, name.replace('M0', 'M-0'), name + '_clean']
+        import re
+        m = re.match(r'^([EB]|BG)(\d+)_?', name)
+        if m:
+            cands.append('%s-%02d' % (m.group(1).lower(), int(m.group(2))))
         src = next((os.path.join(SRC, c + '.png') for c in cands
                     if os.path.exists(os.path.join(SRC, c + '.png'))), None)
         if not src:

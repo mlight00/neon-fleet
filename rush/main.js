@@ -216,6 +216,12 @@ export function boot() {
   });
   addEventListener('keyup', (e) => { keys[e.code] = false; });
 
+  //  개발 콘솔 관찰용(게임 동작에 영향 없음)
+  if (typeof window !== 'undefined') {
+    window.__rushDbg = () => run && ({ state, z: Math.round(run.z), count: run.count, ei: run.ei,
+      enemies: run.combat.enemies.length, eshots: run.combat.eshots.length, boss: !!run.combat.boss });
+  }
+
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
