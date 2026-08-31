@@ -11,7 +11,7 @@ from PIL import Image
 
 SRC = r'E:\workspace\claude\neon-fleet\newmode\sprites'
 DST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'rush')
-NAMES = ['M01', 'M02', 'M03', 'M04', 'M05',
+NAMES = ['M01', 'M02', 'M03', 'M04', 'M05', 'SOLDIER',
          'E1_scrapbit', 'E2_ramhound', 'E3_wallguard', 'E4_needleeye',
          'E5_wheeler', 'E6_signaler', 'E7_cartyard', 'E8_manholejumper', 'E9_spawnpod', 'E10_magnethead',
          'B1_grader', 'B2_gantrywidow', 'B3_railleviathan', 'B4_smelter', 'B5_crownbreaker',
@@ -70,13 +70,23 @@ def run(only=None):
             print('  없음(건너뜀):', name)
             continue
         if name.startswith('BG'):
-            #  배경: 불투명 그대로, 폭 480 기준으로만 축소(투명화·잘라내기 없음)
+            #  배경: 불투명 그대로, 폭 480 축소 + 상단 48px 를 하단과 크로스블렌드(세로 무한 타일 이음새 제거)
             im = Image.open(src).convert('RGB')
             r = 480 / im.size[0]
             im = im.resize((480, max(1, int(im.size[1] * r))), Image.LANCZOS)
+            F = 48
+            w2, h2 = im.size
+            px2 = im.load()
+            for y in range(F):
+                a = y / F                              # 0=하단 복제, 1=원래 상단
+                for x in range(w2):
+                    tr, tg, tb = px2[x, y]
+                    br, bg_, bb = px2[x, h2 - F + y]
+                    px2[x, y] = (int(br * (1 - a) + tr * a), int(bg_ * (1 - a) + tg * a), int(bb * (1 - a) + tb * a))
+            im = im.crop((0, 0, w2, h2 - F))           # 겹친 만큼 잘라 완전 순환
             out = os.path.join(DST, name + '.png')
             im.save(out, optimize=True)
-            print('  반입(배경):', name, im.size, '->', out)
+            print('  반입(배경/이음새):', name, im.size, '->', out)
             continue
         im = strip_bg(Image.open(src))
         bb = im.split()[3].getbbox()

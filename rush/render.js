@@ -113,29 +113,37 @@ export function createRenderer(canvas, sprites) {
     }
   }
 
-  function unitHeight(count) { return count >= 150 ? 18 : count >= 75 ? 21 : 26; }
-
+  //  선두 1기 = 히어로(크게, 티어에 따라 진화) / 뒤따르는 병력 = 병사 스프라이트(작게)
   function drawSquad(squad) {
-    const h = unitHeight(squad.count);
+    const S = BAL.squad;
     const pts = formation(squad.count);
-    const key = 'm' + (squad.tier + 1);
-    for (let i = pts.length - 1; i >= 0; i--) {       // 뒷줄부터 그려 앞줄이 위에 오게
-      const px = squad.x + pts[i].x, py = BAL.squad.y + pts[i].y;
-      drawImgCentered(key, px, py, h, () => {
-        ctx.fillStyle = TIER_FALLBACK[squad.tier];
+    for (let i = pts.length - 1; i >= 1; i--) {       // 병사들 — 뒷줄부터 그려 앞줄이 위에 오게
+      const px = squad.x + pts[i].x, py = S.y + pts[i].y + 16;   // 히어로 뒤로 살짝 밀어 겹침 방지
+      drawImgCentered('soldier', px, py, S.soldierSize, () => {
+        ctx.fillStyle = '#DFE6F5';
         ctx.beginPath();
-        ctx.moveTo(px, py - h / 2);
-        ctx.lineTo(px - h / 3, py + h / 2);
-        ctx.lineTo(px + h / 3, py + h / 2);
+        ctx.moveTo(px, py - S.soldierSize / 2);
+        ctx.lineTo(px - S.soldierSize / 3, py + S.soldierSize / 2);
+        ctx.lineTo(px + S.soldierSize / 3, py + S.soldierSize / 2);
         ctx.closePath();
         ctx.fill();
       });
     }
-    if (squad.count > BAL.squad.drawCap) {            // 상한 초과분은 숫자 라벨이 담당
+    const hx = squad.x, hy = S.y;                     // 히어로(선두)
+    drawImgCentered('m' + (squad.tier + 1), hx, hy, S.heroSize, () => {
+      ctx.fillStyle = TIER_FALLBACK[squad.tier];
+      ctx.beginPath();
+      ctx.moveTo(hx, hy - S.heroSize / 2);
+      ctx.lineTo(hx - S.heroSize / 3, hy + S.heroSize / 2);
+      ctx.lineTo(hx + S.heroSize / 3, hy + S.heroSize / 2);
+      ctx.closePath();
+      ctx.fill();
+    });
+    if (squad.count > S.drawCap) {                    // 상한 초과분은 숫자 라벨이 담당
       ctx.font = 'bold 20px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = '#F3F1E8';
-      ctx.fillText('x' + squad.count, squad.x, BAL.squad.y - 26);
+      ctx.fillText('x' + squad.count, squad.x, S.y - 34);
     }
   }
 

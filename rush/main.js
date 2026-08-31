@@ -31,7 +31,7 @@ function newRun(save, mode) {
   return {
     mode, seedKey: seedInfo.key,
     track: buildTrack(seedInfo.seed), rnd: mulberry32((seedInfo.seed ^ 0x9E37) >>> 0),
-    z: 0, ei: 0, x: 240, count: eff.startCount, eff,
+    z: 0, ei: 0, x: 240, tx: 240, count: eff.startCount, eff,
     combat: createCombat(),
     watcher: recordWatcher(save.get().best), slowmo: slowmoCtl(), cont: continueToken(isDaily),
     recordFlash: 0, gold: false, dim: 0, invulnT: 0, curBossZone: -1,
@@ -227,9 +227,10 @@ export function boot() {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (state === 'run') {
-      if (pointer.down) run.x = clampX(pointer.x);
-      if (keys.ArrowLeft) run.x = clampX(run.x - BAL.squad.moveSpeed * dt);
-      if (keys.ArrowRight) run.x = clampX(run.x + BAL.squad.moveSpeed * dt);
+      if (pointer.down) run.tx = clampX(pointer.x);
+      if (keys.ArrowLeft) run.tx = clampX(run.tx - BAL.squad.moveSpeed * dt);
+      if (keys.ArrowRight) run.tx = clampX(run.tx + BAL.squad.moveSpeed * dt);
+      run.x += (run.tx - run.x) * Math.min(1, dt * BAL.squad.followRate);   // 부드러운 추종(뚝뚝 끊김 방지)
       advance(run, dt);
       if (run.over) {
         if (run.cont.canUse()) state = 'over';
