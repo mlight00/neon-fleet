@@ -2,7 +2,7 @@
 export const BAL = {
   //  판 = 5구간 × 900. 구간마다 신규 적 2종 합류(누적), 구간 끝(900의 배수)마다 전용 보스.
   track: { length: 4500, zoneLen: 900, zones: 5, scrollSpeed: 190, gateEvery: 300, firstGateZ: 240, waveEvery: 150 },
-  squad: { y: 640, moveSpeed: 420, followRate: 10, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
+  squad: { y: 640, moveSpeed: 420, followRate: 9, unitSpacingX: 22,   // followRate=기존 게임 followSpeed 와 동일값 unitSpacingY: 18, drawCap: 130, startCount: 1,
            heroSize: 46, soldierSize: 22,
            fireInterval: 0.5, bulletSpeed: 700, bulletDmg: 1, dmgPerTroop: 0.02, touchLossPerHit: 1 },
   tiers: [1, 25, 75, 150, 300],          // M1~M5 병력 임계

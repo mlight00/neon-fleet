@@ -205,7 +205,13 @@ export function boot() {
     pointer.x = x;
     onPress(x, y);
   });
-  canvas.addEventListener('pointermove', (e) => { if (pointer.down) pointer.x = toLogical(e)[0]; });
+  //  기존 네온함대 입력 방식(js/input.js): 마우스는 호버만으로 조향, 터치는 드래그 중에만
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse' || pointer.down) {
+      pointer.x = toLogical(e)[0];
+      if (state === 'run') run.tx = clampX(pointer.x);
+    }
+  });
   addEventListener('pointerup', () => { pointer.down = false; });
   addEventListener('keydown', (e) => {
     keys[e.code] = true;
