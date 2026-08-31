@@ -106,3 +106,12 @@ test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 보스까�
     assert.ok(count > 10, 'seed ' + seed + ' 성장 실패: ' + count);
   }
 });
+
+test('MAIN-HELPERS: 버튼 히트·게이트 좌우 판정 (DOM 없이 import 가능해야 한다)', async () => {
+  const { hitButton, gateHitSide } = await import('../rush/main.js');
+  const btns = [{ id: 'retry', x: 140, y: 600, w: 200, h: 56 }];
+  assert.equal(hitButton(btns, 240, 628), 'retry');
+  assert.equal(hitButton(btns, 60, 628), null);
+  assert.equal(gateHitSide(120), 'left');
+  assert.equal(gateHitSide(360), 'right');
+});
