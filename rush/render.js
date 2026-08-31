@@ -84,8 +84,14 @@ export function createRenderer(canvas, sprites) {
       ctx.globalAlpha = 0.88;
       const im = sprites.get('gate');
       if (im) {
-        const h = g.h + 26;
-        ctx.drawImage(im, b.x, y - h / 2, g.width, h);
+        //  그림 비율 유지(살짝 눌러 원근감), 왼쪽 게이트는 좌우 반전해 대칭 구도로
+        const h = Math.round(g.width * (im.height / im.width) * 0.72);
+        const mirror = b.x < W / 2;
+        ctx.save();
+        ctx.translate(b.x + g.width / 2, y);
+        if (mirror) ctx.scale(-1, 1);
+        ctx.drawImage(im, -g.width / 2, -h / 2, g.width, h);
+        ctx.restore();
       } else {
         ctx.fillStyle = 'rgba(16,22,31,0.72)';
         roundRect(b.x, y - g.h / 2, g.width, g.h, 12);
