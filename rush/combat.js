@@ -11,50 +11,71 @@ export function spawnWave(st, kind, n, rnd) {
     st.enemies.push({
       kind, hp: def.hp, r: def.r,
       x: 60 + rnd() * 360, y: -40 - rnd() * 120,
-      vx: (rnd() - 0.5) * 30, vy: def.speed,
+      vx: def.zigzag ? (rnd() < 0.5 ? -def.zigzag : def.zigzag) : (rnd() - 0.5) * 30,
+      vy: def.speed,
       shootT: def.shootEvery ? def.shootEvery * (0.5 + rnd() * 0.8) : undefined,
+      hopT: def.hopEvery ? def.hopEvery * (0.4 + rnd() * 0.8) : undefined,
+      hopDur: 0,
     });
   }
 }
 
-export function spawnBoss(st, troopCount) {
-  const B = BAL.boss;
-  st.boss = { hp: Math.round(B.baseHp + B.hpPerTroop * troopCount), max: 0, x: 240, y: -80, r: B.r,
-              dir: 1, shootT: B.shootEvery, touchT: 0 };
-  st.boss.max = st.boss.hp;
+export function spawnBoss(st, troopCount, zone) {
+  const B = BAL.boss, def = BAL.bosses[zone];
+  const hp = Math.round((B.baseHp + B.hpPerTroop * troopCount) * def.hpMult);
+  st.boss = { zone, hp, max: hp, x: 240, y: -80, r: def.r,
+              dir: 1, shootT: def.shootEvery, touchT: 0, spawnT: def.spawnEvery ?? 0 };
+}
+
+function shootFan(st, x, y, tx, ty, fan, speed) {
+  const base = Math.atan2(ty - y, tx - x);
+  for (let k = 0; k < fan; k++) {
+    const a = base + (k - (fan - 1) / 2) * 0.26;
+    st.eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed });
+  }
 }
 
 export function stepCombat(st, squad, dt, rnd) {
   const S = BAL.squad, lineY = S.y - 8;
+  const bulletDmg = S.bulletDmg + squad.count * S.dmgPerTroop;   // 병력 = 화력(탄 수는 완만, 탄 위력이 비례)
   let troopLoss = 0;
 
   //  아군 사격 — count 비례 발사(틱당 묶음). fireRateMult 0 이면 사격 없음(테스트용).
   if (squad.fireRateMult > 0) {
     st.fireT -= dt;
     const interval = S.fireInterval / (squad.fireRateMult * Math.max(1, Math.sqrt(squad.count)));
+    const spread = Math.min(280, 30 + 20 * Math.sqrt(squad.count));   // 전열 전체가 쏜다 — 대형 폭만큼 사선이 넓어진다
     while (st.fireT <= 0) {
       st.fireT += Math.max(0.02, interval);
-      st.bullets.push({ x: squad.x + (rnd() - 0.5) * 60, y: S.y - 20, vy: -S.bulletSpeed });
+      st.bullets.push({ x: squad.x + (rnd() - 0.5) * spread, y: S.y - 20, vy: -S.bulletSpeed });
     }
   }
   for (const b of st.bullets) b.y += b.vy * dt;
 
   //  적 이동·사격·접촉
   for (const e of st.enemies) {
+    const def = BAL.enemies[e.kind];
+    if (e.hopT !== undefined) {                       // 맨홀 점퍼: 주기적으로 옆 차선 도약
+      e.hopT -= dt;
+      if (e.hopT <= 0) {
+        e.hopT = def.hopEvery;
+        e.hopDur = 0.25;
+        e.hopVx = (rnd() < 0.5 ? -1 : 1) * def.hopSpeed;
+      }
+      if (e.hopDur > 0) { e.hopDur -= dt; e.x += e.hopVx * dt; }
+    }
     e.x += e.vx * dt; e.y += e.vy * dt;
-    if (e.x < 30 || e.x > 450) e.vx *= -1;
+    if (e.x < 30 || e.x > 450) { e.vx *= -1; e.x = Math.max(30, Math.min(450, e.x)); }
     if (e.shootT !== undefined) {
       e.shootT -= dt;
       if (e.shootT <= 0) {
-        e.shootT = BAL.enemies[e.kind].shootEvery;
-        const dx = squad.x - e.x, dy = lineY - e.y, len = Math.hypot(dx, dy) || 1;
-        const sp = BAL.enemies[e.kind].shotSpeed;
-        st.eshots.push({ x: e.x, y: e.y, vx: (dx / len) * sp, vy: (dy / len) * sp });
+        e.shootT = def.shootEvery;
+        shootFan(st, e.x, e.y, squad.x, lineY, def.fan ?? 1, def.shotSpeed);
       }
     }
     if (e.y >= lineY - e.r && Math.abs(e.x - squad.x) < 90) {
-      troopLoss += BAL.enemies[e.kind].touchLoss ?? S.touchLossPerHit;
-      e.hp = 0; e.touched = true;                          // 접촉 = 자폭 소모(기획 4-1)
+      troopLoss += def.touchLoss ?? S.touchLossPerHit;
+      e.hp = 0; e.touched = true;                     // 접촉 = 자폭 소모(기획 4-1)
     }
   }
 
@@ -64,24 +85,25 @@ export function stepCombat(st, squad, dt, rnd) {
     if (s.y >= lineY && Math.abs(s.x - squad.x) < 80) { troopLoss += 1; s.dead = true; }
   }
 
-  //  보스
+  //  보스 — 공통 골격: 좌우 이동 + 부채꼴 사격 + 접촉. 스멜터(spawnEvery)는 잡졸 소환.
   if (st.boss) {
-    const B = BAL.boss, bo = st.boss;
+    const bo = st.boss, def = BAL.bosses[bo.zone];
     if (bo.y < 140) bo.y += 60 * dt;
-    bo.x += bo.dir * B.speed * dt;
+    bo.x += bo.dir * def.speed * dt;
     if (bo.x < 90 || bo.x > 390) bo.dir *= -1;
     bo.shootT -= dt;
     if (bo.shootT <= 0) {
-      bo.shootT = B.shootEvery;
-      for (let k = 0; k < B.fan; k++) {
-        const a = Math.PI / 2 + (k - (B.fan - 1) / 2) * 0.28;   // 아래 부채꼴
-        st.eshots.push({ x: bo.x, y: bo.y + bo.r, vx: Math.cos(a) * B.shotSpeed, vy: Math.sin(a) * B.shotSpeed });
-      }
+      bo.shootT = def.shootEvery;
+      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, def.fan, def.shotSpeed);
+    }
+    if (def.spawnEvery) {
+      bo.spawnT -= dt;
+      if (bo.spawnT <= 0) { bo.spawnT = def.spawnEvery; spawnWave(st, 'scrapbit', 2, rnd); }
     }
     bo.touchT -= dt;
     if (bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < 110 && bo.touchT <= 0) {
-      bo.touchT = 1 / B.touchLossPerSec * 4;                   // 초당 손실 상한을 4틱으로 분할
-      troopLoss += Math.max(1, Math.round(B.touchLossPerSec / 4));
+      bo.touchT = 1 / BAL.boss.touchLossPerSec * 4;   // 초당 손실 상한을 4틱으로 분할
+      troopLoss += Math.max(1, Math.round(BAL.boss.touchLossPerSec / 4));
     }
   }
 
@@ -89,23 +111,43 @@ export function stepCombat(st, squad, dt, rnd) {
   for (const b of st.bullets) {
     if (b.dead) continue;
     if (st.boss && Math.hypot(b.x - st.boss.x, b.y - st.boss.y) < st.boss.r) {
-      st.boss.hp -= S.bulletDmg; b.dead = true; continue;
+      st.boss.hp -= bulletDmg; b.dead = true; continue;
     }
     for (const e of st.enemies) {
-      if (e.hp > 0 && Math.hypot(b.x - e.x, b.y - e.y) < e.r + 4) { e.hp -= S.bulletDmg; b.dead = true; break; }
+      if (e.hp > 0 && Math.hypot(b.x - e.x, b.y - e.y) < e.r + 4) { e.hp -= bulletDmg; b.dead = true; break; }
     }
   }
 
-  //  정리(격파 보상 포함 — 접촉 자폭은 보상 없음)
+  //  정리 — 격파 보상(접촉 자폭은 보상 없음)·스폰 포드 부화·마그넷헤드 도주 페널티
+  const born = [];
   st.enemies = st.enemies.filter((e) => {
+    const def = BAL.enemies[e.kind];
     if (e.hp <= 0) {
       st.kills++;
-      if (!e.touched) st.coins += BAL.enemies[e.kind].coin;
+      if (!e.touched) st.coins += def.coin;
+      if (def.spawns) born.push({ kind: def.spawns, n: def.spawnN, x: e.x, y: e.y });
       return false;
     }
-    return e.y < 830;
+    if (e.y >= 830) {
+      if (def.stealCoins) st.coins = Math.max(0, st.coins - def.stealCoins);   // 도둑이 달아났다
+      return false;
+    }
+    return true;
   });
-  if (st.boss && st.boss.hp <= 0) { st.coins += BAL.boss.coin; st.kills++; st.boss = null; }
+  for (const b of born) {
+    for (let i = 0; i < b.n; i++) {
+      st.enemies.push({
+        kind: b.kind, hp: BAL.enemies[b.kind].hp, r: BAL.enemies[b.kind].r,
+        x: Math.max(40, Math.min(440, b.x + (rnd() - 0.5) * 70)), y: b.y + (rnd() - 0.5) * 30,
+        vx: (rnd() - 0.5) * 40, vy: BAL.enemies[b.kind].speed,
+      });
+    }
+  }
+  if (st.boss && st.boss.hp <= 0) {
+    st.coins += BAL.bosses[st.boss.zone].coin;
+    st.kills++;
+    st.boss = null;
+  }
   st.bullets = st.bullets.filter((b) => !b.dead && b.y > -40);
   st.eshots = st.eshots.filter((s) => !s.dead && s.y < 830 && s.x > -40 && s.x < 520);
 

@@ -57,16 +57,38 @@ test('COMBAT-TOUCH: 적이 부대 줄에 닿으면 병력이 깎이고 적도 �
   assert.equal(st.enemies.length, 0, '자폭 소모');
 });
 
-test('COMBAT-BOSS: 보스 HP 는 병력 비례, 격파 시 코인 지급', () => {
+test('COMBAT-BOSS: 구간별 보스 HP 배율·격파 코인', () => {
   const rnd = mulberry32(3);
   const st = createCombat();
-  spawnBoss(st, 100);
-  assert.equal(st.boss.hp, Math.round(120 + 2.2 * 100));
+  spawnBoss(st, 100, 4);                              // 최종 보스(크라운 브레이커)
+  assert.equal(st.boss.hp, Math.round((120 + 2.2 * 100) * BAL.bosses[4].hpMult));
+  assert.equal(st.boss.zone, 4);
+  const st0 = createCombat();
+  spawnBoss(st0, 100, 0);                             // 구간1 보스는 훨씬 약하다
+  assert.ok(st0.boss.hp < st.boss.hp);
   st.boss.hp = 1;
   st.boss.x = 240; st.boss.y = 200;
   for (let i = 0; i < 240 && st.boss; i++) stepCombat(st, { x: 240, count: 50, fireRateMult: 1 }, 1 / 60, rnd);
   assert.equal(st.boss, null, '보스 격파');
-  assert.ok(st.coins >= 40);
+  assert.ok(st.coins >= BAL.bosses[4].coin);
+});
+
+test('COMBAT-NEW: 스폰 포드는 죽으며 잡졸을 낳고, 마그넷헤드는 도주 시 코인을 훔친다', () => {
+  const rnd = mulberry32(9);
+  const st = createCombat();
+  st.coins = 10;
+  spawnWave(st, 'spawnpod', 1, rnd);
+  st.enemies[0].x = 240; st.enemies[0].y = 300; st.enemies[0].hp = 0;   // 사살 처리
+  stepCombat(st, { x: 240, count: 10, fireRateMult: 0 }, 1 / 60, rnd);
+  const hatched = st.enemies.filter((e) => e.kind === 'scrapbit');
+  assert.equal(hatched.length, 3, '고치에서 스크랩비트 3');
+  const st2 = createCombat();
+  st2.coins = 10;
+  spawnWave(st2, 'magnethead', 1, rnd);
+  st2.enemies[0].x = 100; st2.enemies[0].y = 829; st2.enemies[0].vy = 500;  // 부대를 비켜 도주
+  stepCombat(st2, { x: 400, count: 10, fireRateMult: 0 }, 1 / 30, rnd);
+  assert.equal(st2.coins, 5, '코인 5 도난');
+  assert.equal(st2.enemies.length, 0);
 });
 
 test('COMBAT-ESHOT: 적탄이 부대에 닿으면 병력 1 손실', () => {
@@ -78,17 +100,17 @@ test('COMBAT-ESHOT: 적탄이 부대에 닿으면 병력 1 손실', () => {
   assert.equal(st.eshots.length, 0);
 });
 
-test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 보스까지 도달한다', () => {
+test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 5보스를 전부 깬다', () => {
   for (const seed of [1, 2, 3, 4, 5]) {
     const track = buildTrack(seed);
     let count = 10;                                   // 업그레이드 몇 개 한 상태 가정
     const rnd = mulberry32(seed * 7 + 1);
     const st = createCombat();
-    let z = 0, ei = 0, dead = false;
+    let z = 0, ei = 0, dead = false, bossKills = 0;
     const dt = 1 / 30;
     let guard = 0;
-    while (z < track.length && !dead && guard++ < 20000) {
-      z += 190 * dt;
+    while (!dead && guard++ < 40000 && !(z >= track.length && !st.boss && ei >= track.events.length)) {
+      if (!st.boss) z += 190 * dt;                    // 보스전 동안 제자리(main.advance 와 동일 규칙)
       while (ei < track.events.length && track.events[ei].z <= z) {
         const ev = track.events[ei++];
         if (ev.type === 'gatepair') {
@@ -96,13 +118,18 @@ test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 보스까�
           const better = applyGate(count, left) >= applyGate(count, right) ? left : right;
           count = applyGate(count, better);
         } else if (ev.type === 'wave') spawnWave(st, ev.data.kind, ev.data.n, rnd);
-        else spawnBoss(st, count);
+        else spawnBoss(st, count, ev.data.zone);
       }
-      const r = stepCombat(st, { x: 240, count, fireRateMult: 1 }, dt, rnd);
+      const hadBoss = !!st.boss;
+      //  플레이어는 보스를 조준하려고 그 밑으로 이동한다 — 봇도 동일하게
+      const x = st.boss ? Math.max(40, Math.min(440, st.boss.x)) : 240;
+      const r = stepCombat(st, { x, count, fireRateMult: 1 }, dt, rnd);
+      if (hadBoss && !st.boss) bossKills++;
       count -= r.troopLoss;
       if (count <= 0) dead = true;
     }
-    assert.ok(!dead, 'seed ' + seed + ' 에서 보스 전에 전멸 (병력 ' + count + ')');
+    assert.ok(!dead, 'seed ' + seed + ' 전멸 (보스 ' + bossKills + '킬, 병력 ' + count + ')');
+    assert.equal(bossKills, 5, 'seed ' + seed + ' 보스 ' + bossKills + '/5');
     assert.ok(count > 10, 'seed ' + seed + ' 성장 실패: ' + count);
   }
 });

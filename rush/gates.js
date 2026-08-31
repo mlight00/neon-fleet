@@ -29,10 +29,12 @@ function makeGate(rnd, t, good) {
     : { op: 'div', value: g.divVals[(rnd() * g.divVals.length) | 0] };
 }
 
-/** 쌍 패턴: 좋+나쁨 55% / 좋+좋 25% / 나쁨+나쁨 20% — 라스트워식 "덜 나쁜 쪽 고르기" 포함. */
-export function makeGatePair(rnd, t) {
+/** 쌍 패턴: 좋+나쁨 55% / 좋+좋 25% / 나쁨+나쁨 20% — 라스트워식 "덜 나쁜 쪽 고르기" 포함.
+ *  guaranteeGood: 나쁨+나쁨 금지(보스 직전 게이트 — 함정으로 억울하게 죽지 않게). */
+export function makeGatePair(rnd, t, guaranteeGood = false) {
   const roll = rnd();
-  const kinds = roll < 0.55 ? [true, false] : roll < 0.8 ? [true, true] : [false, false];
+  let kinds = roll < 0.55 ? [true, false] : roll < 0.8 ? [true, true] : [false, false];
+  if (guaranteeGood && !kinds[0] && !kinds[1]) kinds = [true, false];
   if (rnd() < 0.5) kinds.reverse();
   let left = makeGate(rnd, t, kinds[0]);
   let right = makeGate(rnd, t, kinds[1]);

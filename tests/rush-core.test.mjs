@@ -43,18 +43,26 @@ test('GATE-PAIR: 쌍은 항상 두 연산이 다르고 값이 양수·진행도�
   assert.ok(late > early, '후반 게이트 값이 더 크다');
 });
 
-test('TRACK-DET: 같은 시드는 같은 트랙, 정렬·보스 보장', async () => {
-  const { buildTrack } = await import('../rush/track.js');
+test('TRACK-DET: 같은 시드는 같은 트랙, 5구간·보스 5·구간별 적 합류', async () => {
+  const { buildTrack, zonePool } = await import('../rush/track.js');
   const a = buildTrack(42), b = buildTrack(42), c = buildTrack(43);
   assert.deepEqual(a, b);
   assert.notDeepEqual(a.events, c.events);
   for (let i = 1; i < a.events.length; i++) assert.ok(a.events[i].z >= a.events[i - 1].z, 'z 정렬');
-  assert.equal(a.events[a.events.length - 1].type, 'boss');
-  assert.equal(a.length, 2600);
+  assert.equal(a.length, 4500);
+  const bosses = a.events.filter((e) => e.type === 'boss');
+  assert.equal(bosses.length, 5, '구간 보스 5개');
+  assert.deepEqual(bosses.map((e) => e.data.zone), [0, 1, 2, 3, 4]);
+  assert.equal(a.events[a.events.length - 1].type, 'boss', '마지막 이벤트 = 최종 보스');
   const gates = a.events.filter((e) => e.type === 'gatepair');
   assert.ok(gates.length >= 6, '게이트쌍이 최소 6개: ' + gates.length);
   const kinds = new Set(a.events.filter((e) => e.type === 'wave').map((e) => e.data.kind));
-  assert.ok(kinds.size >= 3, '적 종류가 3종 이상 섞인다');
+  assert.ok(kinds.size >= 6, '적 종류가 다양하게 섞인다: ' + kinds.size);
+  //  구간1 웨이브에는 구간1 적만 나온다
+  const z1kinds = new Set(a.events.filter((e) => e.type === 'wave' && e.z < 900).map((e) => e.data.kind));
+  for (const k of z1kinds) assert.ok(['scrapbit', 'wheeler'].includes(k), '구간1 침범: ' + k);
+  assert.deepEqual([...new Set(zonePool(0))], ['scrapbit', 'wheeler']);
+  assert.equal(zonePool(4).length > zonePool(1).length, true, '풀이 누적 확장');
 });
 
 test('BAL-SHAPE: 계획이 쓰는 키가 전부 있다', () => {

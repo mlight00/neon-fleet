@@ -34,29 +34,36 @@ function newRun(save, mode) {
     z: 0, ei: 0, x: 240, count: eff.startCount, eff,
     combat: createCombat(),
     watcher: recordWatcher(save.get().best), slowmo: slowmoCtl(), cont: continueToken(isDaily),
-    recordFlash: 0, gold: false, dim: 0, invulnT: 0, bossSeen: false,
+    recordFlash: 0, gold: false, dim: 0, invulnT: 0, curBossZone: -1,
     peak: eff.startCount, over: false, won: false,
     firstX2: !isDaily && isFirstRunToday(save.get(), todayKey()),
   };
 }
 
+export function nextBossZ(run) {
+  for (let i = run.ei; i < run.track.events.length; i++) {
+    if (run.track.events[i].type === 'boss') return run.track.events[i].z;
+  }
+  return run.combat.boss ? run.z : Infinity;          // 싸우는 중이면 0m 로 표시
+}
+
 function advance(run, dt0) {
   const scale = run.slowmo.update(run.count, dt0);
   const dt = dt0 * scale;
-  //  보스 앞 정적(A-3): 보스 이벤트 1.5초 거리 앞에서 화면이 어두워진다
+  //  보스 앞 정적(A-3): 다음 보스 이벤트 1.5초 앞에서 화면이 어두워진다 — 구간마다 반복
   const next = run.track.events[run.ei];
-  if (next && next.type === 'boss' && !run.bossSeen) {
+  if (next && next.type === 'boss') {
     const eta = (next.z - run.z) / BAL.track.scrollSpeed;
     run.dim = eta < BAL.fx.bossHushSec ? Math.min(0.35, run.dim + dt0) : 0;
   }
-  if (!run.bossSeen || run.combat.boss || run.won) run.z += BAL.track.scrollSpeed * dt;
+  if (!run.combat.boss) run.z += BAL.track.scrollSpeed * dt;   // 보스전 동안은 제자리 전투
   while (run.ei < run.track.events.length && run.track.events[run.ei].z <= run.z) {
     const ev = run.track.events[run.ei++];
     if (ev.type === 'gatepair') {
       const gate = gateHitSide(run.x) === 'left' ? ev.data.left : ev.data.right;
       run.count = applyGate(run.count, gate);
     } else if (ev.type === 'wave') spawnWave(run.combat, ev.data.kind, ev.data.n, run.rnd);
-    else { spawnBoss(run.combat, run.count); run.bossSeen = true; run.dim = 0; }
+    else { spawnBoss(run.combat, run.count, ev.data.zone); run.curBossZone = ev.data.zone; run.dim = 0; }
   }
   const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult }, dt, run.rnd);
   if (run.invulnT > 0) run.invulnT -= dt0; else run.count -= r.troopLoss;
@@ -64,7 +71,10 @@ function advance(run, dt0) {
   if (run.watcher.update(run.count) === 'break') { run.recordFlash = 1.2; run.gold = true; }
   run.recordFlash = Math.max(0, run.recordFlash - dt0);
   if (run.count <= 0) run.over = true;
-  else if (run.bossSeen && !run.combat.boss) run.won = true;
+  else if (run.curBossZone >= 0 && !run.combat.boss) {         // 이번 구간 보스 격파
+    if (run.curBossZone >= BAL.track.zones - 1) run.won = true;
+    run.curBossZone = -1;
+  }
   return scale;
 }
 
@@ -121,10 +131,11 @@ export function boot() {
       v.boss = run.combat.boss;
       v.squad = { x: run.x, count: run.count, tier: tierFor(run.count) };
       v.dim = run.dim;
-      const bossZ = run.track.length;
+      v.zone = Math.min(BAL.track.zones - 1, Math.floor(run.z / BAL.track.zoneLen));
+      const bz = nextBossZ(run);
       v.hud = {
-        count: run.count, gold: run.gold, progress: Math.min(1, run.z / bossZ),
-        bossDist: run.bossSeen ? 0 : Math.max(0, Math.round((bossZ - run.z) / 10)),
+        count: run.count, gold: run.gold, progress: Math.min(1, run.z / run.track.length),
+        bossDist: (run.combat.boss || bz === Infinity) ? 0 : Math.max(0, Math.round((bz - run.z) / 10)),
         firstRunX2: run.firstX2, recordFlash: run.recordFlash,
       };
       if (state === 'over') {

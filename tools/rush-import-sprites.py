@@ -12,7 +12,10 @@ from PIL import Image
 SRC = r'E:\workspace\claude\neon-fleet\newmode\sprites'
 DST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'rush')
 NAMES = ['M01', 'M02', 'M03', 'M04', 'M05',
-         'E1_scrapbit', 'E2_ramhound', 'E3_wallguard', 'E4_needleeye', 'E5_crownbreaker', 'GATE']
+         'E1_scrapbit', 'E2_ramhound', 'E3_wallguard', 'E4_needleeye',
+         'E5_wheeler', 'E6_signaler', 'E7_cartyard', 'E8_manholejumper', 'E9_spawnpod', 'E10_magnethead',
+         'B1_grader', 'B2_gantrywidow', 'B3_railleviathan', 'B4_smelter', 'B5_crownbreaker',
+         'GATE', 'BG1', 'BG2', 'BG3', 'BG4', 'BG5']
 
 
 def is_bg(p):
@@ -61,6 +64,15 @@ def run(only=None):
                     if os.path.exists(os.path.join(SRC, c + '.png'))), None)
         if not src:
             print('  없음(건너뜀):', name)
+            continue
+        if name.startswith('BG'):
+            #  배경: 불투명 그대로, 폭 480 기준으로만 축소(투명화·잘라내기 없음)
+            im = Image.open(src).convert('RGB')
+            r = 480 / im.size[0]
+            im = im.resize((480, max(1, int(im.size[1] * r))), Image.LANCZOS)
+            out = os.path.join(DST, name + '.png')
+            im.save(out, optimize=True)
+            print('  반입(배경):', name, im.size, '->', out)
             continue
         im = strip_bg(Image.open(src))
         bb = im.split()[3].getbbox()
