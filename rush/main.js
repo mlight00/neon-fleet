@@ -36,7 +36,7 @@ function newRun(save, mode) {
     combat: createCombat(),
     watcher: recordWatcher(save.get().best), slowmo: slowmoCtl(), cont: continueToken(isDaily),
     recordFlash: 0, gold: false, dim: 0, invulnT: 0, curBossZone: -1,
-    parts: [], floaters: [], shakeT: 0, hurtT: 0, burstSeed: 0, sfxQueue: [],
+    parts: [], floaters: [], shakeT: 0, hurtT: 0, fireFlash: 0, burstSeed: 0, sfxQueue: [],
     peak: eff.startCount, over: false, won: false,
     firstX2: !isDaily && isFirstRunToday(save.get(), todayKey()),
   };
@@ -102,13 +102,14 @@ function advance(run, dt0) {
       run.hurtT = BAL.fx.hurtFlashDur;
       run.floaters.push({ x: run.x, y: BAL.squad.y - 40, text: '−' + ev.n, color: '#FF4A4A', t: 0 });
       run.sfxQueue.push('hurt');
-    } else if (ev.type === 'fire') run.sfxQueue.push('fire');
+    } else if (ev.type === 'fire') { run.sfxQueue.push('fire'); run.fireFlash = 0.09; }
   }
   if (run.invulnT > 0) run.invulnT -= dt0; else run.count -= r.troopLoss;
   if (tierFor(run.count) > prevTier) run.sfxQueue.push('evolve');
   //  연출 상태 갱신
   run.shakeT = Math.max(0, run.shakeT - dt0);
   run.hurtT = Math.max(0, run.hurtT - dt0);
+  run.fireFlash = Math.max(0, run.fireFlash - dt0);
   for (const p of run.parts) { p.t += dt0; p.x += p.vx * dt0; p.y += p.vy * dt0; }
   run.parts = run.parts.filter((p) => p.t < p.life);
   for (const f of run.floaters) { f.t += dt0; f.y -= 44 * dt0; }
@@ -185,7 +186,8 @@ export function boot() {
       v.eshots = run.combat.eshots;
       v.boss = run.combat.boss;
       const disp = Math.round(run.dispCount);
-      v.squad = { x: run.x, count: disp, tier: tierFor(run.count), radius: squadRadius(run.count), hurt: run.hurtT > 0 };
+      v.squad = { x: run.x, count: disp, tier: tierFor(run.count), radius: squadRadius(run.count), hurt: run.hurtT > 0,
+                  fireFlash: run.fireFlash, muzzles: BAL.squad.muzzles[tierFor(run.count)] ?? 1 };
       v.dim = run.dim;
       v.parts = run.parts;
       v.floaters = run.floaters;

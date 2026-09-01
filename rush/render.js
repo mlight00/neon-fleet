@@ -122,12 +122,17 @@ export function createRenderer(canvas, sprites) {
   }
 
   //  선두 1기 = 히어로(크게, 티어에 따라 진화) / 뒤따르는 병력 = 병사 스프라이트(작게)
-  function drawSquad(squad) {
+  //  걷기 애니메이션: 유닛마다 위상이 다른 행진 바운스(절차식 — 그림 추가 없이).
+  function drawSquad(squad, now = 0) {
     const S = BAL.squad;
     const pts = formation(displayUnits(squad.count));
+    const recoil = (squad.fireFlash ?? 0) > 0.05 ? 2 : 0;        // 사격 반동 — 부대가 살짝 눌린다
     for (const p of pts) shadow(squad.x + p.x, S.y + p.y + (p.x === 0 && p.y === 0 ? S.heroSize : S.soldierSize) * 0.42, (p.x === 0 && p.y === 0 ? S.heroSize : S.soldierSize) * 0.42);
     for (let i = pts.length - 1; i >= 1; i--) {       // 병사들 — 뒷줄부터 그려 앞줄이 위에 오게
-      const px = squad.x + pts[i].x, py = S.y + pts[i].y;        // 링 대형(히어로 중심 군집)
+      const phase = now * 9 + i * 1.7;
+      const bob = Math.sin(phase) * 1.6;              // 발걸음 상하
+      const sway = Math.sin(phase * 0.5 + i) * 1.1;   // 좌우 뒤뚱
+      const px = squad.x + pts[i].x + sway, py = S.y + pts[i].y + bob + recoil;   // 링 대형(히어로 중심 군집)
       drawImgCentered('soldier', px, py, S.soldierSize, () => {
         ctx.fillStyle = '#DFE6F5';
         ctx.beginPath();
@@ -138,7 +143,8 @@ export function createRenderer(canvas, sprites) {
         ctx.fill();
       });
     }
-    const hx = squad.x, hy = S.y;                     // 히어로(선두)
+    const hx = squad.x + Math.sin(now * 4.5) * 0.8;   // 히어로(선두) — 묵직한 걸음
+    const hy = S.y + Math.sin(now * 9) * 2 + recoil;
     drawImgCentered('m' + (squad.tier + 1), hx, hy, S.heroSize, () => {
       ctx.fillStyle = TIER_FALLBACK[squad.tier];
       ctx.beginPath();
@@ -148,6 +154,21 @@ export function createRenderer(canvas, sprites) {
       ctx.closePath();
       ctx.fill();
     });
+    //  사격 총구 섬광 — 발사 열 수만큼 부대 전방에서 번쩍인다.
+    if ((squad.fireFlash ?? 0) > 0) {
+      const k = squad.fireFlash / 0.09;
+      const mz = squad.muzzles ?? 1;
+      ctx.globalAlpha = Math.min(1, k);
+      for (let m = 0; m < mz; m++) {
+        const fx = squad.x + (m - (mz - 1) / 2) * 14;
+        const fy = S.y - S.heroSize / 2 - 8;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(fx, fy, 3 + k * 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(53,229,255,0.6)';
+        ctx.beginPath(); ctx.arc(fx, fy, 6 + k * 5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     //  부대 발밑 병력 수 = 체력 표시. 피격 중엔 빨갛게 — 맞았다는 것이 부대에서 바로 보인다.
     const ly = S.y + (squad.radius ?? 40) + 24;
     ctx.font = 'bold 26px system-ui, sans-serif';
@@ -386,7 +407,7 @@ export function createRenderer(canvas, sprites) {
       }
       ctx.fillStyle = '#FF3DA5';
       for (const s of view.eshots) { ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, Math.PI * 2); ctx.fill(); }
-      drawSquad(view.squad);
+      drawSquad(view.squad, view.now ?? 0);
       drawParts(view.parts ?? []);
       drawFloaters(view.floaters ?? []);
       if (view.dim > 0) {                              // 보스 앞 정적
