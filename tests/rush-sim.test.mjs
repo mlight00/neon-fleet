@@ -162,3 +162,12 @@ test('SQUAD-RADIUS: 대형 반경이 병력에 비례하고 피탄 폭이 그만
   const r = stepCombat(st, { x: 240, count: 1, fireRateMult: 0, radius: squadRadius(1) }, 1 / 30, mulberry32(1));
   assert.equal(r.troopLoss, 0, '빗나감');
 });
+
+test('SQUAD-DISPLAY: 표시 유닛 축약 — 12까지 1:1, 이후 7:1, 최대 50', async () => {
+  const { displayUnits } = await import('../rush/squad.js');
+  assert.equal(displayUnits(1), 1);
+  assert.equal(displayUnits(12), 12);
+  assert.equal(displayUnits(13), 12);
+  assert.equal(displayUnits(82), 22);
+  assert.equal(displayUnits(999), 50);
+});

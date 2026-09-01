@@ -28,9 +28,16 @@ export function formation(count) {
 
 export function clampX(x) { return Math.max(80, Math.min(400, x)); }   // 도로 폭 = 게이트 폭
 
+/** 병력 → 화면에 그릴 유닛 수. 12까지는 1:1(한 명씩 느는 맛), 이후 7명당 1기, 최대 50기.
+ *  실제 병력은 발밑 숫자가 전달한다(라스트워식 축약 표시). */
+export function displayUnits(count) {
+  if (count <= 12) return Math.max(0, count);
+  return Math.min(50, 12 + Math.round((count - 12) / 7));
+}
+
 /** 대형의 실제 반경(px) — 피탄·접촉 판정이 이 크기를 쓴다(부대가 작으면 얻어맞는 폭도 작게). */
 export function squadRadius(count) {
-  const n = Math.min(count, BAL.squad.drawCap);
+  const n = displayUnits(Math.min(count, BAL.squad.drawCap));
   if (n <= 1) return BAL.squad.heroSize / 2;
   let k = 1, placed = 1;
   while (placed < n) {

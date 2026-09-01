@@ -1,6 +1,6 @@
 // rush/render.js — 캔버스 그리기 전담. 게임 판단은 하나도 하지 않는다(view 를 그대로 그림).
 import { BAL } from './balance.js';
-import { formation } from './squad.js';
+import { formation, displayUnits } from './squad.js';
 import { gateColor } from './gates.js';
 
 const W = 480, H = 800;
@@ -116,7 +116,7 @@ export function createRenderer(canvas, sprites) {
   //  선두 1기 = 히어로(크게, 티어에 따라 진화) / 뒤따르는 병력 = 병사 스프라이트(작게)
   function drawSquad(squad) {
     const S = BAL.squad;
-    const pts = formation(squad.count);
+    const pts = formation(displayUnits(squad.count));
     for (let i = pts.length - 1; i >= 1; i--) {       // 병사들 — 뒷줄부터 그려 앞줄이 위에 오게
       const px = squad.x + pts[i].x, py = S.y + pts[i].y;        // 링 대형(히어로 중심 군집)
       drawImgCentered('soldier', px, py, S.soldierSize, () => {
