@@ -1,12 +1,12 @@
 // rush/balance.js — 스타포지 러시 수치 단일 진실. 로직 없음.
 export const BAL = {
   //  판 = 5구간 × 900. 구간마다 신규 적 2종 합류(누적), 구간 끝(900의 배수)마다 전용 보스.
-  track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 520, firstGateZ: 300, waveEvery: 200 },   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
+  track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 780, firstGateZ: 300, waveEvery: 200, enemyHpMult: [1, 1.6, 2.4, 3.4, 4.6] },   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
   //  followRate = 기존 게임(js/balance.js) followSpeed 와 동일값
   squad: { y: 640, maxCount: 999, moveSpeed: 420, followRate: 9, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
            heroSize: 46, soldierSize: 22, ringGap: 19, ringStart: 26,
            muzzles: [1, 1, 2, 2, 3], bulletW: [4, 5, 6, 7, 8],   // 티어별 발사 열·탄 굵기(성장 체감)
-           fireInterval: 0.5, bulletSpeed: 700, bulletDmg: 1, dmgPerTroop: 0.02, touchLossPerHit: 1 },
+           fireInterval: 0.5, fireRateCap: 7, bulletSpeed: 700, bulletDmg: 1, dmgPerTroop: 0.012, touchLossPerHit: 1 },
   tiers: [1, 25, 75, 150, 300],          // M1~M5 병력 임계
   gates: {
     colors: { add: '#35E5FF', mul: '#F6C84A', sub: '#FF6A3D', div: '#FF3DA5' },
@@ -16,8 +16,8 @@ export const BAL = {
   },
   enemies: {
     //  구간1
-    scrapbit:      { hp: 2,  r: 18, speed: 120, count: [4, 9],  coin: 1 },
-    wheeler:       { hp: 3,  r: 19, speed: 170, count: [2, 4],  coin: 2, zigzag: 140 },
+    scrapbit:      { hp: 2,  r: 18, speed: 120, count: [3, 7],  coin: 1 },
+    wheeler:       { hp: 3,  r: 19, speed: 170, count: [2, 3],  coin: 2, zigzag: 140 },
     //  구간2
     ramhound:      { hp: 6,  r: 22, speed: 260, count: [1, 2],  coin: 3, touchLoss: 3 },
     signaler:      { hp: 7,  r: 20, speed: 55,  count: [1, 2],  coin: 4, shootEvery: 2.2, shotSpeed: 220, fan: 3 },
@@ -32,7 +32,7 @@ export const BAL = {
     magnethead:    { hp: 9,  r: 21, speed: 75,  count: [1, 2],  coin: 8, stealCoins: 5 },
   },
   //  구간 보스 5종 — 공통 골격(좌우 이동+부채꼴 사격+접촉)에 스탯만 다르게. 스멜터는 잡졸 소환.
-  boss: { baseHp: 120, hpPerTroop: 2.2, touchLossPerSec: 12 },
+  boss: { baseHp: 120, hpPerTroop: 1.5, touchLossPerSec: 12 },
   bosses: [
     { key: 'b1', name: '그레이더',      hpMult: 0.55, r: 48, speed: 60,  shootEvery: 1.1, fan: 1, shotSpeed: 200, coin: 25 },
     { key: 'b2', name: '갠트리 위도우', hpMult: 0.65, r: 52, speed: 65,  shootEvery: 1.0, fan: 2, shotSpeed: 210, coin: 35 },

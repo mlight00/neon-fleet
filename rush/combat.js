@@ -5,11 +5,11 @@ export function createCombat() {
   return { enemies: [], bullets: [], eshots: [], boss: null, fireT: 0, coins: 0, kills: 0 };
 }
 
-export function spawnWave(st, kind, n, rnd) {
+export function spawnWave(st, kind, n, rnd, hpMult = 1) {
   const def = BAL.enemies[kind];
   for (let i = 0; i < n; i++) {
     st.enemies.push({
-      kind, hp: def.hp, r: def.r,
+      kind, hp: Math.round(def.hp * hpMult), r: def.r,
       x: 85 + rnd() * 310, y: -40 - rnd() * 120,
       vx: def.zigzag ? (rnd() < 0.5 ? -def.zigzag : def.zigzag) : (rnd() - 0.5) * 30,
       vy: def.speed,
@@ -47,8 +47,8 @@ export function stepCombat(st, squad, dt, rnd) {
   //  아군 사격 — count 비례 발사(틱당 묶음). 티어가 오르면 발사 열이 늘고 탄이 굵어진다(성장 체감).
   if (squad.fireRateMult > 0) {
     st.fireT -= dt;
-    const interval = S.fireInterval / (squad.fireRateMult * Math.max(1, Math.sqrt(squad.count)));
-    const spread = Math.min(280, 30 + 20 * Math.sqrt(squad.count));   // 전열 전체가 쏜다 — 대형 폭만큼 사선이 넓어진다
+    const interval = S.fireInterval / (squad.fireRateMult * Math.min(S.fireRateCap, Math.max(1, Math.sqrt(squad.count))));
+    const spread = Math.min(150, 24 + (squad.radius ?? 40) * 1.4);    // 사선 = 부대 폭 — 조준하려면 움직여야 한다
     let shots = 0;
     while (st.fireT <= 0) {
       st.fireT += Math.max(0.02, interval);

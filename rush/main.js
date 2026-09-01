@@ -82,7 +82,8 @@ function advance(run, dt0) {
       run.floaters.push({ x: run.x, y: 560, text: sym + gate.value, color: gateColor(gate.op), t: 0, big: true });
       run.sfxQueue.push(isGood(gate.op) ? 'gateGood' : 'gateBad');
       if (run.count < before && run.count <= 5) { run.shakeT = BAL.fx.shakeDur; run.hurtT = BAL.fx.hurtFlashDur; }
-    } else if (ev.type === 'wave') spawnWave(run.combat, ev.data.kind, ev.data.n, run.rnd);
+    } else if (ev.type === 'wave') spawnWave(run.combat, ev.data.kind, ev.data.n, run.rnd,
+      BAL.track.enemyHpMult[Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen))]);
     else {
       for (const e of run.combat.enemies) spawnBurst(run, e.x, e.y, e.r, false);   // 보스전은 1:1 — 잡졸 일괄 정리
       run.combat.enemies.length = 0;

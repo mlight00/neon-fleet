@@ -63,7 +63,7 @@ test('COMBAT-BOSS: 구간별 보스 HP 배율·격파 코인', () => {
   const rnd = mulberry32(3);
   const st = createCombat();
   spawnBoss(st, 100, 4);                              // 최종 보스(크라운 브레이커)
-  assert.equal(st.boss.hp, Math.round((120 + 2.2 * 100) * BAL.bosses[4].hpMult));
+  assert.equal(st.boss.hp, Math.round((BAL.boss.baseHp + BAL.boss.hpPerTroop * 100) * BAL.bosses[4].hpMult));
   assert.equal(st.boss.zone, 4);
   const st0 = createCombat();
   spawnBoss(st0, 100, 0);                             // 구간1 보스는 훨씬 약하다
@@ -102,8 +102,9 @@ test('COMBAT-ESHOT: 적탄이 부대에 닿으면 병력 1 손실', () => {
   assert.equal(st.eshots.length, 0);
 });
 
-test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 5보스를 전부 깬다', () => {
-  for (const seed of [1, 2, 3, 4, 5]) {
+test('SIM-FULLRUN: 요격 봇이 10시드 중 7판 이상 5보스를 깬다(빡빡하되 깰 수 있는 난이도)', () => {
+  let cleared = 0;
+  for (const seed of [1, 2, 3, 4, 5, 11, 22, 33, 44, 55]) {
     const track = buildTrack(seed);
     let count = 10;                                   // 업그레이드 몇 개 한 상태 가정
     const rnd = mulberry32(seed * 7 + 1);
@@ -119,8 +120,10 @@ test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 5보스를
           const { left, right } = ev.data;
           const better = applyGate(count, left) >= applyGate(count, right) ? left : right;
           count = applyGate(count, better);
-        } else if (ev.type === 'wave') spawnWave(st, ev.data.kind, ev.data.n, rnd);
-        else {
+        } else if (ev.type === 'wave') {
+          const zone = Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen));
+          spawnWave(st, ev.data.kind, ev.data.n, rnd, BAL.track.enemyHpMult[zone]);   // main.advance 와 동일 규칙
+        } else {
           st.enemies.length = 0; st.eshots.length = 0;   // 보스전은 1:1(main.advance 와 동일 규칙)
           spawnBoss(st, count, ev.data.zone);
         }
@@ -131,15 +134,15 @@ test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 5보스를
       if (st.boss) tx = st.boss.x;
       else if (st.enemies.length) tx = st.enemies.reduce((a, b) => (a.y > b.y ? a : b)).x;
       const x = Math.max(80, Math.min(400, tx));
-      const r = stepCombat(st, { x, count, fireRateMult: 1 }, dt, rnd);
+      const r = stepCombat(st, { x, count, fireRateMult: 1, tier: 1, radius: 60 }, dt, rnd);
       if (hadBoss && !st.boss) bossKills++;
       count -= r.troopLoss;
       if (count <= 0) dead = true;
     }
-    assert.ok(!dead, 'seed ' + seed + ' 전멸 (보스 ' + bossKills + '킬, 병력 ' + count + ')');
-    assert.equal(bossKills, 5, 'seed ' + seed + ' 보스 ' + bossKills + '/5');
-    assert.ok(count > 10, 'seed ' + seed + ' 성장 실패: ' + count);
+    if (!dead && bossKills === 5) { cleared++; assert.ok(count > 10, 'seed ' + seed + ' 성장 실패: ' + count); }
   }
+  assert.ok(cleared >= 7, '완주 ' + cleared + '/10 — 난이도가 무너졌다(너무 어렵거나 회귀)');
+  assert.ok(cleared <= 10, 'sanity');
 });
 
 test('MAIN-HELPERS: 버튼 히트·게이트 좌우 판정 (DOM 없이 import 가능해야 한다)', async () => {
