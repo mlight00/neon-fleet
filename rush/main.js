@@ -32,7 +32,7 @@ function newRun(save, mode) {
   return {
     mode, seedKey: seedInfo.key,
     track: buildTrack(seedInfo.seed), rnd: mulberry32((seedInfo.seed ^ 0x9E37) >>> 0),
-    z: 0, ei: 0, x: 240, tx: 240, count: eff.startCount, eff,
+    z: 0, ei: 0, x: 240, tx: 240, count: eff.startCount, dispCount: eff.startCount, eff,
     combat: createCombat(),
     watcher: recordWatcher(save.get().best), slowmo: slowmoCtl(), cont: continueToken(isDaily),
     recordFlash: 0, gold: false, dim: 0, invulnT: 0, curBossZone: -1,
@@ -112,6 +112,14 @@ function advance(run, dt0) {
   run.parts = run.parts.filter((p) => p.t < p.life);
   for (const f of run.floaters) { f.t += dt0; f.y -= 44 * dt0; }
   run.floaters = run.floaters.filter((f) => f.t < 0.9);
+  //  표시 병력은 실제 병력을 지연 추종 — 늘 때는 촤르륵(차이의 3배/초), 줄 때는 즉각적으로(12배/초)
+  {
+    const gap = run.count - run.dispCount;
+    const rate = gap > 0 ? Math.max(8, gap * 3) : Math.max(30, -gap * 12);
+    const step = Math.min(Math.abs(gap), rate * dt0);
+    run.dispCount += Math.sign(gap) * step;
+    if (Math.abs(run.count - run.dispCount) < 0.05) run.dispCount = run.count;
+  }
   run.peak = Math.max(run.peak, run.count);
   if (run.watcher.update(run.count) === 'break') { run.recordFlash = 1.2; run.gold = true; run.sfxQueue.push('record'); }
   run.recordFlash = Math.max(0, run.recordFlash - dt0);
@@ -175,7 +183,8 @@ export function boot() {
       v.bullets = run.combat.bullets;
       v.eshots = run.combat.eshots;
       v.boss = run.combat.boss;
-      v.squad = { x: run.x, count: run.count, tier: tierFor(run.count), radius: squadRadius(run.count), hurt: run.hurtT > 0 };
+      const disp = Math.round(run.dispCount);
+      v.squad = { x: run.x, count: disp, tier: tierFor(run.count), radius: squadRadius(run.count), hurt: run.hurtT > 0 };
       v.dim = run.dim;
       v.parts = run.parts;
       v.floaters = run.floaters;
@@ -185,7 +194,7 @@ export function boot() {
       v.zone = Math.min(BAL.track.zones - 1, Math.floor(run.z / BAL.track.zoneLen));
       const bz = nextBossZ(run);
       v.hud = {
-        count: run.count, gold: run.gold, progress: Math.min(1, run.z / run.track.length),
+        count: Math.round(run.dispCount), gold: run.gold, progress: Math.min(1, run.z / run.track.length),
         bossDist: (run.combat.boss || bz === Infinity) ? 0 : Math.max(0, Math.round((bz - run.z) / 10)),
         firstRunX2: run.firstX2, recordFlash: run.recordFlash,
       };
