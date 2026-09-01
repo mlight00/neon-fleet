@@ -10,7 +10,7 @@ export function spawnWave(st, kind, n, rnd) {
   for (let i = 0; i < n; i++) {
     st.enemies.push({
       kind, hp: def.hp, r: def.r,
-      x: 60 + rnd() * 360, y: -40 - rnd() * 120,
+      x: 85 + rnd() * 310, y: -40 - rnd() * 120,
       vx: def.zigzag ? (rnd() < 0.5 ? -def.zigzag : def.zigzag) : (rnd() - 0.5) * 30,
       vy: def.speed,
       shootT: def.shootEvery ? def.shootEvery * (0.5 + rnd() * 0.8) : undefined,
@@ -74,7 +74,7 @@ export function stepCombat(st, squad, dt, rnd) {
       if (e.hopDur > 0) { e.hopDur -= dt; e.x += e.hopVx * dt; }
     }
     e.x += e.vx * dt; e.y += e.vy * dt;
-    if (e.x < 30 || e.x > 450) { e.vx *= -1; e.x = Math.max(30, Math.min(450, e.x)); }
+    if (e.x < 80 || e.x > 400) { e.vx *= -1; e.x = Math.max(80, Math.min(400, e.x)); }
     if (e.shootT !== undefined) {
       e.shootT -= dt;
       if (e.shootT <= 0) {

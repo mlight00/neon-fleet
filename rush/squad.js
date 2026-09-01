@@ -26,4 +26,4 @@ export function formation(count) {
   return out.slice(0, n);
 }
 
-export function clampX(x) { return Math.max(40, Math.min(440, x)); }
+export function clampX(x) { return Math.max(80, Math.min(400, x)); }   // 도로 폭 = 게이트 폭

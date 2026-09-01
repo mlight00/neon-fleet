@@ -12,7 +12,7 @@ export const BAL = {
     colors: { add: '#35E5FF', mul: '#F6C84A', sub: '#FF6A3D', div: '#FF3DA5' },
     // 진행도 t(0..1)에 따른 값 범위
     addMin: 4, addMax: 40, mulVals: [2, 3], subMin: 5, subMax: 60, divVals: [2, 3],
-    width: 190, gap: 26, h: 64,
+    width: 150, gap: 20, h: 64,   // 총폭 320(80~400) = 도로·이동 범위와 일치
   },
   enemies: {
     //  구간1

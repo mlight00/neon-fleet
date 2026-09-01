@@ -29,10 +29,12 @@ test('SQUAD-FORM: 링 군집 — 상한·히어로 중심·전방 개방·중복
   assert.equal(set.size, f.length, '겹치는 자리 없음');
 });
 
-test('SQUAD-CLAMP: 중심 x 는 화면 안', () => {
-  assert.equal(clampX(-999), 40);
-  assert.equal(clampX(999), 440);
+test('SQUAD-CLAMP: 중심 x 는 도로 안(게이트 폭과 일치)', () => {
+  assert.equal(clampX(-999), 80);
+  assert.equal(clampX(999), 400);
   assert.equal(clampX(240), 240);
+  const g = BAL.gates;
+  assert.equal(g.width * 2 + g.gap, 400 - 80, '게이트 총폭 = 이동 가능 폭');
 });
 
 test('COMBAT-KILL: 사격이 적을 잡고 코인·격파가 쌓인다', () => {
