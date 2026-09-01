@@ -168,8 +168,8 @@ export function boot() {
     const v = { state, mode: run?.mode ?? 'normal', buttons: [], best: save.get().best, scroll: run?.z ?? 0 };
     if (state === 'title') {
       v.buttons = [
-        { id: 'start', x: 140, y: 470, w: 200, h: 60, label: '출격', primary: true },
-        { id: 'daily', x: 140, y: 550, w: 200, h: 48, label: '오늘의 도전' },
+        { id: 'start', x: 140, y: 545, w: 200, h: 60, label: '출격', primary: true },
+        { id: 'daily', x: 140, y: 625, w: 200, h: 48, label: '오늘의 도전' },
       ];
     } else if (state === 'run' || state === 'over') {
       v.gates = [];

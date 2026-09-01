@@ -280,7 +280,7 @@ export function createRenderer(canvas, sprites) {
     ctx.fillText('스타포지 러시', W / 2, 172);
     ctx.font = '600 16px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(20,35,58,0.72)';
-    ctx.fillText('군단을 키워, 도시를 되찾아라', W / 2, 204);
+    ctx.fillText('병사들과 협력해, 도시를 되찾아라', W / 2, 204);
     //  히어로 정면 일러스트(도착 전엔 뒷모습 폴백)
     drawImgCentered('mfront', W / 2, 345, 210, () => {
       drawImgCentered('m1', W / 2, 345, 180, () => {
@@ -291,7 +291,7 @@ export function createRenderer(canvas, sprites) {
     if (view.best > 0) {
       ctx.font = '700 14px system-ui, sans-serif';
       ctx.fillStyle = 'rgba(20,35,58,0.8)';
-      ctx.fillText('최고 기록  ' + view.best, W / 2, 452);
+      ctx.fillText('최고 기록  ' + view.best, W / 2, 508);
     }
   }
 
