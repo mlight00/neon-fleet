@@ -30,6 +30,14 @@ export function createRenderer(canvas, sprites) {
     } else fallbackFn();
   }
 
+  //  접지 그림자 — 떠 보이는 느낌을 없앤다. 모든 유닛·적·보스 발밑 공통.
+  function shadow(x, y, w) {
+    ctx.fillStyle = 'rgba(20,25,35,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(x, y, w, w * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   function roundRect(x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -117,6 +125,7 @@ export function createRenderer(canvas, sprites) {
   function drawSquad(squad) {
     const S = BAL.squad;
     const pts = formation(displayUnits(squad.count));
+    for (const p of pts) shadow(squad.x + p.x, S.y + p.y + (p.x === 0 && p.y === 0 ? S.heroSize : S.soldierSize) * 0.42, (p.x === 0 && p.y === 0 ? S.heroSize : S.soldierSize) * 0.42);
     for (let i = pts.length - 1; i >= 1; i--) {       // 병사들 — 뒷줄부터 그려 앞줄이 위에 오게
       const px = squad.x + pts[i].x, py = S.y + pts[i].y;        // 링 대형(히어로 중심 군집)
       drawImgCentered('soldier', px, py, S.soldierSize, () => {
@@ -156,6 +165,7 @@ export function createRenderer(canvas, sprites) {
   function drawEnemy(e) {
     const key = 'e_' + e.kind;
     const h = e.r * 2.4;
+    shadow(e.x, e.y + h * 0.4, e.r * 0.95);
     drawImgCentered(key, e.x, e.y, h, () => {
       ctx.fillStyle = ENEMY_FALLBACK[e.kind] ?? '#B3402F';
       if (RECT_KINDS.has(e.kind)) {                   // 방벽·수레·신호등 = 상자
@@ -182,6 +192,7 @@ export function createRenderer(canvas, sprites) {
   }
 
   function drawBoss(boss) {
+    shadow(boss.x, boss.y + boss.r * 1.05, boss.r * 1.15);
     drawImgCentered('b' + (boss.zone + 1), boss.x, boss.y, boss.r * 2.6, () => {
       ctx.fillStyle = '#2B1420';
       ctx.beginPath(); ctx.arc(boss.x, boss.y, boss.r, 0, Math.PI * 2); ctx.fill();
@@ -363,7 +374,7 @@ export function createRenderer(canvas, sprites) {
       ctx.save();
       ctx.translate(Math.sin(view.now * 71) * a, Math.cos(view.now * 89) * a * 0.7);
     }
-    drawBackground(view.scroll ?? 0, view.zone ?? 0);
+    drawBackground((view.scroll ?? 0) * 0.6, view.zone ?? 0);   // 배경은 60% 속도(시차) — 접지감
     if (view.state === 'run' || view.state === 'over') {
       for (const g of view.gates) drawGatePair(g.y, g.pair);
       for (const e of view.enemies) drawEnemy(e);

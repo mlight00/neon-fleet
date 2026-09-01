@@ -20,11 +20,14 @@ const lerp = (a, b, t) => a + (b - a) * t;
 function makeGate(rnd, t, good) {
   const g = BAL.gates;
   if (good) {
-    return rnd() < 0.6
+    //  x게이트는 후반으로 갈수록: 초반 8% -> 후반 55%. x3 은 중반 이후에만.
+    const mulP = 0.08 + 0.47 * t;
+    return rnd() >= mulP
       ? { op: 'add', value: Math.round(lerp(g.addMin, g.addMax, t) * (0.7 + rnd() * 0.6)) || 1 }
-      : { op: 'mul', value: g.mulVals[(rnd() * g.mulVals.length) | 0] };
+      : { op: 'mul', value: t < 0.35 ? 2 : g.mulVals[(rnd() * g.mulVals.length) | 0] };
   }
-  return rnd() < 0.6
+  const divP = 0.2 + 0.3 * t;
+  return rnd() >= divP
     ? { op: 'sub', value: Math.round(lerp(g.subMin, g.subMax, t) * (0.7 + rnd() * 0.6)) || 1 }
     : { op: 'div', value: g.divVals[(rnd() * g.divVals.length) | 0] };
 }
@@ -33,8 +36,8 @@ function makeGate(rnd, t, good) {
  *  guaranteeGood: 나쁨+나쁨 금지(보스 직전 게이트 — 함정으로 억울하게 죽지 않게). */
 export function makeGatePair(rnd, t, guaranteeGood = false) {
   const roll = rnd();
-  let kinds = roll < 0.55 ? [true, false] : roll < 0.8 ? [true, true] : [false, false];
-  if (guaranteeGood && !kinds[0] && !kinds[1]) kinds = [true, false];
+  let kinds = roll < 0.55 ? [true, false] : roll < 0.7 ? [true, true] : [false, false];
+  if ((guaranteeGood || t < 0.08) && !kinds[0] && !kinds[1]) kinds = [true, false];   // 판 초반·보스 직전엔 회복 불능 함정 금지
   if (rnd() < 0.5) kinds.reverse();
   let left = makeGate(rnd, t, kinds[0]);
   let right = makeGate(rnd, t, kinds[1]);
