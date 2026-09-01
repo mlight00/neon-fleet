@@ -42,6 +42,8 @@ export function createAudio() {
       unlocked = true;
       if (bgmEl && bgmName) bgmEl.play().catch(() => {});
     },
+    bgmPause() { if (bgmEl) bgmEl.pause(); },
+    bgmResume() { if (bgmEl && unlocked && bgmName) bgmEl.play().catch(() => {}); },
     bgmBattle() { playBgm('nf_bgm_battle1'); },
     /** 구간별 보스곡: 1~2구간=sector1, 3구간=sector2, 4구간=sector3, 최종=boss */
     bgmBoss(zone = 4) {

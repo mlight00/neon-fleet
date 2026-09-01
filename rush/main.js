@@ -171,7 +171,7 @@ export function boot() {
         { id: 'start', x: 140, y: 545, w: 200, h: 60, label: '출격', primary: true },
         { id: 'daily', x: 140, y: 625, w: 200, h: 48, label: '오늘의 도전' },
       ];
-    } else if (state === 'run' || state === 'over') {
+    } else if (state === 'run' || state === 'over' || state === 'paused') {
       v.gates = [];
       for (let i = run.ei; i < run.track.events.length; i++) {
         const ev = run.track.events[i];
@@ -202,6 +202,11 @@ export function boot() {
         v.buttons = [
           { id: 'continue', x: 120, y: 430, w: 240, h: 56, label: '이어하기 (1회)', primary: true },
           { id: 'giveup', x: 120, y: 510, w: 240, h: 44, label: '그만하기' },
+        ];
+      } else if (state === 'paused') {
+        v.buttons = [
+          { id: 'resume', x: 120, y: 400, w: 240, h: 56, label: '계속하기', primary: true },
+          { id: 'giveup', x: 120, y: 480, w: 240, h: 44, label: '그만하기' },
         ];
       }
     } else if (state === 'results') {
@@ -236,6 +241,9 @@ export function boot() {
     if (state === 'title') {
       if (id === 'start') startRun('normal');
       else if (id === 'daily') startRun('daily');
+    } else if (state === 'paused') {
+      if (id === 'resume') { state = 'run'; au.bgmResume(); }
+      else if (id === 'giveup') finishRun();
     } else if (state === 'over') {
       if (id === 'continue' && run.cont.use()) {
         run.count = BAL.fx.continueTroops;
@@ -277,6 +285,11 @@ export function boot() {
   });
   addEventListener('pointerup', () => { pointer.down = false; });
   addEventListener('keydown', (e) => {
+    if (e.code === 'Escape') {                        // ESC = 일시 정지 토글
+      if (state === 'run') { state = 'paused'; au.bgmPause(); }
+      else if (state === 'paused') { state = 'run'; au.bgmResume(); }
+      return;
+    }
     keys[e.code] = true;
     if (e.code === 'Space' || e.code === 'Enter') {
       if (state === 'title') startRun('normal');

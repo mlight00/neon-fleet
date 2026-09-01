@@ -375,7 +375,7 @@ export function createRenderer(canvas, sprites) {
       ctx.translate(Math.sin(view.now * 71) * a, Math.cos(view.now * 89) * a * 0.7);
     }
     drawBackground((view.scroll ?? 0) * 0.6, view.zone ?? 0);   // 배경은 60% 속도(시차) — 접지감
-    if (view.state === 'run' || view.state === 'over') {
+    if (view.state === 'run' || view.state === 'over' || view.state === 'paused') {
       for (const g of view.gates) drawGatePair(g.y, g.pair);
       for (const e of view.enemies) drawEnemy(e);
       if (view.boss) drawBoss(view.boss);
@@ -403,6 +403,17 @@ export function createRenderer(canvas, sprites) {
       }
       drawHud(view.hud);
       if (view.state === 'over') drawOver(view);
+      else if (view.state === 'paused') {              // ESC 일시 정지
+        ctx.fillStyle = 'rgba(5,8,14,0.62)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 36px system-ui, sans-serif';
+        ctx.fillStyle = '#F3F1E8';
+        ctx.fillText('일시 정지', W / 2, 300);
+        ctx.font = '14px system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(243,241,232,0.7)';
+        ctx.fillText('ESC 키로도 다시 시작할 수 있다', W / 2, 336);
+      }
     } else if (view.state === 'title') {
       drawTitle(view);
     } else if (view.state === 'results') {
