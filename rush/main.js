@@ -82,8 +82,10 @@ function advance(run, dt0) {
       run.floaters.push({ x: run.x, y: 560, text: sym + gate.value, color: gateColor(gate.op), t: 0, big: true });
       run.sfxQueue.push(isGood(gate.op) ? 'gateGood' : 'gateBad');
       if (run.count < before && run.count <= 5) { run.shakeT = BAL.fx.shakeDur; run.hurtT = BAL.fx.hurtFlashDur; }
-    } else if (ev.type === 'wave') spawnWave(run.combat, ev.data.kind, ev.data.n, run.rnd,
-      BAL.track.enemyHpMult[Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen))]);
+    } else if (ev.type === 'wave') {
+      const zn = Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen));
+      spawnWave(run.combat, ev.data.kind, ev.data.n, run.rnd, BAL.track.enemyHpMult[zn], zn);
+    }
     else {
       for (const e of run.combat.enemies) spawnBurst(run, e.x, e.y, e.r, false);   // 보스전은 1:1 — 잡졸 일괄 정리
       run.combat.enemies.length = 0;
@@ -96,6 +98,11 @@ function advance(run, dt0) {
   const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult, tier: prevTier, radius: squadRadius(run.count) }, dt, run.rnd);
   for (const ev of r.events) {
     if (ev.type === 'kill') { spawnBurst(run, ev.x, ev.y, ev.r, false); if (!ev.touched) run.sfxQueue.push('kill'); }
+    else if (ev.type === 'supply') {                  // 보급 컨테이너 격파 = 병력 획득
+      run.count = Math.min(BAL.squad.maxCount, run.count + ev.n);
+      run.floaters.push({ x: ev.x, y: ev.y, text: '+' + ev.n, color: '#F6C84A', t: 0, big: true });
+      run.sfxQueue.push('gateGood');
+    }
     else if (ev.type === 'bossKill') { spawnBurst(run, ev.x, ev.y, ev.r, true); run.sfxQueue.push('bossDie'); run.shakeT = BAL.fx.shakeDur; }
     else if (ev.type === 'hurt' && run.invulnT <= 0) {
       run.shakeT = BAL.fx.shakeDur;
@@ -137,6 +144,7 @@ export function boot() {
   const canvas = document.getElementById('game');
   const save = createSave();
   const au = createAudio();
+  au.setMuted(!!save.get().mute);
   let state = 'title', run = null, renderer = null, buttons = [];
   const pointer = { down: false, x: 240 };
   const keys = {};
@@ -172,6 +180,7 @@ export function boot() {
       v.buttons = [
         { id: 'start', x: 140, y: 545, w: 200, h: 60, label: '출격', primary: true },
         { id: 'daily', x: 140, y: 625, w: 200, h: 48, label: '오늘의 도전' },
+        { id: 'mute', x: 422, y: 14, w: 44, h: 44, label: au.isMuted() ? '🔇' : '🔊' },
       ];
     } else if (state === 'run' || state === 'over' || state === 'paused') {
       v.gates = [];
@@ -212,6 +221,7 @@ export function boot() {
         v.buttons = [
           { id: 'resume', x: 120, y: 400, w: 240, h: 56, label: '계속하기', primary: true },
           { id: 'giveup', x: 120, y: 480, w: 240, h: 44, label: '그만하기' },
+          { id: 'mute', x: 120, y: 548, w: 240, h: 44, label: au.isMuted() ? '소리 켜기 🔇' : '소리 끄기 🔊' },
         ];
       }
     } else if (state === 'results') {
@@ -242,6 +252,11 @@ export function boot() {
   function onPress(x, y) {
     const id = hitButton(buttons, x, y);
     if (!id) return;
+    if (id === 'mute') {                              // 어느 화면에서든 음소거 토글
+      au.setMuted(!au.isMuted());
+      save.patch({ mute: au.isMuted() });
+      return;
+    }
     au.sfx('click');
     if (state === 'run') {
       if (id === 'pause') { state = 'paused'; au.bgmPause(); }

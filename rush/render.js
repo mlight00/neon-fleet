@@ -180,10 +180,30 @@ export function createRenderer(canvas, sprites) {
     ctx.fillText(String(squad.count), squad.x, ly);
   }
 
-  const RECT_KINDS = new Set(['wallguard', 'cartyard', 'signaler']);
+  const RECT_KINDS = new Set(['wallguard', 'cartyard', 'signaler', 'supply']);
   const ROUND_KINDS = new Set(['wheeler', 'manholejumper', 'magnethead', 'spawnpod']);
 
   function drawEnemy(e) {
+    if (e.kind === 'supply') {                        // 보급 컨테이너 — 골드 상자 + 남은 내구도
+      shadow(e.x, e.y + e.r * 0.95, e.r * 0.9);
+      ctx.fillStyle = '#8A6D1F';
+      roundRect(e.x - e.r, e.y - e.r * 0.8, e.r * 2, e.r * 1.6, 8); ctx.fill();
+      ctx.strokeStyle = '#F6C84A'; ctx.lineWidth = 4;
+      roundRect(e.x - e.r, e.y - e.r * 0.8, e.r * 2, e.r * 1.6, 8); ctx.stroke();
+      ctx.fillStyle = '#F6C84A';
+      ctx.fillRect(e.x - 3, e.y - e.r * 0.8, 6, e.r * 1.6);
+      ctx.fillRect(e.x - e.r, e.y - 3, e.r * 2, 6);
+      const reward = BAL.enemies.supply.rewardByZone[e.zone ?? 0] ?? 6;
+      ctx.font = 'bold 22px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 5; ctx.strokeStyle = '#14233A';
+      ctx.strokeText('+' + reward, e.x, e.y - 2);
+      ctx.fillStyle = '#FFE9B8';
+      ctx.fillText('+' + reward, e.x, e.y - 2);
+      ctx.textBaseline = 'alphabetic';
+      drawHpTag(e);
+      return;
+    }
     const key = 'e_' + e.kind;
     const h = e.r * 2.4;
     shadow(e.x, e.y + h * 0.4, e.r * 0.95);
@@ -210,6 +230,18 @@ export function createRenderer(canvas, sprites) {
       ctx.fillStyle = '#FF3DA5';                      // 공통 마젠타 센서 점
       ctx.beginPath(); ctx.arc(e.x, e.y, Math.max(3, e.r * 0.28), 0, Math.PI * 2); ctx.fill();
     });
+    if (BAL.enemies[e.kind]?.showHp) drawHpTag(e);
+  }
+
+  /** 고체력 적 실시간 HP 숫자 — 깎이는 것이 눈에 보인다. */
+  function drawHpTag(e) {
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#14233A';
+    ctx.strokeText(Math.max(0, Math.ceil(e.hp)), e.x, e.y + e.r + 16);
+    ctx.fillStyle = '#FF9A4A';
+    ctx.fillText(Math.max(0, Math.ceil(e.hp)), e.x, e.y + e.r + 16);
   }
 
   function drawBoss(boss) {
@@ -405,8 +437,19 @@ export function createRenderer(canvas, sprites) {
         const w = b.w ?? 4;
         ctx.fillRect(b.x - w / 2, b.y - 7 - w, w, 14 + w);
       }
-      ctx.fillStyle = '#FF3DA5';
-      for (const s of view.eshots) { ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, Math.PI * 2); ctx.fill(); }
+      for (const s of view.eshots) {
+        if (s.hook) {                                  // 갠트리 위도우 갈고리: 체인 + 클로
+          ctx.strokeStyle = '#5A5A66'; ctx.lineWidth = 5;
+          ctx.beginPath(); ctx.moveTo(s.x, view.boss ? view.boss.y : s.y - 220); ctx.lineTo(s.x, s.y); ctx.stroke();
+          ctx.fillStyle = '#8A8A96';
+          ctx.beginPath(); ctx.arc(s.x, s.y, 12, 0, Math.PI); ctx.fill();
+          ctx.fillStyle = '#FF3DA5';
+          ctx.beginPath(); ctx.arc(s.x, s.y - 2, 5, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillStyle = '#FF3DA5';
+          ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
       drawSquad(view.squad, view.now ?? 0);
       drawParts(view.parts ?? []);
       drawFloaters(view.floaters ?? []);

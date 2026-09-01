@@ -122,7 +122,7 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 7판 이상 5보스를 깬다(빡�
           count = applyGate(count, better);
         } else if (ev.type === 'wave') {
           const zone = Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen));
-          spawnWave(st, ev.data.kind, ev.data.n, rnd, BAL.track.enemyHpMult[zone]);   // main.advance 와 동일 규칙
+          spawnWave(st, ev.data.kind, ev.data.n, rnd, BAL.track.enemyHpMult[zone], zone);   // main.advance 와 동일 규칙
         } else {
           st.enemies.length = 0; st.eshots.length = 0;   // 보스전은 1:1(main.advance 와 동일 규칙)
           spawnBoss(st, count, ev.data.zone);
@@ -137,6 +137,7 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 7판 이상 5보스를 깬다(빡�
       const r = stepCombat(st, { x, count, fireRateMult: 1, tier: 1, radius: 60 }, dt, rnd);
       if (hadBoss && !st.boss) bossKills++;
       count -= r.troopLoss;
+      for (const ev of r.events) if (ev.type === 'supply') count = Math.min(BAL.squad.maxCount, count + ev.n);   // main 과 동일 규칙
       if (count <= 0) dead = true;
     }
     if (!dead && bossKills === 5) { cleared++; assert.ok(count > 10, 'seed ' + seed + ' 성장 실패: ' + count); }

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chase3dLabTarget } from '../js/chase3d-config.js';
 import { SHOT_LEN, SHOT_W, SHOT_MIN_PX } from '../js/chase3d-prop-defs.js';   // §G-30: 값 기반 검증용
+import { SHIP_VISUAL_SIZE } from '../js/ships.js';   // §G-49: 3D 등급 배율이 2D 성장 비율을 따르는지 검사
 import { shotDepth } from '../js/chase3d-shot-place.js';   // §G-34: 동작 기반 검증용
 
 // Opus5 §12.4 hero 하이브리드 배선 — 소스 정적 계약. 실동작(교차·자원·loss)은 브라우저 QA(보고서 §12) 실측.
@@ -135,7 +136,12 @@ test('HW-03: 기함 본체만 페이드 — 피격핵은 alpha 밖(§9.3 판정 
   assert.ok(i > 0, 'fsAlpha 게이트 존재');
   const block = entities.slice(i, entities.indexOf('this.drawHitCore(ctx);', i));
   assert.match(block, /drawFlames/); assert.match(block, /shipBaseSprite/); assert.match(block, /drawWeaponRig/);
-  assert.match(block, /ctx\.globalAlpha = 1;\s*\}\s*$/, '본체 뒤 alpha 복원 → hitCore 는 항상 표시');
+  //  ⚠️§G-52: 예전에는 블록이 `globalAlpha = 1; }` 으로 **끝나는지**를 봤다. hitCore 호출 앞에
+  //   주석 한 줄만 붙어도 깨진다 — 지켜야 할 것은 위치가 아니라 **순서**다:
+  //   본체 페이드(fsAlpha)가 hitCore 보다 먼저 닫혀야 hitCore 가 같이 흐려지지 않는다.
+  const restore = block.lastIndexOf('ctx.globalAlpha = 1;');
+  assert.ok(restore > 0, '본체 뒤 alpha 복원이 없다');
+  assert.match(block.slice(restore), /ctx\.globalAlpha = 1;\s*\}/, '본체 뒤 alpha 복원 → hitCore 는 항상 표시');
   assert.match(chaseRender, /flagshipAlpha: opts\.flagshipAlpha \?\? 1/);
 });
 
@@ -197,21 +203,32 @@ test('HW-13: 기함 가림 계약(이사 "적·수송선이 기함 위로 지나
 
 test('HW-14: §G-8 기함 실모델 등급 스왑 + 피격 연출 교체(이사 "섬광 말고 부품 이탈·흔들림")', () => {
   const defs = readFileSync(new URL('../js/chase3d-prop-defs.js', import.meta.url), 'utf8');
-  // 등급 6종 테이블 — T0/T1 은 드론·순양함 원화 재사용, T2~T5 는 전용 실모델
+  //  등급 6종 테이블. ⚠️§G-49 전에는 여기서 **파일명을 못박았다**(a1/a2/t2/a0/t4/t5).
+  //   기함 아트를 갈아 끼우자마자 깨졌다 — 파일명은 계약이 아니다. 지켜야 할 것은 아래 셋이다.
   assert.match(defs, /export const FLAG3D = \{/);
-  for (const [t, f] of [[0, 'a1'], [1, 'a2'], [2, 't2'], [3, 'a0'], [4, 't4'], [5, 't5']]) {
-    assert.match(defs, new RegExp(`${t}: \{ glb: 'assets/3d/${f}_model\.glb'`), `T${t}=${f}`);
-  }
-  // ⚠️회전 규약: 서 있는 원본(a1/a2/a0)만 rotX -π/2, 누운 원본(t2/t4/t5)은 rotX 금지(적용 시 5m 벽으로 세워짐 — 실측)
-  const flagBlock = defs.slice(defs.indexOf('export const FLAG3D'));
-  for (const f of ['t2', 't4', 't5']) {
-    const line = flagBlock.split('\n').find((l) => l.includes(`${f}_model.glb`));
-    assert.ok(line && !/rotX/.test(line), `${f} 는 rotX 금지(이미 누운 원본)`);
-    assert.match(line, /rotY: Math\.PI/, `${f} 노즈 +z 정렬`);
+  const flagBlock = defs.slice(defs.indexOf('export const FLAG3D'), defs.indexOf('};', defs.indexOf('export const FLAG3D')));
+  const rows = [0, 1, 2, 3, 4, 5].map((t) => flagBlock.split('\n').find((l) => l.trim().startsWith(`${t}:`)));
+  rows.forEach((line, t) => {
+    //  ① 등급마다 한 줄이 있고 GLB 를 가리킨다
+    assert.ok(line, `T${t} 줄이 없다`);
+    assert.match(line, /glb: 'assets\/3d\/[\w-]+\.glb'/, `T${t} 가 GLB 를 안 가리킨다`);
+  });
+  //  ② ⚠️회전 규약: rotX 를 쓸 때는 -π/2 여야 한다(누운 원본에 붙이면 5m 벽으로 세워진다 — 실측).
+  for (const l of rows.filter((x) => /rotX/.test(x))) {
+    assert.match(l, /rotX: -Math\.PI \/ 2/, '서 있는 원본은 rotX -π/2 여야 한다');
   }
   // renderer: 리그·홀더·등급 배율·가시성 스왑
   assert.match(renderer, /import \{[^}]*\bENEMY3D\b[^}]*\bMOUNT_POINTS\b[^}]*\bSHOT_KEYS\b[^}]*\}/);
-  assert.match(renderer, /const TIER_SCALE = \[0\.62, 0\.75, 0\.88, 1\.00, 1\.13, 1\.26\]/);
+  //  §G-49: 등급 배율은 **2D 의 성장 비율을 따라야 한다.** 숫자를 못박는 대신 그 관계를 검사한다 —
+  //  ⚠️예전엔 [0.62 … 1.26](2.03배)을 문자 그대로 못박아 뒀는데, 2D 는 34→140(4.12배)이었다.
+  //   즉 2D 에서 네 배로 자란 배가 3D 에서는 두 배밖에 안 커지는 것을 **아무도 못 잡고 있었다**.
+  const ts = renderer.match(/const TIER_SCALE = \[([^\]]+)\]/);
+  assert.ok(ts, 'TIER_SCALE 을 찾지 못했다');
+  const scale = ts[1].split(',').map((v) => +v.trim());
+  assert.equal(scale.length, SHIP_VISUAL_SIZE.length, '등급 수가 2D 와 다르다');
+  const base = scale[3] / SHIP_VISUAL_SIZE[3];
+  scale.forEach((v, t) => assert.ok(Math.abs(v - SHIP_VISUAL_SIZE[t] * base) < 0.01,
+    `T${t} 배율 ${v} 가 2D 비율(${(SHIP_VISUAL_SIZE[t] * base).toFixed(3)})과 다르다`));
   assert.match(renderer, /holder\.visible = false; holder\.scale\.setScalar\(FLAG_LEN \* \(TIER_SCALE\[\+t\] \?\? 1\)\)/);
   assert.match(renderer, /for \(const k of Object\.keys\(flags\)\) flags\[k\]\.holder\.visible = \(useGlb && \+k === tier\)/);
   //  §G-34 후속(2026-08-11): 절차 AURORA 폴백을 **띄우지 않는다**(이사님 "큰 기체가 스쳐 나온다").
@@ -264,7 +281,13 @@ test('HW-15: §G-12 기함 무기 실모델(이사 VARCO 5종) — 갑판 포탑
   assert.match(renderer, /for \(const k of \['vulcan', 'laser', 'homing'\]\)/);
   assert.match(renderer, /const n = Math\.min\(pts\.length, Math\.max\(1, 1 \+ tier \+ Math\.max\(0, lv - 1\)\)\)/);
   assert.match(renderer, /const wKey = sq\.weapon === 'laser' \? 'laser' : sq\.weapon === 'homing' \? 'homing' : 'vulcan'/);
-  assert.match(renderer, /mountRig\.visible = useGlb && placeMounts\(tier, wKey, sq\.weaponLv \| 0, flags\[tier\]\.box/);
+  //  §G-50: 갑판 포탑은 이사 지시로 **꺼져 있다**(따개비처럼 보여 디자인을 방해). 배선은 남아 있다.
+  //  ⚠️2D 의 `WEAPON_RIG_ON`(entities.js)과 **같은 값**이어야 한다 — 한쪽만 켜면 2D 와 3D 가 다른 배가 된다.
+  assert.match(renderer, /const DECK_TURRETS = (true|false)/, '갑판 포탑 스위치가 없다');
+  assert.match(renderer, /mountRig\.visible = DECK_TURRETS && useGlb\s*\n?\s*&& placeMounts\(tier, wKey, sq\.weaponLv \| 0, flags\[tier\]\.box/);
+  const deck3d = /const DECK_TURRETS = true/.test(renderer);
+  const rig2d = /const WEAPON_RIG_ON = true/.test(readFileSync(new URL('../js/entities.js', import.meta.url), 'utf8'));
+  assert.equal(deck3d, rig2d, `무기 장착물 스위치가 2D(${rig2d})·3D(${deck3d}) 서로 다르다`);
   assert.match(renderer, /mountRig\.rotation\.z = bank/);
   assert.match(renderer, /flags\[t\] = \{ holder, ok: false, box: null \}/);   // 장착점 환산 기준(기함 바운딩)
   // 차지 포구: chargeRig 자식이라 충전·발사 동안만 보인다(상시 표시 금지 — 실루엣 변형)

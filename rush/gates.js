@@ -20,11 +20,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 function makeGate(rnd, t, good) {
   const g = BAL.gates;
   if (good) {
-    //  x게이트는 후반으로 갈수록: 초반 8% -> 후반 55%. x3 은 중반 이후에만.
-    const mulP = 0.08 + 0.47 * t;
-    return rnd() >= mulP
-      ? { op: 'add', value: Math.round(lerp(g.addMin, g.addMax, t) * (0.7 + rnd() * 0.6)) || 1 }
-      : { op: 'mul', value: t < 0.35 ? 2 : g.mulVals[(rnd() * g.mulVals.length) | 0] };
+    //  곱하기 게이트 폐지(2026-09-02 이사 결정 — 병력이 너무 금방 는다). 좋은 게이트 = 더하기만.
+    return { op: 'add', value: Math.round(lerp(g.addMin, g.addMax, t) * (0.7 + rnd() * 0.6)) || 1 };
   }
   const divP = 0.2 + 0.3 * t;
   return rnd() >= divP

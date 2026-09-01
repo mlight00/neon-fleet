@@ -34,7 +34,10 @@ test('G22-URL: chase3d 판정 우선순위 — 0 최우선 / 1 명시 ON / 측�
   const rows = [
     ['', true], ['?utm_source=x', true], ['?chase3d=1', true], ['?chase3d=0', false],
     ['?playtest=prolific', false], ['?coreLoopMeasure=1', false], ['?campaign25=1', false],
-    ['?fleetlab=1', false], ['?bosslab=1&boss=B14', false], ['?fleetlab', false],
+    //  ⚠️§G-49: fleetlab 은 **ON** 으로 바뀌었다. 이 모드는 함대를 눈으로 보라고 만든 것이라
+    //   3D 를 끄면 정작 볼 것이 안 보인다(이사 제보). 측정용 하네스만 OFF 로 남긴다.
+    ['?fleetlab=1', true], ['?fleetlab', true],
+    ['?bosslab=1&boss=B14', false],
     ['?playtest=prolific&chase3d=1', true], ['?bosslab=1&boss=B14&chase3d=1', true],
     ['?chase3d=0&chase3dTest=1', false], ['?fleetlab=1&chase3d=0', false],
     ['?coreLoopTest=1', true],   // 사람 플레이 하네스는 측정용이 아니다
@@ -266,7 +269,11 @@ test('G25-LANCE: 차지 빔은 발사체와 같은 사거리 — 화면 상단�
   const oldEnd400 = screenY(new THREE.Vector3(0, 0.35, NOSE_Z + 400));
   const vanish = screenY(new THREE.Vector3(0, 0.35, 1e6));
   assert.ok(oldEnd400 > vanish - 1, '길이를 늘려도 소실점 위로는 못 간다');
-  assert.ok(oldEnd110 - oldEnd400 < 40, '110 → 400 으로 늘려도 화면상 40px 미만만 이동');
+  //  ⚠️§G-50: 여기 숫자는 **계약이 아니라 옛 방식의 한계를 보여주는 예시**다. 카메라를 뒤로 물리면
+  //   (CHASE_PULLBACK) 같은 깊이 변화가 화면에서 더 크게 움직이므로 절대 px 로 못박으면 깨진다.
+  //   말하려는 바는 "길이를 3.6배 늘려도 화면에서는 조금밖에 안 간다"이므로 화면 높이 대비로 잰다.
+  assert.ok(oldEnd110 - oldEnd400 < LH * 0.08,
+    `110 → 400 으로 늘려도 화면 높이의 8% 미만만 이동 — 실측 ${(oldEnd110 - oldEnd400).toFixed(1)}px`);
   assert.ok(vanish > LH * 0.15, '소실점 자체가 화면 상단이 아니다(=구조적 한계)');
 
   //  ② 새 방식: 발사체가 화면 상단에 놓이는 그 지점을 향한다.

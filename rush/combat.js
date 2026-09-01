@@ -5,13 +5,13 @@ export function createCombat() {
   return { enemies: [], bullets: [], eshots: [], boss: null, fireT: 0, coins: 0, kills: 0 };
 }
 
-export function spawnWave(st, kind, n, rnd, hpMult = 1) {
+export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0) {
   const def = BAL.enemies[kind];
   for (let i = 0; i < n; i++) {
     st.enemies.push({
-      kind, hp: Math.round(def.hp * hpMult), r: def.r,
+      kind, zone, hp: Math.round(def.hp * hpMult), r: def.r,
       x: 85 + rnd() * 310, y: -40 - rnd() * 120,
-      vx: def.zigzag ? (rnd() < 0.5 ? -def.zigzag : def.zigzag) : (rnd() - 0.5) * 30,
+      vx: def.zigzag ? (rnd() < 0.5 ? -def.zigzag : def.zigzag) : (def.straight ? 0 : (rnd() - 0.5) * 30),
       vy: def.speed,
       shootT: def.shootEvery ? def.shootEvery * (0.5 + rnd() * 0.8) : undefined,
       hopT: def.hopEvery ? def.hopEvery * (0.4 + rnd() * 0.8) : undefined,
@@ -74,6 +74,7 @@ export function stepCombat(st, squad, dt, rnd) {
       }
       if (e.hopDur > 0) { e.hopDur -= dt; e.x += e.hopVx * dt; }
     }
+    if (def.accel) e.vy = Math.min(def.maxSpeed ?? 999, e.vy + def.accel * dt);   // 램하운드: 자동차처럼 내리막 가속
     e.x += e.vx * dt; e.y += e.vy * dt;
     if (e.x < 80 || e.x > 400) { e.vx *= -1; e.x = Math.max(80, Math.min(400, e.x)); }
     if (e.shootT !== undefined) {
@@ -92,13 +93,32 @@ export function stepCombat(st, squad, dt, rnd) {
   //  적탄 이동·명중
   for (const s of st.eshots) {
     s.x += s.vx * dt; s.y += s.vy * dt;
-    if (s.y >= lineY && Math.abs(s.x - squad.x) < rad + 5) { troopLoss += 1; s.dead = true; }
+    if (s.y >= lineY && Math.abs(s.x - squad.x) < rad + (s.hook ? 16 : 5)) { troopLoss += s.hook ? 3 : 1; s.dead = true; }
   }
 
   //  보스 — 공통 골격: 좌우 이동 + 부채꼴 사격 + 접촉. 스멜터(spawnEvery)는 잡졸 소환.
   if (st.boss) {
     const bo = st.boss, def = BAL.bosses[bo.zone];
-    if (bo.y < 140) bo.y += 60 * dt;
+    if (def.ramEvery) {                               // 그레이더: 불도저 돌진 — 밀고 내려왔다 후진
+      bo.ramT = (bo.ramT ?? def.ramEvery) - dt;
+      if (bo.ramPhase === 1) {
+        bo.y += def.ramSpeed * dt;
+        if (bo.y >= lineY - bo.r * 0.6) bo.ramPhase = 2;
+      } else if (bo.ramPhase === 2) {
+        bo.y -= 150 * dt;
+        if (bo.y <= 140) { bo.y = 140; bo.ramPhase = 0; }
+      } else if (bo.ramT <= 0 && bo.y >= 130) {
+        bo.ramPhase = 1; bo.ramT = def.ramEvery;
+      }
+    }
+    if (def.hookEvery) {                              // 갠트리 위도우: 갈고리를 아래로 쭉 뻗는다
+      bo.hookT = (bo.hookT ?? def.hookEvery * 0.6) - dt;
+      if (bo.hookT <= 0) {
+        bo.hookT = def.hookEvery;
+        st.eshots.push({ x: bo.x, y: bo.y + bo.r, vx: 0, vy: def.hookSpeed, hook: true });
+      }
+    }
+    if (bo.y < 140 && !bo.ramPhase) bo.y += 60 * dt;
     bo.x += bo.dir * def.speed * dt;
     if (bo.x < 90 || bo.x > 390) bo.dir *= -1;
     bo.shootT -= dt;
@@ -134,8 +154,11 @@ export function stepCombat(st, squad, dt, rnd) {
     const def = BAL.enemies[e.kind];
     if (e.hp <= 0) {
       st.kills++;
-      events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, touched: !!e.touched });
+      events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, kind: e.kind, touched: !!e.touched });
       if (!e.touched) st.coins += def.coin;
+      if (e.kind === 'supply' && !e.touched) {
+        events.push({ type: 'supply', x: e.x, y: e.y, n: def.rewardByZone[e.zone ?? 0] ?? 6 });
+      }
       if (def.spawns) born.push({ kind: def.spawns, n: def.spawnN, x: e.x, y: e.y });
       return false;
     }

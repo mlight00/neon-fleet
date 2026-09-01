@@ -10,7 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { makeChaseCamera, projectPoint3D, CAMERA } from '../js/chase3d-mapping.js';
+import { makeChaseCamera, projectPoint3D, CAMERA, CHASE_PULLBACK } from '../js/chase3d-mapping.js';
 import { transitionT } from '../js/chase3d-config.js';
 
 const VIEWPORTS = [[360, 800], [480, 800], [800, 600]];
@@ -42,11 +42,15 @@ test('G34-CAM-CONTINUOUS: 하드 컷 지점에서 카메라 값이 튀지 않는
   //  t=0.5 는 기함 표시가 2D→3D 로 **하드 컷**되는 지점이다(flagshipLayer).
   //  카메라 자체까지 그 순간 튀면 화면 전체가 덜컥거린다 — 카메라는 연속이어야 한다.
   const eps = 1e-3;
+  //  ⚠️§G-50: 허용오차는 **카메라 규모에 비례**해야 한다. 절대 0.01 로 두었더니
+  //   CHASE_PULLBACK(카메라를 뒤로 물림)만으로 깨졌다 — 곡선은 그대로 매끄러운데 값만 커진 것이다.
+  //   연속성은 규모와 무관한 성질이므로, 배율을 곱해 같은 판정을 유지한다.
+  const tol = 0.01 * Math.max(1, CHASE_PULLBACK);
   for (const [W, H] of VIEWPORTS) {
     const a = makeChaseCamera(W, H, 0.5 - eps), b = makeChaseCamera(W, H, 0.5 + eps);
     for (let i = 0; i < 3; i++) {
-      assert.ok(Math.abs(a.eye[i] - b.eye[i]) < 0.01, `eye[${i}] 연속 — ${a.eye[i]} vs ${b.eye[i]}`);
-      assert.ok(Math.abs(a.target[i] - b.target[i]) < 0.01, `target[${i}] 연속`);
+      assert.ok(Math.abs(a.eye[i] - b.eye[i]) < tol, `eye[${i}] 연속 — ${a.eye[i]} vs ${b.eye[i]}`);
+      assert.ok(Math.abs(a.target[i] - b.target[i]) < tol, `target[${i}] 연속`);
     }
     assert.ok(Math.abs(a.fov - b.fov) < 0.01, 'fov 연속');
     assert.ok(Math.abs(vanishY(a) - vanishY(b)) < 0.5, '소실점 화면 y 연속');

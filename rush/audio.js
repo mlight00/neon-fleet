@@ -22,6 +22,7 @@ const VOL = { fire: 0.16, kill: 0.4, bossDie: 0.8, hurt: 0.55, gateGood: 0.6, ga
 
 export function createAudio() {
   let unlocked = false;
+  let muted = false;
   const rr = {};                                     // 라운드로빈 인덱스
   const lastAt = {};
   const bgmEl = typeof Audio !== 'undefined' ? new Audio() : null;
@@ -33,17 +34,22 @@ export function createAudio() {
     bgmName = name;
     bgmEl.src = DIR + name + '.ogg';
     bgmEl.volume = baseVol * duckMult;
-    if (unlocked) bgmEl.play().catch(() => {});
+    if (unlocked && !muted) bgmEl.play().catch(() => {});
   }
 
   return {
     unlock() {                                       // 첫 pointerdown 에서 호출
       if (unlocked) return;
       unlocked = true;
-      if (bgmEl && bgmName) bgmEl.play().catch(() => {});
+      if (bgmEl && bgmName && !muted) bgmEl.play().catch(() => {});
+    },
+    isMuted() { return muted; },
+    setMuted(v) {
+      muted = !!v;
+      if (bgmEl) { if (muted) bgmEl.pause(); else if (unlocked && bgmName) bgmEl.play().catch(() => {}); }
     },
     bgmPause() { if (bgmEl) bgmEl.pause(); },
-    bgmResume() { if (bgmEl && unlocked && bgmName) bgmEl.play().catch(() => {}); },
+    bgmResume() { if (bgmEl && unlocked && bgmName && !muted) bgmEl.play().catch(() => {}); },
     bgmBattle() { playBgm('nf_bgm_battle1'); },
     /** 구간별 보스곡: 1~2구간=sector1, 3구간=sector2, 4구간=sector3, 최종=boss */
     bgmBoss(zone = 4) {
@@ -56,7 +62,7 @@ export function createAudio() {
       if (bgmEl) bgmEl.volume = baseVol * duckMult;
     },
     sfx(name) {
-      if (!unlocked || typeof Audio === 'undefined') return;
+      if (!unlocked || muted || typeof Audio === 'undefined') return;
       const files = SFX[name];
       if (!files) return;
       const now = performance.now() / 1000;

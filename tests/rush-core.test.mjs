@@ -60,7 +60,7 @@ test('TRACK-DET: 같은 시드는 같은 트랙, 5구간·보스 5·구간별 �
   assert.ok(kinds.size >= 6, '적 종류가 다양하게 섞인다: ' + kinds.size);
   //  구간1 웨이브에는 구간1 적만 나온다
   const z1kinds = new Set(a.events.filter((e) => e.type === 'wave' && e.z < 11400).map((e) => e.data.kind));
-  for (const k of z1kinds) assert.ok(['scrapbit', 'wheeler'].includes(k), '구간1 침범: ' + k);
+  for (const k of z1kinds) assert.ok(['scrapbit', 'wheeler', 'supply'].includes(k), '구간1 침범: ' + k);
   assert.deepEqual([...new Set(zonePool(0))], ['scrapbit', 'wheeler']);
   assert.equal(zonePool(4).length > zonePool(1).length, true, '풀이 누적 확장');
 });

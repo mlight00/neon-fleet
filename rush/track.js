@@ -33,6 +33,10 @@ export function buildTrack(seed) {
       const isLastGateOfZone = z + T.gateEvery >= z0 + T.zoneLen - 260;
       events.push({ z: Math.round(z), type: 'gatepair', data: makeGatePair(rnd, t, isLastGateOfZone) });
       for (let w = z + 90; w < z + T.gateEvery - 60; w += T.waveEvery) {
+        if (rnd() < 0.26) {                            // 보급 컨테이너 — 쏴서 깨면 병력(게이트 밖의 성장 축)
+          events.push({ z: Math.round(w), type: 'wave', data: { kind: 'supply', n: 1 } });
+          continue;
+        }
         const kind = pool[(rnd() * pool.length) | 0];
         const [lo, hi] = BAL.enemies[kind].count;
         events.push({ z: Math.round(w), type: 'wave', data: { kind, n: lo + ((rnd() * (hi - lo + 1)) | 0) } });
