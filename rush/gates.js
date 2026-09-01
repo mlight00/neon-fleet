@@ -12,7 +12,7 @@ export function applyGate(count, gate) {
   else if (gate.op === 'mul') r = count * n;
   else if (gate.op === 'sub') r = count - n;
   else r = Math.ceil(count / n);
-  return Math.max(0, Math.round(r));
+  return Math.max(0, Math.min(BAL.squad.maxCount, Math.round(r)));   // 상한 999(라스트워식) — 후반은 '덜 나쁜 쪽' 게임
 }
 
 const lerp = (a, b, t) => a + (b - a) * t;

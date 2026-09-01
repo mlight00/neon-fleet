@@ -49,7 +49,7 @@ test('TRACK-DET: 같은 시드는 같은 트랙, 5구간·보스 5·구간별 �
   assert.deepEqual(a, b);
   assert.notDeepEqual(a.events, c.events);
   for (let i = 1; i < a.events.length; i++) assert.ok(a.events[i].z >= a.events[i - 1].z, 'z 정렬');
-  assert.equal(a.length, 8000);
+  assert.equal(a.length, 57000);
   const bosses = a.events.filter((e) => e.type === 'boss');
   assert.equal(bosses.length, 5, '구간 보스 5개');
   assert.deepEqual(bosses.map((e) => e.data.zone), [0, 1, 2, 3, 4]);
@@ -59,7 +59,7 @@ test('TRACK-DET: 같은 시드는 같은 트랙, 5구간·보스 5·구간별 �
   const kinds = new Set(a.events.filter((e) => e.type === 'wave').map((e) => e.data.kind));
   assert.ok(kinds.size >= 6, '적 종류가 다양하게 섞인다: ' + kinds.size);
   //  구간1 웨이브에는 구간1 적만 나온다
-  const z1kinds = new Set(a.events.filter((e) => e.type === 'wave' && e.z < 1600).map((e) => e.data.kind));
+  const z1kinds = new Set(a.events.filter((e) => e.type === 'wave' && e.z < 11400).map((e) => e.data.kind));
   for (const k of z1kinds) assert.ok(['scrapbit', 'wheeler'].includes(k), '구간1 침범: ' + k);
   assert.deepEqual([...new Set(zonePool(0))], ['scrapbit', 'wheeler']);
   assert.equal(zonePool(4).length > zonePool(1).length, true, '풀이 누적 확장');
@@ -70,4 +70,9 @@ test('BAL-SHAPE: 계획이 쓰는 키가 전부 있다', () => {
     assert.ok(BAL[k], 'BAL.' + k + ' 누락');
   }
   assert.deepEqual(BAL.tiers, [1, 25, 75, 150, 300]);
+});
+
+test('GATE-CAP: 병력 상한 999', () => {
+  assert.equal(applyGate(600, { op: 'mul', value: 3 }), 999);
+  assert.equal(applyGate(999, { op: 'sub', value: 60 }), 939, '상한에서도 감소는 그대로 아프다');
 });

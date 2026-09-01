@@ -126,8 +126,11 @@ test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 5보스를
         }
       }
       const hadBoss = !!st.boss;
-      //  플레이어는 보스를 조준하려고 그 밑으로 이동한다 — 봇도 동일하게
-      const x = st.boss ? Math.max(40, Math.min(440, st.boss.x)) : 240;
+      //  플레이어는 보스나 가장 가까운 적을 조준하러 이동한다 — 봇도 동일하게
+      let tx = 240;
+      if (st.boss) tx = st.boss.x;
+      else if (st.enemies.length) tx = st.enemies.reduce((a, b) => (a.y > b.y ? a : b)).x;
+      const x = Math.max(80, Math.min(400, tx));
       const r = stepCombat(st, { x, count, fireRateMult: 1 }, dt, rnd);
       if (hadBoss && !st.boss) bossKills++;
       count -= r.troopLoss;
