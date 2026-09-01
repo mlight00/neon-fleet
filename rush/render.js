@@ -118,7 +118,7 @@ export function createRenderer(canvas, sprites) {
     const S = BAL.squad;
     const pts = formation(squad.count);
     for (let i = pts.length - 1; i >= 1; i--) {       // 병사들 — 뒷줄부터 그려 앞줄이 위에 오게
-      const px = squad.x + pts[i].x, py = S.y + pts[i].y + 16;   // 히어로 뒤로 살짝 밀어 겹침 방지
+      const px = squad.x + pts[i].x, py = S.y + pts[i].y;        // 링 대형(히어로 중심 군집)
       drawImgCentered('soldier', px, py, S.soldierSize, () => {
         ctx.fillStyle = '#DFE6F5';
         ctx.beginPath();
@@ -301,19 +301,68 @@ export function createRenderer(canvas, sprites) {
     void view;
   }
 
+  function drawParts(parts) {
+    for (const p of parts) {
+      const k = 1 - p.t / p.life;
+      if (p.flash) {                                   // 중심 섬광
+        ctx.globalAlpha = k * 0.85;
+        ctx.fillStyle = p.big ? '#FFD9A0' : '#FFE9C8';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.2 - k * 0.5), 0, Math.PI * 2); ctx.fill();
+      } else {                                         // 파편
+        ctx.globalAlpha = k;
+        ctx.fillStyle = p.big ? '#FF9A4A' : '#FF6A3D';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * k + 1, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawFloaters(floaters) {
+    ctx.textAlign = 'center';
+    for (const f of floaters) {
+      ctx.globalAlpha = Math.max(0, 1 - f.t / 0.9);
+      ctx.font = 'bold ' + (f.big ? 34 : 22) + 'px system-ui, sans-serif';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = '#14233A';
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function draw(view) {
+    const shaking = (view.shakeT ?? 0) > 0;
+    if (shaking) {                                     // 피탄·충돌 화면 흔들림
+      const a = BAL.fx.shakeAmp * (view.shakeT / BAL.fx.shakeDur);
+      ctx.save();
+      ctx.translate(Math.sin(view.now * 71) * a, Math.cos(view.now * 89) * a * 0.7);
+    }
     drawBackground(view.scroll ?? 0, view.zone ?? 0);
     if (view.state === 'run' || view.state === 'over') {
       for (const g of view.gates) drawGatePair(g.y, g.pair);
       for (const e of view.enemies) drawEnemy(e);
       if (view.boss) drawBoss(view.boss);
       ctx.fillStyle = '#8FF3FF';
-      for (const b of view.bullets) ctx.fillRect(b.x - 2, b.y - 7, 4, 14);
+      for (const b of view.bullets) {
+        const w = b.w ?? 4;
+        ctx.fillRect(b.x - w / 2, b.y - 7 - w, w, 14 + w);
+      }
       ctx.fillStyle = '#FF3DA5';
       for (const s of view.eshots) { ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, Math.PI * 2); ctx.fill(); }
       drawSquad(view.squad);
+      drawParts(view.parts ?? []);
+      drawFloaters(view.floaters ?? []);
       if (view.dim > 0) {                              // 보스 앞 정적
         ctx.fillStyle = 'rgba(0,0,0,' + view.dim + ')';
+        ctx.fillRect(0, 0, W, H);
+      }
+      if ((view.hurtT ?? 0) > 0) {                     // 피격 빨간 비네트 — "왜 죽는지" 즉시 보이게
+        const a = Math.min(0.45, view.hurtT / BAL.fx.hurtFlashDur * 0.45);
+        const gr = ctx.createRadialGradient(W / 2, H / 2, 160, W / 2, H / 2, 470);
+        gr.addColorStop(0, 'rgba(255,40,40,0)');
+        gr.addColorStop(1, 'rgba(255,40,40,' + a + ')');
+        ctx.fillStyle = gr;
         ctx.fillRect(0, 0, W, H);
       }
       drawHud(view.hud);
@@ -330,6 +379,7 @@ export function createRenderer(canvas, sprites) {
       ctx.fillStyle = '#F6C84A';
       ctx.fillText('오늘의 도전', W - 44, 30);
     }
+    if (shaking) ctx.restore();
   }
 
   return { draw };

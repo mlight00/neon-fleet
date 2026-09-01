@@ -7,21 +7,23 @@ export function tierFor(count) {
   return 0;
 }
 
-/** 행 r(0=선두)에 r+1 자리, 행마다 뒤로. drawCap 초과분은 그리지 않는다(숫자 라벨이 담당). */
+/** 라스트워식 둥근 군집: 히어로(0,0)를 중심으로 동심 링에 병사를 채운다.
+ *  전방 ±45도는 비워 히어로가 보이게. drawCap 초과분은 그리지 않는다(숫자 라벨이 담당). */
 export function formation(count) {
   const n = Math.min(count, BAL.squad.drawCap);
-  const sx = BAL.squad.unitSpacingX, sy = BAL.squad.unitSpacingY;
-  const out = [];
-  let r = 0, placed = 0;
-  while (placed < n) {
-    const cols = Math.min(r + 1, 13);                    // 한 행 최대 13 — 화면 폭 보호
-    const take = Math.min(cols, n - placed);
-    for (let k = 0; k < take; k++) {
-      out.push({ x: (k - (take - 1) / 2) * sx, y: r * sy });
+  const out = [{ x: 0, y: 0 }];                       // index 0 = 히어로 자리
+  let k = 1;
+  while (out.length < n) {
+    const r = BAL.squad.ringStart + (k - 1) * BAL.squad.ringGap;
+    const usable = Math.PI * 1.5;                     // 전방 90도 부채꼴 제외
+    const slots = Math.max(3, Math.round(usable * r / 22));
+    for (let i = 0; i < slots && out.length < n; i++) {
+      const a = Math.PI * 0.25 + (i + (k % 2) * 0.5) * (usable / slots);   // 0=전방(위), π=정후방
+      out.push({ x: Math.round(Math.sin(a) * r), y: Math.round(-Math.cos(a) * r) });
     }
-    placed += take; r++;
+    k++;
   }
-  return out;
+  return out.slice(0, n);
 }
 
 export function clampX(x) { return Math.max(40, Math.min(440, x)); }

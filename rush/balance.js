@@ -1,10 +1,11 @@
 // rush/balance.js — 스타포지 러시 수치 단일 진실. 로직 없음.
 export const BAL = {
   //  판 = 5구간 × 900. 구간마다 신규 적 2종 합류(누적), 구간 끝(900의 배수)마다 전용 보스.
-  track: { length: 4500, zoneLen: 900, zones: 5, scrollSpeed: 190, gateEvery: 300, firstGateZ: 240, waveEvery: 150 },
+  track: { length: 8000, zoneLen: 1600, zones: 5, scrollSpeed: 190, gateEvery: 400, firstGateZ: 260, waveEvery: 160 },
   //  followRate = 기존 게임(js/balance.js) followSpeed 와 동일값
   squad: { y: 640, moveSpeed: 420, followRate: 9, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
-           heroSize: 46, soldierSize: 22,
+           heroSize: 46, soldierSize: 22, ringGap: 19, ringStart: 26,
+           muzzles: [1, 1, 2, 2, 3], bulletW: [4, 5, 6, 7, 8],   // 티어별 발사 열·탄 굵기(성장 체감)
            fireInterval: 0.5, bulletSpeed: 700, bulletDmg: 1, dmgPerTroop: 0.02, touchLossPerHit: 1 },
   tiers: [1, 25, 75, 150, 300],          // M1~M5 병력 임계
   gates: {
@@ -41,7 +42,8 @@ export const BAL = {
   ],
   coins: { perDistance: 0.01 },          // 거리 보정 코인(주 수입은 격파)
   fx: { slowmoAt: 5, slowmoDur: 0.5, slowmoScale: 0.4, slowmoMax: 2,
-        continueTroops: 10, continueInvulnSec: 2, bossHushSec: 1.5 },
+        continueTroops: 10, continueInvulnSec: 2, bossHushSec: 1.5,
+        shakeDur: 0.25, shakeAmp: 7, hurtFlashDur: 0.35 },
   upgrades: {
     startTroops: { max: 9, effect: 1,    costs: [30, 80, 160, 280, 450, 680, 980, 1350, 1800] },
     fireRate:    { max: 5, effect: 0.05, costs: [40, 100, 200, 350, 550] },

@@ -13,18 +13,18 @@ test('SQUAD-TIER: 임계 1/25/75/150/300', () => {
   for (const [n, t] of cases) assert.equal(tierFor(n), t, n + '기');
 });
 
-test('SQUAD-FORM: 개수 상한·쐐기(뒤로 갈수록 넓다)·중복 없음', () => {
+test('SQUAD-FORM: 링 군집 — 상한·히어로 중심·전방 개방·중복 없음', () => {
   assert.equal(formation(1).length, 1);
+  assert.deepEqual(formation(1)[0], { x: 0, y: 0 }, '선두=히어로 자리');
   assert.equal(formation(10).length, 10);
   assert.equal(formation(500).length, BAL.squad.drawCap);
   const f = formation(60);
-  const rows = new Map();
-  for (const p of f) {
-    const key = Math.round(p.y);
-    rows.set(key, Math.max(rows.get(key) ?? 0, Math.abs(p.x)));
+  for (const p of f.slice(1)) {
+    const r = Math.hypot(p.x, p.y);
+    assert.ok(r >= BAL.squad.ringStart - 1, '병사는 히어로에서 링 간격 이상 떨어짐: ' + r);
+    const ang = Math.atan2(p.x, -p.y);                 // 0=정전방
+    assert.ok(Math.abs(ang) >= Math.PI * 0.2, '전방 부채꼴은 빈다: ' + ang.toFixed(2));
   }
-  const ys = [...rows.keys()].sort((a, b) => a - b);
-  assert.ok(rows.get(ys[ys.length - 1]) >= rows.get(ys[0]), '뒷줄이 앞줄보다 넓거나 같다');
   const set = new Set(f.map((p) => Math.round(p.x) + ',' + Math.round(p.y)));
   assert.equal(set.size, f.length, '겹치는 자리 없음');
 });
@@ -118,7 +118,10 @@ test('SIM-FULLRUN: "좋은 쪽만 고르는" 봇이 시드 5개에서 5보스를
           const better = applyGate(count, left) >= applyGate(count, right) ? left : right;
           count = applyGate(count, better);
         } else if (ev.type === 'wave') spawnWave(st, ev.data.kind, ev.data.n, rnd);
-        else spawnBoss(st, count, ev.data.zone);
+        else {
+          st.enemies.length = 0; st.eshots.length = 0;   // 보스전은 1:1(main.advance 와 동일 규칙)
+          spawnBoss(st, count, ev.data.zone);
+        }
       }
       const hadBoss = !!st.boss;
       //  플레이어는 보스를 조준하려고 그 밑으로 이동한다 — 봇도 동일하게

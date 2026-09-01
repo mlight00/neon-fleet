@@ -37,18 +37,27 @@ function shootFan(st, x, y, tx, ty, fan, speed) {
 
 export function stepCombat(st, squad, dt, rnd) {
   const S = BAL.squad, lineY = S.y - 8;
-  const bulletDmg = S.bulletDmg + squad.count * S.dmgPerTroop;   // 병력 = 화력(탄 수는 완만, 탄 위력이 비례)
+  const tier = squad.tier ?? 0;
+  const muzzles = S.muzzles[tier] ?? 1;
+  const bulletDmg = (S.bulletDmg + squad.count * S.dmgPerTroop) / muzzles;   // 병력 = 화력(열 수로 배분)
+  const events = [];
   let troopLoss = 0;
 
-  //  아군 사격 — count 비례 발사(틱당 묶음). fireRateMult 0 이면 사격 없음(테스트용).
+  //  아군 사격 — count 비례 발사(틱당 묶음). 티어가 오르면 발사 열이 늘고 탄이 굵어진다(성장 체감).
   if (squad.fireRateMult > 0) {
     st.fireT -= dt;
     const interval = S.fireInterval / (squad.fireRateMult * Math.max(1, Math.sqrt(squad.count)));
     const spread = Math.min(280, 30 + 20 * Math.sqrt(squad.count));   // 전열 전체가 쏜다 — 대형 폭만큼 사선이 넓어진다
+    let shots = 0;
     while (st.fireT <= 0) {
       st.fireT += Math.max(0.02, interval);
-      st.bullets.push({ x: squad.x + (rnd() - 0.5) * spread, y: S.y - 20, vy: -S.bulletSpeed });
+      const cx = squad.x + (rnd() - 0.5) * spread;
+      for (let m = 0; m < muzzles; m++) {
+        st.bullets.push({ x: cx + (m - (muzzles - 1) / 2) * 14, y: S.y - 20, vy: -S.bulletSpeed, w: S.bulletW[tier] ?? 4 });
+      }
+      shots++;
     }
+    if (shots > 0) events.push({ type: 'fire' });
   }
   for (const b of st.bullets) b.y += b.vy * dt;
 
@@ -124,6 +133,7 @@ export function stepCombat(st, squad, dt, rnd) {
     const def = BAL.enemies[e.kind];
     if (e.hp <= 0) {
       st.kills++;
+      events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, touched: !!e.touched });
       if (!e.touched) st.coins += def.coin;
       if (def.spawns) born.push({ kind: def.spawns, n: def.spawnN, x: e.x, y: e.y });
       return false;
@@ -146,10 +156,12 @@ export function stepCombat(st, squad, dt, rnd) {
   if (st.boss && st.boss.hp <= 0) {
     st.coins += BAL.bosses[st.boss.zone].coin;
     st.kills++;
+    events.push({ type: 'bossKill', x: st.boss.x, y: st.boss.y, r: st.boss.r });
     st.boss = null;
   }
   st.bullets = st.bullets.filter((b) => !b.dead && b.y > -40);
   st.eshots = st.eshots.filter((s) => !s.dead && s.y < 830 && s.x > -40 && s.x < 520);
 
-  return { troopLoss };
+  if (troopLoss > 0) events.push({ type: 'hurt', n: troopLoss });
+  return { troopLoss, events };
 }

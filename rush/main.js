@@ -3,7 +3,8 @@
 import { BAL } from './balance.js';
 import { mulberry32, dateSeed, hashSeed } from './rng.js';
 import { buildTrack } from './track.js';
-import { applyGate } from './gates.js';
+import { applyGate, isGood, gateColor } from './gates.js';
+import { createAudio } from './audio.js';
 import { tierFor, clampX } from './squad.js';
 import { createCombat, spawnWave, spawnBoss, stepCombat } from './combat.js';
 import { createSave } from './save.js';
@@ -35,6 +36,7 @@ function newRun(save, mode) {
     combat: createCombat(),
     watcher: recordWatcher(save.get().best), slowmo: slowmoCtl(), cont: continueToken(isDaily),
     recordFlash: 0, gold: false, dim: 0, invulnT: 0, curBossZone: -1,
+    parts: [], floaters: [], shakeT: 0, hurtT: 0, burstSeed: 0, sfxQueue: [],
     peak: eff.startCount, over: false, won: false,
     firstX2: !isDaily && isFirstRunToday(save.get(), todayKey()),
   };
@@ -45,6 +47,19 @@ export function nextBossZ(run) {
     if (run.track.events[i].type === 'boss') return run.track.events[i].z;
   }
   return run.combat.boss ? run.z : Infinity;          // 싸우는 중이면 0m 로 표시
+}
+
+/** 파편 폭발 — 각도는 카운터 기반(전역 난수 금지). big=보스급. */
+function spawnBurst(run, x, y, r, big) {
+  run.burstSeed++;
+  const n = big ? 16 : 7;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + run.burstSeed * 0.7;
+    const sp = (big ? 210 : 130) * (0.6 + ((i + run.burstSeed) % 3) * 0.25);
+    run.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                     t: 0, life: big ? 0.7 : 0.42, r: big ? 7 : 4, big: !!big });
+  }
+  run.parts.push({ x, y, vx: 0, vy: 0, t: 0, life: big ? 0.5 : 0.3, r: r * (big ? 1.6 : 1.2), flash: true });
 }
 
 function advance(run, dt0) {
@@ -61,14 +76,44 @@ function advance(run, dt0) {
     const ev = run.track.events[run.ei++];
     if (ev.type === 'gatepair') {
       const gate = gateHitSide(run.x) === 'left' ? ev.data.left : ev.data.right;
+      const before = run.count;
       run.count = applyGate(run.count, gate);
+      const sym = { add: '+', mul: '×', sub: '−', div: '÷' }[gate.op];
+      run.floaters.push({ x: run.x, y: 560, text: sym + gate.value, color: gateColor(gate.op), t: 0, big: true });
+      run.sfxQueue.push(isGood(gate.op) ? 'gateGood' : 'gateBad');
+      if (run.count < before && run.count <= 5) { run.shakeT = BAL.fx.shakeDur; run.hurtT = BAL.fx.hurtFlashDur; }
     } else if (ev.type === 'wave') spawnWave(run.combat, ev.data.kind, ev.data.n, run.rnd);
-    else { spawnBoss(run.combat, run.count, ev.data.zone); run.curBossZone = ev.data.zone; run.dim = 0; }
+    else {
+      for (const e of run.combat.enemies) spawnBurst(run, e.x, e.y, e.r, false);   // 보스전은 1:1 — 잡졸 일괄 정리
+      run.combat.enemies.length = 0;
+      run.combat.eshots.length = 0;
+      spawnBoss(run.combat, run.count, ev.data.zone);
+      run.curBossZone = ev.data.zone; run.dim = 0; run.sfxQueue.push('bossIn');
+    }
   }
-  const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult }, dt, run.rnd);
+  const prevTier = tierFor(run.count);
+  const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult, tier: prevTier }, dt, run.rnd);
+  for (const ev of r.events) {
+    if (ev.type === 'kill') { spawnBurst(run, ev.x, ev.y, ev.r, false); if (!ev.touched) run.sfxQueue.push('kill'); }
+    else if (ev.type === 'bossKill') { spawnBurst(run, ev.x, ev.y, ev.r, true); run.sfxQueue.push('bossDie'); run.shakeT = BAL.fx.shakeDur; }
+    else if (ev.type === 'hurt' && run.invulnT <= 0) {
+      run.shakeT = BAL.fx.shakeDur;
+      run.hurtT = BAL.fx.hurtFlashDur;
+      run.floaters.push({ x: run.x, y: BAL.squad.y - 40, text: '−' + ev.n, color: '#FF4A4A', t: 0 });
+      run.sfxQueue.push('hurt');
+    } else if (ev.type === 'fire') run.sfxQueue.push('fire');
+  }
   if (run.invulnT > 0) run.invulnT -= dt0; else run.count -= r.troopLoss;
+  if (tierFor(run.count) > prevTier) run.sfxQueue.push('evolve');
+  //  연출 상태 갱신
+  run.shakeT = Math.max(0, run.shakeT - dt0);
+  run.hurtT = Math.max(0, run.hurtT - dt0);
+  for (const p of run.parts) { p.t += dt0; p.x += p.vx * dt0; p.y += p.vy * dt0; }
+  run.parts = run.parts.filter((p) => p.t < p.life);
+  for (const f of run.floaters) { f.t += dt0; f.y -= 44 * dt0; }
+  run.floaters = run.floaters.filter((f) => f.t < 0.9);
   run.peak = Math.max(run.peak, run.count);
-  if (run.watcher.update(run.count) === 'break') { run.recordFlash = 1.2; run.gold = true; }
+  if (run.watcher.update(run.count) === 'break') { run.recordFlash = 1.2; run.gold = true; run.sfxQueue.push('record'); }
   run.recordFlash = Math.max(0, run.recordFlash - dt0);
   if (run.count <= 0) run.over = true;
   else if (run.curBossZone >= 0 && !run.combat.boss) {         // 이번 구간 보스 격파
@@ -81,6 +126,7 @@ function advance(run, dt0) {
 export function boot() {
   const canvas = document.getElementById('game');
   const save = createSave();
+  const au = createAudio();
   let state = 'title', run = null, renderer = null, buttons = [];
   const pointer = { down: false, x: 240 };
   const keys = {};
@@ -131,6 +177,11 @@ export function boot() {
       v.boss = run.combat.boss;
       v.squad = { x: run.x, count: run.count, tier: tierFor(run.count) };
       v.dim = run.dim;
+      v.parts = run.parts;
+      v.floaters = run.floaters;
+      v.shakeT = run.shakeT;
+      v.hurtT = run.hurtT;
+      v.now = performance.now() / 1000;
       v.zone = Math.min(BAL.track.zones - 1, Math.floor(run.z / BAL.track.zoneLen));
       const bz = nextBossZ(run);
       v.hud = {
@@ -172,6 +223,7 @@ export function boot() {
   function onPress(x, y) {
     const id = hitButton(buttons, x, y);
     if (!id) return;
+    au.sfx('click');
     if (state === 'title') {
       if (id === 'start') startRun('normal');
       else if (id === 'daily') startRun('daily');
@@ -187,7 +239,7 @@ export function boot() {
       if (id === 'retry') startRun(run.mode);
       else if (id === 'daily') startRun('daily');
       else if (id === 'title') state = 'title';
-      else if (id.startsWith('up_')) buy(save, id.slice(3));
+      else if (id.startsWith('up_')) { if (buy(save, id.slice(3))) au.sfx('buy'); }
       else if (id === 'share') {
         navigator.clipboard?.writeText(shareText(run.seedKey, run.resultData.shareBest)).catch(() => {});
       }
@@ -200,6 +252,8 @@ export function boot() {
   }
 
   canvas.addEventListener('pointerdown', (e) => {
+    au.unlock();
+    au.bgmBattle();
     pointer.down = true;
     const [x, y] = toLogical(e);
     pointer.x = x;
@@ -238,6 +292,10 @@ export function boot() {
       if (keys.ArrowRight) run.tx = clampX(run.tx + BAL.squad.moveSpeed * dt);
       run.x += (run.tx - run.x) * Math.min(1, dt * BAL.squad.followRate);   // 부드러운 추종(뚝뚝 끊김 방지)
       advance(run, dt);
+      for (const s of run.sfxQueue) au.sfx(s);
+      run.sfxQueue.length = 0;
+      if (run.combat.boss) au.bgmBoss(); else au.bgmBattle();
+      au.duck(state === 'run' ? Math.max(0.35, 1 - run.dim * 1.8) : 1);     // A-3 보스 앞 정적
       if (run.over) {
         if (run.cont.canUse()) state = 'over';
         else finishRun();
