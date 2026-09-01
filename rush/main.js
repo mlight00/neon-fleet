@@ -198,7 +198,9 @@ export function boot() {
         bossDist: (run.combat.boss || bz === Infinity) ? 0 : Math.max(0, Math.round((bz - run.z) / 10)),
         firstRunX2: run.firstX2, recordFlash: run.recordFlash,
       };
-      if (state === 'over') {
+      if (state === 'run') {
+        v.buttons = [{ id: 'pause', x: 422, y: 14, w: 44, h: 44, label: '❚❚' }];
+      } else if (state === 'over') {
         v.buttons = [
           { id: 'continue', x: 120, y: 430, w: 240, h: 56, label: '이어하기 (1회)', primary: true },
           { id: 'giveup', x: 120, y: 510, w: 240, h: 44, label: '그만하기' },
@@ -238,7 +240,9 @@ export function boot() {
     const id = hitButton(buttons, x, y);
     if (!id) return;
     au.sfx('click');
-    if (state === 'title') {
+    if (state === 'run') {
+      if (id === 'pause') { state = 'paused'; au.bgmPause(); }
+    } else if (state === 'title') {
       if (id === 'start') startRun('normal');
       else if (id === 'daily') startRun('daily');
     } else if (state === 'paused') {
