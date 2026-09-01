@@ -232,45 +232,67 @@ export function createRenderer(canvas, sprites) {
     }
   }
 
+  //  버튼 공통 스타일: 주 버튼 = 딥 네이비 + 시안 라인, 보조 = 반투명 네이비 패널.
+  //  밝은 폐허 배경 위에서도 항상 읽히도록 어두운 판을 깐다. 텍스트는 세로 중앙 정렬.
   function drawButtons(buttons) {
     for (const b of buttons) {
-      ctx.globalAlpha = b.disabled ? 0.4 : 1;
-      ctx.fillStyle = b.primary ? '#35E5FF' : 'rgba(243,241,232,0.12)';
-      roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
-      if (!b.primary) {
-        ctx.strokeStyle = 'rgba(243,241,232,0.5)'; ctx.lineWidth = 2;
-        roundRect(b.x, b.y, b.w, b.h, 12); ctx.stroke();
+      ctx.globalAlpha = b.disabled ? 0.45 : 1;
+      const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+      if (b.primary) {
+        ctx.fillStyle = '#14233A';
+        roundRect(b.x, b.y, b.w, b.h, b.h / 2); ctx.fill();
+        ctx.strokeStyle = '#35E5FF'; ctx.lineWidth = 2;
+        roundRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, (b.h - 2) / 2); ctx.stroke();
+      } else {
+        ctx.fillStyle = 'rgba(20,35,58,0.82)';
+        roundRect(b.x, b.y, b.w, b.h, b.h / 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(246,200,74,0.65)'; ctx.lineWidth = 1.5;
+        roundRect(b.x, b.y, b.w, b.h, b.h / 2); ctx.stroke();
       }
       ctx.textAlign = 'center';
-      ctx.fillStyle = b.primary ? '#0A1420' : '#F3F1E8';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = b.primary ? '#FFFFFF' : '#F3F1E8';
       if (b.sub) {
-        ctx.font = 'bold 17px system-ui, sans-serif';
-        ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 - 8);
+        ctx.font = '700 17px system-ui, sans-serif';
+        ctx.fillText(b.label, cx, cy - 10);
         ctx.font = '13px system-ui, sans-serif';
-        ctx.fillText(b.sub, b.x + b.w / 2, b.y + b.h / 2 + 14);
+        ctx.fillStyle = b.primary ? 'rgba(255,255,255,0.75)' : 'rgba(243,241,232,0.75)';
+        ctx.fillText(b.sub, cx, cy + 12);
       } else {
-        ctx.font = 'bold 20px system-ui, sans-serif';
-        ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 1);
+        ctx.font = '700 19px system-ui, sans-serif';
+        ctx.fillText(b.label, cx, cy);
       }
+      ctx.textBaseline = 'alphabetic';
       ctx.globalAlpha = 1;
     }
   }
 
   function drawTitle(view) {
     ctx.textAlign = 'center';
-    ctx.font = 'bold 52px system-ui, sans-serif';
-    ctx.fillStyle = '#F3F1E8';
-    ctx.fillText('스타포지 러시', W / 2, 170);
-    ctx.font = 'bold 17px system-ui, sans-serif';
-    ctx.fillStyle = '#35E5FF';
-    ctx.fillText('게이트를 골라 군단을 키워라', W / 2, 208);
-    drawImgCentered('m1', W / 2, 340, 170, () => {
-      ctx.fillStyle = TIER_FALLBACK[0];
-      ctx.beginPath(); ctx.arc(W / 2, 340, 60, 0, Math.PI * 2); ctx.fill();
+    //  워드마크: 밝은 배경 위 딥 네이비가 주인공, 골드는 포인트만
+    ctx.font = '700 15px system-ui, sans-serif';
+    ctx.fillStyle = '#B98A1F';
+    ctx.fillText('S T A R F O R G E   R U S H', W / 2, 118);
+    ctx.font = '900 54px system-ui, sans-serif';
+    ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(243,241,232,0.9)';
+    ctx.strokeText('스타포지 러시', W / 2, 172);
+    ctx.fillStyle = '#14233A';
+    ctx.fillText('스타포지 러시', W / 2, 172);
+    ctx.font = '600 16px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(20,35,58,0.72)';
+    ctx.fillText('군단을 키워, 도시를 되찾아라', W / 2, 204);
+    //  히어로 정면 일러스트(도착 전엔 뒷모습 폴백)
+    drawImgCentered('mfront', W / 2, 345, 210, () => {
+      drawImgCentered('m1', W / 2, 345, 180, () => {
+        ctx.fillStyle = TIER_FALLBACK[0];
+        ctx.beginPath(); ctx.arc(W / 2, 345, 60, 0, Math.PI * 2); ctx.fill();
+      });
     });
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(243,241,232,0.75)';
-    ctx.fillText('최고 기록  ' + view.best, W / 2, 442);
+    if (view.best > 0) {
+      ctx.font = '700 14px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(20,35,58,0.8)';
+      ctx.fillText('최고 기록  ' + view.best, W / 2, 452);
+    }
   }
 
   function drawResults(res) {

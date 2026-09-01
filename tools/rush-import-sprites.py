@@ -11,7 +11,7 @@ from PIL import Image
 
 SRC = r'E:\workspace\claude\neon-fleet\newmode\sprites'
 DST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'rush')
-NAMES = ['M01', 'M02', 'M03', 'M04', 'M05', 'SOLDIER',
+NAMES = ['M01', 'M02', 'M03', 'M04', 'M05', 'SOLDIER', 'M01_front',
          'E1_scrapbit', 'E2_ramhound', 'E3_wallguard', 'E4_needleeye',
          'E5_wheeler', 'E6_signaler', 'E7_cartyard', 'E8_manholejumper', 'E9_spawnpod', 'E10_magnethead',
          'B1_grader', 'B2_gantrywidow', 'B3_railleviathan', 'B4_smelter', 'B5_crownbreaker',

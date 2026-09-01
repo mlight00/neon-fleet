@@ -2,7 +2,7 @@
 export const SPRITE_KEYS = {
   //  아군: 히어로 5단 + 병사(군단원)
   m1: 'M01', m2: 'M02', m3: 'M03', m4: 'M04', m5: 'M05',
-  soldier: 'SOLDIER',
+  soldier: 'SOLDIER', mfront: 'M01_front',
   //  적 10종 (구간 순)
   e_scrapbit: 'E1_scrapbit', e_wheeler: 'E5_wheeler',
   e_ramhound: 'E2_ramhound', e_signaler: 'E6_signaler',
