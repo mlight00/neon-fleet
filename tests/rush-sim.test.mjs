@@ -147,3 +147,15 @@ test('MAIN-HELPERS: 버튼 히트·게이트 좌우 판정 (DOM 없이 import �
   assert.equal(gateHitSide(120), 'left');
   assert.equal(gateHitSide(360), 'right');
 });
+
+test('SQUAD-RADIUS: 대형 반경이 병력에 비례하고 피탄 폭이 그만큼 좁아진다', async () => {
+  const { squadRadius } = await import('../rush/squad.js');
+  assert.equal(squadRadius(1), BAL.squad.heroSize / 2, '혼자면 히어로 몸집만');
+  assert.ok(squadRadius(10) > squadRadius(1));
+  assert.ok(squadRadius(120) > squadRadius(10));
+  //  혼자일 때는 60px 옆 적탄에 안 맞는다(예전 ±80 고정 판정이면 맞았다)
+  const st = createCombat();
+  st.eshots.push({ x: 300, y: 632, vx: 0, vy: 200 });
+  const r = stepCombat(st, { x: 240, count: 1, fireRateMult: 0, radius: squadRadius(1) }, 1 / 30, mulberry32(1));
+  assert.equal(r.troopLoss, 0, '빗나감');
+});

@@ -139,12 +139,15 @@ export function createRenderer(canvas, sprites) {
       ctx.closePath();
       ctx.fill();
     });
-    if (squad.count > S.drawCap) {                    // 상한 초과분은 숫자 라벨이 담당
-      ctx.font = 'bold 20px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#F3F1E8';
-      ctx.fillText('x' + squad.count, squad.x, S.y - 34);
-    }
+    //  부대 발밑 병력 수 = 체력 표시. 피격 중엔 빨갛게 — 맞았다는 것이 부대에서 바로 보인다.
+    const ly = S.y + (squad.radius ?? 40) + 24;
+    ctx.font = 'bold 26px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#14233A';
+    ctx.strokeText(String(squad.count), squad.x, ly);
+    ctx.fillStyle = squad.hurt ? '#FF4A4A' : '#F3F1E8';
+    ctx.fillText(String(squad.count), squad.x, ly);
   }
 
   const RECT_KINDS = new Set(['wallguard', 'cartyard', 'signaler']);

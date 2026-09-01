@@ -5,7 +5,7 @@ import { mulberry32, dateSeed, hashSeed } from './rng.js';
 import { buildTrack } from './track.js';
 import { applyGate, isGood, gateColor } from './gates.js';
 import { createAudio } from './audio.js';
-import { tierFor, clampX } from './squad.js';
+import { tierFor, clampX, squadRadius } from './squad.js';
 import { createCombat, spawnWave, spawnBoss, stepCombat } from './combat.js';
 import { createSave } from './save.js';
 import { upCost, buy, effects } from './upgrades.js';
@@ -92,7 +92,7 @@ function advance(run, dt0) {
     }
   }
   const prevTier = tierFor(run.count);
-  const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult, tier: prevTier }, dt, run.rnd);
+  const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult, tier: prevTier, radius: squadRadius(run.count) }, dt, run.rnd);
   for (const ev of r.events) {
     if (ev.type === 'kill') { spawnBurst(run, ev.x, ev.y, ev.r, false); if (!ev.touched) run.sfxQueue.push('kill'); }
     else if (ev.type === 'bossKill') { spawnBurst(run, ev.x, ev.y, ev.r, true); run.sfxQueue.push('bossDie'); run.shakeT = BAL.fx.shakeDur; }
@@ -175,7 +175,7 @@ export function boot() {
       v.bullets = run.combat.bullets;
       v.eshots = run.combat.eshots;
       v.boss = run.combat.boss;
-      v.squad = { x: run.x, count: run.count, tier: tierFor(run.count) };
+      v.squad = { x: run.x, count: run.count, tier: tierFor(run.count), radius: squadRadius(run.count), hurt: run.hurtT > 0 };
       v.dim = run.dim;
       v.parts = run.parts;
       v.floaters = run.floaters;
@@ -294,7 +294,7 @@ export function boot() {
       advance(run, dt);
       for (const s of run.sfxQueue) au.sfx(s);
       run.sfxQueue.length = 0;
-      if (run.combat.boss) au.bgmBoss(); else au.bgmBattle();
+      if (run.combat.boss) au.bgmBoss(run.combat.boss.zone); else au.bgmBattle();
       au.duck(state === 'run' ? Math.max(0.35, 1 - run.dim * 1.8) : 1);     // A-3 보스 앞 정적
       if (run.over) {
         if (run.cont.canUse()) state = 'over';

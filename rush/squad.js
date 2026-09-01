@@ -27,3 +27,16 @@ export function formation(count) {
 }
 
 export function clampX(x) { return Math.max(80, Math.min(400, x)); }   // 도로 폭 = 게이트 폭
+
+/** 대형의 실제 반경(px) — 피탄·접촉 판정이 이 크기를 쓴다(부대가 작으면 얻어맞는 폭도 작게). */
+export function squadRadius(count) {
+  const n = Math.min(count, BAL.squad.drawCap);
+  if (n <= 1) return BAL.squad.heroSize / 2;
+  let k = 1, placed = 1;
+  while (placed < n) {
+    const r = BAL.squad.ringStart + (k - 1) * BAL.squad.ringGap;
+    placed += Math.max(3, Math.round(Math.PI * 1.5 * r / 22));
+    k++;
+  }
+  return BAL.squad.ringStart + (k - 2) * BAL.squad.ringGap + BAL.squad.soldierSize / 2;
+}

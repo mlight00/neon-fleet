@@ -37,6 +37,7 @@ function shootFan(st, x, y, tx, ty, fan, speed) {
 
 export function stepCombat(st, squad, dt, rnd) {
   const S = BAL.squad, lineY = S.y - 8;
+  const rad = squad.radius ?? 60;                     // 대형 실제 반경 — 피탄·접촉 폭의 기준
   const tier = squad.tier ?? 0;
   const muzzles = S.muzzles[tier] ?? 1;
   const bulletDmg = (S.bulletDmg + squad.count * S.dmgPerTroop) / muzzles;   // 병력 = 화력(열 수로 배분)
@@ -82,7 +83,7 @@ export function stepCombat(st, squad, dt, rnd) {
         shootFan(st, e.x, e.y, squad.x, lineY, def.fan ?? 1, def.shotSpeed);
       }
     }
-    if (e.y >= lineY - e.r && Math.abs(e.x - squad.x) < 90) {
+    if (e.y >= lineY - e.r && Math.abs(e.x - squad.x) < rad + e.r) {
       troopLoss += def.touchLoss ?? S.touchLossPerHit;
       e.hp = 0; e.touched = true;                     // 접촉 = 자폭 소모(기획 4-1)
     }
@@ -91,7 +92,7 @@ export function stepCombat(st, squad, dt, rnd) {
   //  적탄 이동·명중
   for (const s of st.eshots) {
     s.x += s.vx * dt; s.y += s.vy * dt;
-    if (s.y >= lineY && Math.abs(s.x - squad.x) < 80) { troopLoss += 1; s.dead = true; }
+    if (s.y >= lineY && Math.abs(s.x - squad.x) < rad + 5) { troopLoss += 1; s.dead = true; }
   }
 
   //  보스 — 공통 골격: 좌우 이동 + 부채꼴 사격 + 접촉. 스멜터(spawnEvery)는 잡졸 소환.
@@ -110,7 +111,7 @@ export function stepCombat(st, squad, dt, rnd) {
       if (bo.spawnT <= 0) { bo.spawnT = def.spawnEvery; spawnWave(st, 'scrapbit', 2, rnd); }
     }
     bo.touchT -= dt;
-    if (bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < 110 && bo.touchT <= 0) {
+    if (bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < rad + bo.r * 0.8 && bo.touchT <= 0) {
       bo.touchT = 1 / BAL.boss.touchLossPerSec * 4;   // 초당 손실 상한을 4틱으로 분할
       troopLoss += Math.max(1, Math.round(BAL.boss.touchLossPerSec / 4));
     }

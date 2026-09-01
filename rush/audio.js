@@ -43,7 +43,11 @@ export function createAudio() {
       if (bgmEl && bgmName) bgmEl.play().catch(() => {});
     },
     bgmBattle() { playBgm('nf_bgm_battle1'); },
-    bgmBoss() { playBgm('nf_bgm_boss'); },
+    /** 구간별 보스곡: 1~2구간=sector1, 3구간=sector2, 4구간=sector3, 최종=boss */
+    bgmBoss(zone = 4) {
+      const pick = ['nf_bgm_boss_sector1', 'nf_bgm_boss_sector1', 'nf_bgm_boss_sector2', 'nf_bgm_boss_sector3', 'nf_bgm_boss'][zone] ?? 'nf_bgm_boss';
+      playBgm(pick);
+    },
     /** A-3 보스 앞 정적: 0~1 (1=평상시) */
     duck(mult) {
       duckMult = mult;
