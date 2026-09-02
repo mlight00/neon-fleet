@@ -458,7 +458,7 @@ export function createRenderer(canvas, sprites) {
       ctx.save();
       ctx.translate(Math.sin(view.now * 71) * a, Math.cos(view.now * 89) * a * 0.7);
     }
-    drawBackground((view.scroll ?? 0) * 0.6, view.zone ?? 0);   // 배경은 60% 속도(시차) — 접지감
+    drawBackground(view.scroll ?? 0, view.zone ?? 0);   // 도로와 게이트·적은 같은 속도로 흐른다(세계 고정 — 시차를 걸면 게이트가 도로 위를 미끄러진다)
     if (view.state === 'run' || view.state === 'over' || view.state === 'paused') {
       for (const g of view.gates) drawGatePair(g.y, g.pair);
       for (const e of view.enemies) drawEnemy(e);
