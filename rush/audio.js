@@ -19,8 +19,8 @@ const SFX = {
   click:   ['nf_sfx_click_1'],
   record:  ['nf_sfx_charge_full_1'],
 };
-const THROTTLE = { fire: 0.09, fireL: 0.09, fireM: 0.11, kill: 0.08, hurt: 0.25 };   // 연타 소음 방지(초)
-const VOL = { fire: 0.16, fireL: 0.15, fireM: 0.18, demote: 0.75, kill: 0.4, bossDie: 0.8, hurt: 0.55, gateGood: 0.6, gateBad: 0.6,
+const THROTTLE = { fire: 0.045, fireL: 0.045, fireM: 0.06, kill: 0.08, hurt: 0.25 };   // 발사음은 발사 간격에 맞춰 촘촘히   // 연타 소음 방지(초)
+const VOL = { fire: 0.11, fireL: 0.11, fireM: 0.14, demote: 0.75, kill: 0.4, bossDie: 0.8, hurt: 0.55, gateGood: 0.6, gateBad: 0.6,
               bossIn: 0.8, evolve: 0.8, buy: 0.6, click: 0.5, record: 0.7 };
 
 export function createAudio() {
@@ -30,13 +30,13 @@ export function createAudio() {
   const lastAt = {};
   const bgmEl = typeof Audio !== 'undefined' ? new Audio() : null;
   if (bgmEl) { bgmEl.loop = true; }
-  let bgmName = null, baseVol = 0.45, duckMult = 1;
+  let bgmName = null, baseVol = 0.45, duckMult = 1, volMult = 1;
 
   function playBgm(name) {
     if (!bgmEl || bgmName === name) return;
     bgmName = name;
     bgmEl.src = DIR + name + '.ogg';
-    bgmEl.volume = baseVol * duckMult;
+    bgmEl.volume = baseVol * duckMult * volMult;
     if (unlocked && !muted) bgmEl.play().catch(() => {});
   }
 
@@ -47,6 +47,11 @@ export function createAudio() {
       if (bgmEl && bgmName && !muted) bgmEl.play().catch(() => {});
     },
     isMuted() { return muted; },
+    getVolume() { return volMult; },
+    setVolume(v) {
+      volMult = Math.max(0, Math.min(1, v));
+      if (bgmEl) bgmEl.volume = baseVol * duckMult * volMult;
+    },
     setMuted(v) {
       muted = !!v;
       if (bgmEl) { if (muted) bgmEl.pause(); else if (unlocked && bgmName) bgmEl.play().catch(() => {}); }
@@ -62,7 +67,7 @@ export function createAudio() {
     /** A-3 보스 앞 정적: 0~1 (1=평상시) */
     duck(mult) {
       duckMult = mult;
-      if (bgmEl) bgmEl.volume = baseVol * duckMult;
+      if (bgmEl) bgmEl.volume = baseVol * duckMult * volMult;
     },
     sfx(name) {
       if (!unlocked || muted || typeof Audio === 'undefined') return;
@@ -73,7 +78,7 @@ export function createAudio() {
       lastAt[name] = now;
       rr[name] = ((rr[name] ?? -1) + 1) % files.length;
       const a = new Audio(DIR + files[rr[name]] + '.ogg');
-      a.volume = VOL[name] ?? 0.5;
+      a.volume = (VOL[name] ?? 0.5) * volMult;
       a.play().catch(() => {});
     },
   };

@@ -63,7 +63,7 @@ export function stepCombat(st, squad, dt, rnd) {
       }
       shots++;
     }
-    if (shots > 0) events.push({ type: 'fire' });
+    for (let si = 0; si < shots; si++) events.push({ type: 'fire' });   // 발사 1회 = 소리 1회(연출 매칭)
   }
   for (const b of st.bullets) b.y += b.vy * dt;
 

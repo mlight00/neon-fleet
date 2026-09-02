@@ -190,6 +190,7 @@ export function boot() {
   const save = createSave();
   const au = createAudio();
   au.setMuted(!!save.get().mute);
+  au.setVolume((save.get().volume ?? 100) / 100);
   let state = 'title', run = null, renderer = null, buttons = [];
   const pointer = { down: false, x: 240 };
   const keys = {};
@@ -269,7 +270,10 @@ export function boot() {
         v.buttons = [
           { id: 'resume', x: 120, y: 400, w: 240, h: 56, label: '계속하기', primary: true },
           { id: 'giveup', x: 120, y: 480, w: 240, h: 44, label: '그만하기' },
-          { id: 'mute', x: 120, y: 548, w: 240, h: 44, label: au.isMuted() ? '소리 켜기 🔇' : '소리 끄기 🔊' },
+          { id: 'vol_down', x: 120, y: 548, w: 64, h: 44, label: '−' },
+          { id: 'mute', x: 192, y: 548, w: 96, h: 44,
+            label: au.isMuted() ? '🔇' : '음량 ' + Math.round(au.getVolume() * 100) + '%' },
+          { id: 'vol_up', x: 296, y: 548, w: 64, h: 44, label: '+' },
         ];
       }
     } else if (state === 'results') {
@@ -303,6 +307,14 @@ export function boot() {
     if (id === 'mute') {                              // 어느 화면에서든 음소거 토글
       au.setMuted(!au.isMuted());
       save.patch({ mute: au.isMuted() });
+      return;
+    }
+    if (id === 'vol_down' || id === 'vol_up') {       // 음량 20% 단계 조절(저장)
+      const v = Math.max(0, Math.min(1, au.getVolume() + (id === 'vol_up' ? 0.2 : -0.2)));
+      au.setVolume(v);
+      if (au.isMuted() && v > 0) { au.setMuted(false); save.patch({ mute: false }); }
+      save.patch({ volume: Math.round(v * 100) });
+      au.sfx('click');
       return;
     }
     au.sfx('click');
