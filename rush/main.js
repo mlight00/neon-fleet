@@ -248,8 +248,8 @@ export function boot() {
       v.parts = run.parts;
       v.cutscene = run.cutscene ? { k: 1 - run.cutscene.t / run.cutscene.total, tier: run.cutscene.tier, down: run.cutscene.down } : null;
       v.floaters = run.floaters;
-      v.shakeT = run.shakeT;
-      v.hurtT = run.hurtT;
+      v.shakeT = state === 'paused' ? 0 : run.shakeT;   // 일시정지 중엔 흔들림·피격 연출 정지
+      v.hurtT = state === 'paused' ? 0 : run.hurtT;
       v.now = performance.now() / 1000;
       v.zone = Math.min(BAL.track.zones - 1, Math.floor(run.z / BAL.track.zoneLen));
       const bz = nextBossZ(run);
