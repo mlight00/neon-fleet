@@ -236,7 +236,7 @@ export function createRenderer(canvas, sprites) {
       return;
     }
     const key = 'e_' + e.kind;
-    const h = e.r * 2.4;
+    const h = e.r * 2.4 * (BAL.enemies[e.kind]?.drawScale ?? 1);   // 키다리 구조물(신호등 등)은 세로만 크게
     shadow(e.x, e.y + h * 0.4, e.r * 0.95);
     drawImgCentered(key, e.x, e.y, h, () => {
       ctx.fillStyle = ENEMY_FALLBACK[e.kind] ?? '#B3402F';

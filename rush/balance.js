@@ -20,12 +20,12 @@ export const BAL = {
     wheeler:       { hp: 3,  r: 17, speed: 265, count: [2, 3],  coin: 2, zigzag: 140 },
     //  구간2
     ramhound:      { hp: 6,  r: 28, speed: 215, accel: 260, maxSpeed: 540, count: [1, 2], coin: 3, touchLoss: 3, straight: true },
-    signaler:      { hp: 7,  r: 23, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3, straight: true },   // 도로 고정 포탑
+    signaler:      { hp: 7,  r: 23, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3, straight: true, drawScale: 1.8 },   // 도로 고정 포탑 — 키 큰 신호등
     //  구간3
     wallguard:     { hp: 34, r: 40, speed: 235, count: [1, 1],  coin: 5, touchLoss: 4, showHp: true, straight: true },
     cartyard:      { hp: 50, r: 42, speed: 215, count: [1, 1],  coin: 7, touchLoss: 5, showHp: true, straight: true },
     //  구간4
-    needleeye:     { hp: 5,  r: 25, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.4, shotSpeed: 240, straight: true },   // 도로 고정 저격수
+    needleeye:     { hp: 5,  r: 25, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.4, shotSpeed: 240, straight: true, drawScale: 1.35 },   // 도로 고정 저격수(가로등 키다리)
     manholejumper: { hp: 8,  r: 16, speed: 245, count: [1, 3],  coin: 4, hopEvery: 1.6, hopSpeed: 260 },
     //  구간5
     spawnpod:      { hp: 14, r: 30, speed: 190, count: [1, 2],  coin: 6, spawns: 'scrapbit', spawnN: 3, touchLoss: 2, straight: true },   // 도로 고정 고치
