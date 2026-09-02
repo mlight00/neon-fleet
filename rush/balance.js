@@ -16,20 +16,20 @@ export const BAL = {
   },
   enemies: {
     //  구간1
-    scrapbit:      { hp: 2,  r: 18, speed: 120, count: [3, 7],  coin: 1 },
-    wheeler:       { hp: 3,  r: 19, speed: 170, count: [2, 3],  coin: 2, zigzag: 140 },
+    scrapbit:      { hp: 2,  r: 14, speed: 120, count: [2, 4],  coin: 1 },
+    wheeler:       { hp: 3,  r: 17, speed: 170, count: [2, 3],  coin: 2, zigzag: 140 },
     //  구간2
-    ramhound:      { hp: 6,  r: 22, speed: 170, accel: 260, maxSpeed: 420, count: [1, 2], coin: 3, touchLoss: 3, straight: true },
-    signaler:      { hp: 7,  r: 20, speed: 85,  count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3 },
+    ramhound:      { hp: 6,  r: 28, speed: 170, accel: 260, maxSpeed: 420, count: [1, 2], coin: 3, touchLoss: 3, straight: true },
+    signaler:      { hp: 7,  r: 23, speed: 85,  count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3 },
     //  구간3
     wallguard:     { hp: 34, r: 40, speed: 105, count: [1, 1],  coin: 5, touchLoss: 4, showHp: true },
     cartyard:      { hp: 50, r: 42, speed: 60,  count: [1, 1],  coin: 7, touchLoss: 5, showHp: true },
     //  구간4
-    needleeye:     { hp: 5,  r: 20, speed: 80,  count: [1, 2],  coin: 4, shootEvery: 1.4, shotSpeed: 240 },
-    manholejumper: { hp: 8,  r: 20, speed: 110, count: [1, 3],  coin: 4, hopEvery: 1.6, hopSpeed: 260 },
+    needleeye:     { hp: 5,  r: 25, speed: 80,  count: [1, 2],  coin: 4, shootEvery: 1.4, shotSpeed: 240 },
+    manholejumper: { hp: 8,  r: 16, speed: 110, count: [1, 3],  coin: 4, hopEvery: 1.6, hopSpeed: 260 },
     //  구간5
-    spawnpod:      { hp: 14, r: 26, speed: 70,  count: [1, 2],  coin: 6, spawns: 'scrapbit', spawnN: 3, touchLoss: 2 },
-    magnethead:    { hp: 9,  r: 21, speed: 95,  count: [1, 2],  coin: 8, stealCoins: 5 },
+    spawnpod:      { hp: 14, r: 30, speed: 70,  count: [1, 2],  coin: 6, spawns: 'scrapbit', spawnN: 3, touchLoss: 2 },
+    magnethead:    { hp: 9,  r: 19, speed: 95,  count: [1, 2],  coin: 8, stealCoins: 5 },
     //  전 구간 공통: 보급 컨테이너 — 한참 쏴서 깨면 병력 획득(게이트 밖의 성장 축)
     supply:        { hp: 26, r: 34, speed: 70,  count: [1, 1],  coin: 0, showHp: true, touchLoss: 0,
                      rewardByZone: [8, 13, 20, 30, 42] },

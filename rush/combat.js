@@ -10,7 +10,9 @@ export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0) {
   for (let i = 0; i < n; i++) {
     st.enemies.push({
       kind, zone, hp: Math.round(def.hp * hpMult), r: def.r,
-      x: 85 + rnd() * 310, y: -40 - rnd() * 120,
+      //  웨이브 내 균등 분산(뭉침 방지): 도로를 n등분한 자리 + 지터
+      x: Math.max(85, Math.min(395, 85 + ((i + 0.5) / n) * 310 + (rnd() - 0.5) * 60)),
+      y: -40 - rnd() * 170,
       vx: def.zigzag ? (rnd() < 0.5 ? -def.zigzag : def.zigzag) : (def.straight ? 0 : (rnd() - 0.5) * 30),
       vy: def.speed,
       shootT: def.shootEvery ? def.shootEvery * (0.5 + rnd() * 0.8) : undefined,
