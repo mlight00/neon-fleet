@@ -221,6 +221,21 @@ export function createRenderer(canvas, sprites) {
   const ROUND_KINDS = new Set(['wheeler', 'manholejumper', 'magnethead', 'spawnpod']);
 
   function drawEnemy(e) {
+    if (e.kind === 'pow') {                           // POW 뱃지 — 주우면 버스터
+      shadow(e.x, e.y + e.r * 0.9, e.r * 0.8);
+      const pulse = 1 + Math.sin(performance.now() / 180) * 0.08;
+      drawImgCentered('pow', e.x, e.y, e.r * 2.3 * pulse, () => {
+        ctx.fillStyle = '#F6C84A';
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+          const rr = i % 2 ? e.r * 0.5 : e.r;
+          ctx[i ? 'lineTo' : 'moveTo'](e.x + Math.cos(a) * rr, e.y + Math.sin(a) * rr);
+        }
+        ctx.closePath(); ctx.fill();
+      });
+      return;
+    }
     if (e.kind === 'supply') {                        // 보급 컨테이너 — 네온함대 포드 그림 + 보상/내구도
       shadow(e.x, e.y + e.r * 0.95, e.r * 0.9);
       const im = sprites.get('supply');
@@ -627,6 +642,22 @@ export function createRenderer(canvas, sprites) {
           ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
           ctx.beginPath(); ctx.arc(s.x, s.y, 5.5, 0, Math.PI * 2); ctx.stroke();
         }
+      }
+      if ((view.squad.busterT ?? 0) > 0) {           // 버스터 빔: 히어로 전방 관통 광선
+        const bx = view.squad.x;
+        const hw = BAL.fx.busterHalfW;
+        const flick = 1 + Math.sin((view.now ?? 0) * 40) * 0.12;
+        const endK = Math.min(1, view.squad.busterT / 0.4);      // 끝날 때 가늘어지며 소멸
+        ctx.globalAlpha = 0.32 * endK;
+        ctx.fillStyle = '#35E5FF';
+        ctx.fillRect(bx - hw * flick, 0, hw * 2 * flick, BAL.squad.y - 20);
+        ctx.globalAlpha = 0.85 * endK;
+        ctx.fillStyle = '#DFFBFF';
+        ctx.fillRect(bx - hw * 0.45, 0, hw * 0.9, BAL.squad.y - 20);
+        ctx.globalAlpha = endK;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(bx - hw * 0.16, 0, hw * 0.32, BAL.squad.y - 20);
+        ctx.globalAlpha = 1;
       }
       drawSquad(view.squad, view.now ?? 0);
       drawParts(view.parts ?? []);

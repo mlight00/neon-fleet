@@ -75,8 +75,9 @@ test('FX-CONTINUE: 판당 1회, 오늘의 도전 불가', () => {
   assert.equal(continueToken(true).canUse(), false);
 });
 
-test('SPRITES-KEYS: 29종 키(아군7+적10+보급+보스5+게이트+배경5)가 파일명 규약과 일치한다', () => {
-  assert.equal(Object.keys(SPRITE_KEYS).length, 29);
+test('SPRITES-KEYS: 30종 키(아군7+적10+보급+POW+보스5+게이트+배경5)가 파일명 규약과 일치한다', () => {
+  assert.equal(Object.keys(SPRITE_KEYS).length, 30);
+  assert.equal(SPRITE_KEYS.pow, 'POW');
   assert.equal(SPRITE_KEYS.supply, 'SUPPLY');
   assert.equal(SPRITE_KEYS.mfront, 'M01_front');
   assert.equal(SPRITE_KEYS.m1, 'M01');

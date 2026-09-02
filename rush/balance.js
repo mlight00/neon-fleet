@@ -7,7 +7,7 @@ export const BAL = {
            heroSize: 46, heroSizes: [46, 52, 58, 66, 74], soldierSize: 22, ringGap: 19, ringStart: 26,
            muzzles: [1, 1, 2, 2, 3], bulletW: [4, 5, 6, 7, 8], tierDmgMult: [1, 1.15, 1.3, 1.5, 1.75],   // 티어별 발사 열·탄 굵기·위력(무기 진화)
            fireInterval: 0.5, fireRateCap: 7, bulletSpeed: 700, bulletSpeeds: [700, 730, 770, 820, 880], bulletDmg: 1, dmgPerTroop: 0.012, touchLossPerHit: 1 },
-  tiers: [1, 25, 75, 150, 300],          // M1~M5 병력 임계
+  tiers: [1, 40, 120, 250, 500],         // M1~M5 병력 임계 — 최종 진화는 종반에나
   gates: {
     colors: { add: '#35E5FF', mul: '#F6C84A', sub: '#FF6A3D', div: '#FF3DA5' },
     // 진행도 t(0..1)에 따른 값 범위
@@ -30,21 +30,23 @@ export const BAL = {
     //  구간5
     spawnpod:      { hp: 14, r: 30, speed: 190, count: [1, 2],  coin: 6, spawns: 'scrapbit', spawnN: 3, touchLoss: 2, straight: true },   // 도로 고정 고치
     magnethead:    { hp: 9,  r: 19, speed: 240, count: [1, 2],  coin: 8, stealCoins: 5 },
+    //  POW 뱃지: 주우면 5초 버스터(전방 관통 빔). 탄이 통과하는 픽업(못 쏨).
+    pow:           { hp: 1,  r: 22, speed: 190, count: [1, 1],  coin: 0, straight: true, pickup: true },
     //  전 구간 공통: 보급 컨테이너 — 한참 쏴서 깨면 병력 획득(게이트 밖의 성장 축)
     supply:        { hp: 26, r: 34, speed: 190, count: [1, 1],  coin: 0, showHp: true, touchLoss: 0, straight: true,   // 도로에 놓인 컨테이너
                      rewardByZone: [8, 13, 20, 30, 42] },
   },
   //  구간 보스 5종 — 공통 골격(좌우 이동+부채꼴 사격+접촉)에 스탯만 다르게. 스멜터는 잡졸 소환.
-  boss: { baseHp: 140, hpPerTroop: 2.4, touchLossPerSec: 14 },
+  boss: { baseHp: 140, hpPerTroop: 2.8, touchLossPerSec: 16, shotBonus: 1 },
   bosses: [
-    { key: 'b1', name: '그레이더',      hpMult: 0.7, r: 48, speed: 60,  shootEvery: 1.3, fan: 1, shotSpeed: 210, coin: 25, ramEvery: 5.5, ramSpeed: 430 },
-    { key: 'b2', name: '갠트리 위도우', hpMult: 0.9, r: 52, speed: 65,  shootEvery: 1.2, fan: 2, shotSpeed: 220, coin: 35, hookEvery: 3.8, hookSpeed: 300, hookSwing: 85 },
-    { key: 'b3', name: '레일 리바이어던', hpMult: 1.0, r: 56, speed: 70, shootEvery: 1.0, fan: 4, shotSpeed: 200, coin: 45, sweepEvery: 6, sweepSpeed: 760, sweepHit: 8 },
-    { key: 'b4', name: '스멜터',        hpMult: 1.15, r: 55, speed: 60,  shootEvery: 1.1, fan: 3, shotSpeed: 220, coin: 55, spawnEvery: 4, poolEvery: 5.5, poolDmg: 2 },
-    { key: 'b5', name: '크라운 브레이커', hpMult: 1.35, r: 60, speed: 75,  shootEvery: 0.85, fan: 5, shotSpeed: 220, coin: 80, ramEvery: 6.5, ramSpeed: 430, spawnEvery: 5 },
+    { key: 'b1', name: '그레이더',      hpMult: 0.8, r: 48, speed: 60,  shootEvery: 1.1, fan: 2, shotSpeed: 220, coin: 25, ramEvery: 4.5, ramSpeed: 460 },
+    { key: 'b2', name: '갠트리 위도우', hpMult: 1.0, r: 52, speed: 70,  shootEvery: 1.0, fan: 3, shotSpeed: 230, coin: 35, hookEvery: 3.0, hookSpeed: 320, hookSwing: 95 },
+    { key: 'b3', name: '레일 리바이어던', hpMult: 1.1, r: 56, speed: 75, shootEvery: 0.9, fan: 5, shotSpeed: 210, coin: 45, sweepEvery: 4.8, sweepSpeed: 800, sweepHit: 10 },
+    { key: 'b4', name: '스멜터',        hpMult: 1.25, r: 55, speed: 62,  shootEvery: 0.95, fan: 4, shotSpeed: 230, coin: 55, spawnEvery: 3.2, poolEvery: 4.4, poolDmg: 3 },
+    { key: 'b5', name: '크라운 브레이커', hpMult: 1.45, r: 60, speed: 80,  shootEvery: 0.75, fan: 6, shotSpeed: 230, coin: 80, ramEvery: 5.5, ramSpeed: 460, spawnEvery: 4 },
   ],
   coins: { perDistance: 0.0015 },        // 거리 보정 코인(주 수입은 격파) — 판이 길어진 만큼 단가 하향
-  fx: { slowmoAt: 5, slowmoDur: 0.5, slowmoScale: 0.4, slowmoMax: 2,
+  fx: { busterDur: 5, busterDps: 70, busterHalfW: 30, slowmoAt: 5, slowmoDur: 0.5, slowmoScale: 0.4, slowmoMax: 2,
         continueTroops: 10, continueInvulnSec: 2, bossHushSec: 1.5,
         shakeDur: 0.25, shakeAmp: 7, hurtFlashDur: 0.35 },
   upgrades: {

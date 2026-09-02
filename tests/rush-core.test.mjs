@@ -60,7 +60,7 @@ test('TRACK-DET: 같은 시드는 같은 트랙, 5구간·보스 5·구간별 �
   assert.ok(kinds.size >= 6, '적 종류가 다양하게 섞인다: ' + kinds.size);
   //  구간1 웨이브에는 구간1 적만 나온다
   const z1kinds = new Set(a.events.filter((e) => e.type === 'wave' && e.z < 11400).map((e) => e.data.kind));
-  for (const k of z1kinds) assert.ok(['scrapbit', 'wheeler', 'supply'].includes(k), '구간1 침범: ' + k);
+  for (const k of z1kinds) assert.ok(['scrapbit', 'wheeler', 'supply', 'pow'].includes(k), '구간1 침범: ' + k);
   assert.deepEqual([...new Set(zonePool(0))], ['scrapbit', 'wheeler']);
   assert.equal(zonePool(4).length > zonePool(1).length, true, '풀이 누적 확장');
 });
@@ -69,7 +69,7 @@ test('BAL-SHAPE: 계획이 쓰는 키가 전부 있다', () => {
   for (const k of ['track', 'squad', 'tiers', 'gates', 'enemies', 'boss', 'coins', 'fx', 'upgrades']) {
     assert.ok(BAL[k], 'BAL.' + k + ' 누락');
   }
-  assert.deepEqual(BAL.tiers, [1, 25, 75, 150, 300]);
+  assert.deepEqual(BAL.tiers, [1, 40, 120, 250, 500]);
 });
 
 test('GATE-CAP: 병력 상한 999', () => {

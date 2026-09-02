@@ -28,13 +28,18 @@ export function buildTrack(seed) {
   for (let zi = 0; zi < T.zones; zi++) {
     const z0 = zi * T.zoneLen;
     const pool = zonePool(zi);
-    for (let z = z0 + T.firstGateZ; z < z0 + T.zoneLen - 260; z += T.gateEvery) {
+    for (let z = z0 + T.firstGateZ; z < z0 + T.zoneLen - 900; z += T.gateEvery) {   // 보스 앞 900은 게이트 없는 전투 구간
       const t = z / T.length;
-      const isLastGateOfZone = z + T.gateEvery >= z0 + T.zoneLen - 260;
+      const isLastGateOfZone = z + T.gateEvery >= z0 + T.zoneLen - 900;
       events.push({ z: Math.round(z), type: 'gatepair', data: makeGatePair(rnd, t, isLastGateOfZone) });
       for (let w = z + 90; w < z + T.gateEvery - 60; w += T.waveEvery) {
-        if (rnd() < 0.14) {                            // 보급 컨테이너 — 쏴서 깨면 병력(게이트 밖의 성장 축)
+        const roll = rnd();
+        if (roll < 0.14) {                             // 보급 컨테이너 — 쏴서 깨면 병력(게이트 밖의 성장 축)
           events.push({ z: Math.round(w), type: 'wave', data: { kind: 'supply', n: 1 } });
+          continue;
+        }
+        if (roll < 0.19) {                             // POW 뱃지 — 주우면 5초 버스터
+          events.push({ z: Math.round(w), type: 'wave', data: { kind: 'pow', n: 1 } });
           continue;
         }
         const kind = pool[(rnd() * pool.length) | 0];

@@ -35,7 +35,7 @@ function newRun(save, mode) {
     z: 0, ei: 0, x: 240, tx: 240, count: eff.startCount, dispCount: eff.startCount, eff,
     combat: createCombat(),
     watcher: recordWatcher(save.get().best), slowmo: slowmoCtl(), cont: continueToken(isDaily),
-    recordFlash: 0, gold: false, dim: 0, invulnT: 0, curBossZone: -1,
+    recordFlash: 0, gold: false, dim: 0, invulnT: 0, busterT: 0, curBossZone: -1,
     parts: [], floaters: [], shakeT: 0, hurtT: 0, fireFlash: 0, evolveT: 0, evolveUp: true, burstSeed: 0, sfxQueue: [],
     peak: eff.startCount, over: false, won: false,
     firstX2: !isDaily && isFirstRunToday(save.get(), todayKey()),
@@ -126,9 +126,14 @@ function advance(run, dt0) {
     }
   }
   const prevTier = tierFor(run.count);
-  const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult, tier: prevTier, radius: squadRadius(run.count) }, dt, run.rnd);
+  const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult, tier: prevTier, radius: squadRadius(run.count), beam: run.busterT > 0 }, dt, run.rnd);
   for (const ev of r.events) {
     if (ev.type === 'kill') { spawnBurst(run, ev.x, ev.y, ev.r, false); if (!ev.touched) run.sfxQueue.push('kill'); }
+    else if (ev.type === 'pow') {                     // POW 뱃지 — 버스터 발동!
+      run.busterT = BAL.fx.busterDur;
+      run.floaters.push({ x: ev.x, y: ev.y, text: '버스터!', color: '#F6C84A', t: 0, big: true });
+      run.sfxQueue.push('record');
+    }
     else if (ev.type === 'supply') {                  // 보급 컨테이너 격파 = 병력 획득
       run.count = Math.min(BAL.squad.maxCount, run.count + ev.n);
       run.floaters.push({ x: ev.x, y: ev.y, text: '+' + ev.n, color: '#F6C84A', t: 0, big: true });
@@ -162,6 +167,7 @@ function advance(run, dt0) {
   run.hurtT = Math.max(0, run.hurtT - dt0);
   run.fireFlash = Math.max(0, run.fireFlash - dt0);
   run.evolveT = Math.max(0, run.evolveT - dt0);
+  run.busterT = Math.max(0, run.busterT - dt);
   for (const p of run.parts) { p.t += dt0; p.x += p.vx * dt0; p.y += p.vy * dt0; }
   run.parts = run.parts.filter((p) => p.t < p.life);
   for (const f of run.floaters) { f.t += dt0; f.y -= 44 * dt0; }
@@ -244,7 +250,7 @@ export function boot() {
       const disp = Math.round(run.dispCount);
       v.squad = { x: run.x, count: disp, tier: tierFor(run.count), radius: squadRadius(run.count), hurt: run.hurtT > 0,
                   fireFlash: run.fireFlash, muzzles: BAL.squad.muzzles[tierFor(run.count)] ?? 1,
-                  evolveT: run.evolveT, evolveUp: run.evolveUp };
+                  evolveT: run.evolveT, evolveUp: run.evolveUp, busterT: run.busterT };
       v.dim = run.dim;
       v.parts = run.parts;
       v.cutscene = run.cutscene ? { k: 1 - run.cutscene.t / run.cutscene.total, tier: run.cutscene.tier, down: run.cutscene.down } : null;

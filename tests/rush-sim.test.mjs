@@ -9,7 +9,7 @@ import { buildTrack } from '../rush/track.js';
 import { applyGate } from '../rush/gates.js';
 
 test('SQUAD-TIER: 임계 1/25/75/150/300', () => {
-  const cases = [[1, 0], [24, 0], [25, 1], [74, 1], [75, 2], [149, 2], [150, 3], [299, 3], [300, 4], [999, 4]];
+  const cases = [[1, 0], [39, 0], [40, 1], [119, 1], [120, 2], [249, 2], [250, 3], [499, 3], [500, 4], [999, 4]];
   for (const [n, t] of cases) assert.equal(tierFor(n), t, n + '기');
 });
 

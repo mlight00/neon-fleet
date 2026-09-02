@@ -57,7 +57,9 @@ export function stepCombat(st, squad, dt, rnd) {
     let shots = 0;
     while (st.fireT <= 0) {
       st.fireT += Math.max(0.02, interval);
-      const cx = squad.x + (rnd() - 0.5) * spread;
+      st.fireSeq = (st.fireSeq ?? 0) + 1;
+      //  절반은 히어로 정중앙 직사(조준의 축), 절반은 대형 폭 산개
+      const cx = st.fireSeq % 2 === 0 ? squad.x : squad.x + (rnd() - 0.5) * spread;
       for (let m = 0; m < muzzles; m++) {
         st.bullets.push({ x: cx + (m - (muzzles - 1) / 2) * 14, y: S.y - 20, vy: -(S.bulletSpeeds?.[tier] ?? S.bulletSpeed), w: S.bulletW[tier] ?? 4, tier });
       }
@@ -101,9 +103,25 @@ export function stepCombat(st, squad, dt, rnd) {
       }
     }
     if (e.y >= lineY - e.r && Math.abs(e.x - squad.x) < rad + e.r) {
-      troopLoss += def.touchLoss ?? S.touchLossPerHit;
-      e.hp = 0; e.touched = true;                     // 접촉 = 자폭 소모(기획 4-1)
+      if (def.pickup) {                               // POW 뱃지: 줍는 순간 버스터
+        e.hp = 0; e.touched = true; e.picked = true;
+        events.push({ type: 'pow', x: e.x, y: e.y });
+      } else {
+        troopLoss += def.touchLoss ?? S.touchLossPerHit;
+        e.hp = 0; e.touched = true;                   // 접촉 = 자폭 소모(기획 4-1)
+      }
     }
+  }
+
+  //  버스터 빔(POW): 히어로 전방 폭 2xhalfW 관통 — 적·보스 지속 피해, 적탄 소각
+  if (squad.beam) {
+    const hw = BAL.fx.busterHalfW;
+    const beamDmg = BAL.fx.busterDps * dt;
+    for (const e of st.enemies) {
+      if (e.hp > 0 && !BAL.enemies[e.kind].pickup && Math.abs(e.x - squad.x) < hw + e.r && e.y < lineY) e.hp -= beamDmg;
+    }
+    if (st.boss && Math.abs(st.boss.x - squad.x) < hw + st.boss.r) st.boss.hp -= beamDmg;
+    for (const s2 of st.eshots) if (Math.abs(s2.x - squad.x) < hw) s2.dead = true;
   }
 
   //  적탄 이동·명중 — 갈고리는 좌우로 크게 흔들리며 낙하한다
@@ -170,7 +188,7 @@ export function stepCombat(st, squad, dt, rnd) {
     bo.shootT -= dt;
     if (bo.shootT <= 0 && bo.sweepPhase !== 2) {
       bo.shootT = def.shootEvery;
-      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, def.fan, def.shotSpeed, BAL.track.eshotDmg?.[bo.zone] ?? 1, 'shell');
+      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, def.fan, def.shotSpeed, (BAL.track.eshotDmg?.[bo.zone] ?? 1) + (BAL.boss.shotBonus ?? 0), 'shell');
     }
     if (def.spawnEvery) {
       bo.spawnT -= dt;
@@ -202,7 +220,7 @@ export function stepCombat(st, squad, dt, rnd) {
       st.boss.hp -= bulletDmg; b.dead = true; continue;
     }
     for (const e of st.enemies) {
-      if (e.hp > 0 && Math.hypot(b.x - e.x, b.y - e.y) < e.r + 4) { e.hp -= bulletDmg * (BAL.enemies[e.kind].shieldReduce ?? 1); b.dead = true; break; }
+      if (e.hp > 0 && !BAL.enemies[e.kind].pickup && Math.hypot(b.x - e.x, b.y - e.y) < e.r + 4) { e.hp -= bulletDmg * (BAL.enemies[e.kind].shieldReduce ?? 1); b.dead = true; break; }
     }
   }
 
