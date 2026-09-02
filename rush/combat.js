@@ -7,6 +7,9 @@ export function createCombat() {
 
 export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0) {
   const def = BAL.enemies[kind];
+  const scroll = BAL.track.scrollSpeed;
+  //  화면 속도 = 스크롤(도로) + 세계 전진 x 구간 배율. 도로 고정형(speed=190)은 배율 무관.
+  const vy = scroll + Math.max(0, def.speed - scroll) * (BAL.track.enemyAdvMult?.[zone] ?? 1);
   for (let i = 0; i < n; i++) {
     st.enemies.push({
       kind, zone, hp: Math.round(def.hp * hpMult), r: def.r,
@@ -14,7 +17,7 @@ export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0) {
       x: Math.max(85, Math.min(395, 85 + ((i + 0.5) / n) * 310 + (rnd() - 0.5) * 60)),
       y: -40 - rnd() * 170,
       vx: def.zigzag ? (rnd() < 0.5 ? -def.zigzag : def.zigzag) : (def.straight ? 0 : (rnd() - 0.5) * 30),
-      vy: def.speed,
+      vy,
       shootT: def.shootEvery ? def.shootEvery * (0.5 + rnd() * 0.8) : undefined,
       hopT: def.hopEvery ? def.hopEvery * (0.4 + rnd() * 0.8) : undefined,
       hopDur: 0,

@@ -1,7 +1,7 @@
 // rush/balance.js — 스타포지 러시 수치 단일 진실. 로직 없음.
 export const BAL = {
   //  판 = 5구간 × 900. 구간마다 신규 적 2종 합류(누적), 구간 끝(900의 배수)마다 전용 보스.
-  track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 780, firstGateZ: 300, waveEvery: 200, enemyHpMult: [1, 1.8, 2.8, 4.0, 5.5] },   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
+  track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 780, firstGateZ: 300, waveEvery: 200, enemyHpMult: [1, 1.7, 2.5, 3.5, 4.7], enemyAdvMult: [0.6, 0.8, 1, 1.1, 1.2] },   // 세계 전진 속도 구간 배율(도로 고정 190에는 미적용)   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
   //  followRate = 기존 게임(js/balance.js) followSpeed 와 동일값
   squad: { y: 640, maxCount: 999, moveSpeed: 420, followRate: 9, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
            heroSize: 46, heroSizes: [46, 52, 58, 66, 74], soldierSize: 22, ringGap: 19, ringStart: 26,
@@ -16,22 +16,22 @@ export const BAL = {
   },
   enemies: {
     //  구간1
-    scrapbit:      { hp: 2,  r: 14, speed: 120, count: [2, 4],  coin: 1 },
-    wheeler:       { hp: 3,  r: 17, speed: 170, count: [2, 3],  coin: 2, zigzag: 140 },
+    scrapbit:      { hp: 2,  r: 14, speed: 250, count: [2, 4],  coin: 1 },
+    wheeler:       { hp: 3,  r: 17, speed: 265, count: [2, 3],  coin: 2, zigzag: 140 },
     //  구간2
-    ramhound:      { hp: 6,  r: 28, speed: 170, accel: 260, maxSpeed: 420, count: [1, 2], coin: 3, touchLoss: 3, straight: true },
-    signaler:      { hp: 7,  r: 23, speed: 85,  count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3 },
+    ramhound:      { hp: 6,  r: 28, speed: 215, accel: 260, maxSpeed: 540, count: [1, 2], coin: 3, touchLoss: 3, straight: true },
+    signaler:      { hp: 7,  r: 23, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3, straight: true },   // 도로 고정 포탑
     //  구간3
-    wallguard:     { hp: 34, r: 40, speed: 105, count: [1, 1],  coin: 5, touchLoss: 4, showHp: true },
-    cartyard:      { hp: 50, r: 42, speed: 60,  count: [1, 1],  coin: 7, touchLoss: 5, showHp: true },
+    wallguard:     { hp: 34, r: 40, speed: 235, count: [1, 1],  coin: 5, touchLoss: 4, showHp: true, straight: true },
+    cartyard:      { hp: 50, r: 42, speed: 215, count: [1, 1],  coin: 7, touchLoss: 5, showHp: true, straight: true },
     //  구간4
-    needleeye:     { hp: 5,  r: 25, speed: 80,  count: [1, 2],  coin: 4, shootEvery: 1.4, shotSpeed: 240 },
-    manholejumper: { hp: 8,  r: 16, speed: 110, count: [1, 3],  coin: 4, hopEvery: 1.6, hopSpeed: 260 },
+    needleeye:     { hp: 5,  r: 25, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.4, shotSpeed: 240, straight: true },   // 도로 고정 저격수
+    manholejumper: { hp: 8,  r: 16, speed: 245, count: [1, 3],  coin: 4, hopEvery: 1.6, hopSpeed: 260 },
     //  구간5
-    spawnpod:      { hp: 14, r: 30, speed: 70,  count: [1, 2],  coin: 6, spawns: 'scrapbit', spawnN: 3, touchLoss: 2 },
-    magnethead:    { hp: 9,  r: 19, speed: 95,  count: [1, 2],  coin: 8, stealCoins: 5 },
+    spawnpod:      { hp: 14, r: 30, speed: 190, count: [1, 2],  coin: 6, spawns: 'scrapbit', spawnN: 3, touchLoss: 2, straight: true },   // 도로 고정 고치
+    magnethead:    { hp: 9,  r: 19, speed: 240, count: [1, 2],  coin: 8, stealCoins: 5 },
     //  전 구간 공통: 보급 컨테이너 — 한참 쏴서 깨면 병력 획득(게이트 밖의 성장 축)
-    supply:        { hp: 26, r: 34, speed: 70,  count: [1, 1],  coin: 0, showHp: true, touchLoss: 0,
+    supply:        { hp: 26, r: 34, speed: 190, count: [1, 1],  coin: 0, showHp: true, touchLoss: 0, straight: true,   // 도로에 놓인 컨테이너
                      rewardByZone: [8, 13, 20, 30, 42] },
   },
   //  구간 보스 5종 — 공통 골격(좌우 이동+부채꼴 사격+접촉)에 스탯만 다르게. 스멜터는 잡졸 소환.
