@@ -63,6 +63,7 @@ function spawnBurst(run, x, y, r, big) {
 }
 
 function advance(run, dt0) {
+  const startTier = tierFor(run.count);               // 프레임 전체의 티어 변화를 본다(게이트 승급 포함)
   const scale = run.slowmo.update(run.count, dt0);
   const dt = dt0 * scale;
   //  보스 앞 정적(A-3): 다음 보스 이벤트 1.5초 앞에서 화면이 어두워진다 — 구간마다 반복
@@ -146,12 +147,13 @@ function advance(run, dt0) {
   }
   if (run.invulnT > 0) run.invulnT -= dt0; else run.count -= r.troopLoss;
   const nowTier = tierFor(run.count);
-  if (nowTier !== prevTier) {                          // 승급/강등 이펙트 + 사운드
+  if (nowTier !== startTier) {                         // 승급/강등 이펙트 + 사운드
     run.evolveT = 0.8;
-    run.evolveUp = nowTier > prevTier;
-    run.sfxQueue.push(nowTier > prevTier ? 'evolve' : 'demote');
-    run.floaters.push({ x: run.x, y: BAL.squad.y - 60, color: nowTier > prevTier ? '#F6C84A' : '#FF6A3D',
-                        text: nowTier > prevTier ? '진화!' : '강등...', t: 0, big: true });
+    if (nowTier > startTier) run.cutscene = { t: 1.1, total: 1.1, tier: nowTier };   // 진화 컷인(히트스톱)
+    run.evolveUp = nowTier > startTier;
+    run.sfxQueue.push(nowTier > startTier ? 'evolve' : 'demote');
+    run.floaters.push({ x: run.x, y: BAL.squad.y - 60, color: nowTier > startTier ? '#F6C84A' : '#FF6A3D',
+                        text: nowTier > startTier ? '진화!' : '강등...', t: 0, big: true });
   }
   //  연출 상태 갱신
   run.shakeT = Math.max(0, run.shakeT - dt0);
@@ -242,6 +244,7 @@ export function boot() {
                   evolveT: run.evolveT, evolveUp: run.evolveUp };
       v.dim = run.dim;
       v.parts = run.parts;
+      v.cutscene = run.cutscene ? { k: 1 - run.cutscene.t / run.cutscene.total, tier: run.cutscene.tier } : null;
       v.floaters = run.floaters;
       v.shakeT = run.shakeT;
       v.hurtT = run.hurtT;
@@ -374,11 +377,16 @@ export function boot() {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (state === 'run') {
+      if (run.cutscene) {                              // 진화 컷인: 세계가 잠깐 멈춘다
+        run.cutscene.t -= dt;
+        if (run.cutscene.t <= 0) run.cutscene = null;
+      } else {
       if (pointer.down) run.tx = clampX(pointer.x);
       if (keys.ArrowLeft) run.tx = clampX(run.tx - BAL.squad.moveSpeed * dt);
       if (keys.ArrowRight) run.tx = clampX(run.tx + BAL.squad.moveSpeed * dt);
       run.x += (run.tx - run.x) * Math.min(1, dt * BAL.squad.followRate);   // 부드러운 추종(뚝뚝 끊김 방지)
       advance(run, dt);
+      }
       for (const s of run.sfxQueue) au.sfx(s);
       run.sfxQueue.length = 0;
       if (run.combat.boss) au.bgmBoss(run.combat.boss.zone); else au.bgmBattle();

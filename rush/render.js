@@ -382,6 +382,50 @@ export function createRenderer(canvas, sprites) {
     }
   }
 
+  /** 진화 컷인: 세계 정지 + 중앙에 새 형태 확대 + 골드 링·광선 */
+  function drawEvolveCutscene(cs, now) {
+    const k = cs.k;                                    // 0->1 진행
+    const fade = k < 0.12 ? k / 0.12 : k > 0.85 ? (1 - k) / 0.15 : 1;
+    ctx.fillStyle = 'rgba(5,8,14,' + 0.6 * fade + ')';
+    ctx.fillRect(0, 0, W, H);
+    const cx = W / 2, cy = 350;
+    //  방사 광선(골드)
+    ctx.globalAlpha = 0.5 * fade;
+    ctx.strokeStyle = '#F6C84A';
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + now * 0.7;
+      ctx.lineWidth = i % 2 ? 2 : 4;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * 105, cy + Math.sin(a) * 105);
+      ctx.lineTo(cx + Math.cos(a) * (150 + k * 60), cy + Math.sin(a) * (150 + k * 60));
+      ctx.stroke();
+    }
+    //  확장 링
+    for (const m of [0, 0.25]) {
+      const kk = Math.max(0, Math.min(1, k * 1.6 - m));
+      if (kk > 0 && kk < 1) {
+        ctx.strokeStyle = 'rgba(246,200,74,' + (1 - kk) + ')';
+        ctx.lineWidth = 6 - kk * 4;
+        ctx.beginPath(); ctx.arc(cx, cy, 60 + kk * 190, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = fade;
+    //  새 형태 뒷모습 — 팝 스케일(0.55 -> 1.06 -> 1)
+    const pop = k < 0.35 ? 0.55 + (k / 0.35) * 0.51 : k < 0.5 ? 1.06 - ((k - 0.35) / 0.15) * 0.06 : 1;
+    const h = 290 * pop;
+    drawImgCentered('m' + (cs.tier + 1), cx, cy, h, () => {
+      ctx.fillStyle = TIER_FALLBACK[cs.tier];
+      ctx.beginPath(); ctx.arc(cx, cy, h * 0.35, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.font = '900 40px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 8; ctx.strokeStyle = '#14233A';
+    ctx.strokeText('M-0' + (cs.tier + 1) + ' 진화!', cx, cy + 210);
+    ctx.fillStyle = '#F6C84A';
+    ctx.fillText('M-0' + (cs.tier + 1) + ' 진화!', cx, cy + 210);
+    ctx.globalAlpha = 1;
+  }
+
   function drawTitle(view) {
     ctx.textAlign = 'center';
     //  워드마크: 밝은 배경 위 딥 네이비가 주인공, 골드는 포인트만
@@ -594,6 +638,7 @@ export function createRenderer(canvas, sprites) {
         ctx.fillStyle = gr;
         ctx.fillRect(0, 0, W, H);
       }
+      if (view.cutscene) drawEvolveCutscene(view.cutscene, view.now ?? 0);
       drawHud(view.hud);
       if (view.state === 'over') drawOver(view);
       else if (view.state === 'paused') {              // ESC 일시 정지
