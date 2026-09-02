@@ -149,7 +149,9 @@ function advance(run, dt0) {
   const nowTier = tierFor(run.count);
   if (nowTier !== startTier) {                         // 승급/강등 이펙트 + 사운드
     run.evolveT = 0.8;
-    if (nowTier > startTier) run.cutscene = { t: 1.1, total: 1.1, tier: nowTier };   // 진화 컷인(히트스톱)
+    run.cutscene = nowTier > startTier
+      ? { t: 1.1, total: 1.1, tier: nowTier }                 // 진화 컷인(히트스톱)
+      : { t: 0.6, total: 0.6, tier: nowTier, down: true };    // 강등 — 짧은 이펙트
     run.evolveUp = nowTier > startTier;
     run.sfxQueue.push(nowTier > startTier ? 'evolve' : 'demote');
     run.floaters.push({ x: run.x, y: BAL.squad.y - 60, color: nowTier > startTier ? '#F6C84A' : '#FF6A3D',
@@ -244,7 +246,7 @@ export function boot() {
                   evolveT: run.evolveT, evolveUp: run.evolveUp };
       v.dim = run.dim;
       v.parts = run.parts;
-      v.cutscene = run.cutscene ? { k: 1 - run.cutscene.t / run.cutscene.total, tier: run.cutscene.tier } : null;
+      v.cutscene = run.cutscene ? { k: 1 - run.cutscene.t / run.cutscene.total, tier: run.cutscene.tier, down: run.cutscene.down } : null;
       v.floaters = run.floaters;
       v.shakeT = run.shakeT;
       v.hurtT = run.hurtT;

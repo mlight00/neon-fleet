@@ -382,16 +382,17 @@ export function createRenderer(canvas, sprites) {
     }
   }
 
-  /** 진화 컷인: 세계 정지 + 중앙에 새 형태 확대 + 골드 링·광선 */
+  /** 진화/강등 컷인: 세계 정지 + 중앙에 형태 확대 — 진화=골드 광선, 강등=적색 수축 */
   function drawEvolveCutscene(cs, now) {
     const k = cs.k;                                    // 0->1 진행
+    const col = cs.down ? '#FF6A3D' : '#F6C84A';
     const fade = k < 0.12 ? k / 0.12 : k > 0.85 ? (1 - k) / 0.15 : 1;
-    ctx.fillStyle = 'rgba(5,8,14,' + 0.6 * fade + ')';
+    ctx.fillStyle = 'rgba(5,8,14,' + (cs.down ? 0.45 : 0.6) * fade + ')';
     ctx.fillRect(0, 0, W, H);
     const cx = W / 2, cy = 350;
-    //  방사 광선(골드)
+    //  방사 광선
     ctx.globalAlpha = 0.5 * fade;
-    ctx.strokeStyle = '#F6C84A';
+    ctx.strokeStyle = col;
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2 + now * 0.7;
       ctx.lineWidth = i % 2 ? 2 : 4;
@@ -400,29 +401,33 @@ export function createRenderer(canvas, sprites) {
       ctx.lineTo(cx + Math.cos(a) * (150 + k * 60), cy + Math.sin(a) * (150 + k * 60));
       ctx.stroke();
     }
-    //  확장 링
+    //  링: 진화=확장, 강등=수축
     for (const m of [0, 0.25]) {
       const kk = Math.max(0, Math.min(1, k * 1.6 - m));
       if (kk > 0 && kk < 1) {
-        ctx.strokeStyle = 'rgba(246,200,74,' + (1 - kk) + ')';
+        const rr = cs.down ? 250 - kk * 190 : 60 + kk * 190;
+        ctx.strokeStyle = (cs.down ? 'rgba(255,106,61,' : 'rgba(246,200,74,') + (1 - kk) + ')';
         ctx.lineWidth = 6 - kk * 4;
-        ctx.beginPath(); ctx.arc(cx, cy, 60 + kk * 190, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
       }
     }
     ctx.globalAlpha = fade;
-    //  새 형태 뒷모습 — 팝 스케일(0.55 -> 1.06 -> 1)
-    const pop = k < 0.35 ? 0.55 + (k / 0.35) * 0.51 : k < 0.5 ? 1.06 - ((k - 0.35) / 0.15) * 0.06 : 1;
-    const h = 290 * pop;
+    //  형태 — 진화=팝 확대(0.55->1.06->1), 강등=움츠러듦(1.05->0.85)
+    const pop = cs.down
+      ? 1.05 - Math.min(1, k * 1.4) * 0.2
+      : (k < 0.35 ? 0.55 + (k / 0.35) * 0.51 : k < 0.5 ? 1.06 - ((k - 0.35) / 0.15) * 0.06 : 1);
+    const h = (cs.down ? 240 : 290) * pop;
     drawImgCentered('m' + (cs.tier + 1), cx, cy, h, () => {
       ctx.fillStyle = TIER_FALLBACK[cs.tier];
       ctx.beginPath(); ctx.arc(cx, cy, h * 0.35, 0, Math.PI * 2); ctx.fill();
     });
-    ctx.font = '900 40px system-ui, sans-serif';
+    const label = cs.down ? 'M-0' + (cs.tier + 1) + ' 강등...' : 'M-0' + (cs.tier + 1) + ' 진화!';
+    ctx.font = '900 ' + (cs.down ? 32 : 40) + 'px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.lineWidth = 8; ctx.strokeStyle = '#14233A';
-    ctx.strokeText('M-0' + (cs.tier + 1) + ' 진화!', cx, cy + 210);
-    ctx.fillStyle = '#F6C84A';
-    ctx.fillText('M-0' + (cs.tier + 1) + ' 진화!', cx, cy + 210);
+    ctx.strokeText(label, cx, cy + 210);
+    ctx.fillStyle = col;
+    ctx.fillText(label, cx, cy + 210);
     ctx.globalAlpha = 1;
   }
 
