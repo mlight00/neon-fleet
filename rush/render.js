@@ -155,6 +155,22 @@ export function createRenderer(canvas, sprites) {
       ctx.closePath();
       ctx.fill();
     });
+    //  승급/강등 이펙트: 히어로 중심 확장 링 + 섬광(승급=골드, 강등=적색)
+    if ((squad.evolveT ?? 0) > 0) {
+      const k = 1 - squad.evolveT / 0.8;              // 0->1 확장
+      const col = squad.evolveUp ? '246,200,74' : '255,106,61';
+      for (const m of [0, 0.35]) {
+        const kk = Math.max(0, Math.min(1, k - m));
+        if (kk <= 0 || kk >= 1) continue;
+        ctx.strokeStyle = 'rgba(' + col + ',' + (1 - kk) * 0.9 + ')';
+        ctx.lineWidth = 5 - kk * 3;
+        ctx.beginPath(); ctx.arc(hx, hy, 20 + kk * 110, 0, Math.PI * 2); ctx.stroke();
+      }
+      if (k < 0.25) {
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.55 - k * 2.2) + ')';
+        ctx.beginPath(); ctx.arc(hx, hy, heroSize * (0.8 + k * 2), 0, Math.PI * 2); ctx.fill();
+      }
+    }
     //  사격 총구 섬광 — 발사 열 수만큼 부대 전방에서 번쩍인다.
     if ((squad.fireFlash ?? 0) > 0) {
       const k = squad.fireFlash / 0.09;
@@ -185,8 +201,22 @@ export function createRenderer(canvas, sprites) {
   const ROUND_KINDS = new Set(['wheeler', 'manholejumper', 'magnethead', 'spawnpod']);
 
   function drawEnemy(e) {
-    if (e.kind === 'supply') {                        // 보급 컨테이너 — 골드 상자 + 남은 내구도
+    if (e.kind === 'supply') {                        // 보급 컨테이너 — 네온함대 포드 그림 + 보상/내구도
       shadow(e.x, e.y + e.r * 0.95, e.r * 0.9);
+      const im = sprites.get('supply');
+      if (im) {
+        drawImgCentered('supply', e.x, e.y, e.r * 2.1, () => {});
+        const reward = BAL.enemies.supply.rewardByZone[e.zone ?? 0] ?? 6;
+        ctx.font = 'bold 22px system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 5; ctx.strokeStyle = '#14233A';
+        ctx.strokeText('+' + reward, e.x, e.y - 2);
+        ctx.fillStyle = '#FFE9B8';
+        ctx.fillText('+' + reward, e.x, e.y - 2);
+        ctx.textBaseline = 'alphabetic';
+        drawHpTag(e);
+        return;
+      }
       ctx.fillStyle = '#8A6D1F';
       roundRect(e.x - e.r, e.y - e.r * 0.8, e.r * 2, e.r * 1.6, 8); ctx.fill();
       ctx.strokeStyle = '#F6C84A'; ctx.lineWidth = 4;
@@ -435,15 +465,21 @@ export function createRenderer(canvas, sprites) {
       if (view.boss) drawBoss(view.boss);
       for (const b of view.bullets) {
         const w = b.w ?? 4, t = b.tier ?? 0;
-        if (t >= 4) {                                  // 최종형: 플라즈마 글로우
-          ctx.fillStyle = 'rgba(53,229,255,0.35)';
-          ctx.beginPath(); ctx.arc(b.x, b.y, w * 1.6, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.fillStyle = '#8FF3FF';
-        ctx.fillRect(b.x - w / 2, b.y - 7 - w, w, 14 + w);
-        if (t >= 2) {                                  // 중반 이후: 흰 코어(더 뜨거운 탄)
+        if (t >= 4) {                                  // 5단 플라즈마: 흰 심 + 청백 글로우 구체
+          ctx.fillStyle = 'rgba(143,243,255,0.35)';
+          ctx.beginPath(); ctx.arc(b.x, b.y, w * 2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#DFFBFF';
+          ctx.beginPath(); ctx.arc(b.x, b.y, w * 1.05, 0, Math.PI * 2); ctx.fill();
           ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(b.x - w / 6, b.y - 5 - w, w / 3, 10 + w);
+          ctx.beginPath(); ctx.arc(b.x, b.y, w * 0.55, 0, Math.PI * 2); ctx.fill();
+        } else if (t >= 2) {                           // 3~4단 레이저: 골드 탄 + 흰 코어
+          ctx.fillStyle = '#F6C84A';
+          ctx.fillRect(b.x - w / 2, b.y - 8 - w, w, 16 + w);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(b.x - w / 6, b.y - 6 - w, w / 3, 12 + w);
+        } else {                                       // 1~2단 발칸: 시안 탄
+          ctx.fillStyle = '#8FF3FF';
+          ctx.fillRect(b.x - w / 2, b.y - 7 - w, w, 14 + w);
         }
       }
       for (const s of view.eshots) {

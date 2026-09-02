@@ -5,6 +5,9 @@ const DIR = 'assets/sound/';
 //  용도별 파일(변형은 라운드로빈). 이름은 기존 게임 자산 그대로.
 const SFX = {
   fire:    ['nf_sfx_vulcan_1', 'nf_sfx_vulcan_2', 'nf_sfx_vulcan_3'],
+  fireL:   ['nf_sfx_laser_1', 'nf_sfx_laser_2', 'nf_sfx_laser_3'],
+  fireM:   ['nf_sfx_missile_1', 'nf_sfx_missile_2'],
+  demote:  ['nf_sfx_demote_1'],
   kill:    ['nf_sfx_explode_s_1', 'nf_sfx_explode_s_2', 'nf_sfx_explode_s_3'],
   bossDie: ['nf_sfx_explode_l_1', 'nf_sfx_explode_l_2'],
   hurt:    ['nf_sfx_damage_1', 'nf_sfx_damage_2'],
@@ -16,8 +19,8 @@ const SFX = {
   click:   ['nf_sfx_click_1'],
   record:  ['nf_sfx_charge_full_1'],
 };
-const THROTTLE = { fire: 0.09, kill: 0.08, hurt: 0.25 };   // 연타 소음 방지(초)
-const VOL = { fire: 0.16, kill: 0.4, bossDie: 0.8, hurt: 0.55, gateGood: 0.6, gateBad: 0.6,
+const THROTTLE = { fire: 0.09, fireL: 0.09, fireM: 0.11, kill: 0.08, hurt: 0.25 };   // 연타 소음 방지(초)
+const VOL = { fire: 0.16, fireL: 0.15, fireM: 0.18, demote: 0.75, kill: 0.4, bossDie: 0.8, hurt: 0.55, gateGood: 0.6, gateBad: 0.6,
               bossIn: 0.8, evolve: 0.8, buy: 0.6, click: 0.5, record: 0.7 };
 
 export function createAudio() {

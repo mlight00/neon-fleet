@@ -56,7 +56,7 @@ export function stepCombat(st, squad, dt, rnd) {
       st.fireT += Math.max(0.02, interval);
       const cx = squad.x + (rnd() - 0.5) * spread;
       for (let m = 0; m < muzzles; m++) {
-        st.bullets.push({ x: cx + (m - (muzzles - 1) / 2) * 14, y: S.y - 20, vy: -S.bulletSpeed, w: S.bulletW[tier] ?? 4, tier });
+        st.bullets.push({ x: cx + (m - (muzzles - 1) / 2) * 14, y: S.y - 20, vy: -(S.bulletSpeeds?.[tier] ?? S.bulletSpeed), w: S.bulletW[tier] ?? 4, tier });
       }
       shots++;
     }

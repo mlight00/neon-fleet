@@ -6,7 +6,7 @@ export const BAL = {
   squad: { y: 640, maxCount: 999, moveSpeed: 420, followRate: 9, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
            heroSize: 46, heroSizes: [46, 52, 58, 66, 74], soldierSize: 22, ringGap: 19, ringStart: 26,
            muzzles: [1, 1, 2, 2, 3], bulletW: [4, 5, 6, 7, 8], tierDmgMult: [1, 1.15, 1.3, 1.5, 1.75],   // 티어별 발사 열·탄 굵기·위력(무기 진화)
-           fireInterval: 0.5, fireRateCap: 7, bulletSpeed: 700, bulletDmg: 1, dmgPerTroop: 0.012, touchLossPerHit: 1 },
+           fireInterval: 0.5, fireRateCap: 7, bulletSpeed: 700, bulletSpeeds: [700, 730, 770, 820, 880], bulletDmg: 1, dmgPerTroop: 0.012, touchLossPerHit: 1 },
   tiers: [1, 25, 75, 150, 300],          // M1~M5 병력 임계
   gates: {
     colors: { add: '#35E5FF', mul: '#F6C84A', sub: '#FF6A3D', div: '#FF3DA5' },
