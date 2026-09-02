@@ -2,7 +2,7 @@
 import { BAL } from './balance.js';
 
 export function createCombat() {
-  return { enemies: [], bullets: [], eshots: [], boss: null, fireT: 0, coins: 0, kills: 0 };
+  return { enemies: [], bullets: [], eshots: [], pools: [], boss: null, fireT: 0, coins: 0, kills: 0 };
 }
 
 export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0) {
@@ -32,11 +32,11 @@ export function spawnBoss(st, troopCount, zone) {
               dir: 1, shootT: def.shootEvery, touchT: 0, spawnT: def.spawnEvery ?? 0 };
 }
 
-function shootFan(st, x, y, tx, ty, fan, speed) {
+function shootFan(st, x, y, tx, ty, fan, speed, dmg = 1) {
   const base = Math.atan2(ty - y, tx - x);
   for (let k = 0; k < fan; k++) {
     const a = base + (k - (fan - 1) / 2) * 0.26;
-    st.eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed });
+    st.eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg });
   }
 }
 
@@ -86,7 +86,7 @@ export function stepCombat(st, squad, dt, rnd) {
       e.shootT -= dt;
       if (e.shootT <= 0) {
         e.shootT = def.shootEvery;
-        shootFan(st, e.x, e.y, squad.x, lineY, def.fan ?? 1, def.shotSpeed);
+        shootFan(st, e.x, e.y, squad.x, lineY, def.fan ?? 1, def.shotSpeed, BAL.track.eshotDmg?.[e.zone ?? 0] ?? 1);
       }
     }
     if (e.y >= lineY - e.r && Math.abs(e.x - squad.x) < rad + e.r) {
@@ -95,10 +95,16 @@ export function stepCombat(st, squad, dt, rnd) {
     }
   }
 
-  //  적탄 이동·명중
+  //  적탄 이동·명중 — 갈고리는 좌우로 크게 흔들리며 낙하한다
   for (const s of st.eshots) {
-    s.x += s.vx * dt; s.y += s.vy * dt;
-    if (s.y >= lineY && Math.abs(s.x - squad.x) < rad + (s.hook ? 16 : 5)) { troopLoss += s.hook ? 3 : 1; s.dead = true; }
+    if (s.hook) {
+      s.t = (s.t ?? 0) + dt;
+      s.x = s.baseX + Math.sin(s.t * 4.2) * (s.swing ?? 0);
+    } else {
+      s.x += s.vx * dt;
+    }
+    s.y += s.vy * dt;
+    if (s.y >= lineY && Math.abs(s.x - squad.x) < rad + (s.hook ? 16 : 5)) { troopLoss += s.hook ? 3 : (s.dmg ?? 1); s.dead = true; }
   }
 
   //  보스 — 공통 골격: 좌우 이동 + 부채꼴 사격 + 접촉. 스멜터(spawnEvery)는 잡졸 소환.
@@ -116,20 +122,44 @@ export function stepCombat(st, squad, dt, rnd) {
         bo.ramPhase = 1; bo.ramT = def.ramEvery;
       }
     }
+    if (def.sweepEvery) {                             // 레일 리바이어던: 경고 후 차선을 위->아래로 관통
+      if (bo.sweepPhase === 1) {                      // 경고(텔레그래프)
+        bo.sweepWarnT -= dt;
+        if (bo.sweepWarnT <= 0) { bo.sweepPhase = 2; bo.x = bo.warnX; bo.y = -110; bo.diveHit = false; }
+      } else if (bo.sweepPhase === 2) {               // 관통 낙하
+        bo.y += def.sweepSpeed * dt;
+        if (!bo.diveHit && bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < rad + bo.r) {
+          troopLoss += def.sweepHit; bo.diveHit = true;
+        }
+        if (bo.y > 900) { bo.sweepPhase = 0; bo.y = -90; bo.sweepT = def.sweepEvery; }
+      } else {
+        bo.sweepT = (bo.sweepT ?? def.sweepEvery) - dt;
+        if (bo.sweepT <= 0) { bo.sweepPhase = 1; bo.sweepWarnT = 1; bo.warnX = squad.x; }
+      }
+    }
+    if (def.poolEvery) {                              // 스멜터: 부대 자리에 쇳물 장판(경고 -> 4초 지속)
+      bo.poolT = (bo.poolT ?? def.poolEvery * 0.7) - dt;
+      if (bo.poolT <= 0) {
+        bo.poolT = def.poolEvery;
+        st.pools.push({ x: squad.x, y: lineY - 46, warn: 0.9, life: 4, tick: 0 });
+      }
+    }
     if (def.hookEvery) {                              // 갠트리 위도우: 갈고리를 아래로 쭉 뻗는다
       bo.hookT = (bo.hookT ?? def.hookEvery * 0.6) - dt;
       if (bo.hookT <= 0) {
         bo.hookT = def.hookEvery;
-        st.eshots.push({ x: bo.x, y: bo.y + bo.r, vx: 0, vy: def.hookSpeed, hook: true });
+        st.eshots.push({ x: bo.x, y: bo.y + bo.r, baseX: bo.x, vx: 0, vy: def.hookSpeed, hook: true, swing: def.hookSwing ?? 0 });
       }
     }
-    if (bo.y < 140 && !bo.ramPhase) bo.y += 60 * dt;
-    bo.x += bo.dir * def.speed * dt;
-    if (bo.x < 90 || bo.x > 390) bo.dir *= -1;
+    if (bo.y < 140 && !bo.ramPhase && !bo.sweepPhase) bo.y += 60 * dt;
+    if (bo.sweepPhase !== 2) {
+      bo.x += bo.dir * def.speed * dt;
+      if (bo.x < 90 || bo.x > 390) bo.dir *= -1;
+    }
     bo.shootT -= dt;
-    if (bo.shootT <= 0) {
+    if (bo.shootT <= 0 && bo.sweepPhase !== 2) {
       bo.shootT = def.shootEvery;
-      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, def.fan, def.shotSpeed);
+      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, def.fan, def.shotSpeed, BAL.track.eshotDmg?.[bo.zone] ?? 1);
     }
     if (def.spawnEvery) {
       bo.spawnT -= dt;
@@ -141,6 +171,18 @@ export function stepCombat(st, squad, dt, rnd) {
       troopLoss += Math.max(1, Math.round(BAL.boss.touchLossPerSec / 4));
     }
   }
+
+  //  쇳물 장판: 경고 후 점화, 위에 서 있으면 주기 손실
+  for (const pl of st.pools) {
+    if (pl.warn > 0) { pl.warn -= dt; continue; }
+    pl.life -= dt;
+    pl.tick -= dt;
+    if (pl.tick <= 0 && Math.abs(squad.x - pl.x) < rad + 34) {
+      pl.tick = 0.5;
+      troopLoss += BAL.bosses[3].poolDmg;
+    }
+  }
+  st.pools = st.pools.filter((pl) => pl.life > 0);
 
   //  탄 명중 판정
   for (const b of st.bullets) {

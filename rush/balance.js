@@ -1,7 +1,7 @@
 // rush/balance.js — 스타포지 러시 수치 단일 진실. 로직 없음.
 export const BAL = {
   //  판 = 5구간 × 900. 구간마다 신규 적 2종 합류(누적), 구간 끝(900의 배수)마다 전용 보스.
-  track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 780, firstGateZ: 300, waveEvery: 200, enemyHpMult: [1, 1.7, 2.5, 3.5, 4.7], enemyAdvMult: [0.6, 0.8, 1, 1.1, 1.2] },   // 세계 전진 속도 구간 배율(도로 고정 190에는 미적용)   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
+  track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 780, firstGateZ: 300, waveEvery: 200, enemyHpMult: [1, 2, 3.2, 4.6, 6.2], enemyAdvMult: [0.6, 0.8, 1, 1.1, 1.2], eshotDmg: [1, 1, 2, 2, 3] },   // 구간 배율: 체력·전진속도·적탄 위력   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
   //  followRate = 기존 게임(js/balance.js) followSpeed 와 동일값
   squad: { y: 640, maxCount: 999, moveSpeed: 420, followRate: 9, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
            heroSize: 46, heroSizes: [46, 52, 58, 66, 74], soldierSize: 22, ringGap: 19, ringStart: 26,
@@ -35,13 +35,13 @@ export const BAL = {
                      rewardByZone: [8, 13, 20, 30, 42] },
   },
   //  구간 보스 5종 — 공통 골격(좌우 이동+부채꼴 사격+접촉)에 스탯만 다르게. 스멜터는 잡졸 소환.
-  boss: { baseHp: 140, hpPerTroop: 2.0, touchLossPerSec: 14 },
+  boss: { baseHp: 140, hpPerTroop: 2.4, touchLossPerSec: 14 },
   bosses: [
-    { key: 'b1', name: '그레이더',      hpMult: 0.6, r: 48, speed: 60,  shootEvery: 1.3, fan: 1, shotSpeed: 210, coin: 25, ramEvery: 5.5, ramSpeed: 430 },
-    { key: 'b2', name: '갠트리 위도우', hpMult: 0.75, r: 52, speed: 65,  shootEvery: 1.2, fan: 2, shotSpeed: 220, coin: 35, hookEvery: 4.2, hookSpeed: 330 },
-    { key: 'b3', name: '레일 리바이어던', hpMult: 0.70, r: 56, speed: 70, shootEvery: 1.0, fan: 4, shotSpeed: 200, coin: 45 },
-    { key: 'b4', name: '스멜터',        hpMult: 0.85, r: 55, speed: 60,  shootEvery: 1.1, fan: 3, shotSpeed: 220, coin: 55, spawnEvery: 4 },
-    { key: 'b5', name: '크라운 브레이커', hpMult: 1.0, r: 60, speed: 75,  shootEvery: 0.85, fan: 5, shotSpeed: 220, coin: 80 },
+    { key: 'b1', name: '그레이더',      hpMult: 0.7, r: 48, speed: 60,  shootEvery: 1.3, fan: 1, shotSpeed: 210, coin: 25, ramEvery: 5.5, ramSpeed: 430 },
+    { key: 'b2', name: '갠트리 위도우', hpMult: 0.9, r: 52, speed: 65,  shootEvery: 1.2, fan: 2, shotSpeed: 220, coin: 35, hookEvery: 3.8, hookSpeed: 300, hookSwing: 85 },
+    { key: 'b3', name: '레일 리바이어던', hpMult: 1.0, r: 56, speed: 70, shootEvery: 1.0, fan: 4, shotSpeed: 200, coin: 45, sweepEvery: 6, sweepSpeed: 760, sweepHit: 8 },
+    { key: 'b4', name: '스멜터',        hpMult: 1.15, r: 55, speed: 60,  shootEvery: 1.1, fan: 3, shotSpeed: 220, coin: 55, spawnEvery: 4, poolEvery: 5.5, poolDmg: 2 },
+    { key: 'b5', name: '크라운 브레이커', hpMult: 1.35, r: 60, speed: 75,  shootEvery: 0.85, fan: 5, shotSpeed: 220, coin: 80, ramEvery: 6.5, ramSpeed: 430, spawnEvery: 5 },
   ],
   coins: { perDistance: 0.0015 },        // 거리 보정 코인(주 수입은 격파) — 판이 길어진 만큼 단가 하향
   fx: { slowmoAt: 5, slowmoDur: 0.5, slowmoScale: 0.4, slowmoMax: 2,

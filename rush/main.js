@@ -108,7 +108,7 @@ function advance(run, dt0) {
     for (const side of ['left', 'right']) {
       const g = gev.data[side];
       if (isGood(g.op) || g.broken) continue;
-      if (g.hp === undefined) g.hp = Math.round(8 + (gev.z / run.track.length) * 42);   // 후반 게이트는 단단
+      if (g.hp === undefined) g.hp = g.op === 'div' ? Math.round(30 + (gev.z / run.track.length) * 70) : Math.max(6, Math.round(g.value * 1.3));   // 내구도 = 게이트 숫자 비례(÷는 고정 상향)
       const gx = side === 'left' ? 240 - BAL.gates.gap / 2 - BAL.gates.width / 2
                                  : 240 + BAL.gates.gap / 2 + BAL.gates.width / 2;
       for (const b of run.combat.bullets) {
@@ -235,6 +235,7 @@ export function boot() {
       v.bullets = run.combat.bullets;
       v.eshots = run.combat.eshots;
       v.boss = run.combat.boss;
+      v.pools = run.combat.pools;
       const disp = Math.round(run.dispCount);
       v.squad = { x: run.x, count: disp, tier: tierFor(run.count), radius: squadRadius(run.count), hurt: run.hurtT > 0,
                   fireFlash: run.fireFlash, muzzles: BAL.squad.muzzles[tierFor(run.count)] ?? 1,

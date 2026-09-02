@@ -106,7 +106,7 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 7판 이상 5보스를 깬다(빡�
   let cleared = 0;
   for (const seed of [1, 2, 3, 4, 5, 11, 22, 33, 44, 55]) {
     const track = buildTrack(seed);
-    let count = 10;                                   // 업그레이드 몇 개 한 상태 가정
+    let count = 10;                                   // 업그레이드 몇 개 한 상태 가정(시작 병력 10·연사 +10%)
     const rnd = mulberry32(seed * 7 + 1);
     const st = createCombat();
     let z = 0, ei = 0, dead = false, bossKills = 0;
@@ -134,7 +134,7 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 7판 이상 5보스를 깬다(빡�
       if (st.boss) tx = st.boss.x;
       else if (st.enemies.length) tx = st.enemies.reduce((a, b) => (a.y > b.y ? a : b)).x;
       const x = Math.max(80, Math.min(400, tx));
-      const r = stepCombat(st, { x, count, fireRateMult: 1, tier: tierFor(count), radius: squadRadius(count) }, dt, rnd);
+      const r = stepCombat(st, { x, count, fireRateMult: 1.1, tier: tierFor(count), radius: squadRadius(count) }, dt, rnd);
       if (hadBoss && !st.boss) bossKills++;
       count -= r.troopLoss;
       for (const ev of r.events) if (ev.type === 'supply') count = Math.min(BAL.squad.maxCount, count + ev.n);   // main 과 동일 규칙

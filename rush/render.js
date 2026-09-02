@@ -481,6 +481,26 @@ export function createRenderer(canvas, sprites) {
     drawBackground(view.scroll ?? 0, view.zone ?? 0);   // 도로와 게이트·적은 같은 속도로 흐른다(세계 고정 — 시차를 걸면 게이트가 도로 위를 미끄러진다)
     if (view.state === 'run' || view.state === 'over' || view.state === 'paused') {
       for (const g of view.gates) drawGatePair(g.y, g.pair);
+      //  스멜터 쇳물 장판(경고 깜빡임 -> 점화)
+      for (const pl of view.pools ?? []) {
+        const warn = pl.warn > 0;
+        ctx.globalAlpha = warn ? (Math.sin(view.now * 18) > 0 ? 0.35 : 0.15) : 0.55;
+        ctx.fillStyle = '#FF3DA5';
+        ctx.beginPath(); ctx.ellipse(pl.x, pl.y, 62, 26, 0, 0, Math.PI * 2); ctx.fill();
+        if (!warn) {
+          ctx.globalAlpha = 0.85;
+          ctx.strokeStyle = '#FF7DC8'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.ellipse(pl.x, pl.y, 62, 26, 0, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      //  레일 리바이어던 관통 경고선
+      if (view.boss?.sweepPhase === 1) {
+        ctx.globalAlpha = Math.sin(view.now * 20) > 0 ? 0.32 : 0.14;
+        ctx.fillStyle = '#FF3DA5';
+        ctx.fillRect(view.boss.warnX - view.boss.r, 0, view.boss.r * 2, H);
+        ctx.globalAlpha = 1;
+      }
       for (const e of view.enemies) drawEnemy(e);
       if (view.boss) drawBoss(view.boss);
       for (const b of view.bullets) {
