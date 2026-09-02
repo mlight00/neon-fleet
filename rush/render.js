@@ -125,9 +125,10 @@ export function createRenderer(canvas, sprites) {
   //  걷기 애니메이션: 유닛마다 위상이 다른 행진 바운스(절차식 — 그림 추가 없이).
   function drawSquad(squad, now = 0) {
     const S = BAL.squad;
+    const heroSize = S.heroSizes?.[squad.tier] ?? S.heroSize;    // 티어가 오르면 히어로 몸집도 큰다
     const pts = formation(displayUnits(squad.count));
     const recoil = (squad.fireFlash ?? 0) > 0.05 ? 2 : 0;        // 사격 반동 — 부대가 살짝 눌린다
-    for (const p of pts) shadow(squad.x + p.x, S.y + p.y + (p.x === 0 && p.y === 0 ? S.heroSize : S.soldierSize) * 0.42, (p.x === 0 && p.y === 0 ? S.heroSize : S.soldierSize) * 0.42);
+    for (const p of pts) shadow(squad.x + p.x, S.y + p.y + (p.x === 0 && p.y === 0 ? heroSize : S.soldierSize) * 0.42, (p.x === 0 && p.y === 0 ? heroSize : S.soldierSize) * 0.42);
     for (let i = pts.length - 1; i >= 1; i--) {       // 병사들 — 뒷줄부터 그려 앞줄이 위에 오게
       const phase = now * 9 + i * 1.7;
       const bob = Math.sin(phase) * 1.6;              // 발걸음 상하
@@ -145,12 +146,12 @@ export function createRenderer(canvas, sprites) {
     }
     const hx = squad.x + Math.sin(now * 4.5) * 0.8;   // 히어로(선두) — 묵직한 걸음
     const hy = S.y + Math.sin(now * 9) * 2 + recoil;
-    drawImgCentered('m' + (squad.tier + 1), hx, hy, S.heroSize, () => {
+    drawImgCentered('m' + (squad.tier + 1), hx, hy, heroSize, () => {
       ctx.fillStyle = TIER_FALLBACK[squad.tier];
       ctx.beginPath();
-      ctx.moveTo(hx, hy - S.heroSize / 2);
-      ctx.lineTo(hx - S.heroSize / 3, hy + S.heroSize / 2);
-      ctx.lineTo(hx + S.heroSize / 3, hy + S.heroSize / 2);
+      ctx.moveTo(hx, hy - heroSize / 2);
+      ctx.lineTo(hx - heroSize / 3, hy + heroSize / 2);
+      ctx.lineTo(hx + heroSize / 3, hy + heroSize / 2);
       ctx.closePath();
       ctx.fill();
     });
@@ -161,7 +162,7 @@ export function createRenderer(canvas, sprites) {
       ctx.globalAlpha = Math.min(1, k);
       for (let m = 0; m < mz; m++) {
         const fx = squad.x + (m - (mz - 1) / 2) * 14;
-        const fy = S.y - S.heroSize / 2 - 8;
+        const fy = S.y - heroSize / 2 - 8;
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath(); ctx.arc(fx, fy, 3 + k * 3, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = 'rgba(53,229,255,0.6)';
@@ -432,10 +433,18 @@ export function createRenderer(canvas, sprites) {
       for (const g of view.gates) drawGatePair(g.y, g.pair);
       for (const e of view.enemies) drawEnemy(e);
       if (view.boss) drawBoss(view.boss);
-      ctx.fillStyle = '#8FF3FF';
       for (const b of view.bullets) {
-        const w = b.w ?? 4;
+        const w = b.w ?? 4, t = b.tier ?? 0;
+        if (t >= 4) {                                  // 최종형: 플라즈마 글로우
+          ctx.fillStyle = 'rgba(53,229,255,0.35)';
+          ctx.beginPath(); ctx.arc(b.x, b.y, w * 1.6, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = '#8FF3FF';
         ctx.fillRect(b.x - w / 2, b.y - 7 - w, w, 14 + w);
+        if (t >= 2) {                                  // 중반 이후: 흰 코어(더 뜨거운 탄)
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(b.x - w / 6, b.y - 5 - w, w / 3, 10 + w);
+        }
       }
       for (const s of view.eshots) {
         if (s.hook) {                                  // 갠트리 위도우 갈고리: 체인 + 클로

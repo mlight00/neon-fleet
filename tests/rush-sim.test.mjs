@@ -1,7 +1,7 @@
 // rush-sim — 부대·전투·완주 시뮬레이션. 게임 규칙 계층이 화면 없이 완주 가능한지 잠근다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tierFor, formation, clampX } from '../rush/squad.js';
+import { tierFor, formation, clampX, squadRadius } from '../rush/squad.js';
 import { BAL } from '../rush/balance.js';
 import { createCombat, spawnWave, spawnBoss, stepCombat } from '../rush/combat.js';
 import { mulberry32 } from '../rush/rng.js';
@@ -134,7 +134,7 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 7판 이상 5보스를 깬다(빡�
       if (st.boss) tx = st.boss.x;
       else if (st.enemies.length) tx = st.enemies.reduce((a, b) => (a.y > b.y ? a : b)).x;
       const x = Math.max(80, Math.min(400, tx));
-      const r = stepCombat(st, { x, count, fireRateMult: 1, tier: 1, radius: 60 }, dt, rnd);
+      const r = stepCombat(st, { x, count, fireRateMult: 1, tier: tierFor(count), radius: squadRadius(count) }, dt, rnd);
       if (hadBoss && !st.boss) bossKills++;
       count -= r.troopLoss;
       for (const ev of r.events) if (ev.type === 'supply') count = Math.min(BAL.squad.maxCount, count + ev.n);   // main 과 동일 규칙

@@ -42,7 +42,7 @@ export function stepCombat(st, squad, dt, rnd) {
   const rad = squad.radius ?? 60;                     // 대형 실제 반경 — 피탄·접촉 폭의 기준
   const tier = squad.tier ?? 0;
   const muzzles = S.muzzles[tier] ?? 1;
-  const bulletDmg = (S.bulletDmg + squad.count * S.dmgPerTroop) / muzzles;   // 병력 = 화력(열 수로 배분)
+  const bulletDmg = (S.bulletDmg + squad.count * S.dmgPerTroop) * (S.tierDmgMult[tier] ?? 1) / muzzles;   // 병력+티어 = 화력(열 수로 배분)
   const events = [];
   let troopLoss = 0;
 
@@ -56,7 +56,7 @@ export function stepCombat(st, squad, dt, rnd) {
       st.fireT += Math.max(0.02, interval);
       const cx = squad.x + (rnd() - 0.5) * spread;
       for (let m = 0; m < muzzles; m++) {
-        st.bullets.push({ x: cx + (m - (muzzles - 1) / 2) * 14, y: S.y - 20, vy: -S.bulletSpeed, w: S.bulletW[tier] ?? 4 });
+        st.bullets.push({ x: cx + (m - (muzzles - 1) / 2) * 14, y: S.y - 20, vy: -S.bulletSpeed, w: S.bulletW[tier] ?? 4, tier });
       }
       shots++;
     }
