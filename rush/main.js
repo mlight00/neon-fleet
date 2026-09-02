@@ -76,6 +76,10 @@ function advance(run, dt0) {
     const ev = run.track.events[run.ei++];
     if (ev.type === 'gatepair') {
       const gate = gateHitSide(run.x) === 'left' ? ev.data.left : ev.data.right;
+      if (gate.broken) {                               // 부숴 둔 게이트 — 효력 없음
+        run.floaters.push({ x: run.x, y: 560, text: '무효', color: '#9AA1AC', t: 0 });
+        continue;
+      }
       const before = run.count;
       run.count = applyGate(run.count, gate);
       const sym = { add: '+', mul: '×', sub: '−', div: '÷' }[gate.op];
@@ -92,6 +96,32 @@ function advance(run, dt0) {
       run.combat.eshots.length = 0;
       spawnBoss(run.combat, run.count, ev.data.zone);
       run.curBossZone = ev.data.zone; run.dim = 0; run.sfxQueue.push('bossIn');
+    }
+  }
+  //  나쁜 게이트는 쏴서 부술 수 있다(부수면 효력 무효). 탄은 게이트에 흡수된다 — 사선 관리의 대가.
+  for (let gi = run.ei; gi < run.track.events.length; gi++) {
+    const gev = run.track.events[gi];
+    const dy = gev.z - run.z;
+    if (dy > 760) break;
+    if (gev.type !== 'gatepair' || dy < -20) continue;
+    const gy = BAL.squad.y - dy;
+    for (const side of ['left', 'right']) {
+      const g = gev.data[side];
+      if (isGood(g.op) || g.broken) continue;
+      if (g.hp === undefined) g.hp = Math.round(8 + (gev.z / run.track.length) * 42);   // 후반 게이트는 단단
+      const gx = side === 'left' ? 240 - BAL.gates.gap / 2 - BAL.gates.width / 2
+                                 : 240 + BAL.gates.gap / 2 + BAL.gates.width / 2;
+      for (const b of run.combat.bullets) {
+        if (b.dead || b.y > gy + 26 || b.y < gy - 26 || Math.abs(b.x - gx) > BAL.gates.width / 2) continue;
+        b.dead = true;
+        g.hp -= 1;
+      }
+      if (g.hp <= 0) {
+        g.broken = true;
+        spawnBurst(run, gx, gy, 34, false);
+        run.floaters.push({ x: gx, y: gy - 20, text: '파괴!', color: '#F6C84A', t: 0, big: true });
+        run.sfxQueue.push('kill');
+      }
     }
   }
   const prevTier = tierFor(run.count);

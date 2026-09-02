@@ -1,7 +1,7 @@
 // rush/render.js — 캔버스 그리기 전담. 게임 판단은 하나도 하지 않는다(view 를 그대로 그림).
 import { BAL } from './balance.js';
 import { formation, displayUnits } from './squad.js';
-import { gateColor } from './gates.js';
+import { gateColor, isGood as isGoodOp } from './gates.js';
 
 const W = 480, H = 800;
 const TIER_FALLBACK = ['#F3F1E8', '#DFE6F5', '#C9E9FF', '#FFE9B8', '#FFD34D'];
@@ -93,7 +93,7 @@ export function createRenderer(canvas, sprites) {
       const im = sprites.get('gate');
       if (im) {
         //  그림 비율 유지(살짝 눌러 원근감), 왼쪽 게이트는 좌우 반전해 대칭 구도로
-        const h = Math.round(g.width * (im.height / im.width) * 0.72);
+        const h = Math.round(g.width * (im.height / im.width) * 0.55);   // 게이트는 납작하게
         const mirror = b.x < W / 2;
         ctx.save();
         ctx.translate(b.x + g.width / 2, y);
@@ -110,14 +110,34 @@ export function createRenderer(canvas, sprites) {
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
-      ctx.font = 'bold 42px system-ui, sans-serif';
+      const cx = b.x + g.width / 2;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = '#14233A';
-      ctx.strokeText(gateLabel(b.gate), b.x + g.width / 2, y);
-      ctx.fillStyle = col;
-      ctx.fillText(gateLabel(b.gate), b.x + g.width / 2, y);
+      if (b.gate.broken) {                             // 파괴된 게이트 — 효력 없음
+        ctx.globalAlpha = 0.45;
+        ctx.font = 'bold 42px system-ui, sans-serif';
+        ctx.lineWidth = 6; ctx.strokeStyle = '#14233A';
+        ctx.strokeText(gateLabel(b.gate), cx, y);
+        ctx.fillStyle = '#9AA1AC';
+        ctx.fillText(gateLabel(b.gate), cx, y);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#FF6A3D';
+        ctx.font = 'bold 52px system-ui, sans-serif';
+        ctx.fillText('✕', cx, y - 2);
+      } else {
+        ctx.font = 'bold 42px system-ui, sans-serif';
+        ctx.lineWidth = 6; ctx.strokeStyle = '#14233A';
+        ctx.strokeText(gateLabel(b.gate), cx, y);
+        ctx.fillStyle = col;
+        ctx.fillText(gateLabel(b.gate), cx, y);
+        if (b.gate.hp !== undefined && !isGoodOp(b.gate.op)) {   // 쏘는 중 — 남은 내구도
+          ctx.font = 'bold 15px system-ui, sans-serif';
+          ctx.lineWidth = 4; ctx.strokeStyle = '#14233A';
+          ctx.strokeText(b.gate.hp, cx, y + 34);
+          ctx.fillStyle = '#FF9A4A';
+          ctx.fillText(b.gate.hp, cx, y + 34);
+        }
+      }
     }
   }
 
