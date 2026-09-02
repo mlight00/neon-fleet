@@ -1,7 +1,7 @@
 // rush/balance.js — 스타포지 러시 수치 단일 진실. 로직 없음.
 export const BAL = {
   //  판 = 5구간 × 900. 구간마다 신규 적 2종 합류(누적), 구간 끝(900의 배수)마다 전용 보스.
-  track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 780, firstGateZ: 300, waveEvery: 200, enemyHpMult: [1, 2, 3.2, 4.6, 6.2], enemyAdvMult: [0.6, 0.8, 1, 1.1, 1.2], eshotDmg: [1, 1, 2, 2, 3] },   // 구간 배율: 체력·전진속도·적탄 위력   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
+  track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 780, firstGateZ: 300, waveEvery: 200, enemyHpMult: [1, 2, 3.2, 4.6, 6.2], enemyAdvMult: [0.6, 0.8, 1, 1.1, 1.2], eshotDmg: [1, 1, 2, 2, 3], enemySizeMult: [1, 1.08, 1.16, 1.24, 1.32] },   // 구간 배율: 체력·전진속도·적탄 위력   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
   //  followRate = 기존 게임(js/balance.js) followSpeed 와 동일값
   squad: { y: 640, maxCount: 999, moveSpeed: 420, followRate: 9, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
            heroSize: 46, heroSizes: [46, 52, 58, 66, 74], soldierSize: 22, ringGap: 19, ringStart: 26,
@@ -20,12 +20,12 @@ export const BAL = {
     wheeler:       { hp: 3,  r: 17, speed: 265, count: [2, 3],  coin: 2, zigzag: 140 },
     //  구간2
     ramhound:      { hp: 6,  r: 28, speed: 215, accel: 260, maxSpeed: 540, count: [1, 2], coin: 3, touchLoss: 3, straight: true },
-    signaler:      { hp: 7,  r: 23, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3, straight: true, drawScale: 1.8 },   // 도로 고정 포탑 — 키 큰 신호등
+    signaler:      { hp: 7,  r: 23, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3, straight: true, drawScale: 1.8, shot: 'lamp' },   // 신호등 포탑 — 램프탄 3연 부채꼴
     //  구간3
-    wallguard:     { hp: 34, r: 40, speed: 235, count: [1, 1],  coin: 5, touchLoss: 4, showHp: true, straight: true },
-    cartyard:      { hp: 50, r: 42, speed: 215, count: [1, 1],  coin: 7, touchLoss: 5, showHp: true, straight: true },
+    wallguard:     { hp: 34, r: 40, speed: 235, count: [1, 1],  coin: 5, touchLoss: 4, showHp: true, straight: true, shieldReduce: 0.3 },   // 방벽 — 탄 70% 감쇠(단단한 벽)
+    cartyard:      { hp: 44, r: 42, speed: 215, count: [1, 1],  coin: 7, touchLoss: 5, showHp: true, deathBurst: 4 },   // 고철 수레 — 좌우로 기우뚱, 터지면 파편 산탄 4발
     //  구간4
-    needleeye:     { hp: 5,  r: 25, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.4, shotSpeed: 240, straight: true, drawScale: 1.35 },   // 도로 고정 저격수(가로등 키다리)
+    needleeye:     { hp: 5,  r: 25, speed: 190, count: [1, 2],  coin: 4, shootEvery: 2.2, shotSpeed: 520, straight: true, drawScale: 1.35, shot: 'needle', aimTime: 0.55 },   // 가로등 저격수 — 조준선 후 고속 니들 단발
     manholejumper: { hp: 8,  r: 16, speed: 245, count: [1, 3],  coin: 4, hopEvery: 1.6, hopSpeed: 260 },
     //  구간5
     spawnpod:      { hp: 14, r: 30, speed: 190, count: [1, 2],  coin: 6, spawns: 'scrapbit', spawnN: 3, touchLoss: 2, straight: true },   // 도로 고정 고치

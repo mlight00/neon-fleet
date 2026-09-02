@@ -483,14 +483,26 @@ export function createRenderer(canvas, sprites) {
       for (const g of view.gates) drawGatePair(g.y, g.pair);
       //  스멜터 쇳물 장판(경고 깜빡임 -> 점화)
       for (const pl of view.pools ?? []) {
-        const warn = pl.warn > 0;
-        ctx.globalAlpha = warn ? (Math.sin(view.now * 18) > 0 ? 0.35 : 0.15) : 0.55;
-        ctx.fillStyle = '#FF3DA5';
-        ctx.beginPath(); ctx.ellipse(pl.x, pl.y, 62, 26, 0, 0, Math.PI * 2); ctx.fill();
-        if (!warn) {
-          ctx.globalAlpha = 0.85;
-          ctx.strokeStyle = '#FF7DC8'; ctx.lineWidth = 3;
+        if (pl.warn > 0) {                             // 경고: 주황 점선 윤곽 깜빡임
+          ctx.globalAlpha = Math.sin(view.now * 18) > 0 ? 0.9 : 0.4;
+          ctx.strokeStyle = '#FF9A3D'; ctx.lineWidth = 3;
+          ctx.setLineDash([10, 8]);
           ctx.beginPath(); ctx.ellipse(pl.x, pl.y, 62, 26, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.globalAlpha = 1;
+          continue;
+        }
+        //  점화: 용광로 쇳물 — 주황 바탕 + 노랑 코어 + 부글거리는 기포
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = '#E85D1F';
+        ctx.beginPath(); ctx.ellipse(pl.x, pl.y, 62, 26, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFB23D';
+        ctx.beginPath(); ctx.ellipse(pl.x, pl.y, 44, 17, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFE28A';
+        for (let bi = 0; bi < 4; bi++) {
+          const bx = pl.x + Math.sin(view.now * 3 + bi * 1.9) * 30;
+          const by = pl.y + Math.cos(view.now * 4 + bi * 2.6) * 9;
+          ctx.beginPath(); ctx.arc(bx, by, 3.5 + (bi % 2), 0, Math.PI * 2); ctx.fill();
         }
         ctx.globalAlpha = 1;
       }
@@ -501,7 +513,17 @@ export function createRenderer(canvas, sprites) {
         ctx.fillRect(view.boss.warnX - view.boss.r, 0, view.boss.r * 2, H);
         ctx.globalAlpha = 1;
       }
-      for (const e of view.enemies) drawEnemy(e);
+      for (const e of view.enemies) {
+        if (e.aimT > 0) {                              // 저격 조준선 — 피하라는 신호
+          ctx.globalAlpha = 0.55;
+          ctx.strokeStyle = '#FF3DA5'; ctx.lineWidth = 2;
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.aimX, e.aimY); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.globalAlpha = 1;
+        }
+        drawEnemy(e);
+      }
       if (view.boss) drawBoss(view.boss);
       for (const b of view.bullets) {
         const w = b.w ?? 4, t = b.tier ?? 0;
@@ -530,9 +552,31 @@ export function createRenderer(canvas, sprites) {
           ctx.beginPath(); ctx.arc(s.x, s.y, 12, 0, Math.PI); ctx.fill();
           ctx.fillStyle = '#FF3DA5';
           ctx.beginPath(); ctx.arc(s.x, s.y - 2, 5, 0, Math.PI * 2); ctx.fill();
-        } else {
+        } else if (s.shape === 'needle') {             // 저격 니들: 진행 방향으로 길쭉한 바늘
+          const a = Math.atan2(s.vy, s.vx);
+          ctx.save();
+          ctx.translate(s.x, s.y); ctx.rotate(a);
           ctx.fillStyle = '#FF3DA5';
-          ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(-11, -2, 22, 4);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(2, -1, 9, 2);
+          ctx.restore();
+        } else if (s.shape === 'shell') {              // 보스 포탄: 크고 묵직한 주황 탄
+          ctx.fillStyle = '#8A2B1F';
+          ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#FF7A3D';
+          ctx.beginPath(); ctx.arc(s.x, s.y, 6, 0, Math.PI * 2); ctx.fill();
+        } else if (s.shape === 'shard') {              // 고철 파편: 회전하는 사각 조각
+          ctx.save();
+          ctx.translate(s.x, s.y); ctx.rotate(view.now * 9);
+          ctx.fillStyle = '#B3402F';
+          ctx.fillRect(-4, -4, 8, 8);
+          ctx.restore();
+        } else {                                       // 램프탄(신호등): 마젠타 구슬 + 흰 테
+          ctx.fillStyle = '#FF3DA5';
+          ctx.beginPath(); ctx.arc(s.x, s.y, 5.5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(s.x, s.y, 5.5, 0, Math.PI * 2); ctx.stroke();
         }
       }
       drawSquad(view.squad, view.now ?? 0);

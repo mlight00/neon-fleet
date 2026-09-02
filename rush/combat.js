@@ -12,7 +12,7 @@ export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0) {
   const vy = scroll + Math.max(0, def.speed - scroll) * (BAL.track.enemyAdvMult?.[zone] ?? 1);
   for (let i = 0; i < n; i++) {
     st.enemies.push({
-      kind, zone, hp: Math.round(def.hp * hpMult), r: def.r,
+      kind, zone, hp: Math.round(def.hp * hpMult), r: Math.round(def.r * (BAL.track.enemySizeMult?.[zone] ?? 1)),
       //  웨이브 내 균등 분산(뭉침 방지): 도로를 n등분한 자리 + 지터
       x: Math.max(85, Math.min(395, 85 + ((i + 0.5) / n) * 310 + (rnd() - 0.5) * 60)),
       y: -40 - rnd() * 170,
@@ -32,11 +32,11 @@ export function spawnBoss(st, troopCount, zone) {
               dir: 1, shootT: def.shootEvery, touchT: 0, spawnT: def.spawnEvery ?? 0 };
 }
 
-function shootFan(st, x, y, tx, ty, fan, speed, dmg = 1) {
+function shootFan(st, x, y, tx, ty, fan, speed, dmg = 1, shape = 'lamp') {
   const base = Math.atan2(ty - y, tx - x);
   for (let k = 0; k < fan; k++) {
     const a = base + (k - (fan - 1) / 2) * 0.26;
-    st.eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg });
+    st.eshots.push({ x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg, shape });
   }
 }
 
@@ -82,11 +82,22 @@ export function stepCombat(st, squad, dt, rnd) {
     if (def.accel) e.vy = Math.min(def.maxSpeed ?? 999, e.vy + def.accel * dt);   // 램하운드: 자동차처럼 내리막 가속
     e.x += e.vx * dt; e.y += e.vy * dt;
     if (e.x < 80 || e.x > 400) { e.vx *= -1; e.x = Math.max(80, Math.min(400, e.x)); }
-    if (e.shootT !== undefined) {
+    if (e.aimT !== undefined && e.aimT > 0) {         // 저격 조준 중(조준점 고정)
+      e.aimT -= dt;
+      if (e.aimT <= 0) {
+        shootFan(st, e.x, e.y, e.aimX, e.aimY, 1, def.shotSpeed, (BAL.track.eshotDmg?.[e.zone ?? 0] ?? 1) + 1, 'needle');
+        e.shootT = def.shootEvery;
+      }
+    } else if (e.shootT !== undefined) {
       e.shootT -= dt;
       if (e.shootT <= 0) {
-        e.shootT = def.shootEvery;
-        shootFan(st, e.x, e.y, squad.x, lineY, def.fan ?? 1, def.shotSpeed, BAL.track.eshotDmg?.[e.zone ?? 0] ?? 1);
+        if (def.aimTime) {                            // 니들아이: 조준선을 보여주고 쏜다
+          e.aimT = def.aimTime;
+          e.aimX = squad.x; e.aimY = lineY;
+        } else {
+          e.shootT = def.shootEvery;
+          shootFan(st, e.x, e.y, squad.x, lineY, def.fan ?? 1, def.shotSpeed, BAL.track.eshotDmg?.[e.zone ?? 0] ?? 1, def.shot ?? 'lamp');
+        }
       }
     }
     if (e.y >= lineY - e.r && Math.abs(e.x - squad.x) < rad + e.r) {
@@ -159,7 +170,7 @@ export function stepCombat(st, squad, dt, rnd) {
     bo.shootT -= dt;
     if (bo.shootT <= 0 && bo.sweepPhase !== 2) {
       bo.shootT = def.shootEvery;
-      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, def.fan, def.shotSpeed, BAL.track.eshotDmg?.[bo.zone] ?? 1);
+      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, def.fan, def.shotSpeed, BAL.track.eshotDmg?.[bo.zone] ?? 1, 'shell');
     }
     if (def.spawnEvery) {
       bo.spawnT -= dt;
@@ -191,7 +202,7 @@ export function stepCombat(st, squad, dt, rnd) {
       st.boss.hp -= bulletDmg; b.dead = true; continue;
     }
     for (const e of st.enemies) {
-      if (e.hp > 0 && Math.hypot(b.x - e.x, b.y - e.y) < e.r + 4) { e.hp -= bulletDmg; b.dead = true; break; }
+      if (e.hp > 0 && Math.hypot(b.x - e.x, b.y - e.y) < e.r + 4) { e.hp -= bulletDmg * (BAL.enemies[e.kind].shieldReduce ?? 1); b.dead = true; break; }
     }
   }
 
@@ -207,6 +218,9 @@ export function stepCombat(st, squad, dt, rnd) {
         events.push({ type: 'supply', x: e.x, y: e.y, n: def.rewardByZone[e.zone ?? 0] ?? 6 });
       }
       if (def.spawns) born.push({ kind: def.spawns, n: def.spawnN, x: e.x, y: e.y });
+      if (def.deathBurst && !e.touched) {              // 고철 수레: 터지며 파편 산탄
+        shootFan(st, e.x, e.y, e.x, e.y + 300, def.deathBurst, 240, 1, 'shard');
+      }
       return false;
     }
     if (e.y >= 830) {
