@@ -69,7 +69,7 @@ test('BAL-SHAPE: 계획이 쓰는 키가 전부 있다', () => {
   for (const k of ['track', 'squad', 'tiers', 'gates', 'enemies', 'boss', 'coins', 'fx', 'upgrades']) {
     assert.ok(BAL[k], 'BAL.' + k + ' 누락');
   }
-  assert.deepEqual(BAL.tiers, [1, 40, 120, 250, 500]);
+  assert.deepEqual(BAL.tiers, [1, 60, 180, 360, 700]);
 });
 
 test('GATE-CAP: 병력 상한 999', () => {

@@ -67,19 +67,49 @@ export function stepCombat(st, squad, dt, rnd) {
     }
     for (let si = 0; si < shots; si++) events.push({ type: 'fire' });   // 발사 1회 = 소리 1회(연출 매칭)
   }
-  for (const b of st.bullets) b.y += b.vy * dt;
+  for (const b of st.bullets) {
+    b.y += b.vy * dt;
+    if (b.vx) b.x += b.vx * dt;
+  }
+  for (const e of st.enemies) {                       // 마그넷헤드 자기장: 근처 아군 탄이 빨려 휜다
+    const def = BAL.enemies[e.kind];
+    if (!def.magnetR) continue;
+    for (const b of st.bullets) {
+      const dx = e.x - b.x, dy = e.y - b.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < def.magnetR * def.magnetR) {
+        const d = Math.sqrt(d2) || 1;
+        b.vx = (b.vx ?? 0) + (dx / d) * def.magnetPull * dt;
+      }
+    }
+  }
 
   //  적 이동·사격·접촉
   for (const e of st.enemies) {
     const def = BAL.enemies[e.kind];
-    if (e.hopT !== undefined) {                       // 맨홀 점퍼: 주기적으로 옆 차선 도약
+    if (e.hopT !== undefined) {                       // 맨홀 점퍼: 부대 쪽으로 도약해 착지 충격파
       e.hopT -= dt;
       if (e.hopT <= 0) {
         e.hopT = def.hopEvery;
         e.hopDur = 0.25;
-        e.hopVx = (rnd() < 0.5 ? -1 : 1) * def.hopSpeed;
+        e.hopVx = Math.sign(squad.x - e.x || 1) * def.hopSpeed;
       }
-      if (e.hopDur > 0) { e.hopDur -= dt; e.x += e.hopVx * dt; }
+      if (e.hopDur > 0) {
+        e.hopDur -= dt;
+        e.x += e.hopVx * dt;
+        if (e.hopDur <= 0 && def.hopShock) {          // 착지 — 파편 충격파
+          shootFan(st, e.x, e.y, squad.x, lineY, def.hopShock, 210, BAL.track.eshotDmg?.[e.zone ?? 0] ?? 1, 'shard');
+        }
+      }
+    }
+    if (def.emitEvery) {                              // 스폰 포드: 살아서도 잡졸을 낳는다
+      e.emitT = (e.emitT ?? def.emitEvery * (0.5 + rnd() * 0.5)) - dt;
+      if (e.emitT <= 0) {
+        e.emitT = def.emitEvery;
+        spawnWave(st, def.spawns, 1, rnd, 1, e.zone ?? 0);
+        st.enemies[st.enemies.length - 1].y = e.y + e.r;
+        st.enemies[st.enemies.length - 1].x = e.x;
+      }
     }
     if (def.accel) e.vy = Math.min(def.maxSpeed ?? 999, e.vy + def.accel * dt);   // 램하운드: 자동차처럼 내리막 가속
     e.x += e.vx * dt; e.y += e.vy * dt;
@@ -139,6 +169,13 @@ export function stepCombat(st, squad, dt, rnd) {
   //  보스 — 공통 골격: 좌우 이동 + 부채꼴 사격 + 접촉. 스멜터(spawnEvery)는 잡졸 소환.
   if (st.boss) {
     const bo = st.boss, def = BAL.bosses[bo.zone];
+    const ratio = bo.hp / bo.max;
+    const B = BAL.boss;
+    bo.rage = ratio < B.rageAt;
+    bo.phase2 = ratio < B.phase2At;
+    const rate = bo.rage ? B.rageRate : bo.phase2 ? B.phase2Rate : 1;   // 패턴 주기 배율
+    const spdMult = bo.rage ? B.rageSpeed : bo.phase2 ? 1.15 : 1;
+    const fanN = def.fan + (bo.phase2 ? 1 : 0) + (bo.rage ? 1 : 0);
     if (def.ramEvery) {                               // 그레이더: 불도저 돌진 — 밀고 내려왔다 후진
       bo.ramT = (bo.ramT ?? def.ramEvery) - dt;
       if (bo.ramPhase === 1) {
@@ -160,39 +197,39 @@ export function stepCombat(st, squad, dt, rnd) {
         if (!bo.diveHit && bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < rad + bo.r) {
           troopLoss += def.sweepHit; bo.diveHit = true;
         }
-        if (bo.y > 900) { bo.sweepPhase = 0; bo.y = -90; bo.sweepT = def.sweepEvery; }
+        if (bo.y > 900) { bo.sweepPhase = 0; bo.y = -90; bo.sweepT = def.sweepEvery * rate; }
       } else {
         bo.sweepT = (bo.sweepT ?? def.sweepEvery) - dt;
-        if (bo.sweepT <= 0) { bo.sweepPhase = 1; bo.sweepWarnT = 1; bo.warnX = squad.x; }
+        if (bo.sweepT <= 0) { bo.sweepPhase = 1; bo.sweepWarnT = bo.rage ? 0.7 : 1; bo.warnX = squad.x; }
       }
     }
     if (def.poolEvery) {                              // 스멜터: 부대 자리에 쇳물 장판(경고 -> 4초 지속)
       bo.poolT = (bo.poolT ?? def.poolEvery * 0.7) - dt;
       if (bo.poolT <= 0) {
-        bo.poolT = def.poolEvery;
+        bo.poolT = def.poolEvery * rate;
         st.pools.push({ x: squad.x, y: lineY - 46, warn: 0.9, life: 4, tick: 0 });
       }
     }
     if (def.hookEvery) {                              // 갠트리 위도우: 갈고리를 아래로 쭉 뻗는다
       bo.hookT = (bo.hookT ?? def.hookEvery * 0.6) - dt;
       if (bo.hookT <= 0) {
-        bo.hookT = def.hookEvery;
+        bo.hookT = def.hookEvery * rate;
         st.eshots.push({ x: bo.x, y: bo.y + bo.r, baseX: bo.x, vx: 0, vy: def.hookSpeed, hook: true, swing: def.hookSwing ?? 0 });
       }
     }
     if (bo.y < 140 && !bo.ramPhase && !bo.sweepPhase) bo.y += 60 * dt;
     if (bo.sweepPhase !== 2) {
-      bo.x += bo.dir * def.speed * dt;
+      bo.x += bo.dir * def.speed * spdMult * dt;
       if (bo.x < 90 || bo.x > 390) bo.dir *= -1;
     }
     bo.shootT -= dt;
     if (bo.shootT <= 0 && bo.sweepPhase !== 2) {
-      bo.shootT = def.shootEvery;
-      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, def.fan, def.shotSpeed, (BAL.track.eshotDmg?.[bo.zone] ?? 1) + (BAL.boss.shotBonus ?? 0), 'shell');
+      bo.shootT = def.shootEvery * rate;
+      shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, fanN, def.shotSpeed * (bo.rage ? 1.15 : 1), (BAL.track.eshotDmg?.[bo.zone] ?? 1) + (B.shotBonus ?? 0), 'shell');
     }
     if (def.spawnEvery) {
       bo.spawnT -= dt;
-      if (bo.spawnT <= 0) { bo.spawnT = def.spawnEvery; spawnWave(st, 'scrapbit', 2, rnd); }
+      if (bo.spawnT <= 0) { bo.spawnT = def.spawnEvery * rate; spawnWave(st, 'scrapbit', bo.rage ? 3 : 2, rnd, 1, bo.zone); }
     }
     bo.touchT -= dt;
     if (bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < rad + bo.r * 0.8 && bo.touchT <= 0) {
@@ -242,7 +279,10 @@ export function stepCombat(st, squad, dt, rnd) {
       return false;
     }
     if (e.y >= 830) {
-      if (def.stealCoins) st.coins = Math.max(0, st.coins - def.stealCoins);   // 도둑이 달아났다
+      if (def.stealCoins) {                            // 도둑이 달아났다
+        st.coins = Math.max(0, st.coins - def.stealCoins);
+        events.push({ type: 'steal', n: def.stealCoins });
+      }
       return false;
     }
     return true;

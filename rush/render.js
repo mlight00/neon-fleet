@@ -222,9 +222,25 @@ export function createRenderer(canvas, sprites) {
 
   function drawEnemy(e) {
     if (e.kind === 'pow') {                           // POW 뱃지 — 주우면 버스터
-      shadow(e.x, e.y + e.r * 0.9, e.r * 0.8);
-      const pulse = 1 + Math.sin(performance.now() / 180) * 0.08;
-      drawImgCentered('pow', e.x, e.y, e.r * 2.3 * pulse, () => {
+      const t = performance.now() / 1000;
+      const bob = Math.sin(t * 3.2) * 5;               // 둥실 부양
+      shadow(e.x, e.y + e.r * 0.95, e.r * (0.7 - Math.sin(t * 3.2) * 0.08));
+      const pulse = 1 + Math.sin(t * 5.5) * 0.08;
+      ctx.globalAlpha = 0.45 + Math.sin(t * 5.5) * 0.15;   // 골드 후광 — 아이템 표식
+      const grd = ctx.createRadialGradient(e.x, e.y + bob, 4, e.x, e.y + bob, e.r * 2.2);
+      grd.addColorStop(0, 'rgba(255,230,150,0.9)');
+      grd.addColorStop(1, 'rgba(246,200,74,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(e.x, e.y + bob, e.r * 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      for (let si = 0; si < 3; si++) {                 // 반짝이 스파클
+        const sa = t * 2.2 + si * 2.1;
+        ctx.fillStyle = '#FFF3C4';
+        ctx.beginPath();
+        ctx.arc(e.x + Math.cos(sa) * e.r * 1.6, e.y + bob + Math.sin(sa) * e.r * 1.2, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      drawImgCentered('pow', e.x, e.y + bob, e.r * 2.3 * pulse, () => {
         ctx.fillStyle = '#F6C84A';
         ctx.beginPath();
         for (let i = 0; i < 10; i++) {
@@ -312,6 +328,12 @@ export function createRenderer(canvas, sprites) {
 
   function drawBoss(boss) {
     shadow(boss.x, boss.y + boss.r * 1.05, boss.r * 1.15);
+    if (boss.rage) {                                   // 광분: 붉은 펄스 오라
+      ctx.globalAlpha = 0.35 + Math.sin(performance.now() / 90) * 0.15;
+      ctx.fillStyle = '#FF3020';
+      ctx.beginPath(); ctx.arc(boss.x, boss.y, boss.r * 1.35, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
     drawImgCentered('b' + (boss.zone + 1), boss.x, boss.y, boss.r * 2.6, () => {
       ctx.fillStyle = '#2B1420';
       ctx.beginPath(); ctx.arc(boss.x, boss.y, boss.r, 0, Math.PI * 2); ctx.fill();
@@ -320,9 +342,9 @@ export function createRenderer(canvas, sprites) {
       ctx.fillStyle = '#FF3DA5';
       ctx.beginPath(); ctx.arc(boss.x, boss.y, boss.r * 0.35, 0, Math.PI * 2); ctx.fill();
     });
-    ctx.fillStyle = 'rgba(20,35,58,0.85)';            // 보스 HP 바
+    ctx.fillStyle = 'rgba(20,35,58,0.85)';            // 보스 HP 바 — 페이즈 색: 마젠타→주황(50%)→빨강(30% 광분)
     roundRect(90, 24, 300, 14, 7); ctx.fill();
-    ctx.fillStyle = '#FF3DA5';
+    ctx.fillStyle = boss.rage ? '#FF3020' : boss.phase2 ? '#FF9A3D' : '#FF3DA5';
     roundRect(90, 24, 300 * Math.max(0, boss.hp / boss.max), 14, 7); ctx.fill();
   }
 

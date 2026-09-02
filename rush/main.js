@@ -236,7 +236,7 @@ export function boot() {
       ];
     } else if (state === 'run' || state === 'over' || state === 'paused') {
       v.gates = [];
-      for (let i = run.ei; i < run.track.events.length; i++) {
+      if (!run.combat.boss) for (let i = run.ei; i < run.track.events.length; i++) {
         const ev = run.track.events[i];
         const y = BAL.squad.y - (ev.z - run.z);
         if (y < -100) break;

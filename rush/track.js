@@ -28,7 +28,8 @@ export function buildTrack(seed) {
   for (let zi = 0; zi < T.zones; zi++) {
     const z0 = zi * T.zoneLen;
     const pool = zonePool(zi);
-    for (let z = z0 + T.firstGateZ; z < z0 + T.zoneLen - 900; z += T.gateEvery) {   // 보스 앞 900은 게이트 없는 전투 구간
+    const zStart = z0 + (zi === 0 ? T.firstGateZ : 1000);   // 보스 격파 직후엔 숨돌릴 여유
+    for (let z = zStart; z < z0 + T.zoneLen - 900; z += T.gateEvery) {   // 보스 앞 900은 게이트 없는 전투 구간
       const t = z / T.length;
       const isLastGateOfZone = z + T.gateEvery >= z0 + T.zoneLen - 900;
       events.push({ z: Math.round(z), type: 'gatepair', data: makeGatePair(rnd, t, isLastGateOfZone) });
