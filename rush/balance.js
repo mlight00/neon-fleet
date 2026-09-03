@@ -16,8 +16,8 @@ export const BAL = {
   },
   enemies: {
     //  구간1
-    scrapbit:      { hp: 2,  r: 14, speed: 250, count: [2, 4],  coin: 1 },
-    wheeler:       { hp: 3,  r: 17, speed: 265, count: [2, 3],  coin: 2, zigzag: 140 },
+    scrapbit:      { hp: 1,  r: 14, speed: 250, count: [2, 4],  coin: 1 },   // 1구간 기준 한 발 격파(구간 배율로 비례 강화)
+    wheeler:       { hp: 1,  r: 17, speed: 265, count: [2, 3],  coin: 2, zigzag: 140 },   // 1구간 기준 한 발 격파(구간 배율로 비례 강화)
     //  구간2
     ramhound:      { hp: 6,  r: 28, speed: 215, accel: 260, maxSpeed: 540, count: [1, 2], coin: 3, touchLoss: 3, straight: true },
     signaler:      { hp: 7,  r: 23, speed: 190, count: [1, 2],  coin: 4, shootEvery: 1.6, shotSpeed: 250, fan: 3, straight: true, drawScale: 1.8, shot: 'lamp' },   // 신호등 포탑 — 램프탄 3연 부채꼴
