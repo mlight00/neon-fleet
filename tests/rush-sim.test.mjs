@@ -178,3 +178,21 @@ test('SQUAD-DISPLAY: 표시 유닛 축약 — 12까지 1:1, 이후 7:1, 최대 5
   assert.equal(displayUnits(82), 22);
   assert.equal(displayUnits(999), 50);
 });
+
+test('COMBAT-BOSS-TOUCH: 보스 접촉은 시각 겹침 안에서만(옆으로 피하면 안 맞는다)', () => {
+  const rnd = mulberry32(7);
+  const st = createCombat();
+  spawnBoss(st, 100, 0);
+  st.boss.x = 240; st.boss.y = 640 - st.boss.r;        // 부대 라인까지 내려온 상태
+  //  부대가 보스 그림 바깥(중심거리 = rad*0.5 + r*0.7 + 10)으로 비켜섬
+  const rad = 60;
+  const clearX = 240 + rad * 0.5 + st.boss.r * 0.7 + 10;
+  const r1 = stepCombat(st, { x: clearX, count: 50, fireRateMult: 0, radius: rad }, 1 / 30, rnd);
+  assert.equal(r1.troopLoss, 0, '비켜섰으면 무피해');
+  //  정통으로 겹치면 맞는다
+  const st2 = createCombat();
+  spawnBoss(st2, 100, 0);
+  st2.boss.x = 240; st2.boss.y = 640 - st2.boss.r;
+  const r2 = stepCombat(st2, { x: 240, count: 50, fireRateMult: 0, radius: rad }, 1 / 30, rnd);
+  assert.ok(r2.troopLoss >= 1, '정면 접촉은 피해');
+});

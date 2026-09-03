@@ -175,7 +175,7 @@ export function stepCombat(st, squad, dt, rnd) {
     bo.phase2 = ratio < B.phase2At;
     const rate = bo.rage ? B.rageRate : bo.phase2 ? B.phase2Rate : 1;   // 패턴 주기 배율
     const spdMult = bo.rage ? B.rageSpeed : bo.phase2 ? 1.15 : 1;
-    const fanN = def.fan + (bo.phase2 ? 1 : 0) + (bo.rage ? 1 : 0);
+    const fanN = def.fan + (bo.phase2 ? 1 : 0);   // 광분은 부채꼴 추가 없이 빈도·기동만(공격량 +30% 수준)
     if (def.ramEvery) {                               // 그레이더: 불도저 돌진 — 밀고 내려왔다 후진
       bo.ramT = (bo.ramT ?? def.ramEvery) - dt;
       if (bo.ramPhase === 1) {
@@ -194,7 +194,7 @@ export function stepCombat(st, squad, dt, rnd) {
         if (bo.sweepWarnT <= 0) { bo.sweepPhase = 2; bo.x = bo.warnX; bo.y = -110; bo.diveHit = false; }
       } else if (bo.sweepPhase === 2) {               // 관통 낙하
         bo.y += def.sweepSpeed * dt;
-        if (!bo.diveHit && bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < rad + bo.r) {
+        if (!bo.diveHit && bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < rad * 0.5 + bo.r * 0.8) {
           troopLoss += def.sweepHit; bo.diveHit = true;
         }
         if (bo.y > 900) { bo.sweepPhase = 0; bo.y = -90; bo.sweepT = def.sweepEvery * rate; }
@@ -230,10 +230,10 @@ export function stepCombat(st, squad, dt, rnd) {
     }
     if (def.spawnEvery) {
       bo.spawnT -= dt;
-      if (bo.spawnT <= 0) { bo.spawnT = def.spawnEvery * rate; spawnWave(st, 'scrapbit', bo.rage ? 3 : 2, rnd, 1, bo.zone); }
+      if (bo.spawnT <= 0) { bo.spawnT = def.spawnEvery * rate; spawnWave(st, 'scrapbit', 2, rnd, 1, bo.zone); }
     }
     bo.touchT -= dt;
-    if (bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < rad + bo.r * 0.8 && bo.touchT <= 0) {
+    if (bo.y + bo.r >= lineY && Math.abs(bo.x - squad.x) < rad * 0.5 + bo.r * 0.7 && bo.touchT <= 0) {
       bo.touchT = 1 / BAL.boss.touchLossPerSec * 4;   // 초당 손실 상한을 4틱으로 분할
       troopLoss += Math.max(1, Math.round(BAL.boss.touchLossPerSec / 4));
     }

@@ -38,7 +38,7 @@ export const BAL = {
   },
   //  구간 보스 5종 — 공통 골격(좌우 이동+부채꼴 사격+접촉)에 스탯만 다르게. 스멜터는 잡졸 소환.
   boss: { baseHp: 160, hpPerTroop: 3.4, touchLossPerSec: 16, shotBonus: 1,
-          phase2At: 0.5, rageAt: 0.3, phase2Rate: 0.75, rageRate: 0.58, rageSpeed: 1.25 },   // 페이즈2=패턴 가속+부채꼴+1, 광분=총력전
+          phase2At: 0.5, rageAt: 0.3, phase2Rate: 0.75, rageRate: 0.58, rageSpeed: 1.25 },   // rageRate 0.58 = 페이즈2 대비 발사 빈도 +30%   // 페이즈2=패턴 가속+부채꼴+1, 광분=총력전
   bosses: [
     { key: 'b1', name: '그레이더',      hpMult: 0.9, r: 48, speed: 60,  shootEvery: 1.1, fan: 2, shotSpeed: 220, coin: 25, ramEvery: 4.5, ramSpeed: 460 },
     { key: 'b2', name: '갠트리 위도우', hpMult: 1.1, r: 52, speed: 70,  shootEvery: 1.0, fan: 3, shotSpeed: 230, coin: 35, hookEvery: 3.0, hookSpeed: 320, hookSwing: 95 },
