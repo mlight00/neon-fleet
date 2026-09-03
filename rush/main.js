@@ -205,6 +205,7 @@ export function boot() {
 
   function finishRun() {
     state = 'results';
+    au.bgmTitle();                                  // 판이 끝나면 잔잔한 타이틀곡으로
     const d = save.get();
     const mult = run.firstX2 ? 2 : 1;
     const gained = Math.round((run.combat.coins + run.z * BAL.coins.perDistance) * run.eff.magnetMult) * mult;
@@ -358,7 +359,7 @@ export function boot() {
 
   canvas.addEventListener('pointerdown', (e) => {
     au.unlock();
-    au.bgmBattle();
+    if (state === 'title' || state === 'results') au.bgmTitle();   // 대기 화면은 타이틀곡
     pointer.down = true;
     const [x, y] = toLogical(e);
     pointer.x = x;
@@ -409,7 +410,8 @@ export function boot() {
       }
       for (const s of run.sfxQueue) au.sfx(s);
       run.sfxQueue.length = 0;
-      if (run.combat.boss) au.bgmBoss(run.combat.boss.zone); else au.bgmBattle();
+      if (run.combat.boss) au.bgmBoss(run.combat.boss.zone);
+      else au.bgmZone(Math.min(BAL.track.zones - 1, Math.floor(run.z / BAL.track.zoneLen)));
       au.duck(state === 'run' ? Math.max(0.35, 1 - run.dim * 1.8) : 1);     // A-3 보스 앞 정적
       if (run.over) {
         if (run.cont.canUse()) state = 'over';

@@ -58,10 +58,15 @@ export function createAudio() {
     },
     bgmPause() { if (bgmEl) bgmEl.pause(); },
     bgmResume() { if (bgmEl && unlocked && bgmName && !muted) bgmEl.play().catch(() => {}); },
+    bgmTitle() { playBgm('nf_bgm_title'); },
+    /** 구간별 주행곡: 보스를 깨고 다음 구간에 들어서면 곡이 바뀐다 */
+    bgmZone(zone = 0) {
+      playBgm(['nf_bgm_sector1a', 'nf_bgm_sector2a', 'nf_bgm_sector3a', 'nf_bgm_sector4a', 'nf_bgm_sector5a'][zone] ?? 'nf_bgm_battle1');
+    },
     bgmBattle() { playBgm('nf_bgm_battle1'); },
     /** 구간별 보스곡: 1~2구간=sector1, 3구간=sector2, 4구간=sector3, 최종=boss */
     bgmBoss(zone = 4) {
-      const pick = ['nf_bgm_boss_sector1', 'nf_bgm_boss_sector1', 'nf_bgm_boss_sector2', 'nf_bgm_boss_sector3', 'nf_bgm_boss'][zone] ?? 'nf_bgm_boss';
+      const pick = ['nf_bgm_boss_sector1', 'nf_bgm_boss_sector2', 'nf_bgm_boss_sector3', 'nf_bgm_boss_sector4', 'nf_bgm_boss'][zone] ?? 'nf_bgm_boss';
       playBgm(pick);
     },
     /** A-3 보스 앞 정적: 0~1 (1=평상시) */
