@@ -223,7 +223,8 @@ export function stepCombat(st, squad, dt, rnd) {
       if (bo.x < 90 || bo.x > 390) bo.dir *= -1;
     }
     bo.shootT -= dt;
-    if (bo.shootT <= 0 && bo.sweepPhase !== 2) {
+    //  돌진(램) 중에는 사격하지 않는다 — 광분 모드만 돌진 중에도 쏜다
+    if (bo.shootT <= 0 && bo.sweepPhase !== 2 && (!bo.ramPhase || bo.rage)) {
       bo.shootT = def.shootEvery * rate;
       shootFan(st, bo.x, bo.y + bo.r, squad.x, lineY, fanN, def.shotSpeed * (bo.rage ? 1.15 : 1), (BAL.track.eshotDmg?.[bo.zone] ?? 1) + (B.shotBonus ?? 0), 'shell');
     }
