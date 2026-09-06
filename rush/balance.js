@@ -37,7 +37,7 @@ export const BAL = {
                      rewardByZone: [10, 16, 25, 38, 52] },
   },
   //  구간 보스 5종 — 공통 골격(좌우 이동+부채꼴 사격+접촉)에 스탯만 다르게. 스멜터는 잡졸 소환.
-  boss: { hpByZone: [340, 900, 1500, 2100, 2900], touchLossPerSec: 16, shotBonus: 1,   // 구간 고정 체력 — 병력을 모을수록 빨리 잡는다
+  boss: { hpByZone: [560, 1250, 1800, 2450, 3300], touchLossPerSec: 16, shotBonus: 1,   // 구간 고정 체력 — 병력을 모을수록 빨리 잡는다
           phase2At: 0.5, rageAt: 0.3, phase2Rate: 0.75, rageRate: 0.58, rageSpeed: 1.25 },   // rageRate 0.58 = 페이즈2 대비 발사 빈도 +30%   // 페이즈2=패턴 가속+부채꼴+1, 광분=총력전
   bosses: [
     { key: 'b1', name: '그레이더',      hpMult: 0.9, r: 48, speed: 60,  shootEvery: 1.1, fan: 2, shotSpeed: 220, coin: 25, ramEvery: 4.5, ramSpeed: 460 },
