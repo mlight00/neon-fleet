@@ -2,7 +2,7 @@
 import { BAL } from './balance.js';
 
 export function createCombat() {
-  return { enemies: [], bullets: [], eshots: [], pools: [], boss: null, fireT: 0, coins: 0, kills: 0 };
+  return { enemies: [], bullets: [], eshots: [], pools: [], boss: null, fireT: 0, coins: 0, kills: 0, powCd: 0 };
 }
 
 export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0, lane = null) {
@@ -45,6 +45,7 @@ function shootFan(st, x, y, tx, ty, fan, speed, dmg = 1, shape = 'lamp') {
 
 export function stepCombat(st, squad, dt, rnd) {
   const S = BAL.squad, lineY = S.y - 8;
+  st.powCd = Math.max(0, (st.powCd ?? 0) - dt);
   const rad = squad.radius ?? 60;                     // 대형 실제 반경 — 피탄·접촉 폭의 기준
   const tier = squad.tier ?? 0;
   const muzzles = S.muzzles[tier] ?? 1;
@@ -273,6 +274,11 @@ export function stepCombat(st, squad, dt, rnd) {
     const def = BAL.enemies[e.kind];
     if (e.hp <= 0) {
       if (!e.picked) st.kills++;                       // POW 픽업은 격파 수에 안 센다
+      //  POW 는 적 처치 드랍으로 나온다(쿨다운 있음) — 잘 싸운 보상
+      if (!e.touched && !def.pickup && e.kind !== 'supply' && st.powCd <= 0 && rnd() < BAL.fx.powDropRate) {
+        st.powCd = BAL.fx.powDropCd;
+        born.push({ kind: 'pow', n: 1, x: e.x, y: e.y });
+      }
       events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, kind: e.kind, touched: !!e.touched });
       if (!e.touched) st.coins += def.coin;
       if (e.kind === 'supply' && !e.touched) {

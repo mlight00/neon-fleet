@@ -38,7 +38,7 @@ export const BAL = {
                      rewardByZone: [10, 16, 25, 38, 52] },
   },
   //  구간 보스 5종 — 공통 골격(좌우 이동+부채꼴 사격+접촉)에 스탯만 다르게. 스멜터는 잡졸 소환.
-  boss: { hpByZone: [560, 1250, 1800, 2450, 3300], touchLossPerSec: 16, shotBonus: 1,   // 구간 고정 체력 — 병력을 모을수록 빨리 잡는다
+  boss: { hpByZone: [560, 1250, 2400, 3600, 5200], touchLossPerSec: 16, shotBonus: 1,   // 구간 고정 체력 — 병력을 모을수록 빨리 잡는다
           phase2At: 0.5, rageAt: 0.3, phase2Rate: 0.75, rageRate: 0.58, rageSpeed: 1.25 },   // rageRate 0.58 = 페이즈2 대비 발사 빈도 +30%   // 페이즈2=패턴 가속+부채꼴+1, 광분=총력전
   bosses: [
     { key: 'b1', name: '그레이더',      hpMult: 0.9, r: 48, speed: 60,  shootEvery: 1.1, fan: 2, shotSpeed: 220, coin: 25, ramEvery: 4.5, ramSpeed: 460 },
@@ -48,7 +48,7 @@ export const BAL = {
     { key: 'b5', name: '크라운 브레이커', hpMult: 1.6, r: 60, speed: 80,  shootEvery: 0.75, fan: 6, shotSpeed: 230, coin: 80, ramEvery: 5.5, ramSpeed: 460, spawnEvery: 4 },
   ],
   coins: { perDistance: 0.0015 },        // 거리 보정 코인(주 수입은 격파) — 판이 길어진 만큼 단가 하향
-  fx: { busterDur: 5, busterDps: 70, busterHalfW: 30, slowmoAt: 5, slowmoDur: 0.5, slowmoScale: 0.4, slowmoMax: 2,
+  fx: { busterDur: 5, busterDps: 70, busterHalfW: 30, powDropRate: 0.012, powDropCd: 12, slowmoAt: 5, slowmoDur: 0.5, slowmoScale: 0.4, slowmoMax: 2,
         continueTroops: 10, continueByZone: [10, 25, 45, 70, 100], continueInvulnSec: 2, bossHushSec: 1.5,   // 이어하기 복구는 구간 비례
         shakeDur: 0.25, shakeAmp: 7, hurtFlashDur: 0.35 },
   upgrades: {

@@ -36,7 +36,7 @@ export function buildTrack(seed) {
       const isLastGateOfZone = z + T.gateEvery >= z0 + T.zoneLen - 900;
       //  손제작 장면(약 30%): 숫자 비교가 아니라 '경로의 위험'이 다른 선택 — 안전 vs 욕심
       const sceneRoll = rnd();
-      if (!isLastGateOfZone && sceneRoll < 0.3) {
+      if (!isLastGateOfZone && sceneRoll < 0.4) {
         const g = BAL.gates;
         const base = Math.max(3, Math.round(lerp(g.addMin, g.addMax, t)));
         const flip = rnd() < 0.5;                      // 좌우 무작위 배치
@@ -49,7 +49,8 @@ export function buildTrack(seed) {
           events.push({ z: Math.round(z), type: 'gatepair', data: flip ? { left: big, right: small } : { left: small, right: big } });
           const kind = pool[(rnd() * pool.length) | 0];
           const [lo, hi] = BAL.enemies[kind].count;
-          events.push({ z: Math.round(z - 210), type: 'wave', data: { kind, n: hi, lane: greedLane } });
+          events.push({ z: Math.round(z + 80), type: 'wave', data: { kind, n: hi, lane: greedLane } });
+          events.push({ z: Math.round(z + 240), type: 'wave', data: { kind, n: Math.max(1, hi - 1), lane: greedLane } });
         } else if (scene === 1) {
           //  S2 즉시 증원 vs 큰 보급: -게이트 라인 뒤에 큰 보급이 숨어 있다(부수면 역전)
           const plus = { op: 'add', value: base };
@@ -57,12 +58,13 @@ export function buildTrack(seed) {
           events.push({ z: Math.round(z), type: 'gatepair', data: flip ? { left: minus, right: plus } : { left: plus, right: minus } });
           events.push({ z: Math.round(z + 200), type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane } });
         } else {
-          //  S3 POW 뒤 위험: 버스터 뱃지 라인에 적 러시 — 줍고 바로 갚아 준다
+          //  S3 지키는 보급: 적 러시 두 겹 뒤에 큰 보급 — 뚫어낸 자에게 병력
           events.push({ z: Math.round(z), type: 'gatepair', data: makeGatePair(rnd, t, true) });
-          events.push({ z: Math.round(z + 150), type: 'wave', data: { kind: 'pow', n: 1, lane: greedLane } });
           const kind = pool[(rnd() * pool.length) | 0];
           const [lo, hi] = BAL.enemies[kind].count;
-          events.push({ z: Math.round(z + 330), type: 'wave', data: { kind, n: hi, lane: greedLane } });
+          events.push({ z: Math.round(z + 120), type: 'wave', data: { kind, n: hi, lane: greedLane } });
+          events.push({ z: Math.round(z + 260), type: 'wave', data: { kind, n: hi, lane: greedLane } });
+          events.push({ z: Math.round(z + 420), type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane } });
         }
         continue;
       }
@@ -73,10 +75,7 @@ export function buildTrack(seed) {
           events.push({ z: Math.round(w), type: 'wave', data: { kind: 'supply', n: 1 } });
           continue;
         }
-        if (roll < 0.19) {                             // POW 뱃지 — 주우면 5초 버스터
-          events.push({ z: Math.round(w), type: 'wave', data: { kind: 'pow', n: 1 } });
-          continue;
-        }
+
         const kind = pool[(rnd() * pool.length) | 0];
         const [lo, hi] = BAL.enemies[kind].count;
         events.push({ z: Math.round(w), type: 'wave', data: { kind, n: lo + ((rnd() * (hi - lo + 1)) | 0) } });
