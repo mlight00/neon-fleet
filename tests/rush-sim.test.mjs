@@ -196,3 +196,21 @@ test('COMBAT-BOSS-TOUCH: 보스 접촉은 시각 겹침 안에서만(옆으로 �
   const r2 = stepCombat(st2, { x: 240, count: 50, fireRateMult: 0, radius: rad }, 1 / 30, rnd);
   assert.ok(r2.troopLoss >= 1, '정면 접촉은 피해');
 });
+
+test('COMBAT-BEAM-BURN: 버스터로 소각된 적탄은 같은 프레임에 명중하지 않는다(GPT 검토 재현 케이스)', () => {
+  const rnd = mulberry32(5);
+  const st = createCombat();
+  st.eshots.push({ x: 240, y: 631, vx: 0, vy: 200, dmg: 3 });
+  const r = stepCombat(st, { x: 240, count: 30, fireRateMult: 0, radius: 60, beam: true }, 1 / 30, rnd);
+  assert.equal(r.troopLoss, 0, '소각과 동시에 맞으면 안 된다');
+});
+
+test('COMBAT-STALE: 부대 줄을 이미 지난 탄·적은 옆걸음에 맞지 않는다', () => {
+  const rnd = mulberry32(6);
+  const st = createCombat();
+  st.eshots.push({ x: 240, y: 700, vx: 0, vy: 200 });        // 이미 한참 지난 탄
+  spawnWave(st, 'scrapbit', 1, rnd);
+  st.enemies[0].x = 240; st.enemies[0].y = 760; st.enemies[0].vy = 10; st.enemies[0].vx = 0;
+  const r = stepCombat(st, { x: 240, count: 10, fireRateMult: 0, radius: 60 }, 1 / 30, rnd);
+  assert.equal(r.troopLoss, 0, '지나간 대상에게 피해를 받지 않는다');
+});

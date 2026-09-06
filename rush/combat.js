@@ -132,7 +132,7 @@ export function stepCombat(st, squad, dt, rnd) {
         }
       }
     }
-    if (e.y >= lineY - e.r && Math.abs(e.x - squad.x) < rad + e.r) {
+    if (e.y >= lineY - e.r && e.y <= lineY + e.r + 30 && Math.abs(e.x - squad.x) < rad + e.r) {   // 지나간 적은 접촉 없음
       if (def.pickup) {                               // POW 뱃지: 줍는 순간 버스터
         e.hp = 0; e.touched = true; e.picked = true;
         events.push({ type: 'pow', x: e.x, y: e.y });
@@ -156,6 +156,7 @@ export function stepCombat(st, squad, dt, rnd) {
 
   //  적탄 이동·명중 — 갈고리는 좌우로 크게 흔들리며 낙하한다
   for (const s of st.eshots) {
+    if (s.dead) continue;                             // 버스터로 소각된 탄은 같은 프레임에도 무효(GPT 검토 재현 버그)
     if (s.hook) {
       s.t = (s.t ?? 0) + dt;
       s.x = s.baseX + Math.sin(s.t * 4.2) * (s.swing ?? 0);
@@ -163,7 +164,8 @@ export function stepCombat(st, squad, dt, rnd) {
       s.x += s.vx * dt;
     }
     s.y += s.vy * dt;
-    if (s.y >= lineY && Math.abs(s.x - squad.x) < rad + (s.hook ? 16 : 5)) { troopLoss += s.hook ? 3 : (s.dmg ?? 1); s.dead = true; }
+    //  부대 줄을 지나는 순간에만 명중(이미 지나간 탄이 옆걸음에 맞지 않게)
+    if (s.y >= lineY && s.y <= lineY + 46 && Math.abs(s.x - squad.x) < rad + (s.hook ? 16 : 5)) { troopLoss += s.hook ? 3 : (s.dmg ?? 1); s.dead = true; }
   }
 
   //  보스 — 공통 골격: 좌우 이동 + 부채꼴 사격 + 접촉. 스멜터(spawnEvery)는 잡졸 소환.
@@ -267,7 +269,7 @@ export function stepCombat(st, squad, dt, rnd) {
   st.enemies = st.enemies.filter((e) => {
     const def = BAL.enemies[e.kind];
     if (e.hp <= 0) {
-      st.kills++;
+      if (!e.picked) st.kills++;                       // POW 픽업은 격파 수에 안 센다
       events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, kind: e.kind, touched: !!e.touched });
       if (!e.touched) st.coins += def.coin;
       if (e.kind === 'supply' && !e.touched) {

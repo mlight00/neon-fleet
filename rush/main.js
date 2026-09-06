@@ -30,7 +30,7 @@ function newRun(save, mode) {
     : { key: todayKey(), seed: hashSeed('r' + Date.now() + Math.random()) };  // 일반 판만 비결정 시드
   const eff = effects(save.get().up, isDaily);
   return {
-    mode, seedKey: seedInfo.key,
+    mode, seedKey: seedInfo.key, seed: seedInfo.seed,
     track: buildTrack(seedInfo.seed), rnd: mulberry32((seedInfo.seed ^ 0x9E37) >>> 0),
     z: 0, ei: 0, x: 240, tx: 240, count: eff.startCount, dispCount: eff.startCount, eff,
     combat: createCombat(),
@@ -89,7 +89,9 @@ function advance(run, dt0) {
       if (run.count < before && run.count <= 5) { run.shakeT = BAL.fx.shakeDur; run.hurtT = BAL.fx.hurtFlashDur; }
     } else if (ev.type === 'wave') {
       const zn = Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen));
-      spawnWave(run.combat, ev.data.kind, ev.data.n, run.rnd, BAL.track.enemyHpMult[zn], zn);
+      //  스폰 배치는 이벤트 위치 시드로 고정 — 오늘의 도전에서 전원이 같은 적 배치를 받는다
+      const evRnd = mulberry32((run.seed ^ Math.imul(ev.z + 1, 2654435761)) >>> 0);
+      spawnWave(run.combat, ev.data.kind, ev.data.n, evRnd, BAL.track.enemyHpMult[zn], zn);
     }
     else {
       for (const e of run.combat.enemies) spawnBurst(run, e.x, e.y, e.r, false);   // 보스전은 1:1 — 잡졸 일괄 정리
@@ -373,7 +375,17 @@ export function boot() {
     }
   });
   addEventListener('pointerup', () => { pointer.down = false; });
+  addEventListener('pointercancel', () => { pointer.down = false; });
+  //  앱 전환·창 이탈: 입력을 비우고 자동 일시정지(통화·홈 화면 복귀 사고 방지)
+  const autoPause = () => {
+    pointer.down = false;
+    for (const k in keys) keys[k] = false;
+    if (state === 'run') { state = 'paused'; au.bgmPause(); }
+  };
+  addEventListener('blur', autoPause);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
   addEventListener('keydown', (e) => {
+    au.unlock();                                      // 키보드로 시작해도 오디오 해제
     if (e.code === 'Escape') {                        // ESC = 일시 정지 토글
       if (state === 'run') { state = 'paused'; au.bgmPause(); }
       else if (state === 'paused') { state = 'run'; au.bgmResume(); }
