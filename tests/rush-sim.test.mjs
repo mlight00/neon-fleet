@@ -59,11 +59,14 @@ test('COMBAT-TOUCH: 적이 부대 줄에 닿으면 병력이 깎이고 적도 �
   assert.equal(st.enemies.length, 0, '자폭 소모');
 });
 
-test('COMBAT-BOSS: 구간별 보스 HP 배율·격파 코인', () => {
+test('COMBAT-BOSS: 구간 고정 체력(병력 무관 — 모을수록 빨리 잡는다)·격파 코인', () => {
   const rnd = mulberry32(3);
   const st = createCombat();
   spawnBoss(st, 100, 4);                              // 최종 보스(크라운 브레이커)
-  assert.equal(st.boss.hp, Math.round((BAL.boss.baseHp + BAL.boss.hpPerTroop * 100) * BAL.bosses[4].hpMult));
+  assert.equal(st.boss.hp, BAL.boss.hpByZone[4]);
+  const stBig = createCombat();
+  spawnBoss(stBig, 999, 4);                           // 병력이 많아도 보스 체력은 같다
+  assert.equal(stBig.boss.hp, st.boss.hp);
   assert.equal(st.boss.zone, 4);
   const st0 = createCombat();
   spawnBoss(st0, 100, 0);                             // 구간1 보스는 훨씬 약하다

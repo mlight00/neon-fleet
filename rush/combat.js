@@ -27,7 +27,8 @@ export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0) {
 
 export function spawnBoss(st, troopCount, zone) {
   const B = BAL.boss, def = BAL.bosses[zone];
-  const hp = Math.round((B.baseHp + B.hpPerTroop * troopCount) * def.hpMult);
+  //  구간 고정 체력: 병력이 많을수록 확실히 빨리 잡는다(비례 체력의 역인센티브 제거)
+  const hp = Math.round(B.hpByZone?.[zone] ?? 900);
   st.boss = { zone, hp, max: hp, x: 240, y: -80, r: def.r,
               dir: 1, shootT: def.shootEvery, touchT: 0, spawnT: def.spawnEvery ?? 0 };
 }
