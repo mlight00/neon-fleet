@@ -4,6 +4,8 @@ import { BAL } from './balance.js';
 import { mulberry32 } from './rng.js';
 import { makeGatePair } from './gates.js';
 
+const lerp = (a, b, t) => a + (b - a) * t;
+
 //  구간 i 에 처음 등장하는 적(등장 순서 = 프롬프트 v4 배치표)
 export const ZONE_NEW_KINDS = [
   ['scrapbit', 'wheeler'],
@@ -32,6 +34,38 @@ export function buildTrack(seed) {
     for (let z = zStart; z < z0 + T.zoneLen - 900; z += T.gateEvery) {   // 보스 앞 900은 게이트 없는 전투 구간
       const t = z / T.length;
       const isLastGateOfZone = z + T.gateEvery >= z0 + T.zoneLen - 900;
+      //  손제작 장면(약 30%): 숫자 비교가 아니라 '경로의 위험'이 다른 선택 — 안전 vs 욕심
+      const sceneRoll = rnd();
+      if (!isLastGateOfZone && sceneRoll < 0.3) {
+        const g = BAL.gates;
+        const base = Math.max(3, Math.round(lerp(g.addMin, g.addMax, t)));
+        const flip = rnd() < 0.5;                      // 좌우 무작위 배치
+        const greedLane = flip ? 'L' : 'R';            // 보상(큰 게이트·보급·POW)이 있는 욕심 라인
+        const scene = (rnd() * 3) | 0;
+        if (scene === 0) {
+          //  S1 편한 소 vs 지키는 대: 큰 +게이트 라인에 적 무리가 버틴다
+          const small = { op: 'add', value: Math.round(base * 0.6) || 1 };
+          const big = { op: 'add', value: Math.round(base * 1.5) + 2 };
+          events.push({ z: Math.round(z), type: 'gatepair', data: flip ? { left: big, right: small } : { left: small, right: big } });
+          const kind = pool[(rnd() * pool.length) | 0];
+          const [lo, hi] = BAL.enemies[kind].count;
+          events.push({ z: Math.round(z - 210), type: 'wave', data: { kind, n: hi, lane: greedLane } });
+        } else if (scene === 1) {
+          //  S2 즉시 증원 vs 큰 보급: -게이트 라인 뒤에 큰 보급이 숨어 있다(부수면 역전)
+          const plus = { op: 'add', value: base };
+          const minus = { op: 'sub', value: Math.round(base * 0.7) || 1 };
+          events.push({ z: Math.round(z), type: 'gatepair', data: flip ? { left: minus, right: plus } : { left: plus, right: minus } });
+          events.push({ z: Math.round(z + 200), type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane } });
+        } else {
+          //  S3 POW 뒤 위험: 버스터 뱃지 라인에 적 러시 — 줍고 바로 갚아 준다
+          events.push({ z: Math.round(z), type: 'gatepair', data: makeGatePair(rnd, t, true) });
+          events.push({ z: Math.round(z + 150), type: 'wave', data: { kind: 'pow', n: 1, lane: greedLane } });
+          const kind = pool[(rnd() * pool.length) | 0];
+          const [lo, hi] = BAL.enemies[kind].count;
+          events.push({ z: Math.round(z + 330), type: 'wave', data: { kind, n: hi, lane: greedLane } });
+        }
+        continue;
+      }
       events.push({ z: Math.round(z), type: 'gatepair', data: makeGatePair(rnd, t, isLastGateOfZone) });
       for (let w = z + 90; w < z + T.gateEvery - 60; w += T.waveEvery) {
         const roll = rnd();

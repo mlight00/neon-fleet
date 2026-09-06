@@ -8,6 +8,7 @@ export const BAL = {
            muzzles: [1, 1, 2, 2, 3], bulletW: [4, 5, 6, 7, 8], tierDmgMult: [1, 1.15, 1.3, 1.5, 1.75],   // 티어별 발사 열·탄 굵기·위력(무기 진화)
            fireInterval: 0.5, fireRateCap: 7, bulletSpeed: 700, bulletSpeeds: [700, 730, 770, 820, 880], bulletDmg: 1, dmgPerTroop: 0.012, touchLossPerHit: 1 },
   tiers: [1, 60, 180, 360, 700],         // M1~M5 병력 임계 — 최종 진화는 종반에나
+  demoteRatio: 0.75,                     // 강등 완충: 임계의 75% 아래로 떨어져야 강등(진화 성취 보존)
   gates: {
     colors: { add: '#35E5FF', mul: '#F6C84A', sub: '#FF6A3D', div: '#FF3DA5' },
     // 진행도 t(0..1)에 따른 값 범위

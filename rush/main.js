@@ -5,7 +5,7 @@ import { mulberry32, dateSeed, hashSeed } from './rng.js';
 import { buildTrack } from './track.js';
 import { applyGate, isGood, gateColor } from './gates.js';
 import { createAudio } from './audio.js';
-import { tierFor, clampX, squadRadius } from './squad.js';
+import { tierFor, tierStep, clampX, squadRadius } from './squad.js';
 import { createCombat, spawnWave, spawnBoss, stepCombat } from './combat.js';
 import { createSave } from './save.js';
 import { upCost, buy, effects } from './upgrades.js';
@@ -32,7 +32,7 @@ function newRun(save, mode) {
   return {
     mode, seedKey: seedInfo.key, seed: seedInfo.seed,
     track: buildTrack(seedInfo.seed), rnd: mulberry32((seedInfo.seed ^ 0x9E37) >>> 0),
-    z: 0, ei: 0, x: 240, tx: 240, count: eff.startCount, dispCount: eff.startCount, eff,
+    z: 0, ei: 0, x: 240, tx: 240, count: eff.startCount, dispCount: eff.startCount, tier: tierFor(eff.startCount), eff,
     combat: createCombat(),
     watcher: recordWatcher(save.get().best), slowmo: slowmoCtl(), cont: continueToken(isDaily),
     recordFlash: 0, gold: false, dim: 0, invulnT: 0, busterT: 0, curBossZone: -1,
@@ -63,7 +63,7 @@ function spawnBurst(run, x, y, r, big) {
 }
 
 function advance(run, dt0) {
-  const startTier = tierFor(run.count);               // 프레임 전체의 티어 변화를 본다(게이트 승급 포함)
+  const startTier = run.tier;                         // 티어는 히스테리시스 상태(오를 땐 즉시, 내릴 땐 완충)
   const scale = run.slowmo.update(run.count, dt0);
   const dt = dt0 * scale;
   //  보스 앞 정적(A-3): 다음 보스 이벤트 1.5초 앞에서 화면이 어두워진다 — 구간마다 반복
@@ -91,7 +91,7 @@ function advance(run, dt0) {
       const zn = Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen));
       //  스폰 배치는 이벤트 위치 시드로 고정 — 오늘의 도전에서 전원이 같은 적 배치를 받는다
       const evRnd = mulberry32((run.seed ^ Math.imul(ev.z + 1, 2654435761)) >>> 0);
-      spawnWave(run.combat, ev.data.kind, ev.data.n, evRnd, BAL.track.enemyHpMult[zn], zn);
+      spawnWave(run.combat, ev.data.kind, ev.data.n, evRnd, BAL.track.enemyHpMult[zn], zn, ev.data.lane);
     }
     else {
       for (const e of run.combat.enemies) spawnBurst(run, e.x, e.y, e.r, false);   // 보스전은 1:1 — 잡졸 일괄 정리
@@ -127,7 +127,8 @@ function advance(run, dt0) {
       }
     }
   }
-  const prevTier = tierFor(run.count);
+  run.tier = tierStep(run.tier, run.count);           // 게이트 통과 반영
+  const prevTier = run.tier;
   const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult, tier: prevTier, radius: squadRadius(run.count), beam: run.busterT > 0 }, dt, run.rnd);
   for (const ev of r.events) {
     if (ev.type === 'kill') { spawnBurst(run, ev.x, ev.y, ev.r, false); if (!ev.touched) run.sfxQueue.push('kill'); }
@@ -153,7 +154,8 @@ function advance(run, dt0) {
     }
   }
   if (run.invulnT > 0) run.invulnT -= dt0; else run.count -= r.troopLoss;
-  const nowTier = tierFor(run.count);
+  run.tier = tierStep(run.tier, run.count);
+  const nowTier = run.tier;
   if (nowTier !== startTier) {                         // 승급/강등 이펙트 + 사운드
     run.evolveT = 0.8;
     run.cutscene = nowTier > startTier
@@ -251,8 +253,8 @@ export function boot() {
       v.boss = run.combat.boss;
       v.pools = run.combat.pools;
       const disp = Math.round(run.dispCount);
-      v.squad = { x: run.x, count: disp, tier: tierFor(run.count), radius: squadRadius(run.count), hurt: run.hurtT > 0,
-                  fireFlash: run.fireFlash, muzzles: BAL.squad.muzzles[tierFor(run.count)] ?? 1,
+      v.squad = { x: run.x, count: disp, tier: run.tier, radius: squadRadius(run.count), hurt: run.hurtT > 0,
+                  fireFlash: run.fireFlash, muzzles: BAL.squad.muzzles[run.tier] ?? 1,
                   evolveT: run.evolveT, evolveUp: run.evolveUp, busterT: run.busterT };
       v.dim = run.dim;
       v.parts = run.parts;

@@ -125,7 +125,7 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 3판 이상 완주한다(회귀 �
           count = applyGate(count, better);
         } else if (ev.type === 'wave') {
           const zone = Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen));
-          spawnWave(st, ev.data.kind, ev.data.n, rnd, BAL.track.enemyHpMult[zone], zone);   // main.advance 와 동일 규칙
+          spawnWave(st, ev.data.kind, ev.data.n, rnd, BAL.track.enemyHpMult[zone], zone, ev.data.lane);   // main.advance 와 동일 규칙
         } else {
           st.enemies.length = 0; st.eshots.length = 0;   // 보스전은 1:1(main.advance 와 동일 규칙)
           spawnBoss(st, count, ev.data.zone);
@@ -216,4 +216,16 @@ test('COMBAT-STALE: 부대 줄을 이미 지난 탄·적은 옆걸음에 맞지 
   st.enemies[0].x = 240; st.enemies[0].y = 760; st.enemies[0].vy = 10; st.enemies[0].vx = 0;
   const r = stepCombat(st, { x: 240, count: 10, fireRateMult: 0, radius: 60 }, 1 / 30, rnd);
   assert.equal(r.troopLoss, 0, '지나간 대상에게 피해를 받지 않는다');
+});
+
+test('TIER-HYST: 강등 완충 — 임계 아래로 살짝 떨어져도 진화가 유지된다', async () => {
+  const { tierStep } = await import('../rush/squad.js');
+  let t = 0;
+  t = tierStep(t, 60);  assert.equal(t, 1, '60 도달 즉시 진화');
+  t = tierStep(t, 59);  assert.equal(t, 1, '59로 떨어져도 유지');
+  t = tierStep(t, 46);  assert.equal(t, 1, '완충선(45) 위는 유지');
+  t = tierStep(t, 44);  assert.equal(t, 0, '완충선 아래는 강등');
+  t = tierStep(t, 200); assert.equal(t, 2, '큰 도약은 즉시 반영');
+  t = tierStep(t, 150); assert.equal(t, 2, '완충선(135) 위면 유지');
+  t = tierStep(t, 100); assert.equal(t, 1, '완충선 아래면 강등(45 위라 1까지만)');
 });

@@ -5,16 +5,18 @@ export function createCombat() {
   return { enemies: [], bullets: [], eshots: [], pools: [], boss: null, fireT: 0, coins: 0, kills: 0 };
 }
 
-export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0) {
+export function spawnWave(st, kind, n, rnd, hpMult = 1, zone = 0, lane = null) {
   const def = BAL.enemies[kind];
   const scroll = BAL.track.scrollSpeed;
   //  화면 속도 = 스크롤(도로) + 세계 전진 x 구간 배율. 도로 고정형(speed=190)은 배율 무관.
   const vy = scroll + Math.max(0, def.speed - scroll) * (BAL.track.enemyAdvMult?.[zone] ?? 1);
+  //  lane: 'L'/'R' 이면 그 차선 대역에만 배치(안전 vs 욕심 장면용)
+  const [x0, x1] = lane === 'L' ? [85, 225] : lane === 'R' ? [255, 395] : [85, 395];
   for (let i = 0; i < n; i++) {
     st.enemies.push({
       kind, zone, hp: Math.round(def.hp * hpMult), r: Math.round(def.r * (BAL.track.enemySizeMult?.[zone] ?? 1)),
-      //  웨이브 내 균등 분산(뭉침 방지): 도로를 n등분한 자리 + 지터
-      x: Math.max(85, Math.min(395, 85 + ((i + 0.5) / n) * 310 + (rnd() - 0.5) * 60)),
+      //  웨이브 내 균등 분산(뭉침 방지): 차선 대역을 n등분한 자리 + 지터
+      x: Math.max(x0, Math.min(x1, x0 + ((i + 0.5) / n) * (x1 - x0) + (rnd() - 0.5) * 50)),
       y: -40 - rnd() * 170,
       vx: def.zigzag ? (rnd() < 0.5 ? -def.zigzag : def.zigzag) : (def.straight ? 0 : (rnd() - 0.5) * 30),
       vy,

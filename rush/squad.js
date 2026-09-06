@@ -28,6 +28,15 @@ export function formation(count) {
 
 export function clampX(x) { return Math.max(80, Math.min(400, x)); }   // 도로 폭 = 게이트 폭
 
+/** 티어 갱신(히스테리시스): 오를 땐 즉시, 내릴 땐 임계의 demoteRatio 아래로 떨어져야 강등. */
+export function tierStep(curTier, count) {
+  const raw = tierFor(count);
+  if (raw > curTier) return raw;
+  let t = curTier;
+  while (t > 0 && count < BAL.tiers[t] * BAL.demoteRatio) t--;
+  return t;
+}
+
 /** 병력 → 화면에 그릴 유닛 수. 12까지는 1:1(한 명씩 느는 맛), 이후 7명당 1기, 최대 50기.
  *  실제 병력은 발밑 숫자가 전달한다(라스트워식 축약 표시). */
 export function displayUnits(count) {
