@@ -78,6 +78,18 @@ test('COMBAT-BOSS: 구간 고정 체력(병력 무관 — 모을수록 빨리 �
   assert.ok(st.coins >= BAL.bosses[4].coin);
 });
 
+test('BOSS-HOOK-GATE: 갠트리 위도우 갈고리는 체력 60% 이하부터 던진다', () => {
+  const rnd = mulberry32(5);
+  const st = createCombat();
+  spawnBoss(st, 50, 1);                                // b2 갠트리 위도우
+  st.boss.y = 200;
+  for (let i = 0; i < 300; i++) stepCombat(st, { x: 240, count: 0, fireRateMult: 0 }, 1 / 60, rnd);
+  assert.equal(st.eshots.filter((s) => s.hook).length, 0, '만피에선 갈고리 없음');
+  st.boss.hp = Math.floor(st.boss.max * 0.6);
+  for (let i = 0; i < 300; i++) stepCombat(st, { x: 240, count: 0, fireRateMult: 0 }, 1 / 60, rnd);
+  assert.ok(st.eshots.some((s) => s.hook), '60% 이하부터 갈고리');
+});
+
 test('COMBAT-NEW: 스폰 포드는 죽으며 잡졸을 낳고, 마그넷헤드는 도주 시 코인을 훔친다', () => {
   const rnd = mulberry32(9);
   const st = createCombat();

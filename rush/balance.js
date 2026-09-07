@@ -43,7 +43,7 @@ export const BAL = {
           phase2At: 0.5, rageAt: 0.3, phase2Rate: 0.75, rageRate: 0.58, rageSpeed: 1.25 },   // rageRate 0.58 = 페이즈2 대비 발사 빈도 +30%   // 페이즈2=패턴 가속+부채꼴+1, 광분=총력전
   bosses: [
     { key: 'b1', name: '그레이더',      hpMult: 0.9, r: 48, speed: 60,  shootEvery: 1.1, fan: 2, shotSpeed: 220, coin: 25, ramEvery: 4.5, ramSpeed: 460 },
-    { key: 'b2', name: '갠트리 위도우', hpMult: 1.1, r: 52, speed: 70,  shootEvery: 1.0, fan: 3, shotSpeed: 230, coin: 35, hookEvery: 3.0, hookSpeed: 320, hookSwing: 95 },
+    { key: 'b2', name: '갠트리 위도우', hpMult: 1.1, r: 52, speed: 70,  shootEvery: 1.0, fan: 3, shotSpeed: 230, coin: 35, hookEvery: 3.0, hookSpeed: 320, hookSwing: 95, hookAt: 0.6 },   // 갈고리는 체력 60% 이하부터
     { key: 'b3', name: '레일 리바이어던', hpMult: 1.2, r: 56, speed: 75, shootEvery: 0.9, fan: 5, shotSpeed: 210, coin: 45, sweepEvery: 4.8, sweepSpeed: 800, sweepHit: 10 },
     { key: 'b4', name: '스멜터',        hpMult: 1.35, r: 55, speed: 62,  shootEvery: 0.95, fan: 4, shotSpeed: 230, coin: 55, spawnEvery: 3.2, poolEvery: 4.4, poolDmg: 3 },
     { key: 'b5', name: '크라운 브레이커', hpMult: 1.6, r: 60, speed: 80,  shootEvery: 0.75, fan: 6, shotSpeed: 230, coin: 80, ramEvery: 5.5, ramSpeed: 460, spawnEvery: 4 },

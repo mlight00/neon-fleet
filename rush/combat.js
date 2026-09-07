@@ -218,7 +218,7 @@ export function stepCombat(st, squad, dt, rnd) {
         st.pools.push({ x: squad.x, y: lineY - 46, warn: 0.9, life: 4, tick: 0 });
       }
     }
-    if (def.hookEvery) {                              // 갠트리 위도우: 갈고리를 아래로 쭉 뻗는다
+    if (def.hookEvery && bo.hp / bo.max <= (def.hookAt ?? 1)) {   // 갠트리 위도우: 체력이 깎이면 갈고리를 아래로 쭉 뻗는다
       bo.hookT = (bo.hookT ?? def.hookEvery * 0.6) - dt;
       if (bo.hookT <= 0) {
         bo.hookT = def.hookEvery * rate;
