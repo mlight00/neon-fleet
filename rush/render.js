@@ -88,7 +88,7 @@ export function createRenderer(canvas, sprites) {
       { x: W / 2 + g.gap / 2, gate: pair.right },
     ];
     for (const b of boxes) {
-      const col = gateColor(b.gate.op);
+      const col = b.gate.greed ? '#F6C84A' : gateColor(b.gate.op);   // 골드 = 욕심 라인(보상이 걸려 있다)
       ctx.globalAlpha = 0.88;
       const im = sprites.get('gate');
       if (im) {
@@ -130,6 +130,11 @@ export function createRenderer(canvas, sprites) {
         ctx.strokeText(gateLabel(b.gate), cx, y);
         ctx.fillStyle = col;
         ctx.fillText(gateLabel(b.gate), cx, y);
+        if (b.gate.greed) {                            // ★ = 이 라인에 보상/위험 세트
+          ctx.font = 'bold 17px system-ui, sans-serif';
+          ctx.fillStyle = '#F6C84A';
+          ctx.fillText('★', cx, y - 34);
+        }
         if (b.gate.hp !== undefined && !isGoodOp(b.gate.op)) {   // 쏘는 중 — 남은 내구도
           ctx.font = 'bold 15px system-ui, sans-serif';
           ctx.lineWidth = 4; ctx.strokeStyle = '#14233A';

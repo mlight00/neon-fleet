@@ -45,7 +45,7 @@ export function buildTrack(seed) {
         if (scene === 0) {
           //  S1 편한 소 vs 지키는 대: 큰 +게이트 라인에 적 무리가 버틴다
           const small = { op: 'add', value: Math.round(base * 0.6) || 1 };
-          const big = { op: 'add', value: Math.round(base * 1.5) + 2 };
+          const big = { op: 'add', value: Math.round(base * 1.5) + 2, greed: true };   // 골드 표시 — 욕심 라인
           events.push({ z: Math.round(z), type: 'gatepair', data: flip ? { left: big, right: small } : { left: small, right: big } });
           const kind = pool[(rnd() * pool.length) | 0];
           const [lo, hi] = BAL.enemies[kind].count;
@@ -54,7 +54,7 @@ export function buildTrack(seed) {
         } else if (scene === 1) {
           //  S2 즉시 증원 vs 큰 보급: -게이트 라인 뒤에 큰 보급이 숨어 있다(부수면 역전)
           const plus = { op: 'add', value: base };
-          const minus = { op: 'sub', value: Math.round(base * 0.7) || 1 };
+          const minus = { op: 'sub', value: Math.round(base * 0.7) || 1, greed: true };   // 골드 표시 — 뒤에 보상이 숨어 있다
           events.push({ z: Math.round(z), type: 'gatepair', data: flip ? { left: minus, right: plus } : { left: plus, right: minus } });
           events.push({ z: Math.round(z + 200), type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane } });
         } else {
@@ -64,7 +64,7 @@ export function buildTrack(seed) {
           const [lo, hi] = BAL.enemies[kind].count;
           events.push({ z: Math.round(z + 120), type: 'wave', data: { kind, n: hi, lane: greedLane } });
           events.push({ z: Math.round(z + 260), type: 'wave', data: { kind, n: hi, lane: greedLane } });
-          events.push({ z: Math.round(z + 420), type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane } });
+          events.push({ z: Math.round(z + 300), type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane } });
         }
         continue;
       }

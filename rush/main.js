@@ -132,6 +132,10 @@ function advance(run, dt0) {
   const r = stepCombat(run.combat, { x: run.x, count: run.count, fireRateMult: run.eff.fireRateMult, tier: prevTier, radius: squadRadius(run.count), beam: run.busterT > 0 }, dt, run.rnd);
   for (const ev of r.events) {
     if (ev.type === 'kill') { spawnBurst(run, ev.x, ev.y, ev.r, false); if (!ev.touched) run.sfxQueue.push('kill'); }
+    else if (ev.type === 'powDrop') {                 // 적이 버스터를 떨어뜨렸다 — 인과가 보이게
+      run.floaters.push({ x: ev.x, y: ev.y - 14, text: '버스터 드랍!', color: '#F6C84A', t: 0 });
+      run.sfxQueue.push('pickupDrop');
+    }
     else if (ev.type === 'pow') {                     // POW 뱃지 — 버스터 발동!
       run.busterT = BAL.fx.busterDur;
       run.floaters.push({ x: ev.x, y: ev.y, text: '버스터!', color: '#F6C84A', t: 0, big: true });

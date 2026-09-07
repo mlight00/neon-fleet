@@ -18,10 +18,11 @@ const SFX = {
   buy:     ['nf_sfx_buy_1'],
   click:   ['nf_sfx_click_1'],
   record:  ['nf_sfx_charge_full_1'],
+  pickupDrop: ['nf_sfx_pickup_1', 'nf_sfx_pickup_2'],
 };
 const THROTTLE = { fire: 0.045, fireL: 0.045, fireM: 0.06, kill: 0.08, hurt: 0.25 };   // 발사음은 발사 간격에 맞춰 촘촘히   // 연타 소음 방지(초)
 const VOL = { fire: 0.11, fireL: 0.11, fireM: 0.14, demote: 0.75, kill: 0.4, bossDie: 0.8, hurt: 0.55, gateGood: 0.6, gateBad: 0.6,
-              bossIn: 0.8, evolve: 0.8, buy: 0.6, click: 0.5, record: 0.7 };
+              bossIn: 0.8, evolve: 0.8, buy: 0.6, click: 0.5, record: 0.7, pickupDrop: 0.7 };
 
 export function createAudio() {
   let unlocked = false;

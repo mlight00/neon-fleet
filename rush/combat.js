@@ -45,6 +45,7 @@ function shootFan(st, x, y, tx, ty, fan, speed, dmg = 1, shape = 'lamp') {
 
 export function stepCombat(st, squad, dt, rnd) {
   const S = BAL.squad, lineY = S.y - 8;
+  const scrollV = BAL.track.scrollSpeed;
   st.powCd = Math.max(0, (st.powCd ?? 0) - dt);
   const rad = squad.radius ?? 60;                     // 대형 실제 반경 — 피탄·접촉 폭의 기준
   const tier = squad.tier ?? 0;
@@ -116,6 +117,7 @@ export function stepCombat(st, squad, dt, rnd) {
       }
     }
     if (def.accel) e.vy = Math.min(def.maxSpeed ?? 999, e.vy + def.accel * dt);   // 램하운드: 자동차처럼 내리막 가속
+    if (def.pickup && e.vy < scrollV) e.vy = Math.min(scrollV, e.vy + 620 * dt);   // 드랍 팝 후 도로 속도로 안착
     e.x += e.vx * dt; e.y += e.vy * dt;
     if (e.x < 80 || e.x > 400) { e.vx *= -1; e.x = Math.max(80, Math.min(400, e.x)); }
     if (e.aimT !== undefined && e.aimT > 0) {         // 저격 조준 중(조준점 고정)
@@ -277,7 +279,8 @@ export function stepCombat(st, squad, dt, rnd) {
       //  POW 는 적 처치 드랍으로 나온다(쿨다운 있음) — 잘 싸운 보상
       if (!e.touched && !def.pickup && e.kind !== 'supply' && st.powCd <= 0 && rnd() < BAL.fx.powDropRate) {
         st.powCd = BAL.fx.powDropCd;
-        born.push({ kind: 'pow', n: 1, x: e.x, y: e.y });
+        born.push({ kind: 'pow', n: 1, x: e.x, y: e.y, pop: true });
+        events.push({ type: 'powDrop', x: e.x, y: e.y });
       }
       events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, kind: e.kind, touched: !!e.touched });
       if (!e.touched) st.coins += def.coin;
@@ -303,8 +306,9 @@ export function stepCombat(st, squad, dt, rnd) {
     for (let i = 0; i < b.n; i++) {
       st.enemies.push({
         kind: b.kind, hp: BAL.enemies[b.kind].hp, r: BAL.enemies[b.kind].r,
-        x: Math.max(40, Math.min(440, b.x + (rnd() - 0.5) * 70)), y: b.y + (rnd() - 0.5) * 30,
-        vx: (rnd() - 0.5) * 40, vy: BAL.enemies[b.kind].speed,
+        x: Math.max(40, Math.min(440, b.x + (b.pop ? 0 : (rnd() - 0.5) * 70))), y: b.y + (b.pop ? 0 : (rnd() - 0.5) * 30),
+        vx: b.pop ? 0 : (rnd() - 0.5) * 40,
+        vy: b.pop ? -70 : BAL.enemies[b.kind].speed,   // 드랍 팝: 위로 톡 튀었다가 도로 속도로 낙하
       });
     }
   }
