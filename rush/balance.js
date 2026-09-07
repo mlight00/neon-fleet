@@ -3,7 +3,8 @@ export const BAL = {
   //  판 = 5구간 × 900. 구간마다 신규 적 2종 합류(누적), 구간 끝(900의 배수)마다 전용 보스.
   track: { length: 57000, zoneLen: 11400, zones: 5, scrollSpeed: 190, gateEvery: 780, firstGateZ: 300, waveEvery: 200, enemyHpMult: [1, 2, 3.2, 4.6, 6.2], enemyAdvMult: [0.6, 0.8, 1, 1.1, 1.2], eshotDmg: [1, 1, 2, 2, 3], enemySizeMult: [1, 1.08, 1.16, 1.24, 1.32] },   // 구간 배율: 체력·전진속도·적탄 위력   // 구간당 60초(스크롤), 성장은 게이트가·웨이브는 양념
   //  followRate = 기존 게임(js/balance.js) followSpeed 와 동일값
-  squad: { y: 640, maxCount: 999, moveSpeed: 420, followRate: 9, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
+  //  baseMoveMax = 실제 횡이동 상한(px/s) — 도로 폭을 약 1.3초에 횡단(기동 속도 업그레이드로 확대)
+  squad: { y: 640, maxCount: 999, moveSpeed: 420, followRate: 9, baseMoveMax: 250, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130, startCount: 1,
            heroSize: 46, heroSizes: [46, 52, 58, 66, 74], soldierSize: 22, ringGap: 19, ringStart: 26,
            muzzles: [1, 1, 2, 2, 3], bulletW: [4, 5, 6, 7, 8], tierDmgMult: [1, 1.15, 1.3, 1.5, 1.75],   // 티어별 발사 열·탄 굵기·위력(무기 진화)
            fireInterval: 0.5, fireRateCap: 7, bulletSpeed: 700, bulletSpeeds: [700, 730, 770, 820, 880], bulletDmg: 1, dmgPerTroop: 0.012, touchLossPerHit: 1 },
@@ -55,5 +56,6 @@ export const BAL = {
     startTroops: { max: 9, effect: 1,    costs: [30, 80, 160, 280, 450, 680, 980, 1350, 1800] },
     fireRate:    { max: 5, effect: 0.05, costs: [40, 100, 200, 350, 550] },
     magnet:      { max: 5, effect: 0.10, costs: [25, 60, 120, 220, 380] },
+    moveSpeed:   { max: 5, effect: 0.08, costs: [30, 70, 140, 240, 380] },
   },
 };

@@ -1,7 +1,7 @@
 // rush-sim — 부대·전투·완주 시뮬레이션. 게임 규칙 계층이 화면 없이 완주 가능한지 잠근다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tierFor, formation, clampX, squadRadius } from '../rush/squad.js';
+import { tierFor, tierStep, formation, clampX, squadRadius } from '../rush/squad.js';
 import { BAL } from '../rush/balance.js';
 import { createCombat, spawnWave, spawnBoss, stepCombat } from '../rush/combat.js';
 import { mulberry32 } from '../rush/rng.js';
@@ -113,6 +113,7 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 3판 이상 완주한다(회귀 �
     const rnd = mulberry32(seed * 7 + 1);
     const st = createCombat();
     let z = 0, ei = 0, dead = false, bossKills = 0, continueLeft = 1;   // 이어하기 1회(게임 규칙 동일)
+    let x = 240, tier = tierFor(count);                 // 이동·티어도 본게임과 동일 규칙(속도 상한·히스테리시스)
     const dt = 1 / 30;
     let guard = 0;
     while (!dead && guard++ < 40000 && !(z >= track.length && !st.boss && ei >= track.events.length)) {
@@ -136,8 +137,12 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 3판 이상 완주한다(회귀 �
       let tx = 240;
       if (st.boss) tx = st.boss.x;
       else if (st.enemies.length) tx = st.enemies.reduce((a, b) => (a.y > b.y ? a : b)).x;
-      const x = Math.max(80, Math.min(400, tx));
-      const r = stepCombat(st, { x, count, fireRateMult: 1.1, tier: tierFor(count), radius: squadRadius(count) }, dt, rnd);
+      tx = Math.max(80, Math.min(400, tx));
+      const want = (tx - x) * Math.min(1, dt * BAL.squad.followRate);   // main.advance 의 이동식과 동일
+      const cap = BAL.squad.baseMoveMax * dt;
+      x += Math.max(-cap, Math.min(cap, want));
+      tier = tierStep(tier, count);
+      const r = stepCombat(st, { x, count, fireRateMult: 1.1, tier, radius: squadRadius(count) }, dt, rnd);
       if (hadBoss && !st.boss) bossKills++;
       count -= r.troopLoss;
       for (const ev of r.events) if (ev.type === 'supply') count = Math.min(BAL.squad.maxCount, count + ev.n);   // main 과 동일 규칙

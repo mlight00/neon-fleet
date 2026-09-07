@@ -21,7 +21,7 @@ export function hitButton(buttons, x, y) {
 
 export function gateHitSide(squadX) { return squadX < 240 ? 'left' : 'right'; }
 
-const UP_LABELS = { startTroops: '시작 병력', fireRate: '연사 속도', magnet: '코인 자석' };
+const UP_LABELS = { startTroops: '시작 병력', fireRate: '연사 속도', magnet: '코인 자석', moveSpeed: '기동 속도' };
 
 function newRun(save, mode) {
   const isDaily = mode === 'daily';
@@ -295,11 +295,11 @@ export function boot() {
       v.results = { ...run.resultData, wallet: save.get().coins };
       v.buttons = [{ id: 'retry', x: 140, y: 400, w: 200, h: 56, label: '다시 출격', primary: true }];
       const d = save.get();
-      const xs = [60, 185, 310];
-      ['startTroops', 'fireRate', 'magnet'].forEach((track, i) => {
+      const xs = [22, 136, 250, 364];
+      ['startTroops', 'fireRate', 'magnet', 'moveSpeed'].forEach((track, i) => {
         const lvl = d.up[track], cost = upCost(track, lvl);
         v.buttons.push({
-          id: 'up_' + track, x: xs[i], y: 500, w: 110, h: 64,
+          id: 'up_' + track, x: xs[i], y: 500, w: 106, h: 64,
           label: UP_LABELS[track] + ' ' + lvl,
           sub: cost === null ? 'MAX' : cost + '💰',
           disabled: cost === null || d.coins < cost,
@@ -408,6 +408,7 @@ export function boot() {
   //  개발 콘솔 관찰용(게임 동작에 영향 없음)
   if (typeof window !== 'undefined') {
     window.__rushDbg = () => run && ({ state, z: Math.round(run.z), count: run.count, ei: run.ei,
+      x: Math.round(run.x), tx: Math.round(run.tx),
       enemies: run.combat.enemies.length, eshots: run.combat.eshots.length, boss: !!run.combat.boss });
   }
 
@@ -423,7 +424,12 @@ export function boot() {
       if (pointer.down) run.tx = clampX(pointer.x);
       if (keys.ArrowLeft) run.tx = clampX(run.tx - BAL.squad.moveSpeed * dt);
       if (keys.ArrowRight) run.tx = clampX(run.tx + BAL.squad.moveSpeed * dt);
-      run.x += (run.tx - run.x) * Math.min(1, dt * BAL.squad.followRate);   // 부드러운 추종(뚝뚝 끊김 방지)
+      {
+        //  실제 기동 제약: 목표를 부드럽게 쫓되 초당 이동 상한(업그레이드로 확대)을 넘지 못한다
+        const want = (run.tx - run.x) * Math.min(1, dt * BAL.squad.followRate);
+        const cap = BAL.squad.baseMoveMax * (run.eff.moveMult ?? 1) * dt;
+        run.x += Math.max(-cap, Math.min(cap, want));
+      }
       advance(run, dt);
       }
       for (const s of run.sfxQueue) au.sfx(s);

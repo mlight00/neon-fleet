@@ -17,11 +17,12 @@ export function buy(save, track) {
 }
 
 export function effects(up, isDaily) {
-  if (isDaily) return { startCount: 1, fireRateMult: 1, magnetMult: 1 };   // 순수 실력 판
+  if (isDaily) return { startCount: 1, fireRateMult: 1, magnetMult: 1, moveMult: 1 };   // 순수 실력 판
   const U = BAL.upgrades;
   return {
     startCount: 1 + (up.startTroops ?? 0) * U.startTroops.effect,
     fireRateMult: 1 + (up.fireRate ?? 0) * U.fireRate.effect,
     magnetMult: 1 + (up.magnet ?? 0) * U.magnet.effect,
+    moveMult: 1 + (up.moveSpeed ?? 0) * U.moveSpeed.effect,
   };
 }

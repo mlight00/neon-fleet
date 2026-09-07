@@ -1,6 +1,6 @@
 // rush/save.js — 단일 키 localStorage. storage 주입으로 Node 테스트 가능.
 const KEY = 'starforgeRush.v1';
-const DEFAULTS = { best: 0, coins: 0, up: { startTroops: 0, fireRate: 0, magnet: 0 }, daily: {}, lastPlayDay: '' };
+const DEFAULTS = { best: 0, coins: 0, up: { startTroops: 0, fireRate: 0, magnet: 0, moveSpeed: 0 }, daily: {}, lastPlayDay: '' };
 
 export function createSave(storage) {
   let store = storage;

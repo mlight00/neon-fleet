@@ -35,8 +35,8 @@ test('UP-BUY: 비용 차감·상한·잔액 부족', () => {
 
 test('UP-EFFECT: 효과 환산과 오늘의 도전 미적용', () => {
   const up = { startTroops: 3, fireRate: 2, magnet: 1 };
-  assert.deepEqual(effects(up, false), { startCount: 4, fireRateMult: 1.1, magnetMult: 1.1 });
-  assert.deepEqual(effects(up, true), { startCount: 1, fireRateMult: 1, magnetMult: 1 });
+  assert.deepEqual(effects(up, false), { startCount: 4, fireRateMult: 1.1, magnetMult: 1.1, moveMult: 1 });
+  assert.deepEqual(effects(up, true), { startCount: 1, fireRateMult: 1, magnetMult: 1, moveMult: 1 });
 });
 
 test('DAILY: 첫판 판정과 자랑 문구', () => {
