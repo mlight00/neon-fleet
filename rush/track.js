@@ -42,29 +42,32 @@ export function buildTrack(seed) {
         const flip = rnd() < 0.5;                      // 좌우 무작위 배치
         const greedLane = flip ? 'L' : 'R';            // 보상(큰 게이트·보급·POW)이 있는 욕심 라인
         const scene = (rnd() * 3) | 0;
+        //  호위(escort) 배치: 게이트가 화면에 들어올 때 그 라인 앞뒤에 붙어 함께 내려온다
+        //  (z 도달 시 화면 꼭대기 스폰으로는 "게이트를 지키는 그림"이 안 나온다 — 9/7 실플레이 지적)
+        const gz = Math.round(z), ez = Math.round(z - 660);
         if (scene === 0) {
-          //  S1 편한 소 vs 지키는 대: 큰 +게이트 라인에 적 무리가 버틴다
+          //  S1 편한 소 vs 지키는 대: 큰 +게이트 라인 앞에 적 무리가 버틴다
           const small = { op: 'add', value: Math.round(base * 0.6) || 1 };
           const big = { op: 'add', value: Math.round(base * 1.5) + 2, greed: true };   // 골드 표시 — 욕심 라인
-          events.push({ z: Math.round(z), type: 'gatepair', data: flip ? { left: big, right: small } : { left: small, right: big } });
+          events.push({ z: gz, type: 'gatepair', data: flip ? { left: big, right: small } : { left: small, right: big } });
           const kind = pool[(rnd() * pool.length) | 0];
           const [lo, hi] = BAL.enemies[kind].count;
-          events.push({ z: Math.round(z + 80), type: 'wave', data: { kind, n: hi, lane: greedLane } });
-          events.push({ z: Math.round(z + 240), type: 'wave', data: { kind, n: Math.max(1, hi - 1), lane: greedLane } });
+          events.push({ z: ez, type: 'wave', data: { kind, n: hi, lane: greedLane, escort: { gateZ: gz, dy: 80 } } });
+          events.push({ z: ez, type: 'wave', data: { kind, n: Math.max(1, hi - 1), lane: greedLane, escort: { gateZ: gz, dy: 170 } } });
         } else if (scene === 1) {
           //  S2 즉시 증원 vs 큰 보급: -게이트 라인 뒤에 큰 보급이 숨어 있다(부수면 역전)
           const plus = { op: 'add', value: base };
           const minus = { op: 'sub', value: Math.round(base * 0.7) || 1, greed: true };   // 골드 표시 — 뒤에 보상이 숨어 있다
-          events.push({ z: Math.round(z), type: 'gatepair', data: flip ? { left: minus, right: plus } : { left: plus, right: minus } });
-          events.push({ z: Math.round(z + 200), type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane } });
+          events.push({ z: gz, type: 'gatepair', data: flip ? { left: minus, right: plus } : { left: plus, right: minus } });
+          events.push({ z: ez, type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane, escort: { gateZ: gz, dy: -60 } } });
         } else {
-          //  S3 지키는 보급: 적 러시 두 겹 뒤에 큰 보급 — 뚫어낸 자에게 병력
-          events.push({ z: Math.round(z), type: 'gatepair', data: makeGatePair(rnd, t, true) });
+          //  S3 지키는 보급: 적 러시 두 겹이 게이트 앞을 막고, 게이트 뒤에 큰 보급 — 뚫어낸 자에게 병력
+          events.push({ z: gz, type: 'gatepair', data: makeGatePair(rnd, t, true) });
           const kind = pool[(rnd() * pool.length) | 0];
           const [lo, hi] = BAL.enemies[kind].count;
-          events.push({ z: Math.round(z + 120), type: 'wave', data: { kind, n: hi, lane: greedLane } });
-          events.push({ z: Math.round(z + 260), type: 'wave', data: { kind, n: hi, lane: greedLane } });
-          events.push({ z: Math.round(z + 300), type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane } });
+          events.push({ z: ez, type: 'wave', data: { kind, n: hi, lane: greedLane, escort: { gateZ: gz, dy: 80 } } });
+          events.push({ z: ez, type: 'wave', data: { kind, n: hi, lane: greedLane, escort: { gateZ: gz, dy: 170 } } });
+          events.push({ z: ez, type: 'wave', data: { kind: 'supply', n: 1, lane: greedLane, escort: { gateZ: gz, dy: -60 } } });
         }
         continue;
       }

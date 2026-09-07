@@ -125,8 +125,16 @@ test('SIM-FULLRUN: 요격 봇이 10시드 중 3판 이상 완주한다(회귀 �
           const better = applyGate(count, left) >= applyGate(count, right) ? left : right;
           count = applyGate(count, better);
         } else if (ev.type === 'wave') {
-          const zone = Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen));
+          const zoneZ = ev.data.escort?.gateZ ?? ev.z;
+          const zone = Math.min(BAL.track.zones - 1, Math.floor(zoneZ / BAL.track.zoneLen));
           spawnWave(st, ev.data.kind, ev.data.n, rnd, BAL.track.enemyHpMult[zone], zone, ev.data.lane);   // main.advance 와 동일 규칙
+          if (ev.data.escort) {                        // 게이트 호위 배치(main.advance 와 동일 규칙)
+            const gy = BAL.squad.y - (ev.data.escort.gateZ - z);
+            for (let i = 1; i <= ev.data.n; i++) {
+              const e = st.enemies[st.enemies.length - i];
+              e.y = gy + ev.data.escort.dy; e.vy = BAL.track.scrollSpeed; e.vx = 0;
+            }
+          }
         } else {
           st.enemies.length = 0; st.eshots.length = 0;   // 보스전은 1:1(main.advance 와 동일 규칙)
           spawnBoss(st, count, ev.data.zone);

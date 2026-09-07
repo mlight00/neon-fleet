@@ -88,10 +88,21 @@ function advance(run, dt0) {
       run.sfxQueue.push(isGood(gate.op) ? 'gateGood' : 'gateBad');
       if (run.count < before && run.count <= 5) { run.shakeT = BAL.fx.shakeDur; run.hurtT = BAL.fx.hurtFlashDur; }
     } else if (ev.type === 'wave') {
-      const zn = Math.min(BAL.track.zones - 1, Math.floor(ev.z / BAL.track.zoneLen));
+      const zoneZ = ev.data.escort?.gateZ ?? ev.z;      // 호위는 지키는 게이트의 구간을 따른다
+      const zn = Math.min(BAL.track.zones - 1, Math.floor(zoneZ / BAL.track.zoneLen));
       //  스폰 배치는 이벤트 위치 시드로 고정 — 오늘의 도전에서 전원이 같은 적 배치를 받는다
-      const evRnd = mulberry32((run.seed ^ Math.imul(ev.z + 1, 2654435761)) >>> 0);
+      //  (호위 두 겹은 같은 z 를 공유하므로 dy 를 섞어 배치가 겹치지 않게)
+      const evRnd = mulberry32((run.seed ^ Math.imul(ev.z + 1 + (ev.data.escort?.dy ?? 0), 2654435761)) >>> 0);
       spawnWave(run.combat, ev.data.kind, ev.data.n, evRnd, BAL.track.enemyHpMult[zn], zn, ev.data.lane);
+      if (ev.data.escort) {                             // 게이트 호위: 그 라인 앞뒤에 붙어 게이트와 나란히 내려온다
+        const gy = BAL.squad.y - (ev.data.escort.gateZ - run.z);
+        for (let i = 1; i <= ev.data.n; i++) {
+          const e = run.combat.enemies[run.combat.enemies.length - i];
+          e.y = gy + ev.data.escort.dy;
+          e.vy = BAL.track.scrollSpeed;
+          e.vx = 0;
+        }
+      }
     }
     else {
       for (const e of run.combat.enemies) spawnBurst(run, e.x, e.y, e.r, false);   // 보스전은 1:1 — 잡졸 일괄 정리
@@ -133,7 +144,7 @@ function advance(run, dt0) {
   for (const ev of r.events) {
     if (ev.type === 'kill') { spawnBurst(run, ev.x, ev.y, ev.r, false); if (!ev.touched) run.sfxQueue.push('kill'); }
     else if (ev.type === 'powDrop') {                 // 적이 버스터를 떨어뜨렸다 — 인과가 보이게
-      run.floaters.push({ x: ev.x, y: ev.y - 14, text: '버스터 드랍!', color: '#F6C84A', t: 0 });
+      run.floaters.push({ x: ev.x, y: ev.y - 14, text: '버스터 드랍!', color: '#F6C84A', t: 0, big: true });
       run.sfxQueue.push('pickupDrop');
     }
     else if (ev.type === 'pow') {                     // POW 뱃지 — 버스터 발동!

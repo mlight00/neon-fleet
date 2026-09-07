@@ -308,7 +308,7 @@ export function stepCombat(st, squad, dt, rnd) {
         kind: b.kind, hp: BAL.enemies[b.kind].hp, r: BAL.enemies[b.kind].r,
         x: Math.max(40, Math.min(440, b.x + (b.pop ? 0 : (rnd() - 0.5) * 70))), y: b.y + (b.pop ? 0 : (rnd() - 0.5) * 30),
         vx: b.pop ? 0 : (rnd() - 0.5) * 40,
-        vy: b.pop ? -70 : BAL.enemies[b.kind].speed,   // 드랍 팝: 위로 톡 튀었다가 도로 속도로 낙하
+        vy: b.pop ? -240 : BAL.enemies[b.kind].speed,   // 드랍 팝: 크게 튀어올랐다가 도로 속도로 낙하(인과가 보이게)
       });
     }
   }
