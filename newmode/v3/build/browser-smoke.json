@@ -1,0 +1,351 @@
+{
+ "pageerrors": [],
+ "console_err": [],
+ "http_fail": [],
+ "steps": [
+  {
+   "name": "title",
+   "dpr": 2,
+   "touch": false,
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   }
+  },
+  {
+   "name": "canvas",
+   "w": 960,
+   "h": 1600,
+   "cssW": 480,
+   "cssH": 800,
+   "dpr": 2,
+   "l": 0,
+   "t": 0,
+   "dprOk": true
+  },
+  {
+   "name": "afterStageClick",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 57,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 1
+   },
+   "ok": true
+  },
+  {
+   "name": "after3s",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 630,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "escPause",
+   "dbg": {
+    "state": "paused",
+    "stageId": 1,
+    "z": 633,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "escResume",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 687,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "blurAutoPause",
+   "dbg": {
+    "state": "paused",
+    "stageId": 1,
+    "z": 690,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "visibilityAutoPause",
+   "dbg": {
+    "state": "paused",
+    "stageId": 1,
+    "z": 725,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "runEnd",
+   "dbg": {
+    "state": "result",
+    "stageId": 1,
+    "z": 7201,
+    "x": 240,
+    "units": 20,
+    "weapon": "auto",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 84
+   },
+   "seconds": 35.9,
+   "ok": true
+  },
+  {
+   "name": "saved",
+   "raw": "{\"v\":3,\"stages\":{\"1\":{\"cleared\":true,\"attempts\":1,\"bestSurvivors\":20,\"bestTime\":38.233333333332446}},\"lastStage\":1,\"volume\":1,\"mute\":false}",
+   "ok": true
+  },
+  {
+   "name": "retryClick",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 54,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "ok": true
+  },
+  {
+   "name": "giveupToTitle",
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "ok": true
+  },
+  {
+   "name": "title",
+   "dpr": 1,
+   "touch": true,
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   }
+  },
+  {
+   "name": "canvas",
+   "w": 480,
+   "h": 800,
+   "cssW": 480,
+   "cssH": 800,
+   "dpr": 1,
+   "l": 0,
+   "t": 0,
+   "dprOk": true
+  },
+  {
+   "name": "afterStageClick",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 54,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "ok": true
+  },
+  {
+   "name": "after3s",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 627,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "escPause",
+   "dbg": {
+    "state": "paused",
+    "stageId": 1,
+    "z": 627,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "escResume",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 684,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "blurAutoPause",
+   "dbg": {
+    "state": "paused",
+    "stageId": 1,
+    "z": 684,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "visibilityAutoPause",
+   "dbg": {
+    "state": "paused",
+    "stageId": 1,
+    "z": 719,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 1
+   },
+   "ok": true
+  },
+  {
+   "name": "touchDrag",
+   "x0": 240,
+   "afterDown": 240,
+   "afterMove": 338,
+   "ok": true
+  },
+  {
+   "name": "runEnd",
+   "dbg": {
+    "state": "result",
+    "stageId": 1,
+    "z": 7201,
+    "x": 240,
+    "units": 20,
+    "weapon": "auto",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 84
+   },
+   "seconds": 34.9,
+   "ok": true
+  },
+  {
+   "name": "saved",
+   "raw": "{\"v\":3,\"stages\":{\"1\":{\"cleared\":true,\"attempts\":1,\"bestSurvivors\":20,\"bestTime\":38.233333333332446}},\"lastStage\":1,\"volume\":1,\"mute\":false}",
+   "ok": true
+  },
+  {
+   "name": "retryClick",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 57,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 1
+   },
+   "ok": true
+  },
+  {
+   "name": "giveupToTitle",
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "ok": true
+  }
+ ],
+ "ok_all": true
+}

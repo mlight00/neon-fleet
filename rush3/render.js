@@ -1,0 +1,626 @@
+// rush3/render.js — 캔버스 그리기 전담(계약서 6장). 게임 판단은 하지 않고 view 를 그대로 그린다.
+//  헬퍼(drawImgCentered/shadow/roundRect/drawParts/drawFloaters/drawButtons/흔들림/비네트/일시정지/적 폴백/적탄)는
+//  rush/render.js 에서 복제. 게이트·보급·부대·벽·HUD·결과·타이틀은 신규. 시계는 view.now 만 쓴다.
+//  화면 y = LINE_Y - (z - run.z). z 가 클수록 앞(화면 위).
+import { BAL3 } from './balance.js';
+import { WEAPONS } from './weapons.js';
+import { gateColor, gateLabel } from './gates.js';
+
+const W = BAL3.view.w, H = BAL3.view.h, LINE_Y = BAL3.view.LINE_Y;
+const ROAD0 = BAL3.road.x0, ROAD1 = BAL3.road.x1;
+const C = BAL3.colors;
+const FX = BAL3.fx;
+const FONT = 'system-ui, sans-serif';
+const ENEMY_FALLBACK = C.enemy;
+const ENEMY_SPRITE = { grunt: 'e_grunt', rusher: 'e_rusher', shooter: 'e_shooter' };
+const ENEMY_LABEL = { grunt: '잡졸', rusher: '돌격체', shooter: '저격수' };
+
+export function createRenderer3(ctx, sprites) {
+  const get = (k) => (sprites && typeof sprites.get === 'function' ? sprites.get(k) : null);
+
+  function drawImgCentered(key, x, y, h, fallbackFn) {
+    const im = get(key);
+    if (im) {
+      const w = h * (im.width / im.height);
+      ctx.drawImage(im, x - w / 2, y - h / 2, w, h);
+    } else if (fallbackFn) fallbackFn();
+  }
+
+  //  접지 그림자 — 유닛·적·통 발밑 공통
+  function shadow(x, y, w) {
+    ctx.fillStyle = 'rgba(20,25,35,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(x, y, w, w * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  //  외곽선 글자(밝은 배경 위에서도 읽히게)
+  function outlinedText(text, x, y, px, color, weight = 'bold', lw = 5) {
+    ctx.font = weight + ' ' + px + 'px ' + FONT;
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = C.outline;
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  //  배경: BG 타일(있으면) + 도로 80~400 + 차선. 도로와 물체는 같은 속도로 흐른다(세계 고정)
+  function drawBackground(scroll, stageIdx) {
+    const pal = C.bg[stageIdx] ?? C.bg[0];
+    const im = get('bg' + (stageIdx + 1));
+    if (im) {
+      const h = Math.round(im.height * (W / im.width));
+      const off = ((scroll % h) + h) % h;
+      for (let y = off - h; y < H; y += h) ctx.drawImage(im, 0, y, W, h);
+      //  그림 위에 v3 도로 폭(80~400)을 얹는다 — 게이트·벽과 같은 폭
+      ctx.globalAlpha = 0.82;
+      ctx.fillStyle = pal.road;
+      ctx.fillRect(ROAD0, 0, ROAD1 - ROAD0, H);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.fillStyle = pal.side;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = pal.road;
+      ctx.fillRect(ROAD0, 0, ROAD1 - ROAD0, H);
+    }
+    //  차선 2줄(대시 스크롤) + 도로 경계
+    ctx.strokeStyle = pal.line;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([18, 22]);
+    ctx.lineDashOffset = -(((scroll % 40) + 40) % 40);
+    for (const x of [ROAD0 + (ROAD1 - ROAD0) / 3, ROAD0 + (ROAD1 - ROAD0) * 2 / 3]) {
+      ctx.beginPath(); ctx.moveTo(x, -40); ctx.lineTo(x, H + 40); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(20,35,58,0.35)';
+    ctx.lineWidth = 4;
+    for (const x of [ROAD0, ROAD1]) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+  }
+
+  //  벽: 도로 위 회색 분리대(상단 하이라이트)
+  function drawWalls(run, sy) {
+    for (const w of run.walls) {
+      const yTop = sy(w.z1), yBot = sy(w.z0);
+      if (yBot < -10 || yTop > H + 10) continue;
+      const y0 = Math.max(-10, yTop), y1 = Math.min(H + 10, yBot);
+      ctx.fillStyle = 'rgba(20,25,35,0.25)';
+      ctx.fillRect(w.x0 - 3, y0 + 4, w.x1 - w.x0 + 6, y1 - y0);
+      ctx.fillStyle = C.wall;
+      ctx.fillRect(w.x0, y0, w.x1 - w.x0, y1 - y0);
+      ctx.fillStyle = C.wallTop;
+      ctx.fillRect(w.x0 + 3, y0, w.x1 - w.x0 - 6, y1 - y0);
+      //  분리대 줄무늬
+      ctx.fillStyle = 'rgba(20,35,58,0.35)';
+      for (let y = y0 + 12; y < y1; y += 36) ctx.fillRect(w.x0 + 3, y, w.x1 - w.x0 - 6, 6);
+    }
+  }
+
+  //  게이트 행: 칸 사각형 + 부호 숫자 + 색. 피격 흰 플래시·숫자 튐(셸 fx.gateFlash 타이머, 규칙의 cell.flashT 는 읽지 않는다). 통과 뒤 흐리게
+  function drawGateRow(row, sy, fx) {
+    const y = sy(row.z);
+    if (y < -60 || y > H + 60) return;
+    const vis = 58;
+    const flashMap = fx && fx.gateFlash ? fx.gateFlash : null;
+    ctx.globalAlpha = row.passed ? 0.32 : 0.92;
+    for (const c of row.cells) {
+      const col = gateColor(c.value);
+      const left = flashMap ? (flashMap[row.id + ':' + c.idx] ?? 0) : 0;
+      const flash = left > 0 ? Math.min(1, left / BAL3.gate.flashT) : 0;
+      ctx.fillStyle = flash > 0 ? 'rgba(255,255,255,' + (0.35 + flash * 0.5) + ')' : 'rgba(16,22,31,0.66)';
+      roundRect(c.x0 + 3, y - vis / 2, c.x1 - c.x0 - 6, vis, 10);
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 4;
+      roundRect(c.x0 + 3, y - vis / 2, c.x1 - c.x0 - 6, vis, 10);
+      ctx.stroke();
+      //  숫자: 피격 직후 살짝 튄다
+      const cx = (c.x0 + c.x1) / 2;
+      const px = 38 + Math.round(flash * 8);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      outlinedText(gateLabel(c.value), cx, y, px, flash > 0.5 ? C.gateFlash : col, 'bold', 6);
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  //  보급 통 내용물: 병사 실루엣 n / 무기 아이콘 / 파란 설비
+  function drawSupplyContents(s, x, y) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (s.kind === 'soldier') {
+      const n = s.payload.n ?? 0;
+      const show = Math.min(n, 6);
+      for (let i = 0; i < show; i++) {
+        const px = x + (i - (show - 1) / 2) * 9, py = y - 6;
+        ctx.fillStyle = C.soldier;
+        ctx.beginPath();
+        ctx.arc(px, py - 5, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(px - 3, py - 1, 6, 8);
+      }
+      outlinedText('+' + n, x, y + 16, 18, C.supplyBody, 'bold', 4);
+    } else if (s.kind === 'weapon') {
+      const w = WEAPONS[s.payload.weapon] ?? WEAPONS.rifle;
+      ctx.fillStyle = w.color;
+      roundRect(x - 16, y - 12, 32, 10, 3);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(x - 12, y - 10, 8, 6);
+      outlinedText(w.name, x, y + 14, 15, w.color, 'bold', 4);
+    } else {
+      ctx.fillStyle = C.chainPad;
+      roundRect(x - 14, y - 14, 28, 20, 4);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(x - 9, y - 9, 18, 3);
+      ctx.fillRect(x - 9, y - 3, 18, 3);
+      outlinedText('증원 설비', x, y + 16, 13, C.chainPad, 'bold', 4);
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  //  보급 통: 그림 + 내용물 + 남은 내구 숫자(병력 수가 아니다). chain 발판 열은 '+1'
+  function drawSupply(s, sy) {
+    //  발판(통보다 앞 z = 화면 위쪽)
+    for (const p of s.pads) {
+      const py = sy(p.z);
+      if (py < -30 || py > H + 30) continue;
+      ctx.globalAlpha = p.taken ? 0.25 : 0.85;
+      ctx.fillStyle = C.chainPad;
+      roundRect(p.x - 34, py - 12, 68, 24, 8);
+      ctx.fill();
+      if (!p.taken) {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        outlinedText('+1', p.x, py, 18, '#FFFFFF', 'bold', 4);
+        ctx.textBaseline = 'alphabetic';
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (s.opened && s.kind !== 'chain') return;
+    const y = sy(s.z);
+    if (y < -60 || y > H + 60) return;
+    const r = s.r;
+    ctx.globalAlpha = s.missed ? 0.35 : 1;
+    shadow(s.x, y + r * 0.95, r * 0.9);
+    drawImgCentered('supply', s.x, y, r * 2.1, () => {
+      ctx.fillStyle = C.supplyDark;
+      roundRect(s.x - r, y - r * 0.8, r * 2, r * 1.6, 8); ctx.fill();
+      ctx.strokeStyle = C.gold; ctx.lineWidth = 4;
+      roundRect(s.x - r, y - r * 0.8, r * 2, r * 1.6, 8); ctx.stroke();
+    });
+    if (!s.opened) drawSupplyContents(s, s.x, y);
+    //  남은 내구 숫자(주황) — 내용물과 구분되는 위치(통 아래)
+    ctx.textAlign = 'center';
+    if (!s.opened) outlinedText(String(Math.max(0, Math.ceil(s.durability))), s.x, y + r + 18, 16, C.bulletHeavy, 'bold', 4);
+    else if (!s.locked) outlinedText('쏘면 +1', s.x, y + r + 18, 13, C.chainPad, 'bold', 4);
+    ctx.globalAlpha = 1;
+  }
+
+  //  적: 스프라이트 폴백(상자/원/마름모) + HP 태그. 저격 예고선은 부대 쪽으로
+  function drawEnemy(e, run, sy) {
+    const y = sy(e.z);
+    if (y < -80 || y > H + 80) return;
+    if (e.kind === 'shooter' && e.aimT > 0) {
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = C.eshot; ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath(); ctx.moveTo(e.x, y); ctx.lineTo(run.x, LINE_Y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+    const h = e.r * 2.4;
+    shadow(e.x, y + h * 0.4, e.r * 0.95);
+    drawImgCentered(ENEMY_SPRITE[e.kind], e.x, y, h, () => {
+      ctx.fillStyle = ENEMY_FALLBACK[e.kind] ?? '#B3402F';
+      if (e.kind === 'shooter') {
+        ctx.fillRect(e.x - e.r * 1.1, y - e.r, e.r * 2.2, e.r * 2);
+        ctx.strokeStyle = C.warn; ctx.lineWidth = 3;
+        ctx.strokeRect(e.x - e.r * 1.1, y - e.r, e.r * 2.2, e.r * 2);
+      } else if (e.kind === 'rusher') {
+        ctx.beginPath(); ctx.arc(e.x, y, e.r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = C.warn; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(e.x, y, e.r, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(e.x, y - e.r);
+        ctx.lineTo(e.x + e.r, y);
+        ctx.lineTo(e.x, y + e.r);
+        ctx.lineTo(e.x - e.r, y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = C.eshot;
+      ctx.beginPath(); ctx.arc(e.x, y, Math.max(3, e.r * 0.28), 0, Math.PI * 2); ctx.fill();
+    });
+    //  HP 태그: 잡졸은 다쳤을 때만, 나머지는 항상
+    const base = BAL3.enemies[e.kind]?.hp ?? 0;
+    if (e.kind !== 'grunt' || e.hp < base) drawHpTag(e.x, y + e.r + 16, e.hp);
+  }
+
+  function drawHpTag(x, y, hp) {
+    ctx.textAlign = 'center';
+    outlinedText(String(Math.max(0, Math.ceil(hp))), x, y, 16, C.bulletHeavy, 'bold', 4);
+  }
+
+  //  정예: 스프라이트(폴백 원) + 발밑 HP 숫자. 막대는 HUD 에서
+  function drawBoss(b, sy, now) {
+    const y = sy(b.z);
+    shadow(b.x, y + b.r * 1.05, b.r * 1.15);
+    drawImgCentered('elite', b.x, y, b.r * 2.6, () => {
+      ctx.fillStyle = ENEMY_FALLBACK.elite;
+      ctx.beginPath(); ctx.arc(b.x, y, b.r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = C.warn; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(b.x, y, b.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = C.eshot;
+      ctx.beginPath(); ctx.arc(b.x, y, b.r * 0.35, 0, Math.PI * 2); ctx.fill();
+    });
+    if (b.state === 'descend') {
+      ctx.globalAlpha = 0.5 + Math.sin(now * 12) * 0.3;
+      ctx.strokeStyle = C.warn; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, y, b.r + 10, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    drawHpTag(b.x, y + b.r + 20, b.hp);
+  }
+
+  //  부대: 실제 units 배열 — 히어로(units[0], M01) + 병사(SOLDIER). 그림자·행진 바운스·발밑 병력 수·중심 마커
+  function drawSquad(run, fx, now) {
+    const S = BAL3.squad;
+    const units = run.units;
+    if (!units.length) return;
+    const order = units.map((u, i) => ({ u, i })).sort((a, b) => a.u.dy - b.u.dy || a.i - b.i);
+    let maxDy = 0;
+    for (const u of units) if (u.dy > maxDy) maxDy = u.dy;
+    for (const { u, i } of order) {
+      const hero = i === 0;
+      const size = hero ? S.heroSize : S.soldierSize;
+      shadow(run.x + u.dx, LINE_Y + u.dy + size * 0.42, size * 0.42);
+    }
+    for (const { u, i } of order) {
+      const hero = i === 0;
+      const size = hero ? S.heroSize : S.soldierSize;
+      const phase = now * 9 + i * 1.7;
+      const bob = hero ? Math.sin(now * 9) * 2 : Math.sin(phase) * 1.6;
+      const sway = hero ? Math.sin(now * 4.5) * 0.8 : Math.sin(phase * 0.5 + i) * 1.1;
+      const px = run.x + u.dx + sway, py = LINE_Y + u.dy + bob;
+      const hurt = u.hp < S.unitHp;
+      drawImgCentered(hero ? 'm1' : 'soldier', px, py, size, () => {
+        ctx.fillStyle = hero ? C.hero : C.soldier;
+        ctx.beginPath();
+        ctx.moveTo(px, py - size / 2);
+        ctx.lineTo(px - size / 3, py + size / 2);
+        ctx.lineTo(px + size / 3, py + size / 2);
+        ctx.closePath();
+        ctx.fill();
+      });
+      //  다친 유닛 표시(hp 1): 붉은 점
+      if (hurt) {
+        ctx.fillStyle = C.heroHurt;
+        ctx.beginPath(); ctx.arc(px, py - size / 2 - 4, 3, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    //  부대 중심 마커(삼각) — 게이트 칸 판정 기준
+    const my = LINE_Y - S.heroSize / 2 - 14;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(run.x, my - 8);
+    ctx.lineTo(run.x - 6, my + 2);
+    ctx.lineTo(run.x + 6, my + 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 8]);
+    ctx.beginPath(); ctx.moveTo(run.x, my - 10); ctx.lineTo(run.x, my - 120); ctx.stroke();
+    ctx.setLineDash([]);
+    //  발밑 병력 수(피격 중 빨강)
+    ctx.textAlign = 'center';
+    outlinedText(String(units.length), run.x, LINE_Y + maxDy + 34, 26, fx.hurtT > 0 ? C.heroHurt : C.hero, 'bold', 6);
+  }
+
+  //  아군 탄: 무기별 색·폭
+  function drawBullets(run, sy) {
+    for (const b of run.bullets) {
+      if (b.dead) continue;
+      const y = sy(b.z);
+      if (y < -20 || y > H + 20) continue;
+      const w = WEAPONS[b.kind] ?? WEAPONS.rifle;
+      const len = 10 + w.w * 1.5;
+      ctx.fillStyle = w.color;
+      ctx.fillRect(b.x - w.w / 2, y - len, w.w, len);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillRect(b.x - w.w / 6, y - len + 2, w.w / 3, len * 0.5);
+    }
+  }
+
+  //  적탄: 마젠타 구슬 + 흰 테(기존 램프탄 복제)
+  function drawEshots(run, sy) {
+    for (const s of run.eshots) {
+      if (s.dead) continue;
+      const y = sy(s.z);
+      if (y < -20 || y > H + 20) continue;
+      ctx.fillStyle = C.eshot;
+      ctx.beginPath(); ctx.arc(s.x, y, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(s.x, y, 5.5, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  function drawParts(parts) {
+    for (const p of parts) {
+      const k = 1 - p.t / p.life;
+      if (p.flash) {
+        ctx.globalAlpha = k * 0.85;
+        ctx.fillStyle = p.big ? '#FFD9A0' : '#FFE9C8';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.2 - k * 0.5), 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.globalAlpha = k;
+        ctx.fillStyle = p.color ?? (p.big ? C.bulletHeavy : C.gateNeg);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * k + 1, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawFloaters(floaters) {
+    ctx.textAlign = 'center';
+    for (const f of floaters) {
+      ctx.globalAlpha = Math.max(0, 1 - f.t / f.life);
+      outlinedText(f.text, f.x, f.y, f.big ? 34 : 22, f.color, 'bold', 5);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  //  보상 팝: 떠오른 뒤 부대로 흡수되는 글자(위치는 셸이 움직인다)
+  function drawPops(pops) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const p of pops) {
+      const k = p.t / p.life;
+      ctx.globalAlpha = k > 0.8 ? (1 - k) / 0.2 : 1;
+      outlinedText(p.text, p.x, p.y, 26, p.color, 'bold', 6);
+    }
+    ctx.textBaseline = 'alphabetic';
+    ctx.globalAlpha = 1;
+  }
+
+  //  HUD: 좌상 STAGE n 제목 + 남은 거리 m / 우상 무기 / 정예 HP 막대+숫자
+  function drawHud(view) {
+    const run = view.run, hud = view.hud;
+    ctx.textAlign = 'left';
+    outlinedText('STAGE ' + run.stageId + '  ' + run.title, 16, 34, 20, C.hud, '900', 6);
+    const goal = run.boss ? '정예 전투!' : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
+    outlinedText(goal, 16, 60, 16, run.boss ? C.gateNeg : C.hero, 'bold', 5);
+    //  무기 칩
+    const w = WEAPONS[run.weapon] ?? WEAPONS.rifle;
+    ctx.fillStyle = 'rgba(20,35,58,0.82)';
+    roundRect(292, 14, 122, 44, 22);
+    ctx.fill();
+    ctx.fillStyle = w.color;
+    roundRect(304, 30, 26, 10, 3);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(308, 32, 7, 6);
+    ctx.font = 'bold 16px ' + FONT;
+    ctx.fillStyle = w.color;
+    ctx.fillText(w.name, 340, 42);
+    //  정예 HP 막대
+    if (run.boss) {
+      ctx.fillStyle = 'rgba(20,35,58,0.85)';
+      roundRect(90, 76, 300, 16, 8); ctx.fill();
+      ctx.fillStyle = C.eshot;
+      roundRect(90, 76, 300 * Math.max(0, run.boss.hp / run.boss.max), 16, 8); ctx.fill();
+      ctx.textAlign = 'center';
+      outlinedText('정예 ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
+    }
+  }
+
+  //  안내·경고 배너
+  function drawBanners(fx) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (fx.guideT > 0) {
+      ctx.globalAlpha = Math.min(1, fx.guideT / 0.5);
+      ctx.fillStyle = 'rgba(20,35,58,0.82)';
+      roundRect(40, 268, W - 80, 52, 14); ctx.fill();
+      ctx.font = 'bold 18px ' + FONT;
+      ctx.fillStyle = C.hud;
+      ctx.fillText('좌우로 드래그 · 쏴서 숫자를 키우세요', W / 2, 294);
+      ctx.globalAlpha = 1;
+    }
+    if (fx.eliteT > 0) {
+      const k = fx.eliteT / FX.eliteBannerSec;
+      ctx.globalAlpha = Math.min(1, k * 3);
+      ctx.fillStyle = 'rgba(194,39,59,0.85)';
+      ctx.fillRect(0, 196, W, 56);
+      ctx.font = '900 30px ' + FONT;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText('정예 접근!', W / 2, 224);
+      ctx.globalAlpha = 1;
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  //  버튼 공통(기존 복제): 주 버튼 = 딥 네이비 + 시안 라인, 보조 = 반투명 네이비 패널
+  function drawButtons(buttons) {
+    for (const b of buttons) {
+      ctx.globalAlpha = b.disabled ? 0.45 : 1;
+      const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+      if (b.primary) {
+        ctx.fillStyle = C.outline;
+        roundRect(b.x, b.y, b.w, b.h, Math.min(b.h / 2, 16)); ctx.fill();
+        ctx.strokeStyle = C.gatePos; ctx.lineWidth = 2;
+        roundRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, Math.min((b.h - 2) / 2, 15)); ctx.stroke();
+      } else {
+        ctx.fillStyle = 'rgba(20,35,58,0.82)';
+        roundRect(b.x, b.y, b.w, b.h, Math.min(b.h / 2, 16)); ctx.fill();
+        ctx.strokeStyle = 'rgba(246,200,74,0.65)'; ctx.lineWidth = 1.5;
+        roundRect(b.x, b.y, b.w, b.h, Math.min(b.h / 2, 16)); ctx.stroke();
+      }
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = b.primary ? '#FFFFFF' : C.hero;
+      if (b.sub) {
+        ctx.font = '700 17px ' + FONT;
+        ctx.fillText(b.label, cx, cy - 10);
+        ctx.font = '13px ' + FONT;
+        ctx.fillStyle = b.primary ? 'rgba(255,255,255,0.75)' : 'rgba(243,241,232,0.75)';
+        ctx.fillText(b.sub, cx, cy + 12);
+      } else {
+        ctx.font = '700 19px ' + FONT;
+        ctx.fillText(b.label, cx, cy);
+      }
+      ctx.textBaseline = 'alphabetic';
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  //  타이틀: 워드마크 + 히어로 + 스테이지 선택 3버튼(기록은 버튼 sub)
+  function drawTitle(view) {
+    drawBackground(view.now * 60, 0);
+    ctx.textAlign = 'center';
+    ctx.font = '700 15px ' + FONT;
+    ctx.fillStyle = '#B98A1F';
+    ctx.fillText('S T A R F O R G E   R U S H   v3', W / 2, 96);
+    ctx.font = '900 50px ' + FONT;
+    ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(243,241,232,0.9)';
+    ctx.strokeText('스타포지 러시', W / 2, 150);
+    ctx.fillStyle = C.outline;
+    ctx.fillText('스타포지 러시', W / 2, 150);
+    ctx.font = '600 16px ' + FONT;
+    ctx.fillStyle = 'rgba(20,35,58,0.72)';
+    ctx.fillText('쏴서 숫자를 키우고, 부대를 불려라', W / 2, 182);
+    drawImgCentered('m1', W / 2, 300, 170, () => {
+      ctx.fillStyle = C.hero;
+      ctx.beginPath(); ctx.arc(W / 2, 300, 55, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.font = '700 15px ' + FONT;
+    ctx.fillStyle = 'rgba(20,35,58,0.8)';
+    ctx.fillText('작전을 고르세요', W / 2, 412);
+    if (view.saveOk === false) {
+      ctx.font = '600 13px ' + FONT;
+      ctx.fillStyle = C.gateNeg;
+      ctx.fillText('기록 저장 안 됨', W / 2, H - 22);
+    }
+  }
+
+  //  결과: 성공/실패·생존·최고·시간·처치·놓친 것 한 줄·저장 실패 안내(버튼은 drawButtons)
+  function drawResult(view) {
+    const r = view.result;
+    ctx.fillStyle = 'rgba(5,8,14,0.8)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.font = '900 38px ' + FONT;
+    ctx.fillStyle = r.won ? C.gold : C.gateNeg;
+    ctx.fillText(r.won ? '작전 성공!' : '작전 실패', W / 2, 150);
+    ctx.font = '700 16px ' + FONT;
+    ctx.fillStyle = 'rgba(243,241,232,0.75)';
+    ctx.fillText('STAGE ' + r.stageId + '  ' + r.title, W / 2, 184);
+    const lines = [
+      ['생존 병력', r.survivors + '명'],
+      ['최고 병력', r.peak + '명'],
+      ['시간', r.timeText],
+      ['처치', r.kills],
+    ];
+    let y = 246;
+    for (const [k, v] of lines) {
+      ctx.textAlign = 'right';
+      ctx.font = '600 19px ' + FONT;
+      ctx.fillStyle = 'rgba(243,241,232,0.8)';
+      ctx.fillText(k, W / 2 - 16, y);
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 22px ' + FONT;
+      ctx.fillStyle = C.hero;
+      ctx.fillText(String(v), W / 2 + 16, y);
+      y += 40;
+    }
+    ctx.textAlign = 'center';
+    ctx.font = '600 15px ' + FONT;
+    ctx.fillStyle = r.won ? 'rgba(243,241,232,0.7)' : C.bulletHeavy;
+    ctx.fillText(r.missedLine, W / 2, y + 6);
+    if (r.isBest) {
+      ctx.font = 'bold 16px ' + FONT;
+      ctx.fillStyle = C.gold;
+      ctx.fillText('신기록!', W / 2, y + 34);
+    }
+    if (r.saveOk === false) {
+      ctx.font = '600 13px ' + FONT;
+      ctx.fillStyle = C.gateNeg;
+      ctx.fillText('기록 저장 안 됨', W / 2, H - 22);
+    }
+  }
+
+  function drawScene(view) {
+    const run = view.run, fx = view.fx, now = view.now;
+    const sy = (z) => LINE_Y - (z - run.z);
+    drawBackground(run.z, Math.max(0, Math.min(2, run.stageId - 1)));
+    drawWalls(run, sy);
+    for (const row of run.gateRows) drawGateRow(row, sy, fx);
+    for (const s of run.supplies) drawSupply(s, sy);
+    for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, sy);
+    if (run.boss && !run.boss.dead) drawBoss(run.boss, sy, now);
+    drawBullets(run, sy);
+    drawEshots(run, sy);
+    drawSquad(run, fx, now);
+    drawParts(fx.parts);
+    drawFloaters(fx.floaters);
+    drawPops(fx.pops);
+    if (fx.hurtT > 0) {
+      const a = Math.min(0.45, fx.hurtT / FX.hurtFlashDur * 0.45);
+      const gr = ctx.createRadialGradient(W / 2, H / 2, 160, W / 2, H / 2, 470);
+      gr.addColorStop(0, 'rgba(255,40,40,0)');
+      gr.addColorStop(1, 'rgba(255,40,40,' + a + ')');
+      ctx.fillStyle = gr;
+      ctx.fillRect(0, 0, W, H);
+    }
+    drawHud(view);
+    drawBanners(fx);
+  }
+
+  function draw(view) {
+    const fx = view.fx;
+    const shaking = view.state === 'run' && fx && fx.shakeT > 0;
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+    if (shaking) {
+      const a = FX.shakeAmp * (fx.shakeT / FX.shakeDur);
+      ctx.translate(Math.sin(view.now * 71) * a, Math.cos(view.now * 89) * a * 0.7);
+    }
+    if (view.state === 'title') {
+      drawTitle(view);
+    } else if (view.run) {
+      drawScene(view);
+      if (view.state === 'paused') {
+        ctx.fillStyle = 'rgba(5,8,14,0.62)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 36px ' + FONT;
+        ctx.fillStyle = C.hero;
+        ctx.fillText('일시 정지', W / 2, 300);
+        ctx.font = '14px ' + FONT;
+        ctx.fillStyle = 'rgba(243,241,232,0.7)';
+        ctx.fillText('ESC 키로도 다시 시작할 수 있다', W / 2, 336);
+      } else if (view.state === 'result') {
+        drawResult(view);
+      }
+    }
+    drawButtons(view.buttons ?? []);
+    ctx.restore();
+  }
+
+  return { draw };
+}
