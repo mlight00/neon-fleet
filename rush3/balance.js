@@ -20,8 +20,8 @@ export const BAL3 = deepFreeze({
   road: { x0: 80, x1: 400, center: 240, startX: 240 },
   // 화면 진입: obj.z - run.z <= 760 부터 그린다(y ≥ -120)
   enterZ: 760,
-  // 정리 임계: 탄 z > run.z + LINE_Y + 140, 적 z < run.z - 200
-  cull: { bulletAhead: 140, enemyBehind: 200 },
+  // 정리 임계: 탄 z > run.z + LINE_Y + 10(화면 위를 벗어나면 소멸 — 화면 밖 게이트·정예를 맞히지 않게), 적 z < run.z - 200
+  cull: { bulletAhead: 10, enemyBehind: 200 },
   // 부대·유닛(3-5장, 4장 1단계)
   squad: {
     unitR: 9, unitHp: 2, unitCap: 150,

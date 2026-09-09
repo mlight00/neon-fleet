@@ -67,7 +67,7 @@ test('V3-ORDER: 한 발이 앞의 통과 뒤의 게이트를 동시에 처리하
     supplies: [soldierCrate(1100, 240, 999, 1, 'c1')],
     gates: [{ z: 1130, cells: [{ x0: 80, x1: 400, value: 0 }] }],
   }));
-  const ev = play(run, 200);
+  const ev = play(run, 300);                          // 통(z 1100)이 사거리에 드는 1.1초 뒤부터 통과(347 STEP) 전까지
   assert.ok(count(ev, 'supplyHit') >= 5, '통에 여러 발 명중');
   assert.equal(count(ev, 'gateHit'), 0);
   assert.equal(run.gateRows[0].cells[0].value, 0);

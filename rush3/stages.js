@@ -29,7 +29,7 @@ const DEFS = {
       { z: 3800, kind: 'grunt', n: 4, xs: [120, 200, 280, 360], dz: [0, 40, 80, 120] },
       { z: 5300, kind: 'grunt', n: 6, rows: 2 },
     ],
-    elite: { z: 7200, hp: 40, summon: false },
+    elite: { z: 7200, hp: 120, summon: false },
   },
   2: {
     title: '갈림길', startUnits: 2, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
@@ -49,7 +49,7 @@ const DEFS = {
       { z: 4600, kind: 'shooter', n: 2, xs: [150, 330] },
       { z: 7000, kind: 'grunt', n: 8, rows: 2 },
     ],
-    elite: { z: 8200, hp: 70, summon: false },
+    elite: { z: 8200, hp: 220, summon: false },
   },
   3: {
     title: '군단', startUnits: 3, startWeapon: 'rifle', length: 11000, eliteZ: 10600,
@@ -72,7 +72,7 @@ const DEFS = {
       { z: 8800, kind: 'grunt', n: 12, rows: 2 },
       { z: 8800, kind: 'shooter', n: 2, xs: [130, 350] },
     ],
-    elite: { z: 10600, hp: 150, summon: true },
+    elite: { z: 10600, hp: 500, summon: true },
   },
 };
 

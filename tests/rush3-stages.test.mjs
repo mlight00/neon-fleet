@@ -94,7 +94,7 @@ test('V3-STAGES: 첫 물체 z ≥ 1100, 정예 z < length, 시작 무기 rifle',
   }
   assert.equal(buildStage(1).elite.summon, false);
   assert.equal(buildStage(3).elite.summon, true);
-  assert.deepEqual([1, 2, 3].map(id => buildStage(id).elite.hp), [40, 70, 150]);
+  assert.deepEqual([1, 2, 3].map(id => buildStage(id).elite.hp), [120, 220, 500]);
 });
 
 test('V3-STAGES: 보급 통은 3-3 필드 전부 초기값·chain 은 S3 하나', () => {

@@ -549,9 +549,11 @@ export function createRenderer3(ctx, sprites) {
       y += 40;
     }
     ctx.textAlign = 'center';
-    ctx.font = '600 15px ' + FONT;
-    ctx.fillStyle = r.won ? 'rgba(243,241,232,0.7)' : C.bulletHeavy;
-    ctx.fillText(r.missedLine, W / 2, y + 6);
+    if (!r.won && r.missedLine) {                       // 놓친 것 안내는 실패 판에만
+      ctx.font = '600 15px ' + FONT;
+      ctx.fillStyle = C.bulletHeavy;
+      ctx.fillText(r.missedLine, W / 2, y + 6);
+    }
     if (r.isBest) {
       ctx.font = 'bold 16px ' + FONT;
       ctx.fillStyle = C.gold;
