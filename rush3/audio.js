@@ -56,20 +56,21 @@ export function createAudio3({ dir = 'assets/sound/' } = {}) {
     applyBgmVol();
     if (unlocked && !muted) bgmEl.play().catch(() => {});
   }
-  //  이름별 풀에서 다음 Audio 를 꺼낸다(생성 실패 시 null)
-  function acquire(name, file) {
-    const pool = pools[name] ?? (pools[name] = { els: [], i: 0 });
+  //  이름·파일별 풀에서 다음 Audio 를 꺼낸다(생성 실패 시 null). src 는 생성 때 한 번만 — 재생마다 파일을 재요청하지 않게
+  function acquire(name, file, perFile = POOL_SIZE) {
+    const key = name + ':' + file;
+    const pool = pools[key] ?? (pools[key] = { els: [], i: 0 });
     let a;
-    if (pool.els.length < POOL_SIZE) {
+    if (pool.els.length < perFile) {
       try { a = new Audio(); } catch { return null; }
       a.addEventListener('ended', () => { playing = Math.max(0, playing - 1); });
+      a.src = dir + file + '.ogg';
       pool.els.push(a);
     } else {
-      a = pool.els[pool.i]; pool.i = (pool.i + 1) % POOL_SIZE;
+      a = pool.els[pool.i]; pool.i = (pool.i + 1) % pool.els.length;
       //  재사용 중이던 객체는 끝난 것으로 셈
       if (!a.paused && !a.ended) playing = Math.max(0, playing - 1);
     }
-    a.src = dir + file + '.ogg';
     return a;
   }
 
@@ -111,7 +112,8 @@ export function createAudio3({ dir = 'assets/sound/' } = {}) {
       if (playing >= MAX_CONCURRENT) return false;
       lastAt[name] = now;
       rr[name] = ((rr[name] ?? -1) + 1) % files.length;
-      const a = acquire(name, files[rr[name]]);
+      //  이름당 총 POOL_SIZE 개를 파일들이 나눠 갖는다(발사음만으로 동시 상한을 채우지 않게)
+      const a = acquire(name, files[rr[name]], Math.max(1, Math.ceil(POOL_SIZE / files.length)));
       if (!a) return false;
       const mult = Math.max(0, Math.min(1, opts.vol ?? 1));
       a.volume = Math.max(0, Math.min(1, (VOL[name] ?? 0.5) * mult * volMult));

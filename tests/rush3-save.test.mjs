@@ -220,25 +220,21 @@ test('V3-AUDIO: 서로 다른 이름 13개 → 12개만 true(동시 상한), 전
   assert.equal(a.sfx(names[0]), true);
 }));
 
-test('V3-AUDIO: 같은 이름 6회(스로틀 간격) → Audio 객체 4개(풀), 재사용 시 src 가 새 파일·상한 안 막힘', () => withFakeAudio((clock) => {
+test('V3-AUDIO: 풀은 이름·파일별 4개까지, src 는 생성 때 고정(재생마다 재요청 없음), 재사용 반복해도 상한이 막히지 않는다', () => withFakeAudio((clock) => {
   const a = createAudio3({ dir: 'assets/sound/' });
   a.unlock();
-  const srcs = [];
-  for (let i = 0; i < 6; i++) {
-    assert.equal(a.sfx('fire_rifle'), true, `${i + 1}번째`);
-    srcs.push(sfxCreated().map((el) => el.src));
-    clock.tick(100);
-  }
+  //  fire_rifle 은 파일 3종 라운드로빈 → 6회면 파일마다 2개씩 6개
+  for (let i = 0; i < 6; i++) { assert.equal(a.sfx('fire_rifle'), true, `${i + 1}번째`); clock.tick(100); }
+  const six = sfxCreated();
+  assert.equal(six.length, 6);
+  assert.deepEqual(six.slice(0, 3).map((el) => el.src),
+    ['assets/sound/nf_sfx_vulcan_1.ogg', 'assets/sound/nf_sfx_vulcan_2.ogg', 'assets/sound/nf_sfx_vulcan_3.ogg']);
+  assert.equal(six[3].src, six[0].src, '4번째는 다시 1번 파일의 새 객체');
+  //  이름당 총 4개를 파일 3종이 나눠 갖는다(파일당 ceil(4/3)=2 → 6개). 그 뒤는 재사용 — 객체 수 불변, src 불변
+  for (let i = 6; i < 30; i++) { assert.equal(a.sfx('fire_rifle'), true); clock.tick(100); }
   const pool = sfxCreated();
-  assert.equal(pool.length, 4, '이름별 풀은 4개까지만 생성');
-  //  5번째 호출은 첫 객체를 재사용하며 라운드로빈으로 파일이 바뀐다(vulcan_1 → vulcan_2)
-  assert.equal(srcs[0][0], 'assets/sound/nf_sfx_vulcan_1.ogg');
-  assert.equal(srcs[4][0], 'assets/sound/nf_sfx_vulcan_2.ogg');
-  assert.equal(srcs[5][1], 'assets/sound/nf_sfx_vulcan_3.ogg');
-  assert.equal(pool[0].src, srcs[4][0]);
+  assert.equal(pool.length, 6, '파일당 2개 × 파일 3종');
+  assert.deepEqual(pool.map((el) => el.src), six.map((el) => el.src), '재사용 객체의 src 는 생성 때 그대로');
   assert.equal(pool[0].paused, false, '재사용 객체는 재생 중');
-  //  ended 없이 재사용만 반복해도 카운터가 4를 넘지 않아 다른 음이 막히지 않는다
-  for (let i = 0; i < 20; i++) { assert.equal(a.sfx('fire_rifle'), true); clock.tick(100); }
-  assert.equal(sfxCreated().length, 4);
   assert.equal(a.sfx('kill'), true, '동시 상한 12 미만이라 다른 음도 재생');
 }));
