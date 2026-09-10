@@ -72,8 +72,8 @@ test('V3-STAGES: 스폰 ev.z 는 표 z(발동 지점), zs 는 ev.z+760 이상의
   // 표에 명시된 좌표는 그대로(xs 절대, zs +오프셋 = ev.z + 760 + 오프셋)
   const s2 = buildStage(2);
   const s2r = s2.spawns.find(s => s.kind === 'rusher'), s2s = s2.spawns.find(s => s.kind === 'shooter');
-  assert.deepEqual([s2r.z, s2r.xs], [3600, [110, 370]]);
-  assert.deepEqual([s2s.z, s2s.xs, s2s.zs], [4600, [150, 330], [5360, 5360]]);
+  assert.deepEqual([s2r.z, s2r.xs], [3600, [110, 215, 265, 370]]);
+  assert.deepEqual([s2s.z, s2s.xs, s2s.zs], [4600, [150, 240, 330], [5360, 5360, 5360]]);
   const s1g = buildStage(1).spawns.find(s => s.kind === 'grunt');
   assert.equal(s1g.z, 3800);
   assert.deepEqual(s1g.xs, [120, 200, 280, 360]);
@@ -155,6 +155,8 @@ test('V3-STAGES: BAL3 는 깊게 동결되어 있고 핵심 수치가 계약서�
   assert.deepEqual([BAL3.squad.unitR, BAL3.squad.unitHp, BAL3.squad.unitCap, BAL3.squad.followRate, BAL3.squad.moveMax, BAL3.squad.keySpeed],
     [9, 2, 150, 9, 250, 420]);
   assert.deepEqual([BAL3.enemies.grunt.hp, BAL3.enemies.rusher.hp, BAL3.enemies.shooter.hp], [2, 4, 6]);
+  // 난이도 튜닝(2026-09-10): 잡졸 추종 90→35(무조작이어도 사선에 들어와 죽지 않게), hp 는 2 유지(heavy 폭발 2 로 잡졸 격파 규칙 보존)
+  assert.equal(BAL3.enemies.grunt.track, 35);
   assert.deepEqual([BAL3.enemies.elite.holdAhead, BAL3.enemies.elite.patrolSpeed, BAL3.enemies.elite.summonEvery], [420, 60, 4]);
   assert.deepEqual([BAL3.supply.padGap, BAL3.supply.padOffset, BAL3.supply.padHalfW, BAL3.gate.h, BAL3.enterZ], [40, 60, 70, 24, 760]);
 });

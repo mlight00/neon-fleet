@@ -332,7 +332,7 @@ test('V3-RETRY: 한 판 진행(통 파괴·게이트 피격·통과) 후 buildSt
   assert.ok(run.units.length > 1);
   const again = buildStage(1);
   assert.deepEqual(again, buildStage(1));
-  assert.deepEqual(again.gateRows.map((r) => [r.passed, r.cells.map((c) => c.value)]), [[false, [1]], [false, [-6]]]);
+  assert.deepEqual(again.gateRows.map((r) => [r.passed, r.cells.map((c) => c.value)]), [[false, [1]], [false, [-9]]]);
   for (const s of again.supplies) { assert.equal(s.opened, false); assert.equal(s.missed, false); assert.equal(s.durability, s.maxDurability); }
   assert.notEqual(again.gateRows[0], run.gateRows[0]);
   assert.notEqual(again.supplies[0], run.supplies[0]);

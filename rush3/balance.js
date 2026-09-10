@@ -49,8 +49,8 @@ export const BAL3 = deepFreeze({
   wall: { x0: 228, x1: 252 },
   // 적 4종(3-7장). vz 는 세계 기준 부대 쪽 접근 속도(양수)
   enemies: {
-    // 잡졸: x 를 run.x 쪽으로 90px/s 추종. 접촉 유닛 hp −1, 적 소모
-    grunt:   { hp: 2, r: 14, vz: 60, track: 90, touchDmg: 1 },
+    // 잡졸: x 를 run.x 쪽으로 35px/s 추종(2026-09-10 90→35: 무조작이어도 사선에 들어와 죽던 것을 완화). 접촉 유닛 hp −1, 적 소모
+    grunt:   { hp: 2, r: 14, vz: 60, track: 35, touchDmg: 1 },
     // 돌격체: 스폰 x 직진, 가속 260/s², 최대 420. 접촉 유닛 hp −2
     rusher:  { hp: 4, r: 18, vz: 90, accel: 260, maxVz: 420, touchDmg: 2 },
     // 저격수: 도로 고정(vz 0). 1.6s 마다 예고 0.5s 후 탄 1발(적탄 vz 260, dmg 1, r 5). 접촉 없음

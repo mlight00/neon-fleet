@@ -16,7 +16,7 @@ const DEFS = {
     title: '첫 진격', startUnits: 1, startWeapon: 'rifle', length: 7600, eliteZ: 7200,
     gates: [
       { z: 1140, maxValue: 15, bypass: true, cells: [[240, 400, 1]] },
-      { z: 3040, maxValue: 15, bypass: true, cells: [[80, 240, -6]] },
+      { z: 3040, maxValue: 15, bypass: true, cells: [[80, 240, -9]] },
     ],
     supplies: [
       { z: 2100, x: 240, kind: 'soldier', durability: 4, n: 2 },
@@ -34,19 +34,19 @@ const DEFS = {
   2: {
     title: '갈림길', startUnits: 2, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
     gates: [
-      { z: 1140, maxValue: 20, bypass: false, cells: [[80, 240, -8], [240, 400, -3]] },
-      { z: 5400, maxValue: 20, bypass: false, cells: [[80, 240, 2], [240, 400, -10]] },
+      { z: 1140, maxValue: 20, bypass: false, cells: [[80, 240, -6], [240, 400, -20]] },
+      { z: 5400, maxValue: 20, bypass: false, cells: [[80, 240, 2], [240, 400, -20]] },
     ],
     supplies: [
-      { z: 2300, x: 154, kind: 'soldier', durability: 6, n: 3 },
+      { z: 2300, x: 120, kind: 'soldier', durability: 6, n: 3 },
       { z: 2300, x: 326, kind: 'weapon', durability: 12, weapon: 'auto' },
       { z: 5800, x: 330, kind: 'soldier', durability: 15, n: 5 },
     ],
     walls: [{ z0: 1800, z1: 3000 }],
     spawns: [
       { z: 3600, kind: 'grunt', n: 5, rows: 1 },
-      { z: 3600, kind: 'rusher', n: 2, xs: [110, 370] },
-      { z: 4600, kind: 'shooter', n: 2, xs: [150, 330] },
+      { z: 3600, kind: 'rusher', n: 4, xs: [110, 215, 265, 370] },
+      { z: 4600, kind: 'shooter', n: 3, xs: [150, 240, 330] },
       { z: 7000, kind: 'grunt', n: 8, rows: 2 },
     ],
     elite: { z: 8200, hp: 220, summon: false },
@@ -54,23 +54,23 @@ const DEFS = {
   3: {
     title: '군단', startUnits: 3, startWeapon: 'rifle', length: 11000, eliteZ: 10600,
     gates: [
-      { z: 4000, maxValue: 40, bypass: false, cells: [[80, 240, 3], [240, 400, -12]] },
+      { z: 4000, maxValue: 40, bypass: false, cells: [[80, 240, 3], [240, 400, -25]] },
     ],
     supplies: [
-      { z: 1100, x: 240, kind: 'soldier', durability: 4, n: 2 },
-      { z: 1500, x: 240, kind: 'soldier', durability: 5, n: 2 },
-      { z: 1900, x: 240, kind: 'soldier', durability: 6, n: 3 },
-      { z: 2800, x: 240, kind: 'chain', durability: 10, pads0: 5, maxPads: 15 },
+      { z: 1100, x: 160, kind: 'soldier', durability: 4, n: 2 },
+      { z: 1500, x: 320, kind: 'soldier', durability: 5, n: 2 },
+      { z: 1900, x: 160, kind: 'soldier', durability: 6, n: 3 },
+      { z: 2800, x: 320, kind: 'chain', durability: 10, pads0: 5, maxPads: 15 },
       { z: 4400, x: 330, kind: 'weapon', durability: 24, weapon: 'heavy' },
       { z: 6300, x: 326, kind: 'soldier', durability: 12, n: 6 },
     ],
     walls: [{ z0: 6000, z1: 7200 }],
     spawns: [
-      { z: 5200, kind: 'grunt', n: 10, rows: 2 },
+      { z: 5200, kind: 'grunt', n: 14, rows: 2 },
       { z: 6300, kind: 'shooter', n: 2, xs: [120, 190] },
-      { z: 8000, kind: 'rusher', n: 4, xs: [100, 190, 290, 380] },
-      { z: 8800, kind: 'grunt', n: 12, rows: 2 },
-      { z: 8800, kind: 'shooter', n: 2, xs: [130, 350] },
+      { z: 8000, kind: 'rusher', n: 6, xs: [100, 160, 210, 270, 320, 380] },
+      { z: 8800, kind: 'grunt', n: 18, rows: 2 },
+      { z: 8800, kind: 'shooter', n: 3, xs: [130, 240, 350] },
     ],
     elite: { z: 10600, hp: 500, summon: true },
   },
