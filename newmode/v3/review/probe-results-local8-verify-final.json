@@ -1,0 +1,865 @@
+{
+  "rows": [
+    {
+      "stage": 1,
+      "policy": "center",
+      "won": true,
+      "over": true,
+      "time": 40,
+      "peak": 14,
+      "survivors": 14,
+      "weapon": "auto",
+      "power": 56,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 2,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": 2.1,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 240
+        },
+        {
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 240
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "center-1",
+      "won": false,
+      "over": true,
+      "time": 16,
+      "peak": 3,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 3,
+      "missed": 0,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": null,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 239
+        },
+        {
+          "id": "g2",
+          "value": -4,
+          "applied": -3,
+          "idx": 0,
+          "x": 239
+        }
+      ],
+      "supply": [
+        "c1"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "center+1",
+      "won": true,
+      "over": true,
+      "time": 40,
+      "peak": 14,
+      "survivors": 14,
+      "weapon": "auto",
+      "power": 56,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 2,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": 2.1,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 241
+        },
+        {
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 241
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "left",
+      "won": false,
+      "over": true,
+      "time": 16,
+      "peak": 1,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 1,
+      "missed": 1,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": null,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 160
+        },
+        {
+          "id": "g2",
+          "value": -4,
+          "applied": -1,
+          "idx": 0,
+          "x": 160
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 1,
+      "policy": "right",
+      "won": true,
+      "over": true,
+      "time": 49.6,
+      "peak": 16,
+      "survivors": 12,
+      "weapon": "rifle",
+      "power": 24,
+      "lossByShot": 4,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 3,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": 11.7,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 320
+        },
+        {
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 320
+        }
+      ],
+      "supply": [
+        "c4"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "sway",
+      "won": false,
+      "over": true,
+      "time": 16,
+      "peak": 1,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 1,
+      "missed": 1,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": null,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 160
+        },
+        {
+          "id": "g2",
+          "value": -8,
+          "applied": -1,
+          "idx": 0,
+          "x": 160
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 1,
+      "policy": "aim",
+      "won": true,
+      "over": true,
+      "time": 42.3,
+      "peak": 20,
+      "survivors": 19,
+      "weapon": "auto",
+      "power": 76,
+      "lossByShot": 1,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 0,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": 4.4,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 320
+        },
+        {
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 320
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2",
+        "c3",
+        "c4"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "plan",
+      "won": true,
+      "over": true,
+      "time": 40,
+      "peak": 14,
+      "survivors": 14,
+      "weapon": "auto",
+      "power": 56,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 2,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": 2.1,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 240
+        },
+        {
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 240
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2"
+      ]
+    },
+    {
+      "stage": 2,
+      "policy": "center",
+      "won": false,
+      "over": true,
+      "time": 6,
+      "peak": 2,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 2,
+      "missed": 0,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": null,
+      "gates": [
+        {
+          "id": "g1",
+          "value": -10,
+          "applied": -2,
+          "idx": 1,
+          "x": 240
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 2,
+      "policy": "center-1",
+      "won": true,
+      "over": true,
+      "time": 55.8,
+      "peak": 17,
+      "survivors": 12,
+      "weapon": "rifle",
+      "power": 24,
+      "lossByShot": 5,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 2,
+      "skippedN": 1,
+      "skipped": [
+        "c2"
+      ],
+      "bossSeconds": 12.7,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 3,
+          "applied": 3,
+          "idx": 0,
+          "x": 239
+        },
+        {
+          "id": "g2",
+          "value": 12,
+          "applied": 12,
+          "idx": 0,
+          "x": 239
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 2,
+      "policy": "center+1",
+      "won": false,
+      "over": true,
+      "time": 6,
+      "peak": 2,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 2,
+      "missed": 0,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": null,
+      "gates": [
+        {
+          "id": "g1",
+          "value": -10,
+          "applied": -2,
+          "idx": 1,
+          "x": 241
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 2,
+      "policy": "left",
+      "won": true,
+      "over": true,
+      "time": 59.3,
+      "peak": 22,
+      "survivors": 14,
+      "weapon": "rifle",
+      "power": 28,
+      "lossByShot": 8,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 1,
+      "skippedN": 1,
+      "skipped": [
+        "c2"
+      ],
+      "bossSeconds": 16.1,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 3,
+          "applied": 3,
+          "idx": 0,
+          "x": 160
+        },
+        {
+          "id": "g2",
+          "value": 12,
+          "applied": 12,
+          "idx": 0,
+          "x": 160
+        }
+      ],
+      "supply": [
+        "c3"
+      ]
+    },
+    {
+      "stage": 2,
+      "policy": "right",
+      "won": false,
+      "over": true,
+      "time": 6,
+      "peak": 2,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 2,
+      "missed": 0,
+      "skippedN": 0,
+      "skipped": [],
+      "bossSeconds": null,
+      "gates": [
+        {
+          "id": "g1",
+          "value": -10,
+          "applied": -2,
+          "idx": 1,
+          "x": 320
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 2,
+      "policy": "sway",
+      "won": true,
+      "over": true,
+      "time": 58.4,
+      "peak": 20,
+      "survivors": 15,
+      "weapon": "auto",
+      "power": 60,
+      "lossByShot": 6,
+      "lossByTouch": 1,
+      "lossByGate": 0,
+      "missed": 0,
+      "skippedN": 1,
+      "skipped": [
+        "c1"
+      ],
+      "bossSeconds": 15.3,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 3,
+          "applied": 3,
+          "idx": 0,
+          "x": 160
+        },
+        {
+          "id": "g2",
+          "value": 12,
+          "applied": 12,
+          "idx": 0,
+          "x": 160
+        }
+      ],
+      "supply": [
+        "c2",
+        "c3"
+      ]
+    },
+    {
+      "stage": 2,
+      "policy": "aim",
+      "won": true,
+      "over": true,
+      "time": 64.7,
+      "peak": 23,
+      "survivors": 13,
+      "weapon": "rifle",
+      "power": 26,
+      "lossByShot": 10,
+      "lossByTouch": 2,
+      "lossByGate": 0,
+      "missed": 0,
+      "skippedN": 1,
+      "skipped": [
+        "c2"
+      ],
+      "bossSeconds": 21.5,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 3,
+          "applied": 3,
+          "idx": 0,
+          "x": 160
+        },
+        {
+          "id": "g2",
+          "value": 12,
+          "applied": 12,
+          "idx": 0,
+          "x": 160
+        }
+      ],
+      "supply": [
+        "c1",
+        "c3"
+      ]
+    },
+    {
+      "stage": 2,
+      "policy": "plan",
+      "won": true,
+      "over": true,
+      "time": 49.1,
+      "peak": 32,
+      "survivors": 30,
+      "weapon": "rifle",
+      "power": 60,
+      "lossByShot": 2,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 0,
+      "skippedN": 1,
+      "skipped": [
+        "c2"
+      ],
+      "bossSeconds": 5.9,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 3,
+          "applied": 3,
+          "idx": 0,
+          "x": 120
+        },
+        {
+          "id": "g2",
+          "value": 19,
+          "applied": 19,
+          "idx": 1,
+          "x": 320
+        }
+      ],
+      "supply": [
+        "c1",
+        "c3"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "center",
+      "won": false,
+      "over": true,
+      "time": 72.6,
+      "peak": 11,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 11,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 7,
+      "skippedN": 2,
+      "skipped": [
+        "c5",
+        "c7"
+      ],
+      "bossSeconds": 16.8,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 8,
+          "applied": 8,
+          "idx": 0,
+          "x": 240
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 3,
+      "policy": "center-1",
+      "won": false,
+      "over": true,
+      "time": 75.5,
+      "peak": 11,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 11,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 7,
+      "skippedN": 2,
+      "skipped": [
+        "c5",
+        "c7"
+      ],
+      "bossSeconds": 19.7,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 8,
+          "applied": 8,
+          "idx": 0,
+          "x": 239
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 3,
+      "policy": "center+1",
+      "won": false,
+      "over": true,
+      "time": 21.1,
+      "peak": 3,
+      "survivors": 0,
+      "weapon": "rifle",
+      "power": 0,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 3,
+      "missed": 6,
+      "skippedN": 2,
+      "skipped": [
+        "c4",
+        "c6"
+      ],
+      "bossSeconds": null,
+      "gates": [
+        {
+          "id": "g1",
+          "value": -11,
+          "applied": -3,
+          "idx": 1,
+          "x": 241
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 3,
+      "policy": "left",
+      "won": true,
+      "over": true,
+      "time": 64.2,
+      "peak": 49,
+      "survivors": 45,
+      "weapon": "auto",
+      "power": 180,
+      "lossByShot": 4,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 1,
+      "skippedN": 2,
+      "skipped": [
+        "c5",
+        "c7"
+      ],
+      "bossSeconds": 8.4,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 12,
+          "applied": 12,
+          "idx": 0,
+          "x": 160
+        }
+      ],
+      "supply": [
+        "c1",
+        "c3",
+        "c4",
+        "c6",
+        "c8",
+        "c9"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "right",
+      "won": true,
+      "over": true,
+      "time": 67.9,
+      "peak": 27,
+      "survivors": 21,
+      "weapon": "heavy",
+      "power": 105,
+      "lossByShot": 6,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 3,
+      "skippedN": 3,
+      "skipped": [
+        "c4",
+        "c6",
+        "c9"
+      ],
+      "bossSeconds": 12.1,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 17,
+          "applied": 17,
+          "idx": 1,
+          "x": 320
+        }
+      ],
+      "supply": [
+        "c2",
+        "c5",
+        "c7"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "sway",
+      "won": true,
+      "over": true,
+      "time": 64.5,
+      "peak": 63,
+      "survivors": 61,
+      "weapon": "auto",
+      "power": 244,
+      "lossByShot": 2,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 1,
+      "skippedN": 3,
+      "skipped": [
+        "c5",
+        "c7",
+        "c9"
+      ],
+      "bossSeconds": 8.7,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 40,
+          "applied": 40,
+          "idx": 1,
+          "x": 303
+        }
+      ],
+      "supply": [
+        "c1",
+        "c3",
+        "c2",
+        "c4",
+        "c6"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "aim",
+      "won": true,
+      "over": true,
+      "time": 64.3,
+      "peak": 51,
+      "survivors": 48,
+      "weapon": "auto",
+      "power": 192,
+      "lossByShot": 3,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 0,
+      "skippedN": 2,
+      "skipped": [
+        "c5",
+        "c7"
+      ],
+      "bossSeconds": 8.5,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 12,
+          "applied": 12,
+          "idx": 0,
+          "x": 160
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c6",
+        "c8",
+        "c9"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "plan",
+      "won": true,
+      "over": true,
+      "time": 59.5,
+      "peak": 79,
+      "survivors": 79,
+      "weapon": "auto",
+      "power": 316,
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 0,
+      "skippedN": 2,
+      "skipped": [
+        "c5",
+        "c7"
+      ],
+      "bossSeconds": 3.7,
+      "gates": [
+        {
+          "id": "g1",
+          "value": 40,
+          "applied": 40,
+          "idx": 1,
+          "x": 320
+        }
+      ],
+      "supply": [
+        "c1",
+        "c3",
+        "c2",
+        "c4",
+        "c6",
+        "c8",
+        "c9"
+      ]
+    }
+  ]
+}

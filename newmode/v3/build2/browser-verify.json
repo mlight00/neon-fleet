@@ -1,0 +1,105 @@
+{
+ "pageerrors": [],
+ "console_err": [],
+ "http_fail": [],
+ "steps": [
+  {
+   "name": "load",
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "ok": true
+  },
+  {
+   "name": "startS1",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "z": 73,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 1
+   },
+   "ok": true
+  },
+  {
+   "name": "keyAfterMouse",
+   "x0": 240,
+   "afterKey2s": 391,
+   "afterRelease": 391,
+   "afterMouseAgain": 200,
+   "stillRunning": true,
+   "ok": true
+  },
+  {
+   "name": "startS2",
+   "dbg": {
+    "state": "run",
+    "stageId": 2,
+    "z": 79,
+    "x": 240,
+    "units": 2,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "ok": true
+  },
+  {
+   "name": "gateShutterShots",
+   "closedAtZ": 475,
+   "openAtZ": 833,
+   "ok": true
+  },
+  {
+   "name": "wallOneSideOnly",
+   "pre": {
+    "z": 1710,
+    "units": 5,
+    "weapon": "rifle"
+   },
+   "post": {
+    "z": 3122,
+    "units": 8,
+    "weapon": "rifle",
+    "state": "run"
+   },
+   "gotSoldier": true,
+   "gotWeapon": false,
+   "ok": true
+  },
+  {
+   "name": "reachResult",
+   "dbg": {
+    "state": "result",
+    "stageId": 2,
+    "z": 8202,
+    "x": 240,
+    "units": 23,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 33
+   },
+   "ok": true
+  },
+  {
+   "name": "saved",
+   "raw": "{\"v\":3,\"stages\":{\"2\":{\"versions\":{\"2\":{\"cleared\":true,\"attempts\":1,\"bestSurvivors\":23,\"bestTime\":49.69999999999846}}}},\"lastStage\":2,\"volume\":1,\"mute\":false}",
+   "ok": true
+  }
+ ],
+ "ok_all": true
+}

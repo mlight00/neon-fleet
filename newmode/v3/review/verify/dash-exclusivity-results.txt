@@ -1,0 +1,16 @@
+--- S2 fine sweep (reachable n=5) ---
+n=4 both at T=[1640]
+n=5 both at T=[1630,1640]
+n=6 both at T=[1590,1600,1610,1620,1630,1640]
+n=7 both at T=[1590,1600,1610,1620,1630,1640]
+--- S3 p1 fine sweep (reachable n=10) ---
+n=8 both at T=[2260,2270]
+n=9 both at T=[2260,2270]
+n=10 both at T=[2260,2270]
+n=11 both at T=[2260,2270]
+n=12 both at T=[2250,2260,2270]
+--- S3 p2 fine sweep ---
+n=15 both at T=[]
+n=20 both at T=[]
+n=25 both at T=[3020]
+n=30 both at T=[2980,2990,3000,3010,3020]

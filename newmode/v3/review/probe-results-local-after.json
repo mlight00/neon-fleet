@@ -1,0 +1,799 @@
+{
+  "keyboard": [
+    {
+      "mouseFirst": false,
+      "x": 391,
+      "tx": 391
+    },
+    {
+      "mouseFirst": true,
+      "x": 391,
+      "tx": 391
+    }
+  ],
+  "routes": [
+    {
+      "stage": 1,
+      "policy": "center",
+      "won": true,
+      "over": true,
+      "time": 39.99999999999901,
+      "peak": 14,
+      "survivors": 14,
+      "weapon": "auto",
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 2,
+      "bossSeconds": 2.0999999999998806,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 240,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 240,
+          "z": 3040,
+          "time": 16.01666666666704
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "center-1",
+      "won": false,
+      "over": true,
+      "time": 46.649999999998634,
+      "peak": 4,
+      "survivors": 0,
+      "weapon": "auto",
+      "lossByShot": 4,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 2,
+      "bossSeconds": 8.749999999999503,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 239.00000000000009,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 1,
+          "applied": 1,
+          "idx": 0,
+          "x": 239.00000000000009,
+          "z": 3040,
+          "time": 16.01666666666704
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "center+1",
+      "won": true,
+      "over": true,
+      "time": 39.99999999999901,
+      "peak": 14,
+      "survivors": 14,
+      "weapon": "auto",
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 2,
+      "bossSeconds": 2.0999999999998806,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 240.99999999999991,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 240.99999999999991,
+          "z": 3040,
+          "time": 16.01666666666704
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "left",
+      "won": false,
+      "over": true,
+      "time": 46.649999999998634,
+      "peak": 4,
+      "survivors": 0,
+      "weapon": "rifle",
+      "lossByShot": 4,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 3,
+      "bossSeconds": 8.749999999999503,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 160.00000000000009,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 1,
+          "applied": 1,
+          "idx": 0,
+          "x": 160.00000000000009,
+          "z": 3040,
+          "time": 16.01666666666704
+        }
+      ],
+      "supply": [
+        "c3"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "right",
+      "won": true,
+      "over": true,
+      "time": 49.649999999998464,
+      "peak": 16,
+      "survivors": 12,
+      "weapon": "rifle",
+      "lossByShot": 4,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 3,
+      "bossSeconds": 11.749999999999332,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 319.99999999999983,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 319.99999999999983,
+          "z": 3040,
+          "time": 16.01666666666704
+        }
+      ],
+      "supply": [
+        "c4"
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "sway",
+      "won": false,
+      "over": true,
+      "time": 16.01666666666704,
+      "peak": 1,
+      "survivors": 0,
+      "weapon": "rifle",
+      "lossByShot": 0,
+      "lossByTouch": 0,
+      "lossByGate": 1,
+      "missed": 1,
+      "bossSeconds": null,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 160.00000000609018,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": -5,
+          "applied": -1,
+          "idx": 0,
+          "x": 160.3441816687342,
+          "z": 3040,
+          "time": 16.01666666666704
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 1,
+      "policy": "aim",
+      "won": true,
+      "over": true,
+      "time": 42.283333333332216,
+      "peak": 20,
+      "survivors": 19,
+      "weapon": "auto",
+      "lossByShot": 1,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 0,
+      "bossSeconds": 4.383333333333084,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 11,
+          "applied": 11,
+          "idx": 0,
+          "x": 319.99999999999983,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 0,
+          "applied": 0,
+          "idx": -1,
+          "x": 319.99999999999983,
+          "z": 3040,
+          "time": 16.01666666666704
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2",
+        "c3",
+        "c4"
+      ]
+    },
+    {
+      "stage": 2,
+      "policy": "center",
+      "won": false,
+      "over": true,
+      "time": 20.516666666666783,
+      "peak": 2,
+      "survivors": 0,
+      "weapon": "rifle",
+      "lossByShot": 0,
+      "lossByTouch": 1,
+      "lossByGate": 1,
+      "missed": 2,
+      "bossSeconds": null,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": -1,
+          "applied": -1,
+          "idx": 1,
+          "x": 240,
+          "z": 1140,
+          "time": 6.016666666666651
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 2,
+      "policy": "center-1",
+      "won": true,
+      "over": true,
+      "time": 49.449999999998475,
+      "peak": 26,
+      "survivors": 24,
+      "weapon": "rifle",
+      "lossByShot": 2,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 3,
+      "bossSeconds": 6.283333333332976,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 4,
+          "applied": 4,
+          "idx": 0,
+          "x": 239.00000000000009,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 20,
+          "applied": 20,
+          "idx": 0,
+          "x": 238.99999999999991,
+          "z": 5400,
+          "time": 28.433333333333
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 2,
+      "policy": "center+1",
+      "won": false,
+      "over": true,
+      "time": 20.516666666666783,
+      "peak": 2,
+      "survivors": 0,
+      "weapon": "rifle",
+      "lossByShot": 0,
+      "lossByTouch": 1,
+      "lossByGate": 1,
+      "missed": 2,
+      "bossSeconds": null,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": -1,
+          "applied": -1,
+          "idx": 1,
+          "x": 240.99999999999991,
+          "z": 1140,
+          "time": 6.016666666666651
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 2,
+      "policy": "left",
+      "won": true,
+      "over": true,
+      "time": 51.58333333333169,
+      "peak": 38,
+      "survivors": 35,
+      "weapon": "rifle",
+      "lossByShot": 3,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 2,
+      "bossSeconds": 8.416666666666188,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 13,
+          "applied": 13,
+          "idx": 0,
+          "x": 160.00000000000009,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 20,
+          "applied": 20,
+          "idx": 0,
+          "x": 160.00000000000009,
+          "z": 5400,
+          "time": 28.433333333333
+        }
+      ],
+      "supply": [
+        "c1"
+      ]
+    },
+    {
+      "stage": 2,
+      "policy": "right",
+      "won": false,
+      "over": true,
+      "time": 27.099999999999742,
+      "peak": 2,
+      "survivors": 0,
+      "weapon": "rifle",
+      "lossByShot": 1,
+      "lossByTouch": 0,
+      "lossByGate": 1,
+      "missed": 2,
+      "bossSeconds": null,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": -1,
+          "applied": -1,
+          "idx": 1,
+          "x": 319.99999999999983,
+          "z": 1140,
+          "time": 6.016666666666651
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 2,
+      "policy": "sway",
+      "won": true,
+      "over": true,
+      "time": 55.73333333333145,
+      "peak": 25,
+      "survivors": 21,
+      "weapon": "auto",
+      "lossByShot": 4,
+      "lossByTouch": 1,
+      "lossByGate": 0,
+      "missed": 2,
+      "bossSeconds": 12.566666666665952,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 4,
+          "applied": 4,
+          "idx": 0,
+          "x": 160.00000000609018,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 20,
+          "applied": 20,
+          "idx": 0,
+          "x": 160.00940432438796,
+          "z": 5400,
+          "time": 28.433333333333
+        }
+      ],
+      "supply": [
+        "c2"
+      ]
+    },
+    {
+      "stage": 2,
+      "policy": "aim",
+      "won": true,
+      "over": true,
+      "time": 47.16666666666527,
+      "peak": 43,
+      "survivors": 41,
+      "weapon": "auto",
+      "lossByShot": 1,
+      "lossByTouch": 1,
+      "lossByGate": 0,
+      "missed": 0,
+      "bossSeconds": 3.9999999999997726,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 13,
+          "applied": 13,
+          "idx": 0,
+          "x": 160.00000000000009,
+          "z": 1140,
+          "time": 6.016666666666651
+        },
+        {
+          "type": "gatePass",
+          "id": "g2",
+          "value": 20,
+          "applied": 20,
+          "idx": 0,
+          "x": 160.00000000000009,
+          "z": 5400,
+          "time": 28.433333333333
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2",
+        "c3"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "center",
+      "won": false,
+      "over": true,
+      "time": 66.54999999999751,
+      "peak": 7,
+      "survivors": 0,
+      "weapon": "rifle",
+      "lossByShot": 6,
+      "lossByTouch": 1,
+      "lossByGate": 0,
+      "missed": 6,
+      "bossSeconds": 10.749999999999396,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 4,
+          "applied": 4,
+          "idx": 1,
+          "x": 240,
+          "z": 4000,
+          "time": 21.06666666666675
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 3,
+      "policy": "center-1",
+      "won": false,
+      "over": true,
+      "time": 85.54999999999643,
+      "peak": 16,
+      "survivors": 0,
+      "weapon": "rifle",
+      "lossByShot": 16,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 6,
+      "bossSeconds": 29.749999999998316,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 13,
+          "applied": 13,
+          "idx": 0,
+          "x": 239.00000000000009,
+          "z": 4000,
+          "time": 21.06666666666675
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 3,
+      "policy": "center+1",
+      "won": false,
+      "over": true,
+      "time": 68.56666666666406,
+      "peak": 7,
+      "survivors": 0,
+      "weapon": "rifle",
+      "lossByShot": 6,
+      "lossByTouch": 1,
+      "lossByGate": 0,
+      "missed": 6,
+      "bossSeconds": 12.766666666665948,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 4,
+          "applied": 4,
+          "idx": 1,
+          "x": 240.99999999999991,
+          "z": 4000,
+          "time": 21.06666666666675
+        }
+      ],
+      "supply": []
+    },
+    {
+      "stage": 3,
+      "policy": "left",
+      "won": true,
+      "over": true,
+      "time": 72.46666666666384,
+      "peak": 48,
+      "survivors": 39,
+      "weapon": "rifle",
+      "lossByShot": 7,
+      "lossByTouch": 2,
+      "lossByGate": 0,
+      "missed": 4,
+      "bossSeconds": 16.666666666665726,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 40,
+          "applied": 40,
+          "idx": 0,
+          "x": 160.00000000000009,
+          "z": 4000,
+          "time": 21.06666666666675
+        }
+      ],
+      "supply": [
+        "c1",
+        "c3"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "right",
+      "won": true,
+      "over": true,
+      "time": 59.51666666666457,
+      "peak": 66,
+      "survivors": 64,
+      "weapon": "heavy",
+      "lossByShot": 0,
+      "lossByTouch": 2,
+      "lossByGate": 0,
+      "missed": 2,
+      "bossSeconds": 3.7166666666664554,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 40,
+          "applied": 40,
+          "idx": 1,
+          "x": 319.99999999999983,
+          "z": 4000,
+          "time": 21.06666666666675
+        }
+      ],
+      "supply": [
+        "c2",
+        "c4",
+        "c5",
+        "c6"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "sway",
+      "won": true,
+      "over": true,
+      "time": 70.39999999999729,
+      "peak": 58,
+      "survivors": 54,
+      "weapon": "rifle",
+      "lossByShot": 4,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 1,
+      "bossSeconds": 14.599999999999177,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 40,
+          "applied": 40,
+          "idx": 1,
+          "x": 303.3333333272431,
+          "z": 4000,
+          "time": 21.06666666666675
+        }
+      ],
+      "supply": [
+        "c1",
+        "c3",
+        "c2",
+        "c4",
+        "c6"
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "aim",
+      "won": true,
+      "over": true,
+      "time": 59.23333333333125,
+      "peak": 71,
+      "survivors": 70,
+      "weapon": "heavy",
+      "lossByShot": 1,
+      "lossByTouch": 0,
+      "lossByGate": 0,
+      "missed": 0,
+      "bossSeconds": 3.433333333333138,
+      "gates": [
+        {
+          "type": "gatePass",
+          "id": "g1",
+          "value": 40,
+          "applied": 40,
+          "idx": 1,
+          "x": 319.99999999999983,
+          "z": 4000,
+          "time": 21.06666666666675
+        }
+      ],
+      "supply": [
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5",
+        "c6"
+      ]
+    }
+  ],
+  "nearest": {
+    "supplyContactZ": 97.31885425213139,
+    "enemyContactZ": 92,
+    "supplyHp": 10,
+    "enemyHp": 1,
+    "events": [
+      {
+        "type": "enemyHit",
+        "id": 1,
+        "kind": "grunt",
+        "hp": 1,
+        "x": 240,
+        "z": 108
+      }
+    ]
+  },
+  "wallChoices": [
+    {
+      "id": "c1",
+      "z": 1659.3333333333437,
+      "x": 140,
+      "wallSide": {}
+    },
+    {
+      "id": "c2",
+      "z": 1960.1666666666843,
+      "x": 325.9995840937329,
+      "wallSide": {
+        "w1": "R"
+      }
+    },
+    {
+      "id": "c3",
+      "z": 5563.833333333396,
+      "x": 327.7876861299673,
+      "wallSide": {}
+    }
+  ]
+}

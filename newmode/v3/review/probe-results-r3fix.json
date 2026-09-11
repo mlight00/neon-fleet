@@ -1,0 +1,818 @@
+{
+  "formationHalfWidth": {
+    "1": 9,
+    "2": 33,
+    "3": 33,
+    "5": 33,
+    "8": 41,
+    "10": 53,
+    "14": 53,
+    "20": 73,
+    "26": 73,
+    "30": 73,
+    "40": 92,
+    "50": 92,
+    "75": 126
+  },
+  "barrelShots": {
+    "p1좌 x150 창2340~2800": {
+      "3": 20,
+      "5": 34,
+      "8": 47,
+      "10": 47,
+      "12": 54,
+      "15": 68,
+      "20": 68,
+      "25": 82,
+      "30": 89,
+      "40": 104
+    },
+    "p1우 x330 창2340~2800": {
+      "3": 20,
+      "5": 34,
+      "8": 47,
+      "10": 47,
+      "12": 54,
+      "15": 68,
+      "20": 68,
+      "25": 88,
+      "30": 88,
+      "40": 107
+    },
+    "p2좌 x150 창3090~3400": {
+      "3": 14,
+      "5": 23,
+      "8": 32,
+      "10": 32,
+      "12": 36,
+      "15": 46,
+      "20": 46,
+      "25": 56,
+      "30": 61,
+      "40": 72
+    },
+    "p2우 x330 창3090~3400": {
+      "3": 14,
+      "5": 23,
+      "8": 32,
+      "10": 32,
+      "12": 36,
+      "15": 46,
+      "20": 46,
+      "25": 61,
+      "30": 61,
+      "40": 75
+    },
+    "C좌 x150 창3660~3900": {
+      "3": 11,
+      "5": 18,
+      "8": 25,
+      "10": 25,
+      "12": 29,
+      "15": 36,
+      "20": 36,
+      "25": 43,
+      "30": 46,
+      "40": 50
+    },
+    "D좌 x150 창5940~6300": {
+      "3": 16,
+      "5": 26,
+      "8": 36,
+      "10": 36,
+      "12": 42,
+      "15": 53,
+      "20": 53,
+      "25": 64,
+      "30": 69,
+      "40": 81
+    }
+  },
+  "pairExclusivity": {
+    "withWall": {
+      "p1 greedy 5명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 195
+      },
+      "p2 greedy 5명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 195
+      },
+      "p1 greedy 8명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 176
+      },
+      "p2 greedy 8명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 187
+      },
+      "p1 greedy 10명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 175
+      },
+      "p2 greedy 10명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 175
+      },
+      "p1 greedy 15명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 175
+      },
+      "p2 greedy 15명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 175
+      },
+      "p1 greedy 25명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 160
+      },
+      "p2 greedy 25명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 160
+      },
+      "p1 greedy 40명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 160
+      },
+      "p2 greedy 40명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 160
+      },
+      "p1 left 5명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 5명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 8명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 8명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 10명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 10명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 15명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 15명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 25명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 25명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 40명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 40명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 right 5명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 5명": {
+        "L": false,
+        "R": false,
+        "missed": 2,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p1 right 8명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 8명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 10명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 10명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 15명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 15명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 25명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 25명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 40명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 40명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      }
+    },
+    "noWall": {
+      "p1 greedy 5명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 greedy 5명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 greedy 8명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 greedy 8명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 greedy 10명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 greedy 10명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 greedy 15명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 greedy 15명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 greedy 25명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 greedy 25명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 greedy 40명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 greedy 40명": {
+        "L": true,
+        "R": true,
+        "missed": 0,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 left 5명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 5명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 8명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 8명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 10명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 10명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 15명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 15명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 25명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 25명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 left 40명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 150
+      },
+      "p2 left 40명": {
+        "L": true,
+        "R": false,
+        "missed": 1,
+        "weapon": "auto",
+        "x": 150
+      },
+      "p1 right 5명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 5명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 8명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 8명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 10명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 10명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 15명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 15명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 25명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 25명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      },
+      "p1 right 40명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "rifle",
+        "x": 330
+      },
+      "p2 right 40명": {
+        "L": false,
+        "R": true,
+        "missed": 1,
+        "weapon": "heavy",
+        "x": 330
+      }
+    }
+  },
+  "choiceC": {
+    "5명 좌통노선": {
+      "openZ": 3806,
+      "rightZ": 3876,
+      "남은사격창px": 124,
+      "우칸유효탄": 12,
+      "좌칸유효탄": 8,
+      "좌칸값": 11,
+      "우칸값": -13,
+      "개봉": true
+    },
+    "5명 우고정": {
+      "openZ": null,
+      "rightZ": null,
+      "남은사격창px": 0,
+      "우칸유효탄": 24,
+      "좌칸유효탄": 0,
+      "좌칸값": 3,
+      "우칸값": -1,
+      "개봉": false
+    },
+    "8명 좌통노선": {
+      "openZ": 3756,
+      "rightZ": 3825,
+      "남은사격창px": 175,
+      "우칸유효탄": 25,
+      "좌칸유효탄": 13,
+      "좌칸값": 12,
+      "우칸값": 0,
+      "개봉": true
+    },
+    "8명 우고정": {
+      "openZ": null,
+      "rightZ": null,
+      "남은사격창px": 0,
+      "우칸유효탄": 39,
+      "좌칸유효탄": 0,
+      "좌칸값": 3,
+      "우칸값": 14,
+      "개봉": false
+    },
+    "12명 좌통노선": {
+      "openZ": 3749,
+      "rightZ": 3819,
+      "남은사격창px": 181,
+      "우칸유효탄": 32,
+      "좌칸유효탄": 25,
+      "좌칸값": 12,
+      "우칸값": 7,
+      "개봉": true
+    },
+    "12명 우고정": {
+      "openZ": null,
+      "rightZ": null,
+      "남은사격창px": 0,
+      "우칸유효탄": 59,
+      "좌칸유효탄": 0,
+      "좌칸값": 3,
+      "우칸값": 34,
+      "개봉": false
+    },
+    "15명 좌통노선": {
+      "openZ": 3721,
+      "rightZ": 3790,
+      "남은사격창px": 210,
+      "우칸유효탄": 43,
+      "좌칸유효탄": 30,
+      "좌칸값": 12,
+      "우칸값": 18,
+      "개봉": true
+    },
+    "15명 우고정": {
+      "openZ": null,
+      "rightZ": null,
+      "남은사격창px": 0,
+      "우칸유효탄": 74,
+      "좌칸유효탄": 0,
+      "좌칸값": 3,
+      "우칸값": 40,
+      "개봉": false
+    },
+    "20명 좌통노선": {
+      "openZ": 3721,
+      "rightZ": 3790,
+      "남은사격창px": 210,
+      "우칸유효탄": 57,
+      "좌칸유효탄": 41,
+      "좌칸값": 12,
+      "우칸값": 32,
+      "개봉": true
+    },
+    "20명 우고정": {
+      "openZ": null,
+      "rightZ": null,
+      "남은사격창px": 0,
+      "우칸유효탄": 98,
+      "좌칸유효탄": 0,
+      "좌칸값": 3,
+      "우칸값": 40,
+      "개봉": false
+    },
+    "25명 좌통노선": {
+      "openZ": 3711,
+      "rightZ": 3781,
+      "남은사격창px": 219,
+      "우칸유효탄": 67,
+      "좌칸유효탄": 56,
+      "좌칸값": 12,
+      "우칸값": 40,
+      "개봉": true
+    },
+    "25명 우고정": {
+      "openZ": null,
+      "rightZ": null,
+      "남은사격창px": 0,
+      "우칸유효탄": 123,
+      "좌칸유효탄": 0,
+      "좌칸값": 3,
+      "우칸값": 40,
+      "개봉": false
+    },
+    "30명 좌통노선": {
+      "openZ": 3711,
+      "rightZ": 3781,
+      "남은사격창px": 219,
+      "우칸유효탄": 78,
+      "좌칸유효탄": 69,
+      "좌칸값": 12,
+      "우칸값": 40,
+      "개봉": true
+    },
+    "30명 우고정": {
+      "openZ": null,
+      "rightZ": null,
+      "남은사격창px": 0,
+      "우칸유효탄": 148,
+      "좌칸유효탄": 0,
+      "좌칸값": 3,
+      "우칸값": 40,
+      "개봉": false
+    },
+    "40명 좌통노선": {
+      "openZ": 3705,
+      "rightZ": 3775,
+      "남은사격창px": 225,
+      "우칸유효탄": 104,
+      "좌칸유효탄": 90,
+      "좌칸값": 12,
+      "우칸값": 40,
+      "개봉": true
+    },
+    "40명 우고정": {
+      "openZ": null,
+      "rightZ": null,
+      "남은사격창px": 0,
+      "우칸유효탄": 195,
+      "좌칸유효탄": 0,
+      "좌칸값": 3,
+      "우칸값": 40,
+      "개봉": false
+    }
+  },
+  "s1Corridor": {
+    "현행xs track35(기준선)": {
+      "won": true,
+      "peak": 14,
+      "survivors": 14,
+      "time": 40,
+      "lossByTouch": 0,
+      "lossByShot": 0,
+      "최소여유px": null
+    },
+    "현행xs track0": {
+      "won": true,
+      "peak": 14,
+      "survivors": 14,
+      "time": 40,
+      "lossByTouch": 0,
+      "lossByShot": 0,
+      "최소여유px": 2.2
+    },
+    "새xs track0 center": {
+      "won": true,
+      "peak": 14,
+      "survivors": 14,
+      "time": 40,
+      "lossByTouch": 0,
+      "lossByShot": 0,
+      "최소여유px": 12.4
+    },
+    "새xs track0 left": {
+      "won": false,
+      "peak": 4,
+      "survivors": 0,
+      "time": 46.6,
+      "lossByTouch": 0,
+      "lossByShot": 4,
+      "최소여유px": -23.6
+    },
+    "새xs track0 right": {
+      "won": true,
+      "peak": 16,
+      "survivors": 12,
+      "time": 49.6,
+      "lossByTouch": 0,
+      "lossByShot": 4,
+      "최소여유px": 52.4
+    },
+    "현행xs값": [
+      170.2,
+      224.17,
+      312.37,
+      138.11,
+      240.76,
+      322.15
+    ]
+  }
+}
