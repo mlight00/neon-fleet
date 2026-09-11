@@ -1,7 +1,7 @@
 // rush3-stages — 스테이지 3개 고정 배치·무기 정의·수치 동결을 잠근다(계약서 5·3-4장, V3-STAGES).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STAGE_IDS, buildStage, stageMeta } from '../rush3/stages.js';
+import { STAGE_IDS, buildStage, stageMeta, stageVersion, coverZFor, VZ_MIN } from '../rush3/stages.js';
 import { WEAPONS, weaponRank, makeBullet } from '../rush3/weapons.js';
 import { BAL3 } from '../rush3/balance.js';
 
@@ -90,7 +90,9 @@ test('V3-STAGES: 첫 물체 z ≥ 1100, 정예 z < length, 시작 무기 rifle',
     assert.ok(st.elite && st.elite.z < st.length && st.elite.z === st.eliteZ);
     assert.ok(st.elite.hp > 0);
     assert.equal(st.startWeapon, 'rifle');
-    assert.equal(st.version, 1);
+    //  코스 버전은 DEFS 의 값을 그대로 물고 온다(1 로 못 박지 않는다 — 배치 개정 담당이 올린다)
+    assert.equal(st.version, stageVersion(id));
+    assert.ok(Number.isInteger(st.version) && st.version >= 1, 'S' + id + ' version=' + st.version);
   }
   assert.equal(buildStage(1).elite.summon, false);
   assert.equal(buildStage(3).elite.summon, true);
@@ -155,8 +157,149 @@ test('V3-STAGES: BAL3 는 깊게 동결되어 있고 핵심 수치가 계약서�
   assert.deepEqual([BAL3.squad.unitR, BAL3.squad.unitHp, BAL3.squad.unitCap, BAL3.squad.followRate, BAL3.squad.moveMax, BAL3.squad.keySpeed],
     [9, 2, 150, 9, 250, 420]);
   assert.deepEqual([BAL3.enemies.grunt.hp, BAL3.enemies.rusher.hp, BAL3.enemies.shooter.hp], [2, 4, 6]);
-  // 난이도 튜닝(2026-09-10): 잡졸 추종 90→35(무조작이어도 사선에 들어와 죽지 않게), hp 는 2 유지(heavy 폭발 2 로 잡졸 격파 규칙 보존)
-  assert.equal(BAL3.enemies.grunt.track, 35);
+  // 개정 r3(2026-09-11): 잡졸 추종 35→0(스폰 열 직진). 비켜야 하는 위협은 돌격체, 사선 다툼은 저격수가 맡는다. hp 는 2 유지
+  assert.equal(BAL3.enemies.grunt.track, 0);
+  // 게이트 셔터 기본값(개정 r3 1장)
+  assert.equal(BAL3.gate.armZ, 340);
   assert.deepEqual([BAL3.enemies.elite.holdAhead, BAL3.enemies.elite.patrolSpeed, BAL3.enemies.elite.summonEvery], [420, 60, 4]);
   assert.deepEqual([BAL3.supply.padGap, BAL3.supply.padOffset, BAL3.supply.padHalfW, BAL3.gate.h, BAL3.enterZ], [40, 60, 70, 24, 760]);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-STAGES 갱신(개정 r3 §10 STG-1~9): 코스 버전 2 · armZ · 좌우 분산 · 배제 쌍 형식 · 표지 · 회피 통로 · 벽 사이 이동
+// ─────────────────────────────────────────────────────────────────────────────
+
+//  벽 활성(통로 확정) 선행 여유 — squad.clampCenter 와 같은 값
+const LEAD = BAL3.squad.wallLead;
+//  같은 z 에서 스폰한 적끼리 묶는다(2열 무리는 열마다 따로 본다)
+function byRow(sp) {
+  const rows = new Map();
+  for (let i = 0; i < sp.n; i++) {
+    const k = String(sp.zs[i]);
+    if (!rows.has(k)) rows.set(k, []);
+    rows.get(k).push(sp.xs[i]);
+  }
+  return [...rows.values()].map((xs) => xs.slice().sort((a, b) => a - b));
+}
+
+test('V3-STAGES STG-1: 세 스테이지 코스 버전 = 2(배치 개정 r3)', () => {
+  for (const id of STAGE_IDS) {
+    assert.equal(stageVersion(id), 2, 'S' + id);
+    assert.equal(buildStage(id).version, 2);
+  }
+});
+
+test('V3-STAGES STG-2: 모든 게이트 행에 armZ 필드가 있고 number | null, armed 초기값이 그에 맞는다', () => {
+  for (const id of STAGE_IDS) for (const row of buildStage(id).gateRows) {
+    assert.ok(row.armZ === null || (typeof row.armZ === 'number' && row.armZ > 0), 'S' + id + ' ' + row.id + ' armZ=' + row.armZ);
+    assert.equal(row.armed, row.armZ === null, 'S' + id + ' ' + row.id + ' armed 초기값');
+    assert.ok('hint' in row);
+  }
+});
+
+test('V3-STAGES STG-3: 좌우 분산 — 스테이지마다 통·게이트 칸이 좌(<240)·우(>=240) 양쪽에 모두 있다', () => {
+  for (const id of STAGE_IDS) {
+    const st = buildStage(id);
+    const xs = st.supplies.map((s) => s.x);
+    for (const row of st.gateRows) for (const c of row.cells) xs.push((c.x0 + c.x1) / 2);
+    assert.ok(xs.some((x) => x < 240), 'S' + id + ' 좌측 대상 없음');
+    assert.ok(xs.some((x) => x >= 240), 'S' + id + ' 우측 대상 없음');
+  }
+});
+
+test('V3-STAGES STG-4: 배제 쌍의 형식(같은 pairId 2개·좌우 1개씩·벽 안·coverZ 공식·벽 끝 여유·통보다 앞)', () => {
+  const vzMin = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
+  for (const id of STAGE_IDS) {
+    const st = buildStage(id);
+    const pairs = {};
+    for (const s of st.supplies) if (s.pairId) (pairs[s.pairId] ??= []).push(s);
+    for (const [pid, list] of Object.entries(pairs)) {
+      assert.equal(list.length, 2, 'S' + id + ' ' + pid + ' 은 정확히 2개');                        // ①
+      assert.equal(list.filter((s) => s.x < 240).length, 1, 'S' + id + ' ' + pid + ' 좌 1개');       // ②
+      assert.equal(list.filter((s) => s.x >= 240).length, 1, 'S' + id + ' ' + pid + ' 우 1개');
+      for (const s of list) {
+        const wall = st.walls.find((w) => w.z0 - LEAD <= s.z && s.z <= w.z1);
+        assert.ok(wall, 'S' + id + ' ' + s.id + ' 이 벽 활성 구간 안에 있어야 한다');                 // ③
+        const commitZ = wall.z0 - LEAD;
+        assert.equal(s.coverZ, Math.ceil(commitZ + (s.z - commitZ) * BAL3.scroll / vzMin),
+          'S' + id + ' ' + s.id + ' coverZ 는 비행시간 보정선(확정선 ' + commitZ + ' 이 아니다)');    // ④
+        assert.ok(s.z <= wall.z1 - 4, 'S' + id + ' ' + s.id + ' 은 벽 끝보다 최소 1 STEP 앞');       // ⑤
+        assert.ok(s.coverZ < s.z, 'S' + id + ' ' + s.id + ' coverZ 는 통보다 앞');                   // ⑥
+        //  통 원이 좌·우 통로 중 정확히 한쪽에서만 닿는다(벽 배제가 실제로 성립하는 형상)
+        const inL = s.x - s.r <= wall.x0, inR = s.x + s.r >= wall.x1;
+        assert.ok(inL !== inR, 'S' + id + ' ' + s.id + ' 은 한쪽 통로에서만 닿아야 한다');
+      }
+    }
+  }
+  //  S2 는 1쌍, S3 는 2쌍
+  assert.equal(new Set(buildStage(2).supplies.filter((s) => s.pairId).map((s) => s.pairId)).size, 1);
+  assert.equal(new Set(buildStage(3).supplies.filter((s) => s.pairId).map((s) => s.pairId)).size, 2);
+});
+
+test('V3-STAGES STG-5: 통로 안내 표지가 그 벽 구간 안 좌/우 통의 실제 내용과 같다', () => {
+  for (const id of STAGE_IDS) {
+    const st = buildStage(id);
+    for (const w of st.walls) {
+      assert.ok(w.signs, 'S' + id + ' ' + w.id + ' 표지 없음');
+      for (const side of ['L', 'R']) {
+        const sg = w.signs[side];
+        const inWall = st.supplies.filter((s) => w.z0 - LEAD <= s.z && s.z <= w.z1
+          && (side === 'L' ? s.x - s.r <= w.x0 : s.x + s.r >= w.x1));
+        if (sg.kind === 'none') { assert.equal(inWall.length, 0, 'S' + id + ' ' + w.id + ' ' + side + ' 은 빈 통로여야 한다'); continue; }
+        assert.equal(inWall.length, 1, 'S' + id + ' ' + w.id + ' ' + side + ' 통이 정확히 1개');
+        const s = inWall[0];
+        assert.equal(sg.kind, s.kind, 'S' + id + ' ' + w.id + ' ' + side + ' 표지 종류');
+        if (sg.kind === 'soldier') assert.equal(sg.n, s.payload.n, '표지 병사 수');
+        if (sg.kind === 'weapon') assert.equal(sg.weapon, s.payload.weapon, '표지 무기');
+      }
+    }
+  }
+});
+
+test('V3-STAGES STG-6: 회피 통로 — corridorHw 가 있는 무리는 가장자리 간격 >= 2×corridorHw + 10 인 틈이 있다', () => {
+  let checked = 0;
+  for (const id of STAGE_IDS) for (const sp of buildStage(id).spawns) {
+    if (sp.corridorHw == null) continue;
+    checked++;
+    const r = BAL3.enemies[sp.kind].r;
+    const need = 2 * sp.corridorHw + 10;
+    for (const xs of byRow(sp)) {
+      //  적 사이 + 도로 양 끝과의 간격
+      const gaps = [xs[0] - r - ROAD[0], ROAD[1] - (xs[xs.length - 1] + r)];
+      for (let i = 1; i < xs.length; i++) gaps.push(xs[i] - xs[i - 1] - 2 * r);
+      assert.ok(Math.max(...gaps) >= need,
+        `S${id} ${sp.kind} z${sp.z} 열 [${xs}] 최대 틈 ${Math.max(...gaps)} < 필요 ${need}`);
+    }
+  }
+  assert.ok(checked >= 2, '통로 규격 대상 무리가 있다: ' + checked);
+});
+
+test('V3-STAGES STG-7: 기존 유지 — 스폰마다 corridorHw 필드가 있다(number | null)', () => {
+  for (const id of STAGE_IDS) for (const sp of buildStage(id).spawns) {
+    assert.ok(sp.corridorHw === null || typeof sp.corridorHw === 'number', 'S' + id + ' ' + sp.kind + ' z' + sp.z);
+  }
+});
+
+test('V3-STAGES STG-9: 인접한 두 벽 사이에 좌↔우 이동 여유(>= 137px)가 있다', () => {
+  for (const id of STAGE_IDS) {
+    const walls = buildStage(id).walls.slice().sort((a, b) => a.z0 - b.z0);
+    for (let i = 1; i < walls.length; i++) {
+      const gap = (walls[i].z0 - LEAD) - walls[i - 1].z1;
+      assert.ok(gap >= 137, `S${id} ${walls[i - 1].id} → ${walls[i].id} 사이 ${gap}px < 137`);
+    }
+  }
+});
+
+test('V3-STAGES: 통에 coverZ·pairId·hint 필드가 전부 있고 초기 skipped 는 false', () => {
+  for (const id of STAGE_IDS) for (const s of buildStage(id).supplies) {
+    assert.ok('coverZ' in s && 'pairId' in s && 'hint' in s, 'S' + id + ' ' + s.id);
+    assert.equal(s.skipped, false);
+    assert.ok(s.coverZ === null || typeof s.coverZ === 'number');
+  }
+  //  coverZFor 는 계약서 §3-3 공식 그대로
+  assert.equal(coverZFor(1800, 2300), 1904);
+  assert.equal(coverZFor(2400, 2800), 2475);
+  assert.equal(coverZFor(3150, 3500), 3210);
+  assert.equal(coverZFor(6000, 6300), 6046);
+  assert.equal(VZ_MIN, 650);
 });

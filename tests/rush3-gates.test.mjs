@@ -1,9 +1,11 @@
 // rush3-gates — 사격형 게이트 행 규칙(계약서 3-2 · 8장 V3-GATE / V3-GATE-SCROLL)을 잠근다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeGateRow, hitGateCell, passGateRow, cellAt, gateColor, gateLabel, sweepHitsGate, GATE_H } from '../rush3/gates.js';
+import { makeGateRow, hitGateCell, passGateRow, cellAt, gateColor, gateLabel, sweepHitsGate, updateGateArm, GATE_H, GATE_ARM_Z } from '../rush3/gates.js';
 import { makeSupply, sweepHitsSupply, hitSupply } from '../rush3/supply.js';
 import { makeUnit, layoutUnits, formation } from '../rush3/squad.js';
+import { createRun, stepRun } from '../rush3/combat.js';
+import { buildStage } from '../rush3/stages.js';
 
 const STEP = 1 / 60;
 const SCROLL = 190;
@@ -16,7 +18,8 @@ function makeRun(n, x = 240) {
   return run;
 }
 const bullet = (x, z = 0, pz = 0) => ({ x, z, pz, dmg: 1, gateHit: 1, dead: false });
-const twoCells = (l, r, extra = {}) => makeGateRow({ id: 'g', z: 1140, maxValue: 15, cells: [{ x0: 80, x1: 240, value: l }, { x0: 240, x1: 400, value: r }], ...extra });
+//  기존 V3-GATE 검사는 셔터를 보지 않는다 → armZ: null(항상 열림)로 만들어 기대값을 그대로 유지한다(개정 r3 §1-5)
+const twoCells = (l, r, extra = {}) => makeGateRow({ id: 'g', z: 1140, maxValue: 15, armZ: null, cells: [{ x0: 80, x1: 240, value: l }, { x0: 240, x1: 400, value: r }], ...extra });
 // 부대를 row.z 를 막 넘긴 STEP 상태로 둔다
 const cross = (run, z) => { run.prevZ = z - 1; run.z = z; };
 
@@ -25,7 +28,7 @@ test('V3-GATE: −2 칸에 유효탄 3발 → +1 (0 이상으로 넘어가는 �
   const cell = row.cells[0];
   for (let i = 0; i < 3; i++) {
     const b = bullet(150);
-    assert.equal(hitGateCell(cell, b, ev), true);
+    assert.equal(hitGateCell(row, cell, b, ev), true);
     assert.equal(b.dead, true, '탄은 흡수된다');
   }
   assert.equal(cell.value, 1);
@@ -64,14 +67,14 @@ test('V3-GATE: maxValue 클램프(15 위로 올라가지 않음, 탄은 여전�
   const row = twoCells(13, 0), ev = [];
   for (let i = 0; i < 10; i++) {
     const b = bullet(100);
-    hitGateCell(row.cells[0], b, ev);
+    hitGateCell(row, row.cells[0], b, ev);
     assert.equal(b.dead, true);
   }
   assert.equal(row.cells[0].value, 15);
   assert.equal(row.cells[0].maxValue, 15);
-  const r40 = makeGateRow({ id: 'h', z: 1, maxValue: 40, cells: [{ x0: 80, x1: 400, value: 39 }] });
-  hitGateCell(r40.cells[0], bullet(100), ev);
-  hitGateCell(r40.cells[0], bullet(100), ev);
+  const r40 = makeGateRow({ id: 'h', z: 1, maxValue: 40, armZ: null, cells: [{ x0: 80, x1: 400, value: 39 }] });
+  hitGateCell(r40, r40.cells[0], bullet(100), ev);
+  hitGateCell(r40, r40.cells[0], bullet(100), ev);
   assert.equal(r40.cells[0].value, 40);
 });
 
@@ -212,7 +215,12 @@ test('V3-GATE: makeGateRow 는 def 를 복사하고 초기값(passed/flashT/valu
   assert.equal(row.cells[0].maxValue, 15);
   assert.equal(row.passed, false);
   assert.equal(row.bypass, false);
+  //  armZ 미지정 = 기본 340(닫힌 채로 시작), hint 는 null
+  assert.equal(row.armZ, GATE_ARM_Z);
+  assert.equal(row.armed, false);
+  assert.equal(row.hint, null);
   assert.equal(def.cells[0].flashT, undefined, 'def 는 건드리지 않는다');
+  assert.equal(def.armZ, undefined);
 });
 
 // 스크롤 켠 상태에서 탄 위상 0~1(20분할)을 훑어 명중 100%, 게이트 뒤 통은 불변
@@ -229,7 +237,7 @@ test('V3-GATE-SCROLL: 탄 위상 20분할 전 구간에서 게이트 명중 100%
       run.prevZ = run.z; run.z += SCROLL * STEP;
       b.pz = b.z; b.z += VZ * STEP;
       const cands = [];
-      for (const c of row.cells) if (sweepHitsGate(row, c, b)) cands.push({ z: row.z, hit: () => hitGateCell(c, b, ev) });
+      for (const c of row.cells) if (sweepHitsGate(row, c, b)) cands.push({ z: row.z, hit: () => hitGateCell(row, c, b, ev) });
       if (sweepHitsSupply(sup, b)) cands.push({ z: sup.z, hit: () => hitSupply(sup, b, ev, run) });
       if (!cands.length) continue;
       cands.sort((a, c) => a.z - c.z);
@@ -240,4 +248,135 @@ test('V3-GATE-SCROLL: 탄 위상 20분할 전 구간에서 게이트 명중 100%
     assert.equal(row.cells[1].value, 1);
     assert.equal(sup.durability, 4, `위상 ${p}/20 에서 뒤 통 불변`);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 셔터 검사용 최소 스테이지 조립기(rush3-combat 의 mkStage 와 같은 형태). 여기서는 armZ 를 명시한다
+function mkStage(o = {}) {
+  return {
+    id: 'a', version: 1, title: 'arm', startUnits: o.startUnits ?? 1, startWeapon: o.startWeapon ?? 'rifle',
+    length: 100000, eliteZ: null,
+    gateRows: (o.gates || []).map((g, i) => ({ id: 'g' + (i + 1), z: g.z, h: 24, maxValue: g.maxValue ?? 15, bypass: !!g.bypass,
+                                               armZ: g.armZ === undefined ? null : g.armZ, cells: g.cells })),
+    supplies: [], walls: [],
+    spawns: (o.spawns || []).map((sp) => ({ z: sp.z, kind: sp.kind, n: sp.xs.length, xs: sp.xs, zs: sp.zs, corridorHw: null })),
+    elite: null,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-GATE-ARM — 게이트 전용 사격 활성 구간(셔터). 계약서 3-2 · 개정 r3 1장
+//  닫힌 셔터에 닿은 탄은 '흡수'된다(통과가 아니다). 그래서 검사는 값 불변 + 탄 dead + gateBlock 을 함께 본다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+//  armZ 340 의 기본 행(닫힌 채로 시작)
+const armRow = (value = -20, maxValue = 40) =>
+  makeGateRow({ id: 'a', z: 1000, maxValue, cells: [{ x0: 80, x1: 240, value: 0 }, { x0: 240, x1: 400, value }] });
+
+test('V3-GATE-ARM ARM-1: 닫힌 셔터(전방 341px)에 탄 10발 → 값 불변·탄 전부 흡수·gateBlock 10 / gateHit 0', () => {
+  const row = armRow(-20), run = { z: 659, prevZ: 659 }, ev = [];
+  assert.equal(row.z - run.z, 341);
+  assert.equal(updateGateArm(row, run, ev), false, '아직 열리지 않는다');
+  assert.equal(row.armed, false);
+  const cell = row.cells[1];
+  for (let i = 0; i < 10; i++) {
+    const b = bullet(300, 1000, 990);
+    assert.equal(hitGateCell(row, cell, b, ev), true);
+    assert.equal(b.dead, true, '닫힌 셔터도 탄을 흡수한다(통과가 아니다)');
+  }
+  assert.equal(cell.value, -20);
+  assert.equal(cell.flashT, 0);
+  assert.equal(ev.filter((e) => e.type === 'gateBlock').length, 10);
+  assert.equal(ev.filter((e) => e.type === 'gateHit' || e.type === 'gateFlip').length, 0);
+});
+
+test('V3-GATE-ARM ARM-2: row.z − run.z <= 340 이 되는 STEP 에 gateArm 이벤트 정확히 1회', () => {
+  const row = armRow(), run = { z: 0, prevZ: 0 }, ev = [];
+  let armEvents = 0, armedAtZ = null;
+  for (let i = 0; i < 400; i++) {
+    run.prevZ = run.z;
+    run.z += SCROLL * STEP;
+    const before = ev.length;
+    updateGateArm(row, run, ev);
+    for (let k = before; k < ev.length; k++) if (ev[k].type === 'gateArm') { armEvents++; armedAtZ = run.z; }
+  }
+  assert.equal(armEvents, 1, 'gateArm 은 정확히 1회');
+  assert.ok(row.z - armedAtZ <= 340 && row.z - armedAtZ > 340 - SCROLL * STEP, '열린 STEP 의 전방거리 = ' + (row.z - armedAtZ));
+  assert.equal(row.armed, true);
+  const ev2 = [];
+  updateGateArm(row, run, ev2);
+  assert.deepEqual(ev2, [], '이미 열린 행은 이벤트를 더 내지 않는다');
+});
+
+test('V3-GATE-ARM ARM-3: armed 뒤에는 유효탄 1발 = +1(상한·gateFlip·흡수 기존 규칙 그대로)', () => {
+  const row = armRow(-2, 15), run = { z: 700, prevZ: 700 }, ev = [];
+  updateGateArm(row, run, ev);
+  assert.equal(row.armed, true);
+  const cell = row.cells[1];
+  for (let i = 0; i < 3; i++) hitGateCell(row, cell, bullet(300), ev);
+  assert.equal(cell.value, 1);
+  assert.deepEqual(ev.map((e) => e.type), ['gateArm', 'gateHit', 'gateFlip', 'gateHit']);
+});
+
+test('V3-GATE-ARM ARM-4: armZ null 행은 생성 직후 armed·언제든 +1·gateArm 이벤트 없음', () => {
+  const row = makeGateRow({ id: 'n', z: 1000, armZ: null, cells: [{ x0: 80, x1: 400, value: 0 }] });
+  assert.equal(row.armed, true);
+  assert.equal(row.armZ, null);
+  const run = { z: 340, prevZ: 340 }, ev = [];   // 전방 660px = 사거리 안이지만 armZ 340 보다 멀다
+  assert.equal(updateGateArm(row, run, ev), false);
+  assert.deepEqual(ev, []);
+  const b = bullet(200);
+  hitGateCell(row, row.cells[0], b, ev);
+  assert.equal(row.cells[0].value, 1);
+  assert.equal(ev.filter((e) => e.type === 'gateArm').length, 0);
+});
+
+test('V3-GATE-ARM ARM-5: 스테이지별 armZ 지정(S1 g1 = null 학습용, 나머지 전부 340)', () => {
+  const s1 = buildStage(1);
+  assert.equal(s1.gateRows[0].armZ, null);
+  assert.equal(s1.gateRows[0].armed, true);
+  assert.equal(s1.gateRows[1].armZ, 340);
+  assert.equal(s1.gateRows[1].armed, false);
+  for (const id of [2, 3]) for (const row of buildStage(id).gateRows) {
+    assert.equal(row.armZ, 340, 'S' + id + ' ' + row.id);
+    assert.equal(row.armed, false);
+  }
+});
+
+test('V3-GATE-ARM ARM-6: 실측 회귀 — armZ 340 에 소총 1명 5발 / 기관총 1명 9발(허용 ±1)', () => {
+  for (const [weapon, expect] of [['rifle', 5], ['auto', 9]]) {
+    const run = createRun(mkStage({
+      startWeapon: weapon,
+      gates: [{ z: 2000, maxValue: 9999, cells: [{ x0: 80, x1: 400, value: 0 }], armZ: 340 }],
+    }));
+    for (let i = 0; i < 1200 && !run.gateRows[0].passed; i++) stepRun(run, { pointerX: 240, dragDx: 0, keyDir: 0 }, STEP);
+    const v = run.gateRows[0].cells[0].value;
+    assert.ok(Math.abs(v - expect) <= 1, weapon + ' 유효탄 ' + v + ' (기대 ' + expect + '±1)');
+  }
+});
+
+test('V3-GATE-ARM ARM-7: 셔터가 닫힌 동안 셔터보다 먼 적은 안 맞고, 가까워지면 정상 피격', () => {
+  //  게이트 z 2000(armZ 340) 뒤(더 먼 곳)의 적 — 셔터가 닫힌 동안은 탄이 셔터에 먹혀 맞지 않는다
+  const far = createRun(mkStage({
+    startWeapon: 'auto',
+    gates: [{ z: 2000, maxValue: 9999, cells: [{ x0: 80, x1: 400, value: 0 }], armZ: 340 }],
+    spawns: [{ z: 0, kind: 'grunt', xs: [240], zs: [2100] }],
+  }));
+  far.enemies.push({ id: 99, kind: 'grunt', x: 240, z: 2100, px: 240, pz: 2100, vz: 0, hp: 9999, r: 14, dead: false, touched: false });
+  let hpAtArm = null;
+  for (let i = 0; i < 1200; i++) {
+    stepRun(far, { pointerX: 240, dragDx: 0, keyDir: 0 }, STEP);
+    const armed = far.gateRows[0].armed;
+    if (armed && hpAtArm === null) hpAtArm = far.enemies.find((e) => e.id === 99)?.hp ?? null;
+    if (far.gateRows[0].passed) break;
+  }
+  assert.equal(hpAtArm, 9999, '셔터가 닫힌 동안 그 뒤의 적은 한 발도 맞지 않는다');
+  //  셔터보다 가까운(부대 쪽) 적은 셔터와 무관하게 맞는다
+  const near = createRun(mkStage({
+    startWeapon: 'auto',
+    gates: [{ z: 2000, maxValue: 9999, cells: [{ x0: 80, x1: 400, value: 0 }], armZ: 340 }],
+  }));
+  near.enemies.push({ id: 98, kind: 'grunt', x: 240, z: 300, px: 240, pz: 300, vz: 0, hp: 9999, r: 14, dead: false, touched: false });
+  for (let i = 0; i < 60; i++) stepRun(near, { pointerX: 240, dragDx: 0, keyDir: 0 }, STEP);
+  assert.ok((near.enemies.find((e) => e.id === 98)?.hp ?? 9999) < 9999, '셔터 앞의 적은 정상 피격');
 });

@@ -3,6 +3,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeSupply, hitSupply, passSupply, takePads, sweepHitsSupply, activateChain, applySupplyReward, supplyActive } from '../rush3/supply.js';
 import { makeUnit, layoutUnits, formation } from '../rush3/squad.js';
+import { createRun, stepRun, drainEvents } from '../rush3/combat.js';
+import { buildStage, STAGE_IDS, coverZFor, VZ_MIN } from '../rush3/stages.js';
+import { WEAPONS } from '../rush3/weapons.js';
+import { BAL3 } from '../rush3/balance.js';
+import { POLICIES, playPolicy } from './lib/rush3-policies.mjs';
 
 // 테스트용 run: 실제 squad.js 유닛(makeUnit + layoutUnits). 콜백 주입 없음 — supply.js 가 squad.addUnits 를 직접 호출한다.
 function makeRun(n, x = 240) {
@@ -335,4 +340,274 @@ test('V3-CHAIN: 미개봉 chain 을 지나면 missed + locked, 보상 없음', (
   assert.equal(run.missedSupplies, 1);
   assert.equal(run.pendingRewards.length, 0);
   assert.equal(hitSupply(s, bullet(240), ev, run), false);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-SUPPLY-PAIR / COVER — 배제 쌍(pairId)·차폐(coverZ)·구조적 획득 불가(skipped). 계약서 3-3·3-6 · 개정 r3 §3-3·§4-2·§6-1
+//  배제를 만드는 것은 '같은 z' 가 아니라 **벽 + 비행시간 보정선 coverZ** 다. 셋 중 하나만 있으면 배제가 아니다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+//  쌍 하나(좌·우)를 벽 안에 둔 run. run.walls·run.wallSide 를 직접 세워 passSupply 판정만 본다
+function pairRun(side, opts = {}) {
+  const run = makeRun(1, side === 'L' ? 150 : 330);
+  run.skippedSupplies = 0;
+  run.walls = [{ id: 'w1', z0: 1800, z1: 3000, x0: 228, x1: 252 }];
+  run.wallSide = side ? { w1: side } : {};
+  const mk = (id, x, kind, extra) => makeSupply({
+    id, z: 2300, x, kind, durability: 6, pairId: opts.noPair ? null : 'w1',
+    coverZ: opts.noCover ? null : 1904, payload: kind === 'chain' ? { pads0: 5, maxPads: 15 } : { n: 3 }, ...extra });
+  run.supplies = [mk('L', 120, opts.chainLeft ? 'chain' : 'soldier'), mk('R', 326, 'soldier')];
+  return run;
+}
+const byId = (run, id) => run.supplies.find((s) => s.id === id);
+
+test('V3-SUPPLY-PAIR PAIR-1: 쌍 중 하나를 열고 다른 하나를 지나면 skipped(missed 아님)·통 z 를 지나는 STEP 에만 1회', () => {
+  for (const chainLeft of [false, true]) {
+    const run = pairRun('L', { chainLeft });
+    const L = byId(run, 'L'), R = byId(run, 'R'), ev = [];
+    //  좌 통을 z 2000(차폐 개방 뒤)에서 연다
+    run.prevZ = 1999; run.z = 2000;
+    L.opened = true;
+    //  파트너를 연 STEP 에는 skipped 가 켜지지 않는다(아직 깰 수 있는 통이다)
+    assert.equal(passSupply(R, run, ev), false);
+    assert.equal(R.skipped, false);
+    assert.deepEqual(ev, []);
+    //  통 z 를 지나는 STEP 에만 정확히 1회
+    cross(run, 2300);
+    assert.equal(passSupply(R, run, ev), true);
+    assert.equal(R.skipped, true);
+    assert.equal(R.missed, false);
+    assert.equal(run.skippedSupplies, 1);
+    assert.equal(run.missedSupplies, 0);
+    assert.deepEqual(ev.map((e) => e.type), ['supplySkipped']);
+    assert.equal(passSupply(R, run, ev), false, '두 번 세지 않는다');
+    assert.equal(run.skippedSupplies, 1);
+    //  지나간 통은 충돌 후보가 아니다
+    assert.equal(supplyActive(R), false);
+    //  좌 통이 chain 이면 지나는 STEP 에 locked
+    if (chainLeft) {
+      const ev2 = [];
+      L.opened = false;
+      L.skipped = false;
+      const run2 = pairRun('R', { chainLeft: true });
+      const L2 = byId(run2, 'L');
+      byId(run2, 'R').opened = true;
+      cross(run2, 2300);
+      assert.equal(passSupply(L2, run2, ev2), true);
+      assert.equal(L2.skipped, true);
+      assert.equal(L2.locked, true, 'skipped 분기에서도 미개봉 chain 은 locked');
+    }
+  }
+});
+
+test('V3-SUPPLY-PAIR PAIR-2: 벽·차폐가 없는 쌍을 둘 다 안 열고 지나면 둘 다 missed', () => {
+  const run = pairRun(null, { noCover: true });
+  run.walls = [];
+  run.wallSide = {};
+  const ev = [];
+  cross(run, 2300);
+  passSupply(byId(run, 'L'), run, ev);
+  passSupply(byId(run, 'R'), run, ev);
+  assert.equal(run.missedSupplies, 2);
+  assert.equal(run.skippedSupplies, 0);
+  assert.deepEqual(ev.map((e) => e.type), ['supplyMissed', 'supplyMissed']);
+});
+
+test('V3-SUPPLY-PAIR PAIR-3: pairId 도 벽도 없는 통은 종전대로 missed 만', () => {
+  const run = makeRun(1);
+  run.skippedSupplies = 0;
+  run.walls = [];
+  const s = soldierCrate(6, 2), ev = [];
+  assert.equal(s.pairId, null);
+  assert.equal(s.coverZ, null);
+  cross(run, s.z);
+  assert.equal(passSupply(s, run, ev), true);
+  assert.equal(s.missed, true);
+  assert.equal(s.skipped, false);
+  assert.deepEqual([run.missedSupplies, run.skippedSupplies], [1, 0]);
+});
+
+test('V3-SUPPLY-PAIR PAIR-5: 우 통로를 골랐는데 우 통을 못 깨면 좌 skipped · 우 missed(구조적 불가와 실제 손실 구분)', () => {
+  const run = pairRun('R'), ev = [];
+  cross(run, 2300);
+  passSupply(byId(run, 'L'), run, ev);
+  passSupply(byId(run, 'R'), run, ev);
+  assert.equal(byId(run, 'L').skipped, true, '좌 통은 벽 반대편 = 구조적 획득 불가');
+  assert.equal(byId(run, 'R').missed, true, '우 통은 실제 기회 손실');
+  assert.deepEqual([run.skippedSupplies, run.missedSupplies], [1, 1]);
+  assert.deepEqual(ev.map((e) => e.type), ['supplySkipped', 'supplyMissed']);
+  //  좌 통이 chain 이면 skipped 와 함께 locked
+  const run2 = pairRun('R', { chainLeft: true }), ev2 = [];
+  cross(run2, 2300);
+  passSupply(byId(run2, 'L'), run2, ev2);
+  assert.deepEqual([byId(run2, 'L').skipped, byId(run2, 'L').locked], [true, true]);
+});
+
+test('V3-SUPPLY-PAIR PAIR-5b: 짝이 없는 통도 벽 반대편이면 skipped(S3 z6300 형태)', () => {
+  const run = makeRun(1, 330);
+  run.skippedSupplies = 0;
+  run.walls = [{ id: 'w3', z0: 6000, z1: 7200, x0: 228, x1: 252 }];
+  run.wallSide = { w3: 'R' };
+  const s = makeSupply({ id: 'c9', z: 6300, x: 150, kind: 'soldier', durability: 20, coverZ: 6046, payload: { n: 10 } });
+  const ev = [];
+  cross(run, 6300);
+  assert.equal(passSupply(s, run, ev), true);
+  assert.deepEqual([s.skipped, s.missed], [true, false]);
+  assert.deepEqual([run.skippedSupplies, run.missedSupplies], [1, 0]);
+  //  같은 통을 좌 통로에서 지나면 '놓침'이다(얻을 수 있었다)
+  const run2 = makeRun(1, 150);
+  run2.skippedSupplies = 0;
+  run2.walls = run.walls;
+  run2.wallSide = { w3: 'L' };
+  const s2 = makeSupply({ id: 'c9', z: 6300, x: 150, kind: 'soldier', durability: 20, coverZ: 6046, payload: { n: 10 } });
+  cross(run2, 6300);
+  passSupply(s2, run2, []);
+  assert.deepEqual([s2.skipped, s2.missed], [false, true]);
+});
+
+test('V3-SUPPLY-COVER COVER-1: coverZ 앞에서 탄 20발 → 내구 불변·탄 전부 흡수·supplyBlock 20 / supplyHit 0', () => {
+  const run = makeRun(1, 120);
+  run.z = 1800; run.prevZ = 1800;
+  const s = makeSupply({ id: 'c1', z: 2300, x: 120, kind: 'soldier', durability: 6, coverZ: 1904, payload: { n: 3 } });
+  const ev = [];
+  for (let i = 0; i < 20; i++) {
+    const b = bullet(120, 2300, 2290);
+    assert.equal(hitSupply(s, b, ev, run), true);
+    assert.equal(b.dead, true, '차폐된 통도 탄을 흡수한다(통과가 아니다)');
+  }
+  assert.equal(s.durability, 6);
+  assert.equal(s.opened, false);
+  assert.equal(ev.filter((e) => e.type === 'supplyBlock').length, 20);
+  assert.equal(ev.filter((e) => e.type === 'supplyHit' || e.type === 'supplyOpen').length, 0);
+  assert.deepEqual(run.pendingRewards, []);
+  //  차폐 중에도 충돌 후보로는 남는다(그래야 흡수가 성립한다)
+  assert.equal(supplyActive(s), true);
+});
+
+test('V3-SUPPLY-COVER COVER-2: run.z >= coverZ 뒤에는 정상 개봉(보상 정확히 1회)', () => {
+  const run = makeRun(1, 120);
+  run.z = 1904; run.prevZ = 1903;
+  const s = makeSupply({ id: 'c1', z: 2300, x: 120, kind: 'soldier', durability: 6, coverZ: 1904, payload: { n: 3 } });
+  const ev = [];
+  for (let i = 0; i < 6; i++) hitSupply(s, bullet(120, 2300, 2290), ev, run);
+  assert.equal(s.opened, true);
+  assert.equal(ev.filter((e) => e.type === 'supplyOpen').length, 1);
+  assert.equal(run.pendingRewards.length, 1);
+});
+
+test('V3-SUPPLY-COVER COVER-3: coverZ 가 null 인 통은 현행과 완전히 동일(회귀)', () => {
+  const run = makeRun(1);
+  run.z = 0; run.prevZ = 0;
+  const s = soldierCrate(4, 2);
+  assert.equal(s.coverZ, null);
+  const ev = [];
+  for (let i = 0; i < 4; i++) hitSupply(s, bullet(240, 2100, 2090), ev, run);
+  assert.equal(s.opened, true);
+  assert.equal(ev.filter((e) => e.type === 'supplyBlock').length, 0);
+});
+
+// ── PAIR-4 계열: 배제가 '봇 정책'이 아니라 '규칙'으로 잠겼는지 stepRun 으로 확인한다 ──
+//  ⚠️r3 초안의 오류: 같은 z 에 좌·우를 두는 것만으로는 배제가 아니다(사거리 662px = 3.48초 동안 좌↔우 이동 0.72초).
+//   배제 = 벽(확정 뒤 반대편을 못 쏨) + coverZ(확정 전에 쏜 비행 중 탄도 못 닿음). 아래 검사가 그 둘을 함께 잠근다.
+
+const PAIR_STEP = 1 / 60;
+const PAIR_SCROLL = 190;
+
+//  벽 1개 + 배제 쌍 1개만 있는 합성 스테이지(짧게 돌기 위해). 실제 배치와 같은 기하
+function pairStage(o) {
+  const cover = o.coverZ ?? coverZFor(o.wallZ0, o.z);
+  return {
+    id: 'p', version: 2, title: 'pair', startUnits: o.n, startWeapon: o.weapon ?? 'rifle',
+    length: o.z + 2000, eliteZ: null,
+    gateRows: [], walls: [{ id: 'w1', z0: o.wallZ0, z1: o.wallZ1, x0: 228, x1: 252 }], spawns: [], elite: null,
+    supplies: [
+      { id: 'L', z: o.z, x: o.lx ?? 150, r: 30, kind: 'soldier', durability: o.ld, maxDurability: o.ld,
+        payload: { n: 1 }, opened: false, missed: false, locked: false, skipped: false, pads: [], coverZ: cover, pairId: 'p', hint: null },
+      { id: 'R', z: o.z, x: o.rx ?? 330, r: 30, kind: 'soldier', durability: o.rd, maxDurability: o.rd,
+        payload: { n: 1 }, opened: false, missed: false, locked: false, skipped: false, pads: [], coverZ: cover, pairId: 'p', hint: null },
+    ],
+  };
+}
+
+//  구간별 목표 x 스크립트로 한 판. 쌍을 지날 때까지만 돈다
+function runScript(stage, pick, untilZ) {
+  const run = createRun(stage);
+  for (let i = 0; i < 20000 && !run.over && run.z <= untilZ; i++) {
+    stepRun(run, { pointerX: pick(run), dragDx: 0, keyDir: 0 }, PAIR_STEP);
+    drainEvents(run);
+  }
+  return run;
+}
+
+test('V3-SUPPLY-PAIR PAIR-4: 실제 S3 의 p1·p2 는 8정책 전부에서 최대 1개만 열린다', () => {
+  const st = buildStage(3);
+  const pairs = {};
+  for (const s of st.supplies) if (s.pairId) (pairs[s.pairId] ??= []).push(s.id);
+  assert.deepEqual(Object.keys(pairs).sort(), ['p1', 'p2']);
+  for (const ids of Object.values(pairs)) assert.equal(ids.length, 2);
+  for (const policy of POLICIES) {
+    const { run } = playPolicy(3, policy);
+    for (const [pid, ids] of Object.entries(pairs)) {
+      const opened = ids.filter((id) => run.supplies.find((s) => s.id === id).opened);
+      assert.ok(opened.length <= 1, `S3 ${policy} ${pid} 에서 ${opened.length} 개가 열렸다(${opened})`);
+    }
+  }
+});
+
+test('V3-SUPPLY-PAIR PAIR-4: 합성 쌍(병력 5·10·15·25·40)에서도 최대 1개 — 벽을 빼면 둘 다 열린다(대조군)', () => {
+  const base = { wallZ0: 2400, wallZ1: 2900, z: 2800, ld: 10, rd: 10 };
+  for (const n of [5, 10, 15, 25, 40]) {
+    //  탐욕(좌를 열고 우로) 노선
+    const greedy = (r) => (r.supplies[0].opened ? 330 : 150);
+    const run = runScript(pairStage({ ...base, n }), greedy, base.z + 100);
+    const opened = run.supplies.filter((s) => s.opened).length;
+    assert.equal(opened, 1, `n=${n} 벽 + coverZ 인데 ${opened} 개가 열렸다`);
+    //  대조군: 같은 배치에서 벽만 빼면 둘 다 열린다(배제를 만드는 것은 같은 z 가 아니라 벽이다)
+    const noWall = pairStage({ ...base, n });
+    noWall.walls = [];
+    noWall.supplies.forEach((s) => { s.coverZ = null; });
+    const run2 = runScript(noWall, greedy, base.z + 100);
+    assert.equal(run2.supplies.filter((s) => s.opened).length, 2, `n=${n} 대조군(벽·차폐 없음)은 둘 다 열려야 한다`);
+  }
+});
+
+test('V3-SUPPLY-PAIR PAIR-4b: 확정 직전 대시 정책(양방향 T 스윕)에서도 같은 쌍이 동시에 열리지 않는다', () => {
+  //  실제 4개 지점의 기하 그대로. T = 확정선 −400 … 확정선 을 10px 간격으로 훑는다(1px·양방향 전수는 review/verify 스크립트)
+  const spots = [
+    { name: 'S2 w1', wallZ0: 1800, wallZ1: 3000, z: 2300, lx: 120, rx: 326, ld: 6, rd: 12, ns: [4, 5, 6, 8, 12] },
+    { name: 'S3 p1', wallZ0: 2400, wallZ1: 2900, z: 2800, lx: 150, rx: 330, ld: 10, rd: 10, ns: [8, 10, 12, 25] },
+    { name: 'S3 p2', wallZ0: 3150, wallZ1: 3550, z: 3500, lx: 150, rx: 330, ld: 12, rd: 24, ns: [10, 25, 30, 40] },
+    { name: 'S3 wD', wallZ0: 6000, wallZ1: 7200, z: 6300, lx: 150, rx: 330, ld: 20, rd: 20, ns: [40] },
+  ];
+  for (const sp of spots) {
+    const commitZ = sp.wallZ0 - 60;
+    for (const n of sp.ns) {
+      for (const dir of ['LR', 'RL']) {
+        const a = dir === 'LR' ? sp.lx : sp.rx, b = dir === 'LR' ? sp.rx : sp.lx;
+        for (let T = commitZ - 400; T <= commitZ; T += 10) {
+          const run = runScript(pairStage({ ...sp, n }), (r) => (r.z < T ? a : b), sp.z + 60);
+          const opened = run.supplies.filter((s) => s.opened).map((s) => s.id);
+          assert.ok(opened.length <= 1, `${sp.name} n=${n} ${dir} T=${T} 에서 ${opened} 가 동시에 열렸다`);
+        }
+      }
+    }
+  }
+});
+
+test('V3-SUPPLY-PAIR PAIR-4c: 배제 쌍의 coverZ 는 비행시간 보정선 공식과 정확히 같다(확정선이 아니다)', () => {
+  const vzMin = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
+  assert.equal(vzMin, VZ_MIN);
+  for (const id of STAGE_IDS) {
+    const st = buildStage(id);
+    for (const s of st.supplies) {
+      if (!s.pairId) continue;
+      const wall = st.walls.find((w) => w.z0 - 60 <= s.z && s.z <= w.z1);
+      assert.ok(wall, 'S' + id + ' ' + s.id + ' 배제 쌍은 벽 안에 있어야 한다');
+      const commitZ = wall.z0 - 60;
+      const want = Math.ceil(commitZ + (s.z - commitZ) * BAL3.scroll / vzMin);
+      assert.equal(s.coverZ, want, 'S' + id + ' ' + s.id + ' coverZ');
+      assert.ok(s.coverZ > commitZ, 'coverZ 는 확정선보다 뒤여야 한다(확정 직전에 쏜 탄이 도착하는 지점)');
+      assert.ok(s.coverZ < s.z, 'coverZ 는 통보다 앞이어야 한다(개방 뒤 사격창이 남는다)');
+    }
+  }
 });

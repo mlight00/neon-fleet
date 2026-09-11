@@ -2,6 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createSave3, KEY3, BAK3 } from '../rush3/save.js';
+import { STAGE_IDS, buildStage, stageVersion } from '../rush3/stages.js';
+import { createRun } from '../rush3/combat.js';
 import { SPRITE_KEYS3, loadSprites3 } from '../rush3/sprites.js';
 import { createAudio3, SFX_NAMES3 } from '../rush3/audio.js';
 
@@ -24,7 +26,7 @@ test('V3-SAVE: 새 저장 → 기본값·진행 가능·ok=true', () => {
   const s = createSave3(st);
   runsFine(s);
   assert.equal(s.ok, true);
-  assert.equal(JSON.parse(st.getItem(KEY3)).stages['1'].attempts, 1);
+  assert.equal(JSON.parse(st.getItem(KEY3)).stages['1'].versions['1'].attempts, 1, '기록은 stageId + 코스 버전으로 저장');
   assert.equal(st.getItem(BAK3), null, '정상 원문은 bak 없음');
   assert.equal(st.getItem('starforgeRush.v1'), null, 'v1 키는 건드리지 않음');
 });
@@ -98,6 +100,123 @@ test('V3-SAVE: updateStage 깊은 병합 — 다른 스테이지·다른 필드�
   const s2 = createSave3(st);
   assert.deepEqual(s2.getStage(1), { cleared: true, attempts: 5, bestSurvivors: 12, bestTime: 40.5 });
   assert.equal(s2.get().v, 3);
+});
+
+test('V3-SAVE-VERSION: 구 저장(stages[id] 에 바로 기록) → 버전 1 로 귀속, 데이터 보존(삭제 없음)', () => {
+  const raw = JSON.stringify({ v: 3, stages: { 1: { cleared: true, attempts: 4, bestSurvivors: 12, bestTime: 41.2 }, 2: { attempts: 2 } },
+    lastStage: 1, volume: 0.5, mute: true });
+  const st = memStorage({ [KEY3]: raw });
+  const s = createSave3(st);
+  assert.equal(st.getItem(BAK3), null, '형식이 맞으므로 bak 없음(구 기록을 버리지 않는다)');
+  const rec1 = { cleared: true, attempts: 4, bestSurvivors: 12, bestTime: 41.2 };
+  assert.deepEqual(s.getStage(1, 1), rec1);
+  assert.deepEqual(s.getStage(1), rec1, '버전을 생략하면 1');
+  assert.deepEqual(s.getStageVersions(1), { 1: rec1 });
+  assert.deepEqual(s.getStage(2, 1), { cleared: false, attempts: 2, bestSurvivors: 0, bestTime: 0 });
+  assert.deepEqual(s.getStage(1, 2), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 }, '새 코스 버전은 빈 기록에서 시작');
+  assert.equal(s.get().volume, 0.5);
+  assert.equal(s.get().mute, true);
+  //  저장 원문도 versions 형식으로 옮겨 적힌다(옛 값 그대로)
+  s.patch({ lastStage: 2 });
+  assert.deepEqual(JSON.parse(st.getItem(KEY3)).stages['1'], { versions: { 1: rec1 } });
+});
+
+test('V3-SAVE-VERSION: v2 기록은 v1 최고 기록을 덮지 않는다(신기록 비교는 같은 버전 안에서만)', () => {
+  const st = memStorage();
+  const s = createSave3(st);
+  s.updateStage(3, { attempts: 1 }, 1);
+  s.updateStage(3, { cleared: true, bestSurvivors: 30, bestTime: 60.5 }, 1);
+  //  코스 개정 뒤 같은 스테이지를 v2 로 도전 — 더 나쁜 기록이라도 v1 을 건드리지 않는다
+  s.updateStage(3, { attempts: 1 }, 2);
+  s.updateStage(3, { cleared: true, bestSurvivors: 8, bestTime: 90.0 }, 2);
+  assert.deepEqual(s.getStage(3, 1), { cleared: true, attempts: 1, bestSurvivors: 30, bestTime: 60.5 });
+  assert.deepEqual(s.getStage(3, 2), { cleared: true, attempts: 1, bestSurvivors: 8, bestTime: 90 });
+  //  v1 의 신기록도 v2 와 무관하게 갱신된다
+  s.updateStage(3, { bestSurvivors: 33 }, 1);
+  assert.equal(s.getStage(3, 1).bestSurvivors, 33);
+  assert.equal(s.getStage(3, 2).bestSurvivors, 8);
+  assert.deepEqual(Object.keys(s.getStageVersions(3)), ['1', '2']);
+  //  재로드 후에도 동일
+  const s2 = createSave3(st);
+  assert.deepEqual(s2.getStage(3, 1), { cleared: true, attempts: 1, bestSurvivors: 33, bestTime: 60.5 });
+  assert.deepEqual(s2.getStage(3, 2), { cleared: true, attempts: 1, bestSurvivors: 8, bestTime: 90 });
+});
+
+test('V3-SAVE-VERSION: 셸 경로 — buildStage 의 version 이 그대로 기록 버전이 된다', () => {
+  for (const id of STAGE_IDS) {
+    const stage = buildStage(id);
+    const run = createRun(stage);
+    assert.equal(run.stageVersion, stageVersion(id), 'stages.js 의 version 을 읽어 쓴다');
+    const s = createSave3(memStorage());
+    s.updateStage(id, { attempts: 1, cleared: true, bestSurvivors: 5 }, run.stageVersion);
+    assert.equal(s.getStage(id, stageVersion(id)).bestSurvivors, 5);
+    assert.deepEqual(Object.keys(s.getStageVersions(id)), [String(stageVersion(id))]);
+  }
+});
+
+test('V3-SAVE-VERSION: 손상 케이스 — versions 가 객체가 아니거나 버전 키가 이상해도 진행 가능', () => {
+  const st = memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: { 1: { versions: 'x' }, 2: { versions: { abc: { attempts: 3 } } },
+    3: { versions: { 2: { attempts: 'x', bestTime: Infinity } } } } }) });
+  const s = createSave3(st);
+  assert.equal(st.getItem(BAK3), null, '최상위 형식은 맞으니 bak 없음');
+  assert.deepEqual(s.getStage(1), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 });
+  assert.deepEqual(s.getStage(2, 1), { cleared: false, attempts: 3, bestSurvivors: 0, bestTime: 0 }, '이상한 버전 키는 1 로 본다');
+  assert.deepEqual(s.getStage(3, 2), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 }, '숫자 필드는 Number.isFinite 강제');
+  runsFine(s);
+});
+
+test('V3-SAVE-VERSION: 손상 케이스 — 잡키가 실재하는 버전 1 기록을 덮지 않는다(무음 손실 금지)', () => {
+  const rec1 = { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 };
+  const old2 = { cleared: true, attempts: 4, bestSurvivors: 12, bestTime: 41.2 };
+  const st = memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {
+    //  진짜 v1 기록 + 잡키가 함께 있는 칸(잡키도 verKey 로는 '1' 이 된다)
+    1: { versions: { 1: rec1, abc: { attempts: 0, bestSurvivors: 1 } } },
+    //  구 저장의 옛 필드 + 잡키 — 옛 필드가 버전 1 이고 잡키는 그것을 못 덮는다
+    2: { ...old2, versions: { abc: { attempts: 0 } } },
+    //  잡키만 있으면 종전대로 버전 1 로 귀속(기존 동작 유지)
+    3: { versions: { xyz: { attempts: 3 } } },
+  } }) });
+  const s = createSave3(st);
+  assert.equal(st.getItem(BAK3), null, '최상위 형식은 맞으니 bak 없음(기존 저장 삭제 금지)');
+  assert.deepEqual(s.getStage(1, 1), rec1, '잡키가 진짜 v1 기록을 지우면 안 된다');
+  assert.deepEqual(s.getStageVersions(1), { 1: rec1 });
+  assert.deepEqual(s.getStage(2, 1), old2, '구 저장의 옛 필드가 버전 1 로 살아남는다');
+  assert.deepEqual(s.getStage(3, 1), { cleared: false, attempts: 3, bestSurvivors: 0, bestTime: 0 }, '잡키만 있으면 1 로 본다');
+  //  저장 원문에 다시 적힐 때도 보존된다
+  s.patch({ lastStage: 1 });
+  assert.deepEqual(JSON.parse(st.getItem(KEY3)).stages['1'], { versions: { 1: rec1 } });
+  //  갱신 경로(updateStage)도 잡키 때문에 옛 기록을 잃지 않는다
+  s.updateStage(1, { attempts: 10 }, 1);
+  assert.deepEqual(s.getStage(1, 1), { ...rec1, attempts: 10 });
+  //  재로드해도 그대로(진행 가능)
+  const s2 = createSave3(st);
+  assert.equal(s2.get().v, 3);
+  assert.equal(s2.get().lastStage, 1);
+  assert.deepEqual(s2.getStage(1, 1), { ...rec1, attempts: 10 });
+  assert.deepEqual(s2.getStage(2, 1), old2);
+});
+
+test('V3-SAVE-VERSION: 손상 케이스 — 정규 키 1 자리가 비객체·빈 객체·null 이어도 옛 필드가 버전 1 로 귀속된다(무음 손실 금지)', () => {
+  const old = { cleared: true, attempts: 5, bestSurvivors: 9, bestTime: 40 };
+  for (const bad of ['junk', {}, null, 3]) {
+    const st = memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: { 1: { ...old, versions: { 1: bad } } } }) });
+    const s = createSave3(st);
+    assert.deepEqual(s.getStage(1, 1), old, '1 자리 ' + JSON.stringify(bad) + ' 은 빈 칸으로 보고 옛 필드를 살린다');
+    assert.equal(st.getItem(BAK3), null);
+  }
+  //  잡키가 옛 필드보다 먼저 와도, 정규 칸이 손상돼도 잡키가 옛 기록을 덮지 않는다
+  const st = memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: { 1: { versions: { x: { attempts: 7 }, 1: 'junk' }, ...old } } }) });
+  assert.deepEqual(createSave3(st).getStage(1, 1), old);
+});
+
+test('V3-SAVE-VERSION: 잡키가 원문에서 앞에 와도 결과가 같다(키 순서 무관)', () => {
+  const rec = { cleared: true, attempts: 7, bestSurvivors: 55, bestTime: 33.3 };
+  //  JSON 원문에서 잡키를 먼저 적어도 정규 키가 이긴다
+  const raw = '{"v":3,"stages":{"1":{"versions":{"abc":{"attempts":0},"1":' + JSON.stringify(rec) + '}}}}';
+  const s = createSave3(memStorage({ [KEY3]: raw }));
+  assert.deepEqual(s.getStage(1, 1), rec);
+  //  잡키가 비어 있는 다른 버전 칸을 침범하지도 않는다
+  assert.deepEqual(Object.keys(s.getStageVersions(1)), ['1']);
 });
 
 test('V3-SAVE: storage 미주입(Node) → 메모리 저장으로 진행', () => {

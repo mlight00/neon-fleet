@@ -1,6 +1,7 @@
 // rush3/stages.js — 기준 전투 3개 고정 배치(계약서 5장). buildStage 는 호출마다 새 객체(구조 공유 금지).
 // 난수는 빌드 시점 좌표 확정용 hashSeed/mulberry32 만(규칙 진행 중 난수 없음).
 import { BAL3 } from './balance.js';
+import { WEAPONS } from './weapons.js';
 import { hashSeed, mulberry32 } from '../rush/rng.js';
 
 export const STAGE_IDS = [1, 2, 3];
@@ -8,69 +9,115 @@ export const STAGE_IDS = [1, 2, 3];
 const ROAD = BAL3.road;
 const WALL_X = BAL3.wall;
 const ENTER = BAL3.enterZ;
+//  벽 활성(통로 확정) 선행 여유 — squad.clampCenter 와 같은 값
+const WALL_LEAD = BAL3.squad.wallLead;
+//  가장 느린 탄 속도(현재 heavy 650). coverZ 공식이 여기에 매달려 있다(더 느린 무기를 넣으면 배제가 다시 열린다)
+export const VZ_MIN = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
+
+/** 배제 쌍의 차폐 개방선 = '비행시간 보정선'(개정 r3 §3-3).
+ *  통로 확정선(commitZ = wall.z0 - 60)에 두면 확정 **직전에 쏜 탄**이 차폐가 걷힌 뒤 반대편 통에 도착해 배제가 뚫린다.
+ *  확정 직전에 쏜 가장 느린 탄이 통에 닿는 순간의 run.z 까지 차폐를 유지한다.
+ *    coverZ = ceil( commitZ + (s.z - commitZ) × scroll / vzMin ) */
+export function coverZFor(wallZ0, supplyZ) {
+  const commitZ = wallZ0 - WALL_LEAD;
+  return Math.ceil(commitZ + (supplyZ - commitZ) * BAL3.scroll / VZ_MIN);
+}
 
 // 표 그대로의 스테이지 정의. z 는 계약서 표의 z(정지물 = 부대 줄에 도달하는 위치, 스폰 = 발동 지점 ev.z)
 //  gate: cells [x0, x1, value] / supply: kind 별 payload / wall: z0~z1 / spawn: xs 명시 없으면 차선 균등 분산+지터, dz = zs 상대 오프셋
-const DEFS = {
+//  배치 개정 담당이 고치는 표(version 포함). 검사에서 코스 버전을 임시로 바꿔 셸 경로를 확인하므로 export 한다.
+export const DEFS = {
   1: {
-    title: '첫 진격', startUnits: 1, startWeapon: 'rifle', length: 7600, eliteZ: 7200,
+    version: 2, title: '첫 진격', startUnits: 1, startWeapon: 'rifle', length: 7600, eliteZ: 7200,
     gates: [
-      { z: 1140, maxValue: 15, bypass: true, cells: [[240, 400, 1]] },
-      { z: 3040, maxValue: 15, bypass: true, cells: [[80, 240, -9]] },
+      //  첫 게이트는 항상 열림(armZ null) — "쏘면 숫자가 오른다"를 바로 배우는 학습용 행
+      { z: 1140, maxValue: 15, bypass: true, armZ: null, cells: [[240, 400, 1]] },
+      { z: 3040, maxValue: 15, bypass: true, cells: [[80, 240, -9]],
+        hint: '왼쪽 −9 칸은 빈 길로 우회할 수 있습니다. 옆으로 한 번만 비켜 보세요' },
     ],
     supplies: [
-      { z: 2100, x: 240, kind: 'soldier', durability: 4, n: 2 },
-      { z: 4180, x: 240, kind: 'weapon', durability: 8, weapon: 'auto' },
-      { z: 5890, x: 150, kind: 'soldier', durability: 6, n: 2 },
-      { z: 5890, x: 330, kind: 'soldier', durability: 10, n: 4 },
+      { z: 2100, x: 240, kind: 'soldier', durability: 4, n: 2, hint: '앞의 통은 그 차선에 서 있기만 하면 저절로 열립니다' },
+      { z: 4180, x: 240, kind: 'weapon', durability: 8, weapon: 'auto', hint: '기관총 통은 내구 8 이라 조금 더 오래 쏴야 합니다' },
+      { z: 5890, x: 150, kind: 'soldier', durability: 6, n: 2, hint: '왼쪽 통은 왼쪽 차선으로 붙어야 열립니다' },
+      { z: 5890, x: 330, kind: 'soldier', durability: 10, n: 4, hint: '오른쪽 통이 병사 4명으로 더 큽니다' },
     ],
     walls: [],
     spawns: [
-      { z: 3800, kind: 'grunt', n: 4, xs: [120, 200, 280, 360], dz: [0, 40, 80, 120] },
-      { z: 5300, kind: 'grunt', n: 6, rows: 2 },
+      //  탄막 무리(통로 없음) — 잡졸 hp 2 라 부대 화력으로 정리한다
+      { z: 3800, kind: 'grunt', n: 4, xs: [120, 200, 280, 360], dz: [0, 40, 80, 120], corridorHw: null },
+      //  회피 통로 무리: 1열 가운데 166px · 2열 208px 이 비어 있다(필요 폭 = 2 × 반폭 53 + 10 = 116)
+      { z: 5300, kind: 'grunt', n: 6, xs: [94, 136, 330, 372, 115, 351], dz: [0, 0, 0, 0, 40, 40], corridorHw: 53 },
     ],
     elite: { z: 7200, hp: 120, summon: false },
   },
   2: {
-    title: '갈림길', startUnits: 2, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
+    version: 2, title: '갈림길', startUnits: 2, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
     gates: [
-      { z: 1140, maxValue: 20, bypass: false, cells: [[80, 240, -6], [240, 400, -20]] },
-      { z: 5400, maxValue: 20, bypass: false, cells: [[80, 240, 2], [240, 400, -20]] },
+      //  안전한 작은 확정 보상(좌) vs 병력을 모아야 여는 큰 음수(우) — 양쪽 모두 음수인 행을 늘리지 않는다
+      { z: 1140, maxValue: 20, bypass: false, cells: [[80, 240, 1, 3], [240, 400, -20, 20]],
+        hint: '왼쪽 칸은 조금만 쏴도 확실합니다. 오른쪽은 병력이 더 모인 뒤에 노려 보세요' },
+      { z: 5400, maxValue: 20, bypass: false, cells: [[80, 240, 2, 12], [240, 400, -20, 40]],
+        hint: '오른쪽 −20 은 상한이 40 입니다. 소총이면 13명, 기관총이면 7명쯤부터 이득입니다' },
     ],
     supplies: [
-      { z: 2300, x: 120, kind: 'soldier', durability: 6, n: 3 },
-      { z: 2300, x: 326, kind: 'weapon', durability: 12, weapon: 'auto' },
-      { z: 5800, x: 330, kind: 'soldier', durability: 15, n: 5 },
+      //  분리벽 안 필수 선택: 병력(좌) vs 화력(우). 벽 + 차폐(coverZ)가 함께 있어야 배제가 성립한다
+      { z: 2300, x: 120, kind: 'soldier', durability: 6, n: 3, pairId: 'w1', coverZ: 1904,
+        hint: '분리벽 왼쪽 통로에는 병사 3명이 있습니다. 벽 앞 표지를 보고 미리 차선을 고르세요' },
+      { z: 2300, x: 326, kind: 'weapon', durability: 12, weapon: 'auto', pairId: 'w1', coverZ: 1904,
+        hint: '분리벽 오른쪽 기관총을 확보하면 다음 무리를 빨리 정리할 수 있어요' },
+      { z: 5800, x: 150, kind: 'soldier', durability: 15, n: 5,
+        hint: '두 번째 게이트에서 오른쪽을 골랐다면 이 통은 왼쪽으로 옮겨야 얻습니다' },
     ],
-    walls: [{ z0: 1800, z1: 3000 }],
+    walls: [{ z0: 1800, z1: 3000, signs: { L: { kind: 'soldier', n: 3 }, R: { kind: 'weapon', weapon: 'auto' } } }],
     spawns: [
-      { z: 3600, kind: 'grunt', n: 5, rows: 1 },
-      { z: 3600, kind: 'rusher', n: 4, xs: [110, 215, 265, 370] },
-      { z: 4600, kind: 'shooter', n: 3, xs: [150, 240, 330] },
-      { z: 7000, kind: 'grunt', n: 8, rows: 2 },
+      //  회피 통로 무리: 오른쪽 도로 끝까지 165px 이 비어 있다(필요 폭 = 2 × 반폭 61 + 10 = 132)
+      { z: 3600, kind: 'grunt', n: 4, xs: [95, 137, 179, 221], corridorHw: 61 },
+      { z: 3600, kind: 'rusher', n: 4, xs: [110, 215, 265, 370], corridorHw: null },
+      { z: 4600, kind: 'shooter', n: 3, xs: [150, 240, 330], corridorHw: null },
+      { z: 7000, kind: 'grunt', n: 8, xs: [94, 136, 178, 220, 262, 304, 346, 386], dz: [0, 0, 0, 0, 40, 40, 40, 40], corridorHw: null },
     ],
     elite: { z: 8200, hp: 220, summon: false },
   },
   3: {
-    title: '군단', startUnits: 3, startWeapon: 'rifle', length: 11000, eliteZ: 10600,
+    version: 2, title: '군단', startUnits: 3, startWeapon: 'rifle', length: 11000, eliteZ: 10600,
     gates: [
-      { z: 4000, maxValue: 40, bypass: false, cells: [[80, 240, 3], [240, 400, -25]] },
+      //  선택 C 의 한쪽 — 좌 안전 +12 vs 우 도전 +40. 앞의 통(z3900)과 사격창을 나눠 쓴다
+      { z: 4000, maxValue: 40, bypass: false, cells: [[80, 240, 3, 12], [240, 400, -25, 40]],
+        hint: '오른쪽 −25 는 상한이 40 입니다. 기관총이면 7명, 소총이면 13명쯤부터 채울 수 있어요' },
     ],
     supplies: [
-      { z: 1100, x: 160, kind: 'soldier', durability: 4, n: 2 },
-      { z: 1500, x: 320, kind: 'soldier', durability: 5, n: 2 },
-      { z: 1900, x: 160, kind: 'soldier', durability: 6, n: 3 },
-      { z: 2800, x: 320, kind: 'chain', durability: 10, pads0: 5, maxPads: 15 },
-      { z: 4400, x: 330, kind: 'weapon', durability: 24, weapon: 'heavy' },
-      { z: 6300, x: 326, kind: 'soldier', durability: 12, n: 6 },
+      { z: 1100, x: 160, kind: 'soldier', durability: 4, n: 2, hint: '통은 좌우로 번갈아 놓여 있습니다. 가만히 있으면 하나도 못 엽니다' },
+      { z: 1500, x: 320, kind: 'soldier', durability: 5, n: 2, hint: '오른쪽 통으로 한 번 옮겨 보세요' },
+      { z: 1900, x: 160, kind: 'soldier', durability: 6, n: 3, hint: '다시 왼쪽입니다. 통이 보이기 시작할 때 옮기면 늦지 않습니다' },
+      //  선택 A: 연속증원(좌, 최대 15명이지만 좌측 차선에 묶인다) vs 즉시 병사 5(우, 자유롭다)
+      { z: 2800, x: 150, kind: 'chain', durability: 10, pads0: 5, maxPads: 15, pairId: 'p1', coverZ: 2475,
+        hint: '왼쪽 증원 설비는 최대 15명까지 자라지만 발판이 왼쪽 차선에 깔립니다' },
+      { z: 2800, x: 330, kind: 'soldier', durability: 10, n: 5, pairId: 'p1', coverZ: 2475,
+        hint: '오른쪽 통은 병사 5명을 즉시 줍니다. 대신 성장 상한이 없습니다' },
+      //  선택 B: 기관총(좌, 게이트 효율 2배) vs 중화기(우, 적 처리·정예전). 중화기를 고르면 발판 9개를 버린다
+      { z: 3500, x: 150, kind: 'weapon', durability: 12, weapon: 'auto', pairId: 'p2', coverZ: 3210,
+        hint: '기관총은 게이트에 넣는 탄이 소총의 두 배입니다' },
+      { z: 3500, x: 330, kind: 'weapon', durability: 24, weapon: 'heavy', pairId: 'p2', coverZ: 3210,
+        hint: '중화기는 적 처리와 정예전에 강하지만 게이트 효율은 가장 낮습니다' },
+      //  선택 C 의 다른 한쪽 — 게이트 사격창(z3660 개시)과 같은 창을 나눠 쓴다
+      { z: 3900, x: 150, kind: 'soldier', durability: 24, n: 4, coverZ: 3660,
+        hint: '이 통과 게이트 오른쪽 칸은 같은 사격 시간을 나눠 씁니다. 둘 다 노리면 둘 다 모자랍니다' },
+      //  선택 D: 좌 통로에 병사 10명 + 저격수 2기 / 우 통로는 안전하지만 보상 0
+      { z: 6300, x: 150, kind: 'soldier', durability: 20, n: 10, coverZ: 6046,
+        hint: '분리벽 왼쪽에는 병사 10명과 저격수 2기가 같이 있습니다. 오른쪽은 안전하지만 아무것도 없습니다' },
     ],
-    walls: [{ z0: 6000, z1: 7200 }],
+    walls: [
+      { z0: 2400, z1: 2900, signs: { L: { kind: 'chain' }, R: { kind: 'soldier', n: 5 } } },
+      { z0: 3150, z1: 3550, signs: { L: { kind: 'weapon', weapon: 'auto' }, R: { kind: 'weapon', weapon: 'heavy' } } },
+      { z0: 6000, z1: 7200, signs: { L: { kind: 'soldier', n: 10 }, R: { kind: 'none' } } },
+    ],
     spawns: [
-      { z: 5200, kind: 'grunt', n: 14, rows: 2 },
-      { z: 6300, kind: 'shooter', n: 2, xs: [120, 190] },
-      { z: 8000, kind: 'rusher', n: 6, xs: [100, 160, 210, 270, 320, 380] },
-      { z: 8800, kind: 'grunt', n: 18, rows: 2 },
-      { z: 8800, kind: 'shooter', n: 3, xs: [130, 240, 350] },
+      { z: 5200, kind: 'grunt', n: 14, xs: [94, 136, 178, 220, 262, 304, 346, 115, 157, 199, 241, 283, 325, 367],
+        dz: [0, 0, 0, 0, 0, 0, 0, 40, 40, 40, 40, 40, 40, 40], corridorHw: null },
+      { z: 6300, kind: 'shooter', n: 2, xs: [120, 190], corridorHw: null },
+      { z: 8000, kind: 'rusher', n: 6, xs: [100, 160, 210, 270, 320, 380], corridorHw: null },
+      { z: 8800, kind: 'grunt', n: 18, rows: 2, corridorHw: null },
+      { z: 8800, kind: 'shooter', n: 3, xs: [130, 240, 350], corridorHw: null },
     ],
     elite: { z: 10600, hp: 500, summon: true },
   },
@@ -82,16 +129,24 @@ function def(id) {
   return d;
 }
 
+// 코스 배치 버전(계약서 7장). 배치를 고치면 이 값을 올린다 → 저장 기록이 버전별로 따로 쌓인다.
+export function stageVersion(id) {
+  return def(id).version ?? 1;
+}
+
 // 메타만(제목·시작 병력·무기·길이·정예 z)
 export function stageMeta(id) {
   const d = def(id);
   return { id, title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ };
 }
 
-// 게이트 행: 계약서 3-2 필드 전부 초기값 포함
+// 게이트 행: 계약서 3-2 필드 전부 초기값 포함. cells 항목 = [x0, x1, value] 또는 [x0, x1, value, maxValue](칸별 상한)
+//  armZ 미지정 = BAL3.gate.armZ(340), 명시적 null = 항상 열림(학습용 행)
 function makeRow(idx, g) {
-  const cells = g.cells.map(([x0, x1, value]) => ({ x0, x1, value, maxValue: g.maxValue, flashT: 0 }));
-  return { id: 'g' + idx, z: g.z, h: BAL3.gate.h, cells, passed: false, bypass: !!g.bypass };
+  const cells = g.cells.map(([x0, x1, value, maxValue]) => ({ x0, x1, value, maxValue: maxValue ?? g.maxValue, flashT: 0 }));
+  const armZ = g.armZ === undefined ? BAL3.gate.armZ : g.armZ;
+  return { id: 'g' + idx, z: g.z, h: BAL3.gate.h, cells, passed: false, bypass: !!g.bypass,
+           armZ, armed: armZ == null, hint: g.hint ?? null };
 }
 
 // 보급 통: 계약서 3-3 필드 전부 초기값 포함
@@ -102,11 +157,15 @@ function makeSupplyDef(idx, s) {
   else payload = { pads0: s.pads0, maxPads: s.maxPads };
   return { id: 'c' + idx, z: s.z, x: s.x, r: BAL3.supply.r, kind: s.kind,
            durability: s.durability, maxDurability: s.durability,
-           payload, opened: false, missed: false, locked: false, pads: [] };
+           payload, opened: false, missed: false, locked: false, skipped: false, pads: [],
+           coverZ: s.coverZ ?? null, pairId: s.pairId ?? null, hint: s.hint ?? null };
 }
 
+//  signs = 벽 앞머리에 그리는 통로 안내 표지(연출이 아니라 계약 데이터 — V3-STAGES 가 실제 통 내용과 대조한다)
 function makeWall(idx, w) {
-  return { id: 'w' + idx, z0: w.z0, z1: w.z1, x0: WALL_X.x0, x1: WALL_X.x1 };
+  const wall = { id: 'w' + idx, z0: w.z0, z1: w.z1, x0: WALL_X.x0, x1: WALL_X.x1 };
+  if (w.signs) wall.signs = { L: { ...w.signs.L }, R: { ...w.signs.R } };
+  return wall;
 }
 
 // 벽 구간(z0~z1) 안의 z 이고 x 가 벽 폭(반경 포함) 안이면 가까운 통로로 밀어낸다
@@ -149,7 +208,8 @@ function makeSpawn(id, sp, walls) {
     xs.push(Math.round(x * 100) / 100);
     zs.push(Math.round(z * 100) / 100);
   }
-  const ev = { z: evZ, kind: sp.kind, n, xs, zs };
+  //  corridorHw = 그 구간 예상 부대 반폭(회피 통로 규격 검사 기준). null = 통로 없음(탄막 무리)
+  const ev = { z: evZ, kind: sp.kind, n, xs, zs, corridorHw: sp.corridorHw ?? null };
   if (sp.hp != null) ev.hp = sp.hp;
   return ev;
 }
@@ -159,7 +219,7 @@ export function buildStage(id) {
   const d = def(id);
   const walls = d.walls.map((w, i) => makeWall(i + 1, w));
   const stage = {
-    id, version: 1,
+    id, version: d.version ?? 1,
     title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ,
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),

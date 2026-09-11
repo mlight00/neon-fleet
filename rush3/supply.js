@@ -1,6 +1,8 @@
 // rush3/supply.js — 보급 통(병사/무기/연속 증원). 순수 규칙만(난수·화면·balance 없음). 계약서 3-3.
-// s = { id, z, x, r, kind, durability, maxDurability, payload, opened, missed, locked, activated, queuedPads, pads }
+// s = { id, z, x, r, kind, durability, maxDurability, payload, opened, missed, locked, skipped, coverZ, pairId, hint, activated, queuedPads, pads }
 // payload: soldier { n } / weapon { weapon } / chain { pads0, maxPads }   pads = [{ z, x, taken }]
+// coverZ = 차폐 개방선(비행시간 보정선). run.z < coverZ 이면 탄을 흡수하고 내구는 줄지 않는다(계약서 3-3 · 개정 r3 §3-3).
+// pairId = 벽으로 배제되는 쌍의 이름. 한 판에서 같은 pairId 는 최대 1개만 열린다.
 // 유닛 증감은 squad.js 의 addUnits/removeUnits 를 직접 호출한다(콜백 주입 없음).
 import { addUnits } from './squad.js';
 
@@ -8,22 +10,54 @@ export const SUPPLY_R = 30;
 export const PAD_START = 60;
 export const PAD_GAP = 40;
 export const PAD_REACH = 70;
+// 벽 활성(통로 확정) 선행 여유. squad.SQUAD_DEFAULTS.wallLead 와 같은 값(순수 모듈이라 import 하지 않고 상수로 둔다)
+export const WALL_LEAD = 60;
 
-// def = { id, z, x, kind, durability, maxDurability?, r?, payload, padStart?, padGap? }
+// def = { id, z, x, kind, durability, maxDurability?, r?, payload, padStart?, padGap?, coverZ?, pairId?, hint? }
 export function makeSupply(def) {
   const payload = def.payload ? { ...def.payload } : {};
   const s = {
     id: def.id, z: def.z, x: def.x, r: def.r ?? SUPPLY_R, kind: def.kind,
     durability: def.durability, maxDurability: def.maxDurability ?? def.durability,
-    payload, opened: false, missed: false, locked: false, activated: false, queuedPads: 0, pads: [],
+    payload, opened: false, missed: false, locked: false, skipped: false, activated: false, queuedPads: 0, pads: [],
+    coverZ: def.coverZ ?? null, pairId: def.pairId ?? null, hint: def.hint ?? null,
     padStart: def.padStart ?? PAD_START, padGap: def.padGap ?? PAD_GAP,
   };
   return s;
 }
 
-// 충돌 후보 여부: (opened && chain 아님) || missed || locked 면 제외.
+// 충돌 후보 여부: (opened && chain 아님) || missed || locked || skipped 면 제외.
+//  차폐(coverZ)는 여기서 보지 않는다 — 차폐된 통도 충돌 후보로 남아 탄을 흡수한다(hitSupply 안에서 검사).
 export function supplyActive(s) {
-  return !((s.opened && s.kind !== 'chain') || s.missed || s.locked);
+  return !((s.opened && s.kind !== 'chain') || s.missed || s.locked || s.skipped);
+}
+
+// 차폐 중인가(탄이 흡수되고 내구가 줄지 않는 구간)
+export function supplyCovered(s, run) {
+  return s.coverZ != null && run && run.z < s.coverZ;
+}
+
+/** 지나는 시점에 '구조적으로 획득 불가능했는가'(개정 r3 §6-1).
+ *  (a) 벽 배제  : 통이 어떤 벽의 활성 구간 안에 있고 통로가 이미 확정됐는데 통 원이 그 통로와 전혀 겹치지 않는다
+ *  (b) 차폐 미개방 : coverZ 가 아직 안 열렸다
+ *  (c) 쌍 배제  : 같은 pairId 의 다른 통이 이미 열렸다  */
+export function structurallyLost(s, run) {
+  const walls = (run && run.walls) || [];
+  const side = (run && run.wallSide) || {};
+  for (const w of walls) {
+    if (!(w.z0 - WALL_LEAD <= s.z && s.z <= w.z1)) continue;
+    const sd = side[w.id];
+    if (sd !== 'L' && sd !== 'R') continue;
+    if (sd === 'L' ? s.x - s.r > w.x0 : s.x + s.r < w.x1) return true;
+  }
+  if (supplyCovered(s, run)) return true;
+  if (s.pairId != null) {
+    for (const o of (run && run.supplies) || []) {
+      if (o === s || o.pairId !== s.pairId) continue;
+      if (o.opened) return true;
+    }
+  }
+  return false;
 }
 
 // 보상 데이터(pendingRewards 항목). id 는 chain 활성화 때 통을 찾기 위한 덤.
@@ -31,14 +65,21 @@ export function supplyReward(s) {
   return { kind: s.kind, payload: { ...s.payload }, x: s.x, z: s.z, id: s.id };
 }
 
-// 탄 스윕 [pz, z](수직 선분) vs 통 원(중심 (x, z), 반지름 r) 겹침.
-export function sweepHitsSupply(s, bullet) {
-  if (!supplyActive(s)) return false;
+// 탄 스윕 [pz, z](수직 선분, 중심 x 기준 = 탄 폭 미반영) vs 통 원(중심 (x, z), 반지름 r) 의 최초 교차 z.
+// 겹치지 않으면 null. 교차 z = 스윕이 원에 처음 들어가는 z = max(s.z - 반현, 스윕 시작).
+export function sweepContactSupply(s, bullet) {
+  if (!supplyActive(s)) return null;
   const dx = Math.abs(bullet.x - s.x);
-  if (dx > s.r) return false;
+  if (dx > s.r) return null;
   const half = Math.sqrt(s.r * s.r - dx * dx);
   const zlo = Math.min(bullet.pz, bullet.z), zhi = Math.max(bullet.pz, bullet.z);
-  return zhi >= s.z - half && zlo <= s.z + half;
+  if (!(zhi >= s.z - half && zlo <= s.z + half)) return null;
+  return Math.max(s.z - half, zlo);
+}
+
+// 겹침 여부만(기존 계약 유지). 판정은 sweepContactSupply 하나로 모았다.
+export function sweepHitsSupply(s, bullet) {
+  return sweepContactSupply(s, bullet) !== null;
 }
 
 // 발판 1개 추가(maxPads 상한). 추가됐으면 true.
@@ -74,6 +115,11 @@ export function hitSupply(s, bullet, events, run) {
   if (!run || !Array.isArray(run.pendingRewards)) throw new TypeError('hitSupply: run.pendingRewards 배열이 필요하다');
   if (!supplyActive(s)) return false;
   bullet.dead = true;
+  //  차폐 구간: 흡수만 하고 내구는 줄지 않는다(⚠️sweepContactSupply·supplyActive 에 넣으면 흡수가 통과로 뒤집힌다)
+  if (supplyCovered(s, run)) {
+    events.push({ type: 'supplyBlock', id: s.id, x: bullet.x, z: s.z });
+    return true;
+  }
   if (s.opened) {
     if (s.activated) addPad(s, events);
     else {
@@ -96,17 +142,26 @@ export function hitSupply(s, bullet, events, run) {
   return true;
 }
 
-// prevZ < s.z <= z 에 미개봉이면 missed(피해 없음). chain 은 이 시점에 locked(발판 더 이상 증가 없음).
+// prevZ < s.z <= z 에 미개봉이면 missed/skipped(피해 없음). chain 은 이 시점에 locked(발판 더 이상 증가 없음).
+//  판정 순서(개정 r3 §6-1): 0 조기 반환 → 0-b z 창 → 1 개봉 chain(locked 만) → 2 구조적 불가면 skipped → 3 그 외 missed.
+//  skipped = 벽·차폐·쌍 배제로 애초에 얻을 수 없던 통(의도된 선택). missed = 실제 기회 손실.
 export function passSupply(s, run, events) {
-  if (s.missed || (s.opened && s.kind !== 'chain')) return false;
+  if (s.missed || s.skipped || (s.opened && s.kind !== 'chain')) return false;
   if (!(run.prevZ < s.z && s.z <= run.z)) return false;
   let changed = false;
   if (!s.opened) {
-    s.missed = true;
-    run.missedSupplies = (run.missedSupplies || 0) + 1;
-    events.push({ type: 'supplyMissed', id: s.id, kind: s.kind, x: s.x, z: s.z });
+    if (structurallyLost(s, run)) {
+      s.skipped = true;
+      run.skippedSupplies = (run.skippedSupplies || 0) + 1;
+      events.push({ type: 'supplySkipped', id: s.id, kind: s.kind, x: s.x, z: s.z });
+    } else {
+      s.missed = true;
+      run.missedSupplies = (run.missedSupplies || 0) + 1;
+      events.push({ type: 'supplyMissed', id: s.id, kind: s.kind, x: s.x, z: s.z });
+    }
     changed = true;
   }
+  //  ⚠️미개봉 chain 도 지나는 순간 locked(기존 V3-CHAIN 계약). skipped 분기에서도 실제로 발생한다(S3 p1 좌 = chain)
   if (s.kind === 'chain' && !s.locked) {
     s.locked = true;
     changed = true;

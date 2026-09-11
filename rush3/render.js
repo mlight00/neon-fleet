@@ -104,15 +104,83 @@ export function createRenderer3(ctx, sprites) {
       //  분리대 줄무늬
       ctx.fillStyle = 'rgba(20,35,58,0.35)';
       for (let y = y0 + 12; y < y1; y += 36) ctx.fillRect(w.x0 + 3, y, w.x1 - w.x0 - 6, 6);
+      //  통로 안내 표지: 벽 앞머리(z0)에 좌·우 통로 내용물. 확정선(z0-60)까지 700px = 3.7초의 판단 시간을 준다
+      if (w.signs) {
+        const sYbot = sy(w.z0);
+        if (sYbot > -40 && sYbot < H + 40) {
+          drawSign(w.signs.L, (ROAD0 + w.x0) / 2, sYbot + 26);
+          drawSign(w.signs.R, (w.x1 + ROAD1) / 2, sYbot + 26);
+        }
+        //  통로 확정선(여기서 통로가 정해진다) — 벽과 같은 회색 실선
+        const cy = sy(w.z0 - BAL3.squad.wallLead);
+        if (cy > -10 && cy < H + 10) {
+          ctx.strokeStyle = 'rgba(154,161,172,0.75)';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([]);
+          ctx.beginPath(); ctx.moveTo(ROAD0, cy); ctx.lineTo(ROAD1, cy); ctx.stroke();
+        }
+      }
     }
   }
 
+  //  통로 안내 표지 1개(아이콘 + 숫자). kind 'none' = 빈 통로
+  function drawSign(sg, x, y) {
+    if (!sg) return;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(16,22,31,0.72)';
+    roundRect(x - 44, y - 20, 88, 40, 8);
+    ctx.fill();
+    if (sg.kind === 'soldier') {
+      ctx.fillStyle = C.soldier;
+      for (let i = 0; i < 3; i++) {
+        const px = x - 28 + i * 11;
+        ctx.beginPath(); ctx.arc(px, y - 8, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(px - 3, y - 4, 6, 9);
+      }
+      outlinedText('+' + (sg.n ?? 0), x + 16, y, 20, C.supplyBody, 'bold', 4);
+    } else if (sg.kind === 'weapon') {
+      const wp = WEAPONS[sg.weapon] ?? WEAPONS.rifle;
+      ctx.fillStyle = wp.color;
+      roundRect(x - 34, y - 6, 28, 9, 3); ctx.fill();
+      outlinedText(wp.name, x + 12, y, 16, wp.color, 'bold', 4);
+    } else if (sg.kind === 'chain') {
+      ctx.fillStyle = C.chainPad;
+      roundRect(x - 34, y - 10, 22, 18, 4); ctx.fill();
+      outlinedText('증원', x + 10, y, 16, C.chainPad, 'bold', 4);
+    } else {
+      outlinedText('빈 길', x, y, 17, C.gateZero, 'bold', 4);
+    }
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
   //  게이트 행: 칸 사각형 + 부호 숫자 + 색. 피격 흰 플래시·숫자 튐(셸 fx.gateFlash 타이머, 규칙의 cell.flashT 는 읽지 않는다). 통과 뒤 흐리게
-  function drawGateRow(row, sy, fx) {
+  //  셔터(armZ): 아직 안 열린 행은 회색 빗금 판을 덮고 숫자를 흐리게 그린다. 열리는 순간(fx.gateOpen)에는 판이 위로 걷힌다
+  function drawGateRow(row, sy, fx, runZ) {
     const y = sy(row.z);
     if (y < -60 || y > H + 60) return;
     const vis = 58;
     const flashMap = fx && fx.gateFlash ? fx.gateFlash : null;
+    //  0 = 완전히 닫힘 · 1 = 완전히 열림
+    const openLeft = fx && fx.gateOpen ? (fx.gateOpen[row.id] ?? 0) : 0;
+    const openT = BAL3.gate.openT || 0.25;
+    const shut = row.passed ? 0 : row.armed ? (openLeft > 0 ? openLeft / openT : 0) : 1;
+    //  사격 개시선: 아직 닫힌 행이면 도로 위 run.z + armZ 위치에 점선 1줄("여기서부터 쏠 수 있다")
+    if (!row.armed && !row.passed && row.armZ != null && runZ != null) {
+      const ay = LINE_Y - row.armZ;
+      if (ay > -10 && ay < H + 10) {
+        ctx.save();
+        ctx.strokeStyle = gateColor(row.cells[0] ? row.cells[0].value : 0);
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath(); ctx.moveTo(ROAD0, ay); ctx.lineTo(ROAD1, ay); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+    }
     ctx.globalAlpha = row.passed ? 0.32 : 0.92;
     for (const c of row.cells) {
       const col = gateColor(c.value);
@@ -130,8 +198,31 @@ export function createRenderer3(ctx, sprites) {
       const px = 38 + Math.round(flash * 8);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      //  닫힌 셔터 뒤에서는 숫자를 흐리게(무엇이 걸린 판인지 미리 읽게 한다)
+      const numAlpha = 1 - shut * 0.55;
+      ctx.globalAlpha = (row.passed ? 0.32 : 0.92) * numAlpha;
       outlinedText(gateLabel(c.value), cx, y, px, flash > 0.5 ? C.gateFlash : col, 'bold', 6);
+      ctx.globalAlpha = row.passed ? 0.32 : 0.92;
       ctx.textBaseline = 'alphabetic';
+      //  셔터 판(회색 빗금). 열리는 동안 위로 걷힌다
+      if (shut > 0) {
+        const hh = vis * shut;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(c.x0 + 3, y + vis / 2 - hh, c.x1 - c.x0 - 6, hh);
+        ctx.clip();
+        ctx.fillStyle = 'rgba(120,128,140,0.82)';
+        ctx.fillRect(c.x0 + 3, y - vis / 2, c.x1 - c.x0 - 6, vis);
+        ctx.strokeStyle = 'rgba(30,38,50,0.55)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let k = -vis; k < c.x1 - c.x0 + vis; k += 12) {
+          ctx.moveTo(c.x0 + 3 + k, y + vis / 2);
+          ctx.lineTo(c.x0 + 3 + k + vis, y - vis / 2);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -173,7 +264,7 @@ export function createRenderer3(ctx, sprites) {
   }
 
   //  보급 통: 그림 + 내용물 + 남은 내구 숫자(병력 수가 아니다). chain 발판 열은 '+1'
-  function drawSupply(s, sy) {
+  function drawSupply(s, sy, runZ) {
     //  발판(통보다 앞 z = 화면 위쪽)
     for (const p of s.pads) {
       const py = sy(p.z);
@@ -194,7 +285,10 @@ export function createRenderer3(ctx, sprites) {
     const y = sy(s.z);
     if (y < -60 || y > H + 60) return;
     const r = s.r;
-    ctx.globalAlpha = s.missed ? 0.35 : 1;
+    //  차폐(coverZ): 통로가 정해지고 잠시 뒤에 걷힌다. 걷히기 전에는 통 위에 회색 막이 덮여 있다
+    const covered = s.coverZ != null && runZ != null && runZ < s.coverZ;
+    //  skipped = 구조적으로 얻을 수 없던 대안. '밀려나며 사라지는' missed 연출과 달리 흐려지며 뒤로 빠진다
+    ctx.globalAlpha = s.skipped ? 0.22 : s.missed ? 0.35 : 1;
     shadow(s.x, y + r * 0.95, r * 0.9);
     drawImgCentered('supply', s.x, y, r * 2.1, () => {
       ctx.fillStyle = C.supplyDark;
@@ -207,6 +301,23 @@ export function createRenderer3(ctx, sprites) {
     ctx.textAlign = 'center';
     if (!s.opened) outlinedText(String(Math.max(0, Math.ceil(s.durability))), s.x, y + r + 18, 16, C.bulletHeavy, 'bold', 4);
     else if (!s.locked) outlinedText('쏘면 +1', s.x, y + r + 18, 13, C.chainPad, 'bold', 4);
+    if (covered && !s.opened) {
+      //  차폐 막 + 개방선(도로 위 가로선). 확정선(벽 회색 실선)과 다른 색으로 그려 '확정 뒤에도 잠깐 못 쏘는 이유'를 남긴다
+      ctx.fillStyle = 'rgba(120,128,140,0.55)';
+      roundRect(s.x - r - 2, y - r - 2, r * 2 + 4, r * 2 + 4, 8);
+      ctx.fill();
+      const oy = LINE_Y - (s.coverZ - runZ);
+      if (oy > -10 && oy < H + 10) {
+        ctx.save();
+        ctx.strokeStyle = C.chainPad;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath(); ctx.moveTo(ROAD0, oy); ctx.lineTo(ROAD1, oy); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -519,6 +630,32 @@ export function createRenderer3(ctx, sprites) {
   }
 
   //  결과: 성공/실패·생존·최고·시간·처치·놓친 것 한 줄·저장 실패 안내(버튼은 drawButtons)
+  //  어절(공백) 경계에서만 끊는 줄바꿈 — 단어 중간에서 줄이 갈라지지 않게 한다
+  function splitWrap(text, maxW) {
+    const words = String(text).split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const t = line ? line + ' ' + w : w;
+      if (line && ctx.measureText(t).width > maxW) { lines.push(line); line = w; }
+      else line = t;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  function wrapLines(text, maxW, font) {
+    const prev = ctx.font;
+    if (font) ctx.font = font;
+    const n = splitWrap(text, maxW).length;
+    ctx.font = prev;
+    return n;
+  }
+  function wrapText(text, cx, y, maxW, lh) {
+    const lines = splitWrap(text, maxW);
+    lines.forEach((l, i) => ctx.fillText(l, cx, y + i * lh));
+    return lines.length;
+  }
+
   function drawResult(view) {
     const r = view.result;
     ctx.fillStyle = 'rgba(5,8,14,0.8)';
@@ -549,7 +686,17 @@ export function createRenderer3(ctx, sprites) {
       y += 40;
     }
     ctx.textAlign = 'center';
-    if (!r.won && r.missedLine) {                       // 놓친 것 안내는 실패 판에만
+    //  제안 한 줄(advice)이 있으면 그것을 크게, 놓친 것 요약은 그 아래 작게(계약서 6장 · 개정 r3 §6-2)
+    if (r.advice) {
+      ctx.font = 'bold 17px ' + FONT;
+      ctx.fillStyle = C.gatePos;
+      wrapText(r.advice, W / 2, y + 4, W - 56, 22);
+      if (!r.won && r.missedLine) {
+        ctx.font = '600 13px ' + FONT;
+        ctx.fillStyle = 'rgba(255,154,74,0.8)';
+        ctx.fillText(r.missedLine, W / 2, y + 4 + 22 * wrapLines(r.advice, W - 56, 'bold 17px ' + FONT) + 6);
+      }
+    } else if (!r.won && r.missedLine) {                // 놓친 것 안내는 실패 판에만
       ctx.font = '600 15px ' + FONT;
       ctx.fillStyle = C.bulletHeavy;
       ctx.fillText(r.missedLine, W / 2, y + 6);
@@ -557,7 +704,7 @@ export function createRenderer3(ctx, sprites) {
     if (r.isBest) {
       ctx.font = 'bold 16px ' + FONT;
       ctx.fillStyle = C.gold;
-      ctx.fillText('신기록!', W / 2, y + 34);
+      ctx.fillText('신기록!', W / 2, y + 68);
     }
     if (r.saveOk === false) {
       ctx.font = '600 13px ' + FONT;
@@ -571,8 +718,8 @@ export function createRenderer3(ctx, sprites) {
     const sy = (z) => LINE_Y - (z - run.z);
     drawBackground(run.z, Math.max(0, Math.min(2, run.stageId - 1)));
     drawWalls(run, sy);
-    for (const row of run.gateRows) drawGateRow(row, sy, fx);
-    for (const s of run.supplies) drawSupply(s, sy);
+    for (const row of run.gateRows) drawGateRow(row, sy, fx, run.z);
+    for (const s of run.supplies) drawSupply(s, sy, run.z);
     for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, sy);
     if (run.boss && !run.boss.dead) drawBoss(run.boss, sy, now);
     drawBullets(run, sy);

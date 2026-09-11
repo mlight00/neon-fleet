@@ -2,8 +2,8 @@
 // 모든 좌표는 트랙 z(클수록 앞). 화면 y 변환은 렌더 몫. 규칙은 STEP = 1/60 단위로만 진행한다.
 import { BAL3 } from './balance.js';
 import { WEAPONS, weaponRank, makeBullet } from './weapons.js';
-import { makeGateRow, sweepHitsGate, hitGateCell, passGateRow } from './gates.js';
-import { makeSupply, sweepHitsSupply, hitSupply, passSupply, takePads, applySupplyReward } from './supply.js';
+import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm } from './gates.js';
+import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward } from './supply.js';
 import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit } from './squad.js';
 
 export const STEP = BAL3.STEP;
@@ -33,7 +33,7 @@ export function createRun(stage) {
     boss: null,
     wallSide: {},
     pendingRewards: [],
-    time: 0, peak: 0, kills: 0, lossByTouch: 0, lossByShot: 0, lossByGate: 0, missedSupplies: 0, badGatesPassed: 0,
+    time: 0, peak: 0, kills: 0, lossByTouch: 0, lossByShot: 0, lossByGate: 0, missedSupplies: 0, skippedSupplies: 0, badGatesPassed: 0, lastBadGateId: null,
     over: false, won: false, wonAt: null,
   };
   const interval = WEAPONS[weapon].interval;
@@ -60,6 +60,7 @@ export function stepRun(run, input, dt = STEP) {
   if (!run.boss) run.z += BAL3.scroll * dt;
   run.time += dt;
   spawnDue(run, ev);
+  armGates(run, ev);
   fireUnits(run, ev, dt);
   moveBullets(run, ev, dt);
   moveEnemies(run, ev, dt);
@@ -75,6 +76,7 @@ export function stepRun(run, input, dt = STEP) {
 // 1단계 조향: 지수 추종(followRate) + 속도 상한 → clampCenter(벽 진입 규칙·tx 클램프) → compressUnits
 function steer(run, inp, dt) {
   const px = inp.pointerX;
+  //  pointerX 가 null 이면 tx 를 덮어쓰지 않는다(키·드래그로 옮긴 목표가 옛 마우스 위치로 되돌아가지 않게 — 계약서 6장 장치 우선순위)
   if (px !== null && px !== undefined && Number.isFinite(px)) run.tx = px;
   run.tx += Number.isFinite(inp.dragDx) ? inp.dragDx : 0;
   run.tx += (inp.keyDir || 0) * SQ.keySpeed * dt;
@@ -103,6 +105,11 @@ function spawnDue(run, ev) {
   }
 }
 
+// 3-b 단계 게이트 셔터 갱신: run.z 갱신(2단계) 뒤·사격(4단계) 앞. 그 STEP 의 탄 충돌(5단계)이 올바른 셔터 상태를 보게 한다
+function armGates(run, ev) {
+  for (const row of run.gateRows) updateGateArm(row, run, ev);
+}
+
 // 적 1기 생성. hp 는 스테이지 정의 고정값(병력 무관)
 function spawnEnemy(run, kind, x, z, hp) {
   const d = EN[kind];
@@ -127,21 +134,29 @@ function fireUnits(run, ev, dt) {
   if (count > 0) ev.push({ type: 'fire', count, weapon: w.id, x: run.x, z: run.z });
 }
 
-// 수직 스윕 [pz, z] × x 가 벽 사각형과 겹치는가
-function bulletHitsWall(b, w) {
-  return b.x >= w.x0 && b.x <= w.x1 && Math.max(b.pz, b.z) >= w.z0 && Math.min(b.pz, b.z) <= w.z1;
+// 수직 스윕 [pz, z] × x(중심, 탄 폭 미반영) 와 벽 사각형의 최초 교차 z. 겹치지 않으면 null
+function wallContactZ(b, w) {
+  if (!(b.x >= w.x0 && b.x <= w.x1)) return null;
+  const lo = Math.min(b.pz, b.z), hi = Math.max(b.pz, b.z);
+  if (!(hi >= w.z0 && lo <= w.z1)) return null;
+  return Math.max(w.z0, lo);
 }
 
-// 수직 스윕 [pz, z] 가 원(cx, cz, r)과 겹치는가
-function sweepHitsCircle(b, cx, cz, r) {
+// 수직 스윕 [pz, z] 와 원(cx, cz, r)의 최초 교차 z. 겹치지 않으면 null
+// 적·보스는 r 에 탄 반폭을 더해 부르므로 비스듬히 스치는 접점 z 가 그대로 나온다
+function circleContactZ(b, cx, cz, r) {
   const dx = Math.abs(b.x - cx);
-  if (dx > r) return false;
+  if (dx > r) return null;
   const half = Math.sqrt(r * r - dx * dx);
   const lo = Math.min(b.pz, b.z), hi = Math.max(b.pz, b.z);
-  return hi >= cz - half && lo <= cz + half;
+  if (!(hi >= cz - half && lo <= cz + half)) return null;
+  return Math.max(cz - half, lo);
 }
 
-// 5단계 아군 탄: 후보(벽·통·게이트·적·보스) 중 접촉 z 가 가장 작은 1개만. 동일 z 는 벽(0) > 통(1) > 게이트(2) > 적(3)
+// 5단계 아군 탄: 후보(벽·통·게이트·적·보스) 중 **실제 최초 교차 z** 가 가장 작은 1개만.
+// 교차 z 는 물체 앞면이 아니라 스윕이 그 물체에 처음 닿는 점이다(원은 중심 x 차이에 따른 반현 반영).
+// 동일 교차 z 일 때만 벽(0) > 통(1) > 게이트(2) > 적(3) 우선순위를 쓴다.
+// 탄 폭: 벽·통·게이트는 탄 중심 x(폭 미반영), 적·보스는 반지름에 탄 반폭을 더한다(계약서 4장 5단계).
 function moveBullets(run, ev, dt) {
   const bullets = run.bullets;
   for (let i = 0; i < bullets.length; i++) {
@@ -150,24 +165,24 @@ function moveBullets(run, ev, dt) {
     b.pz = b.z;
     b.z += b.vz * dt;
     let bestZ = Infinity, bestP = 9, kind = -1, obj = null, cell = null;
-    // 후보 등록: 접촉 z = max(물체 앞면 z, 스윕 시작)
-    const consider = (front, p, k, o, c) => {
-      const cz = Math.max(front, b.pz);
+    // 후보 등록: cz = 교차 함수가 돌려준 최초 교차 z(이미 스윕 시작 이상으로 잘려 있다)
+    const consider = (cz, p, k, o, c) => {
+      if (cz === null) return;
       if (cz < bestZ || (cz === bestZ && p < bestP)) { bestZ = cz; bestP = p; kind = k; obj = o; cell = c; }
     };
-    for (const w of run.walls) if (bulletHitsWall(b, w)) consider(w.z0, 0, 0, w, null);
-    for (const s of run.supplies) if (sweepHitsSupply(s, b)) consider(s.z - s.r, 1, 1, s, null);
+    for (const w of run.walls) consider(wallContactZ(b, w), 0, 0, w, null);
+    for (const s of run.supplies) consider(sweepContactSupply(s, b), 1, 1, s, null);
     for (const row of run.gateRows) {
       if (row.passed) continue;
-      for (const c of row.cells) if (sweepHitsGate(row, c, b)) consider(row.z - row.h / 2, 2, 2, row, c);
+      for (const c of row.cells) consider(sweepContactGate(row, c, b), 2, 2, row, c);
     }
     const halfW = b.w / 2;
-    for (const e of run.enemies) if (!e.dead && sweepHitsCircle(b, e.x, e.z, e.r + halfW)) consider(e.z - e.r, 3, 3, e, null);
+    for (const e of run.enemies) if (!e.dead) consider(circleContactZ(b, e.x, e.z, e.r + halfW), 3, 3, e, null);
     const bo = run.boss;
-    if (bo && !bo.dead && sweepHitsCircle(b, bo.x, bo.z, bo.r + halfW)) consider(bo.z - bo.r, 3, 3, bo, null);
+    if (bo && !bo.dead) consider(circleContactZ(b, bo.x, bo.z, bo.r + halfW), 3, 3, bo, null);
     if (kind === 0) { b.dead = true; ev.push({ type: 'wallHit', x: b.x, z: bestZ }); }
     else if (kind === 1) hitSupply(obj, b, ev, run);
-    else if (kind === 2) hitGateCell(cell, b, ev);
+    else if (kind === 2) hitGateCell(obj, cell, b, ev);
     else if (kind === 3) hitEnemy(run, obj, b, ev);
   }
 }

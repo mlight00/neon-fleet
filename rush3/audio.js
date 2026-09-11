@@ -12,6 +12,8 @@ const SFX = {
   //  게이트 숫자 증가·음수→양수 전환
   gateTick:   ['nf_sfx_crystal_1', 'nf_sfx_crystal_2'],
   gateFlip:   ['nf_sfx_gate_good_1', 'nf_sfx_gate_good_2'],
+  //  게이트 셔터 열림(사격 활성 구간 진입) — 행마다 1회
+  gateOpen:   ['nf_sfx_gate_good_1'],
   //  3명 이상 합류·무기 교체
   joinMany:   ['nf_sfx_evolve_1'],
   weaponSwap: ['nf_sfx_buy_1'],
@@ -26,7 +28,7 @@ const SFX = {
 //  이름별 스로틀(초). 기본 0.045, 아래는 예외
 const THROTTLE = { crateHit: 0.03, kill: 0.08, hurt: 0.25, gateTick: 0.03 };
 const THROTTLE_DEFAULT = 0.045;
-const VOL = { fire_rifle: 0.11, fire_auto: 0.11, fire_heavy: 0.14, crateHit: 0.35, crateBreak: 0.7, gateTick: 0.4, gateFlip: 0.6,
+const VOL = { fire_rifle: 0.11, fire_auto: 0.11, fire_heavy: 0.14, crateHit: 0.35, crateBreak: 0.7, gateTick: 0.4, gateFlip: 0.6, gateOpen: 0.45,
               joinMany: 0.8, weaponSwap: 0.6, hurt: 0.55, kill: 0.4, elite: 0.8, win: 0.8, lose: 0.75, click: 0.5 };
 //  이름별 Audio 풀 크기(순환) · 전체 동시 재생 상한
 const POOL_SIZE = 4;

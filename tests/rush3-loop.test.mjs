@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { hitButton, makeLoop, boot, missedLine, timeText } from '../rush3/main.js';
 import { createInput } from '../rush3/input.js';
 import { createRun, stepRun, STEP } from '../rush3/combat.js';
-import { buildStage } from '../rush3/stages.js';
+import { buildStage, stageVersion, DEFS } from '../rush3/stages.js';
 import { createSave3 } from '../rush3/save.js';
 import { BAL3 } from '../rush3/balance.js';
 
@@ -159,7 +159,67 @@ test('V3-INPUT: 두 손가락 — 둘째 손가락의 down/move/up 은 첫 손�
   assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: -10, keyDir: 0 });
   // 드래그 중 pointercancel 은 손가락과 무관하게 reset
   inp.onPointerCancel();
-  assert.deepEqual(inp.state, { pointerX: null, dragDx: 0, keyDir: 0, dragging: false, pointerId: null, lastX: null, left: false, right: false });
+  assert.deepEqual(inp.state, { pointerX: null, dragDx: 0, keyDir: 0, dragging: false, pointerId: null, lastX: null, left: false, right: false, device: null });
+});
+
+test('V3-INPUT-SWITCH: 마지막으로 쓴 장치가 이긴다 — 마우스→키·키 해제 뒤 복귀 없음·키→마우스 재개', () => {
+  //  (1) 같은 조건(오른쪽 키 2초)에서 마우스를 먼저 x240 에 둔 판과 두지 않은 판의 최종 x 가 같아야 한다
+  const play2s = (mouseFirst) => {
+    const run = createRun(buildStage(1)), inp = createInput();
+    if (mouseFirst) inp.onPointerMove(240, 'mouse', 1);
+    inp.onKey('ArrowRight', true);
+    for (let i = 0; i < 120; i++) stepRun(run, inp.snapshot(), STEP);
+    return run.x;
+  };
+  const noMouse = play2s(false), afterMouse = play2s(true);
+  assert.ok(noMouse > 380 && noMouse < 400, '키만: x=' + noMouse);
+  assert.equal(afterMouse, noMouse, '마우스를 먼저 써도 키 조작 결과가 같다(마우스 목표에 묶이지 않음)');
+
+  //  (2) 키를 놓아도 옛 마우스 위치로 되돌아가지 않는다
+  const run = createRun(buildStage(1)), inp = createInput();
+  inp.onPointerMove(240, 'mouse');
+  inp.onKey('ArrowRight', true);
+  for (let i = 0; i < 60; i++) stepRun(run, inp.snapshot(), STEP);
+  const xKey = run.x;
+  assert.ok(xKey > 300, '키로 오른쪽으로 갔다: ' + xKey);
+  inp.onKey('ArrowRight', false);
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 }, '키를 놓아도 pointerX 는 null 그대로');
+  for (let i = 0; i < 60; i++) stepRun(run, inp.snapshot(), STEP);
+  assert.ok(run.x >= xKey - 1e-9, '옛 마우스 위치(240)로 되돌아가지 않는다: ' + run.x);
+
+  //  (3) 마우스를 다시 움직이면 마우스가 이긴다(눌린 키는 해제)
+  inp.onKey('ArrowRight', true);
+  inp.onPointerMove(160, 'mouse');
+  assert.deepEqual(inp.snapshot(), { pointerX: 160, dragDx: 0, keyDir: 0 });
+  assert.equal(inp.state.device, 'mouse');
+  for (let i = 0; i < 180; i++) stepRun(run, inp.snapshot(), STEP);
+  assert.ok(Math.abs(run.x - 160) < 2, '마우스 위치를 다시 따라간다: ' + run.x);
+});
+
+test('V3-INPUT-SWITCH: 터치↔키 — 드래그가 시작되면 마우스·키 목표 해제, 드래그 중 키는 무시(드래그 우선)', () => {
+  const inp = createInput();
+  //  키 조작 중 드래그 시작 → 키 방향 해제
+  inp.onKey('ArrowRight', true);
+  assert.equal(inp.snapshot().keyDir, 1);
+  inp.onPointerDown(200, 'touch', 1);
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 }, '드래그 시작이 키 방향을 지운다');
+  assert.equal(inp.state.device, 'touch');
+  //  드래그 중 키는 방향에 반영하지 않는다(아는 키라 셸에는 true 로 알린다)
+  assert.equal(inp.onKey('ArrowLeft', true), true);
+  inp.onPointerMove(260, 'touch', 1);
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 60, keyDir: 0 }, '드래그 중에는 이동량만');
+  //  드래그가 끝난 뒤 다시 누르면 키가 듣는다
+  inp.onPointerUp(1);
+  inp.onKey('ArrowLeft', true);
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: -1 });
+  assert.equal(inp.state.device, 'key');
+  //  마우스 → 터치: 마우스 목표 해제
+  inp.onPointerMove(300, 'mouse');
+  assert.equal(inp.snapshot().pointerX, 300);
+  inp.onPointerDown(50, 'touch', 2);
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 });
+  inp.onPointerMove(70, 'touch', 2);
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 20, keyDir: 0 });
 });
 
 test('V3-SHELL: main.js 는 DOM 없이 import 되고 hitButton 은 사각형 안·disabled 를 구분한다', () => {
@@ -177,13 +237,14 @@ test('V3-SHELL: main.js 는 DOM 없이 import 되고 hitButton 은 사각형 안
 });
 
 // ── boot 스모크: 가짜 캔버스(기록 ctx)·가짜 시계·rAF 큐로 타이틀 → 출격 → 일시정지 → 완주 → 결과 → 저장까지 ──
-function fakeCanvas(calls) {
+function fakeCanvas(calls, texts = []) {
   const grad = { addColorStop() {} };
   const ctx = new Proxy({ canvas: null }, {
     get(t, k) {
       if (k in t) return t[k];
       if (typeof k !== 'string') return undefined;
-      return (...args) => { calls.push(k); if (k.startsWith('create')) return grad; if (k === 'measureText') return { width: 10 }; return undefined; };
+      //  texts: 화면에 실제로 찍힌 글(버튼 label/sub 검사용)
+      return (...args) => { calls.push(k); if (k === 'fillText') texts.push(String(args[0])); if (k.startsWith('create')) return grad; if (k === 'measureText') return { width: 10 }; return undefined; };
     },
     set(t, k, v) { t[k] = v; return true; },
   });
@@ -237,7 +298,8 @@ function fakeWin() {
 
 async function bootFake() {
   const calls = [];
-  const canvas = fakeCanvas(calls);
+  const texts = [];
+  const canvas = fakeCanvas(calls, texts);
   const win = fakeWin();
   const queue = [];
   let nowMs = 1000;
@@ -248,7 +310,7 @@ async function bootFake() {
   await app.ready;
   //  프레임 n 개를 dt(ms) 간격으로 돌린다
   const frames = (n, dtMs = 1000 / 60) => { for (let i = 0; i < n; i++) { nowMs += dtMs; const f = queue.shift(); f(nowMs); } };
-  return { app, canvas, win, calls, frames, save, audio, storage, now: () => nowMs };
+  return { app, canvas, win, calls, texts, frames, save, audio, storage, now: () => nowMs };
 }
 
 test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → 일시정지 중 z 정지 → 재개 → 봇 완주 → 결과·저장', async () => {
@@ -259,7 +321,8 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   //  타이틀 버튼 클릭(스테이지 1): 논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율
   canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
   assert.equal(app.getState(), 'run');
-  assert.equal(save.getStage(1).attempts, 1, '출격 때 attempts +1');
+  //  기록은 코스 버전 칸에 쌓인다 — 버전 없이 읽으면 DEFS 의 version 이 올라간 순간 헛것을 본다(계약서 7장)
+  assert.equal(save.getStage(1, stageVersion(1)).attempts, 1, '출격 때 attempts +1');
   assert.equal(save.get().lastStage, 1);
   frames(60);
   const d1 = app.dbg();
@@ -286,7 +349,7 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
     frames(1);
   }
   assert.equal(app.getState(), 'result', 'guard=' + guard + ' dbg=' + JSON.stringify(app.dbg()));
-  const st = save.getStage(1);
+  const st = save.getStage(1, stageVersion(1));
   assert.equal(st.cleared, true);
   assert.ok(st.bestSurvivors >= 2 && st.bestTime > 30);
   assert.ok(audio.played.some((p) => p[0] === 'elite') && audio.played.some((p) => p[0] === 'win'));
@@ -295,7 +358,7 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   canvas.fire('pointerdown', { clientX: 120, clientY: (548 + 28) / 2, pointerType: 'mouse' });
   assert.equal(app.getState(), 'run');
   assert.equal(app.dbg().stageId, 2);
-  assert.equal(save.getStage(2).attempts, 1);
+  assert.equal(save.getStage(2, stageVersion(2)).attempts, 1);
   //  터치 드래그: 손가락 댄 위치로 튀지 않고 이동량만 반영
   frames(1);
   const x0 = app.getRun().x;
@@ -395,11 +458,81 @@ test('V3-SHELL: 전멸 → 결과(실패)·놓친 것 한 줄, 저장 실패면 
   assert.equal(app.getState(), 'result', 'guard=' + guard);
   assert.equal(run.won, false);
   assert.equal(run.units.length, 0);
-  assert.ok(run.missedSupplies >= 1 || run.badGatesPassed >= 1, JSON.stringify({ m: run.missedSupplies, b: run.badGatesPassed }));
+  //  r3: 좌 통로에서 얻을 수 있던 좌 통은 열리고, 반대편 통은 '놓침'이 아니라 skipped(구조적 획득 불가)로 잡힌다
+  assert.ok(run.missedSupplies >= 1 || run.skippedSupplies >= 1 || run.badGatesPassed >= 1,
+    JSON.stringify({ m: run.missedSupplies, s: run.skippedSupplies, b: run.badGatesPassed }));
   assert.equal(save.ok, false);
-  assert.equal(save.getStage(2).cleared, false);
+  assert.equal(save.getStage(2, stageVersion(2)).cleared, false);
   //  결과 화면 렌더가 예외 없이 돌고 버튼은 2개(다음 작전 없음)
   nowMs += 16;
   queue.shift()(nowMs);
   assert.ok(calls.includes('fillText'));
+});
+
+test('V3-INPUT-SWITCH: 브라우저 자동반복 keydown 은 마우스 목표를 다시 지우지 않는다(셸 결선)', async () => {
+  const { app, canvas, win, frames } = await bootFake();
+  frames(2);
+  app.startRun(1);
+  frames(1);
+  //  마우스 호버 x240(CSS 120 = 논리 240)
+  canvas.fire('pointermove', { clientX: 120, clientY: 200, pointerType: 'mouse', pointerId: 1 });
+  assert.equal(app.input.state.pointerX, 240);
+  //  최초 keydown 은 마우스 목표를 지운다(키가 이긴다)
+  win.fire('keydown', { code: 'ArrowRight', preventDefault() {} });
+  assert.equal(app.input.state.pointerX, null);
+  assert.equal(app.input.state.keyDir, 1);
+  //  키를 누른 채 마우스를 움직이면 마우스가 이긴다
+  canvas.fire('pointermove', { clientX: 80, clientY: 200, pointerType: 'mouse', pointerId: 1 });
+  assert.equal(app.input.state.pointerX, 160);
+  assert.equal(app.input.state.keyDir, 0);
+  //  ★ 그 뒤 브라우저 자동반복 keydown 이 계속 와도 마우스 목표를 지우지 않는다(가드가 없으면 여기서 null 이 된다)
+  let prevented = 0;
+  for (let i = 0; i < 30; i++) win.fire('keydown', { code: 'ArrowRight', repeat: true, preventDefault() { prevented++; } });
+  assert.equal(app.input.state.pointerX, 160, '자동반복이 마우스 목표를 지우면 안 된다');
+  assert.equal(app.input.state.keyDir, 0);
+  assert.equal(prevented, 30, '조향 키의 브라우저 기본 동작은 자동반복에서도 계속 막는다');
+  //  3초 뒤 부대는 마우스 위치를 따라가 있다(계약서 6장 (3))
+  frames(180);
+  assert.ok(Math.abs(app.getRun().x - 160) < 2, 'x=' + app.getRun().x);
+  //  ESC 의 자동반복은 일시정지를 다시 뒤집지 않는다
+  win.fire('keydown', { code: 'Escape' });
+  assert.equal(app.getState(), 'paused');
+  win.fire('keydown', { code: 'Escape', repeat: true });
+  assert.equal(app.getState(), 'paused', '자동반복 ESC 로 재개되면 안 된다');
+});
+
+test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에 기록하고 옛 버전 기록은 화면에서만 빠진다', async () => {
+  //  배치 개정 담당이 DEFS[1].version 을 올린 상황을 그대로 흉내낸다(끝나면 되돌린다)
+  const orig = DEFS[1].version;
+  try {
+    DEFS[1].version = 2;
+    assert.equal(stageVersion(1), 2);
+    const { app, canvas, frames, save, texts } = await bootFake();
+    //  개정 전(버전 1)의 기록
+    save.updateStage(1, { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 1);
+    frames(2);
+    //  스테이지 선택 화면은 현재 코스 버전(2)의 기록만 보여 준다
+    assert.ok(texts.includes('미도전'), '표시된 글: ' + JSON.stringify(texts));
+    assert.ok(!texts.some((t) => t.includes('99명')), 'v1 기록이 화면에 나오면 안 된다: ' + JSON.stringify(texts));
+    //  출격 — attempts 는 버전 2 칸에서 1, v1 은 그대로
+    canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
+    assert.equal(app.getState(), 'run');
+    assert.equal(app.getRun().stageVersion, 2);
+    assert.equal(save.getStage(1, 2).attempts, 1);
+    assert.equal(save.getStage(1, 1).attempts, 9);
+    //  승리 판을 셸의 정상 경로(run.over → 여운 → finishRun)로 끝낸다
+    frames(30);
+    const run = app.getRun();
+    run.won = true;
+    run.wonAt = 55.5;
+    run.over = true;
+    let guard = 0;
+    while (app.getState() === 'run' && guard++ < 300) frames(1);
+    assert.equal(app.getState(), 'result', 'guard=' + guard);
+    assert.deepEqual(save.getStage(1, 2), { cleared: true, attempts: 1, bestSurvivors: run.units.length, bestTime: 55.5 });
+    assert.deepEqual(save.getStage(1, 1), { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 'v2 기록이 v1 최고 기록을 덮지 않는다');
+    assert.deepEqual(Object.keys(save.getStageVersions(1)).sort(), ['1', '2'], '옛 버전 기록은 저장에 남는다');
+  } finally {
+    DEFS[1].version = orig;
+  }
 });

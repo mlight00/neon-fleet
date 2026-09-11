@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL('../rush3/' + f, import.meta.url), 'utf8');
 const RNG_IMPORT = /import[^;]*from\s*['"][^'"]*rng\.js['"]/;
 
-test('V3-PURE: combat/gates/supply/squad/weapons 소스에 Math.random·rng import 가 없다(stages.js 는 rng 허용)', () => {
-  for (const f of ['combat.js', 'gates.js', 'supply.js', 'squad.js', 'weapons.js']) {
+test('V3-PURE: combat/gates/supply/squad/weapons/advice 소스에 Math.random·rng import 가 없다(stages.js 는 rng 허용)', () => {
+  for (const f of ['combat.js', 'gates.js', 'supply.js', 'squad.js', 'weapons.js', 'advice.js']) {
     const code = read(f);
     assert.ok(!code.includes('Math.random'), f + ': Math.random 사용');
     assert.doesNotMatch(code, RNG_IMPORT, f + ': rng import');

@@ -17,10 +17,11 @@ function mkStage(o = {}) {
   return {
     id: o.id ?? 't', version: 1, title: 'test', startUnits: o.startUnits ?? 1, startWeapon: o.startWeapon ?? 'rifle',
     length: o.length ?? 100000, eliteZ: o.elite ? o.elite.z : null,
-    gateRows: (o.gates || []).map((g, i) => ({ id: g.id ?? 'g' + (i + 1), z: g.z, h: 24, maxValue: g.maxValue ?? 15, bypass: !!g.bypass, cells: g.cells })),
-    supplies: (o.supplies || []).map((s, i) => ({ id: s.id ?? 'c' + (i + 1), z: s.z, x: s.x, r: 30, kind: s.kind, durability: s.durability, maxDurability: s.durability, payload: s.payload })),
+    //  armZ 를 명시하지 않은 조립기 게이트는 '항상 열림'(null) — 기존 검사가 셔터 없이 세운 기대값을 그대로 유지한다
+    gateRows: (o.gates || []).map((g, i) => ({ id: g.id ?? 'g' + (i + 1), z: g.z, h: 24, maxValue: g.maxValue ?? 15, bypass: !!g.bypass, armZ: g.armZ === undefined ? null : g.armZ, cells: g.cells })),
+    supplies: (o.supplies || []).map((s, i) => ({ id: s.id ?? 'c' + (i + 1), z: s.z, x: s.x, r: 30, kind: s.kind, durability: s.durability, maxDurability: s.durability, payload: s.payload, coverZ: s.coverZ ?? null, pairId: s.pairId ?? null })),
     walls: (o.walls || []).map((w, i) => ({ id: 'w' + (i + 1), z0: w.z0, z1: w.z1, x0: 228, x1: 252 })),
-    spawns: (o.spawns || []).map((s) => ({ z: s.z, kind: s.kind, n: s.xs.length, xs: s.xs, zs: s.zs })),
+    spawns: (o.spawns || []).map((s) => ({ z: s.z, kind: s.kind, n: s.xs.length, xs: s.xs, zs: s.zs, corridorHw: s.corridorHw ?? null })),
     elite: o.elite ? { z: o.elite.z, hp: o.elite.hp, summon: !!o.elite.summon } : null,
   };
 }
@@ -101,6 +102,34 @@ test('V3-ORDER: 5단계에서 격파된 잡졸은 같은 STEP 8단계에서 유�
   assert.equal(count(ev, 'kill'), 1);
 });
 
+test('V3-ORDER-CONTACT: 비스듬히 스치는 통보다 정면의 적이 먼저 맞는다(정렬 기준 = 실제 최초 교차 z)', () => {
+  //  검수자 재현 그대로: 탄 x240 z90→101.67(w 4), 통 중심 (269,105) r30 내구 10, 적 (240,108) r14 hp 2
+  //  적 접점 = 108 − (14 + 탄 반폭 2) = 92, 통 접점 = 105 − √(30² − 29²) = 97.319 → 적이 먼저다
+  const run = createRun(mkStage({ supplies: [{ id: 'edge', z: 105, x: 269, kind: 'soldier', durability: 10, payload: { n: 1 } }] }));
+  holdFire(run);
+  run.enemies.push({ id: 1, kind: 'grunt', x: 240, z: 108, px: 240, pz: 108, vz: 60, hp: 2, r: 14, dead: false });
+  run.bullets.push({ x: 240, z: 90, pz: 90, vz: 700, w: 4, dmg: 1, gateHit: 1, kind: 'rifle', dead: false });
+  const ev = play(run, 1);
+  assert.equal(run.supplies[0].durability, 10, '통 내구는 그대로');
+  assert.equal(run.supplies[0].opened, false);
+  assert.equal(run.enemies[0].hp, 1, '앞의 적이 맞는다');
+  assert.equal(count(ev, 'supplyHit'), 0);
+  assert.equal(count(ev, 'enemyHit'), 1);
+});
+
+test('V3-ORDER-CONTACT: 반대 배치 — 통 접점이 더 앞이면 통이 맞는다(적 무사)', () => {
+  //  통 중심 (240,100) r30 → 접점 70(스윕 시작 90 으로 잘림), 적 (240,110) r14+2 → 접점 94
+  const run = createRun(mkStage({ supplies: [{ id: 'front', z: 100, x: 240, kind: 'soldier', durability: 10, payload: { n: 1 } }] }));
+  holdFire(run);
+  run.enemies.push({ id: 1, kind: 'grunt', x: 240, z: 110, px: 240, pz: 110, vz: 60, hp: 2, r: 14, dead: false });
+  run.bullets.push({ x: 240, z: 90, pz: 90, vz: 700, w: 4, dmg: 1, gateHit: 1, kind: 'rifle', dead: false });
+  const ev = play(run, 1);
+  assert.equal(run.supplies[0].durability, 9, '통이 맞는다');
+  assert.equal(run.enemies[0].hp, 2, '뒤의 적은 무사');
+  assert.equal(count(ev, 'enemyHit'), 0);
+  assert.equal(count(ev, 'supplyHit'), 1);
+});
+
 test('V3-ORDER: 유닛 1명 hp 1 인 STEP 에 통 개봉 +2 와 접촉 −1 이 겹쳐도 over=false(보상이 사망보다 먼저)', () => {
   const run = createRun(mkStage({
     supplies: [soldierCrate(30, 240, 1, 2, 'c1')],
@@ -178,7 +207,8 @@ test('V3-WEAPON: 동급·하급 무기 통(rifle)은 무시(weaponSame)·heavy �
 
 // S2 벽(z 1800~3000, x 228~252) 통합
 test('V3-WALL: x 240 무조작으로 벽 진입 → 한쪽 통로로 스냅·n=1/n=60 유닛 전원 통로 안·벽 끝 뒤 해제(S2 실제·벽만 있는 스테이지)', () => {
-  for (const [n, stage] of [[2, buildStage(2)], [60, buildStage(2)], [1, mkStage({ walls: [{ z0: 1800, z1: 3000 }] })], [60, mkStage({ walls: [{ z0: 1800, z1: 3000 }] })]]) {
+  //  r3 배치에서 S2 첫 게이트 우 칸(−20, armZ 340)은 2명 부대를 벽 앞에서 전멸시킨다 → 벽 검사용 병력을 30 으로 올린다(검사 의도는 그대로)
+  for (const [n, stage] of [[30, buildStage(2)], [60, buildStage(2)], [1, mkStage({ walls: [{ z0: 1800, z1: 3000 }] })], [60, mkStage({ walls: [{ z0: 1800, z1: 3000 }] })]]) {
     const run = createRun(stage);
     if (n > run.units.length) addUnits(run, n - run.units.length);
     if (stage.id === 't') holdFire(run);

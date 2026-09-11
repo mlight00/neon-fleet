@@ -3,32 +3,49 @@
 //  드래그는 처음 댄 손가락(pointerId) 하나만 따라간다: 다른 손가락·마우스 이벤트는 드래그 중 무시(누적 금지).
 //  좌우 키 = keyDir(-1/0/1). pointercancel·blur → reset(드래그 해제 + dragDx 0).
 //  snapshot() 이 STEP 직전 입력 { pointerX, dragDx, keyDir } 을 주고 dragDx 를 소비한다.
+//
+//  장치 우선순위(계약서 6장) = 마지막으로 쓴 장치가 이긴다. state.device 에 'mouse'|'touch'|'key' 로 남는다.
+//   - 키를 누르는 순간 마우스 목표를 지운다(pointerX = null). 키를 놓아도 pointerX 는 null 그대로라
+//     옛 마우스 위치로 되돌아가지 않는다(다음 마우스 이동 전까지).
+//   - 마우스를 움직이면 눌린 키 상태·keyDir 을 지운다 → 마우스 조작 재개(키는 다시 눌러야 듣는다).
+//   - 드래그가 시작되면 마우스 목표와 키 방향을 둘 다 지우고, 드래그 중 키 입력은 방향에 반영하지 않는다(드래그 우선).
+//  즉 셋 중 하나만 살아 있으므로 combat 1단계에서 서로 덮어쓰는 일이 없다.
+
+//  조향 키 판정. 셸의 자동반복 가드(main.js keydown)가 같은 판정을 써야 해서 밖으로 뺀다(계약서 6장).
+export function isSteerKey(code) {
+  return code === 'ArrowLeft' || code === 'KeyA' || code === 'ArrowRight' || code === 'KeyD';
+}
 
 export function createInput() {
-  const state = { pointerX: null, dragDx: 0, keyDir: 0, dragging: false, pointerId: null, lastX: null, left: false, right: false };
+  const state = { pointerX: null, dragDx: 0, keyDir: 0, dragging: false, pointerId: null, lastX: null, left: false, right: false, device: null };
   const isMouse = (pointerType) => pointerType === 'mouse' || pointerType === undefined || pointerType === null;
   //  id 가 없는 호출(테스트·구형 환경)은 드래그 중인 손가락으로 간주한다
   const isDragPointer = (id) => id === undefined || id === null || state.pointerId === null || id === state.pointerId;
+  //  눌린 키 상태까지 해제한다(놓을 때의 keyup 이 와도 방향이 되살아나지 않게)
+  function clearKeys() { state.left = false; state.right = false; state.keyDir = 0; }
 
   function onPointerDown(x, pointerType, id) {
     //  드래그 중에는 어떤 down 도 받지 않는다(둘째 손가락·마우스 클릭이 lastX 를 덮어쓰지 않게)
     if (state.dragging) return;
-    if (isMouse(pointerType)) { state.pointerX = x; return; }
-    //  터치: 절대 위치를 쓰지 않는다(이후 이동량만 누적). 마우스 호버 값이 남아 있으면 지운다
+    if (isMouse(pointerType)) { state.pointerX = x; state.device = 'mouse'; clearKeys(); return; }
+    //  터치: 절대 위치를 쓰지 않는다(이후 이동량만 누적). 마우스 호버 값·키 방향은 여기서 해제
     state.pointerX = null;
+    clearKeys();
     state.dragging = true;
+    state.device = 'touch';
     state.pointerId = id === undefined ? null : id;
     state.lastX = x;
   }
   function onPointerMove(x, pointerType, id) {
     if (!state.dragging) {
-      if (isMouse(pointerType)) state.pointerX = x;
+      if (isMouse(pointerType)) { state.pointerX = x; state.device = 'mouse'; clearKeys(); }
       return;
     }
     //  드래그 중: 마우스·다른 손가락의 이동은 누적하지 않는다
     if (isMouse(pointerType) || !isDragPointer(id)) return;
     if (state.lastX !== null) state.dragDx += x - state.lastX;
     state.lastX = x;
+    state.device = 'touch';
   }
   function onPointerUp(id) {
     //  드래그 중인 손가락이 아닌 up(둘째 손가락·마우스)은 드래그를 끝내지 않는다
@@ -46,13 +63,19 @@ export function createInput() {
     state.lastX = null;
     state.left = false;
     state.right = false;
+    state.device = null;
   }
   function onPointerCancel() { reset(); }
+  //  아는 키면 true(셸이 preventDefault 한다). 드래그 중에는 방향에 반영하지 않되 키로는 인정한다.
   function onKey(code, down) {
-    if (code === 'ArrowLeft' || code === 'KeyA') state.left = !!down;
-    else if (code === 'ArrowRight' || code === 'KeyD') state.right = !!down;
-    else return false;
+    if (!isSteerKey(code)) return false;
+    const left = code === 'ArrowLeft' || code === 'KeyA';
+    const right = code === 'ArrowRight' || code === 'KeyD';
+    if (state.dragging) return true;
+    if (left) state.left = !!down; else state.right = !!down;
     state.keyDir = (state.right ? 1 : 0) - (state.left ? 1 : 0);
+    //  누르는 순간 마우스 목표 해제 = 이후 STEP 이 옛 마우스 위치로 tx 를 덮어쓰지 않는다
+    if (down) { state.pointerX = null; state.device = 'key'; }
     return true;
   }
   //  STEP 직전 스냅샷. dragDx 는 여기서 소비(같은 프레임의 두 번째 STEP 부터는 0)

@@ -3,14 +3,15 @@
 //  rush/main.js 는 import 하지 않는다(자동 부트가 같은 캔버스에 붙는다). 골격(hitButton/toLogical/spawnBurst/
 //  autoPause/오디오 unlock/ESC/음량 버튼/로드 후 루프 시작/#game3 가드)만 참고해 옮겨 적었다.
 import { BAL3 } from './balance.js';
-import { STAGE_IDS, buildStage, stageMeta } from './stages.js';
+import { STAGE_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
-import { createInput } from './input.js';
+import { createInput, isSteerKey } from './input.js';
 import { createRenderer3 } from './render.js';
 import { loadSprites3 } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
+import { adviceLine } from './advice.js';
 
 const W = BAL3.view.w, H = BAL3.view.h, LINE_Y = BAL3.view.LINE_Y;
 const FX = BAL3.fx;
@@ -69,15 +70,15 @@ function spawnBurst(fx, x, y, r, big, color) {
 const GATE_FLASH_SEC = BAL3.gate.flashT;
 
 function makeFx() {
-  //  gateFlash: { 'rowId:idx': 남은 초 } — 렌더가 이것만 읽는다
-  return { parts: [], floaters: [], pops: [], gateFlash: {}, shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null };
+  //  gateFlash: { 'rowId:idx': 남은 초 } · gateOpen: { rowId: 남은 초 }(셔터가 걷히는 연출) — 렌더가 이것만 읽는다
+  return { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null };
 }
 
 function floater(fx, x, y, text, color, big = false) {
   fx.floaters.push({ x, y, text, color, t: 0, life: 0.9, big });
 }
 
-//  실패 시 놓친 것 한 줄(계약서 6장)
+//  실패 시 놓친 것 한 줄(계약서 6장). skipped(구조적으로 얻을 수 없던 대안)는 '놓침'이 아니므로 세지 않는다
 export function missedLine(run) {
   const parts = [];
   if (run.missedSupplies > 0) parts.push('보급 통 ' + run.missedSupplies + '개를 놓침');
@@ -130,14 +131,16 @@ export function boot(canvas, deps = {}) {
   function startRun(id) {
     const stage = buildStage(id);
     run = createRun(stage);
+    //  기록은 stageId + 코스 버전으로 묶는다(run.stageVersion = stage.version)
+    const ver = run.stageVersion;
     fx = makeFx();
     result = null;
     overT = -1;
     input.reset();
     //  첫 플레이 안내: 지금까지 출격 기록이 없을 때 3초
-    const total = STAGE_IDS.reduce((n, s) => n + (save.getStage(s).attempts || 0), 0);
+    const total = STAGE_IDS.reduce((n, s) => n + totalAttempts(s), 0);
     fx.guideT = total === 0 ? FX.guideSec : 0;
-    save.updateStage(id, { attempts: (save.getStage(id).attempts || 0) + 1 });
+    save.updateStage(id, { attempts: (save.getStage(id, ver).attempts || 0) + 1 }, ver);
     save.patch({ lastStage: id });
     state = 'run';
     loop.start(nowSec());
@@ -164,10 +167,15 @@ export function boot(canvas, deps = {}) {
     au.bgmPlay(BGM.title);
   }
 
-  //  결과 확정 + 저장(attempts 는 출격 때, cleared/best 는 여기서)
+  //  어느 버전으로 몇 번 도전했는지(첫 플레이 안내 판정용 — 코스 버전이 올라가도 초보 안내가 되살아나지 않게)
+  function totalAttempts(id) {
+    return Object.values(save.getStageVersions(id)).reduce((n, r) => n + (r.attempts || 0), 0);
+  }
+
+  //  결과 확정 + 저장(attempts 는 출격 때, cleared/best 는 여기서). 신기록 비교는 같은 코스 버전 안에서만
   function finishRun() {
-    const id = run.stageId;
-    const cur = save.getStage(id);
+    const id = run.stageId, ver = run.stageVersion;
+    const cur = save.getStage(id, ver);
     const won = !!run.won;
     const survivors = run.units.length;
     const time = won ? run.wonAt ?? run.time : run.time;
@@ -178,10 +186,10 @@ export function boot(canvas, deps = {}) {
       patch.bestSurvivors = Math.max(cur.bestSurvivors || 0, survivors);
       patch.bestTime = cur.bestTime > 0 ? Math.min(cur.bestTime, time) : time;
     }
-    save.updateStage(id, patch);
+    save.updateStage(id, patch, ver);
     result = {
-      stageId: id, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
-      missedLine: missedLine(run), isBest, saveOk: save.ok,
+      stageId: id, stageVersion: ver, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
+      missedLine: missedLine(run), advice: adviceLine(run, run), isBest, saveOk: save.ok,
       nextId: won && STAGE_IDS.includes(id + 1) ? id + 1 : null,
     };
     state = 'result';
@@ -205,6 +213,12 @@ export function boot(canvas, deps = {}) {
           break;
         }
         case 'supplyMissed': floater(fx, ev.x, sy(ev.z) - 20, '놓침', C.gateZero); break;
+        //  구조적으로 얻을 수 없던 대안 — '놓침'이 아니라 '다른 길'로 알린다(흐려지며 뒤로 빠진다)
+        case 'supplySkipped': floater(fx, ev.x, sy(ev.z) - 20, '다른 길', C.wall); break;
+        case 'supplyBlock': break;
+        //  셔터 열림: 0.25초 걷히는 연출 + 효과음 1회. 막힌 탄은 회색 튐(소리 없음)
+        case 'gateArm': fx.gateOpen[ev.id] = BAL3.gate.openT; fx.sfx.push(['gateOpen']); break;
+        case 'gateBlock': spawnBurst(fx, ev.x, sy(ev.z), 6, false, C.wall); break;
         case 'gateHit': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateTick']); break;
         case 'gateFlip': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateFlip']); floater(fx, ev.x, sy(run.gateRows.find((r) => r.id === ev.id)?.z ?? run.z) - 40, '반전!', C.gatePos, true); break;
         case 'gatePass': {
@@ -254,6 +268,11 @@ export function boot(canvas, deps = {}) {
       fx.gateFlash[k] -= dt;
       if (fx.gateFlash[k] <= 0) delete fx.gateFlash[k];
     }
+    //  셔터가 걷히는 연출 타이머(행 단위)
+    for (const k of Object.keys(fx.gateOpen)) {
+      fx.gateOpen[k] -= dt;
+      if (fx.gateOpen[k] <= 0) delete fx.gateOpen[k];
+    }
     for (const p of fx.parts) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     fx.parts = fx.parts.filter((p) => p.t < p.life);
     for (const f of fx.floaters) { f.t += dt; f.y -= 44 * dt; }
@@ -278,7 +297,7 @@ export function boot(canvas, deps = {}) {
     if (state === 'title') {
       const last = lastStageId();
       v.buttons = STAGE_IDS.map((id, i) => {
-        const m = stageMeta(id), st = save.getStage(id);
+        const m = stageMeta(id), st = save.getStage(id, stageVersion(id));
         const sub = st.cleared ? '완료 · 최고 ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전';
         return { id: 'stage' + id, x: 60, y: 436 + i * 76, w: 360, h: 62, label: 'STAGE ' + id + '  ' + m.title, sub, primary: last === id };
       });
@@ -286,7 +305,7 @@ export function boot(canvas, deps = {}) {
     } else if (run) {
       v.run = run;
       const paused = state === 'paused';
-      v.fx = paused ? { ...fx, gateFlash: { ...fx.gateFlash }, shakeT: 0, hurtT: 0 } : fx;
+      v.fx = paused ? { ...fx, gateFlash: { ...fx.gateFlash }, gateOpen: { ...fx.gateOpen }, shakeT: 0, hurtT: 0 } : fx;
       v.hud = { distM: Math.max(0, Math.round((run.length - run.z) / 10)) };
       if (state === 'run') {
         v.buttons = [{ id: 'pause', x: 422, y: 14, w: 44, h: 44, label: '❚❚' }];
@@ -372,6 +391,10 @@ export function boot(canvas, deps = {}) {
     win.addEventListener('keydown', (e) => {
       au.unlock();
       const code = keyCode(e);
+      //  브라우저 자동반복 keydown(키를 누르고 있는 동안 초당 수십 회)은 입력으로 보지 않는다 — 계약서 6장.
+      //  반복까지 input.onKey 로 넘기면 매 반복이 pointerX 를 지워, "키를 누른 채 마우스를 움직이면 마우스가 이긴다"가 깨진다.
+      //  (조향 키는 브라우저 기본 스크롤만 계속 막고, ESC·Space·Enter 의 반복은 동작을 다시 일으키지 않는다)
+      if (e.repeat) { if (isSteerKey(code) && e.preventDefault) e.preventDefault(); return; }
       if (code === 'Escape') {
         if (state === 'run') pause();
         else if (state === 'paused') resume();
