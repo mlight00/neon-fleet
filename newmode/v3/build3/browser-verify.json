@@ -1,0 +1,163 @@
+{
+ "pageerrors": [],
+ "console_err": [],
+ "http_fail": [],
+ "steps": [
+  {
+   "name": "load",
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "difficulty": "normal",
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "ok": true
+  },
+  {
+   "name": "clickHard",
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "difficulty": "hard",
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "savedDifficulty": "hard",
+   "ok": true
+  },
+  {
+   "name": "keys123",
+   "keys": [
+    [
+     "3",
+     "brutal",
+     "brutal"
+    ],
+    [
+     "1",
+     "normal",
+     "normal"
+    ],
+    [
+     "2",
+     "hard",
+     "hard"
+    ]
+   ],
+   "ok": true
+  },
+  {
+   "name": "startS1hard",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "difficulty": "hard",
+    "z": 152,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "versions": {
+    "2:hard": {
+     "cleared": false,
+     "attempts": 1,
+     "bestSurvivors": 0,
+     "bestTime": 0
+    }
+   },
+   "ok": true
+  },
+  {
+   "name": "reachResultHard",
+   "dbg": {
+    "state": "result",
+    "stageId": 1,
+    "difficulty": "hard",
+    "z": 7201,
+    "x": 240,
+    "units": 11,
+    "weapon": "auto",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 32
+   },
+   "rec": {
+    "cleared": true,
+    "attempts": 1,
+    "bestSurvivors": 11,
+    "bestTime": 42.66666666666553
+   },
+   "keys": [
+    "2:hard"
+   ],
+   "ok": true
+  },
+  {
+   "name": "reloadRemembersHard",
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "difficulty": "hard",
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "ok": true
+  },
+  {
+   "name": "clickBrutal",
+   "dbg": {
+    "state": "title",
+    "stageId": null,
+    "difficulty": "brutal",
+    "z": 0,
+    "x": 0,
+    "units": 0,
+    "weapon": null,
+    "boss": false,
+    "enemies": 0,
+    "bullets": 0
+   },
+   "ok": true
+  },
+  {
+   "name": "startS1brutal",
+   "dbg": {
+    "state": "run",
+    "stageId": 1,
+    "difficulty": "brutal",
+    "z": 187,
+    "x": 240,
+    "units": 1,
+    "weapon": "rifle",
+    "boss": false,
+    "enemies": 0,
+    "bullets": 2
+   },
+   "keys": [
+    "2:brutal",
+    "2:hard"
+   ],
+   "ok": true
+  }
+ ],
+ "ok_all": true
+}

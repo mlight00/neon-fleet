@@ -3,6 +3,7 @@
 작성 2026-09-09, r2 = 3렌즈 설계 검토(규칙/결정성/기획충실도) 반영판.
 **r3(2026-09-11) = 외부 검수(F2·F3·Q1·Q2·Q4·후속개선) 반영 배치·규칙 개정.** 근거 문서 = `newmode/v3/DESIGN_r3_draft.md`(승인된 개정안 r3.2), 검수 = `newmode/v3/review/01_GPT_1단계_검수결과.md`.
 r3 에서 새로 들어온 규칙: **게이트 사격 활성 구간(셔터 `armZ`)** · **보급 통 차폐(`coverZ`, 비행시간 보정선)와 배제 쌍(`pairId`)** · **구조적 획득 불가 집계(`skipped`)** · **잡졸 직진(`track 0`)** · **통로 안내 표지(`wall.signs`)·회피 통로 규격(`spawns[].corridorHw`)** · **결과 제안 한 줄(`rush3/advice.js`)** · 세 스테이지 **코스 버전 2**. 기준 문서: `newmode/v3/spec/01_스타포지러시_재기획_v3.md`, `03_구현담당자_전달서.md`. 기존 코드 분석: `newmode/v3/analysis/01~06`.
+**r3.3(2026-09-16) = 난이도 선택(보통/어려움/극한) 추가** — §3-8(배수 표·근거·검수 금지 조항과의 관계), §6(타이틀 토글·HUD·결과 표기), §7(기록 칸 키 `버전:난이도`), §8(V3-DIFF·V3-SIM-DIFF·V3-SAVE-VERSION DIFF). 코스 배치·규칙 STEP 은 손대지 않았다(normal = r3 그대로).
 이 문서는 구현 담당(사람·에이전트)이 공유하는 **모듈 경계와 규칙의 단일 진실**이다. 수치는 시제품 출발값이며 `rush3/balance.js`·`rush3/stages.js`가 최종 값을 가진다.
 
 ## 0. 범위와 원칙
@@ -26,19 +27,19 @@ r3 에서 새로 들어온 규칙: **게이트 사격 활성 구간(셔터 `armZ
 
 | 파일 | export | 순수 |
 |---|---|---|
-| `balance.js` | `BAL3` (동결된 객체) | 데이터 |
-| `stages.js` | `STAGE_IDS`, `DEFS`, `buildStage(id) → stage`, `stageMeta(id)`, `stageVersion(id)`, **`coverZFor(wallZ0, supplyZ)`**, **`VZ_MIN`** | 순수 |
+| `balance.js` | `BAL3` (동결된 객체, **`BAL3.difficulty` 배수 표 포함**), **`DIFFICULTY_IDS`**, **`DEFAULT_DIFFICULTY`**, **`difficultyMult(id)`**(표 한 줄, 모르는 id 는 throw) | 데이터 |
+| `stages.js` | `STAGE_IDS`, `DEFS`, **`buildStage(id, { difficulty = 'normal' }) → stage`**(`stage.difficulty` 포함), `stageMeta(id)`, `stageVersion(id)`, **`coverZFor(wallZ0, supplyZ)`**, **`VZ_MIN`** | 순수 |
 | `weapons.js` | `WEAPONS`, `weaponRank(id)`, `makeBullet(weaponId, x, z, ownerId)` | 순수 |
 | `gates.js` | `makeGateRow(def) → row`, **`updateGateArm(row, run, events)`**, **`hitGateCell(row, cell, bullet, events)`**, `passGateRow(row, run, events)`, `cellAt(row, x)`, `gateColor(value)`, `gateLabel(value)`, `sweepContactGate(row, cell, bullet)`, `sweepHitsGate(row, cell, bullet)`, `GATE_ARM_Z` | 순수 |
 | `supply.js` | `makeSupply(def)`, `hitSupply(s, bullet, events, run)`, `passSupply(s, run, events)`, `takePads(s, run, events)`, `supplyActive(s)`, **`supplyCovered(s, run)`**, **`structurallyLost(s, run)`**, `supplyReward(s)`, `sweepContactSupply(s, bullet)`, `sweepHitsSupply(s, bullet)`, `activateChain(s, events)`, `applySupplyReward(reward, run, events, opts)`, `WALL_LEAD` | 순수 |
 | `squad.js` | `formation(n) → [{dx,dy}]`, `formationHalfWidth(n)`, `makeUnit(id)`, `layoutUnits(units)`, `compressUnits(units, lo, hi)`, `clampCenter(run, walls)`, `hitUnit(units, x, z, r) → unit|null`, `frontmostUnit(units)`, `removeUnits(units, n, from='back')` | 순수 |
-| `combat.js` | `createRun(stage) → run`, `stepRun(run, input, STEP)`, `drainEvents(run) → events[]`, `STEP` | 순수 |
+| `combat.js` | **`createRun(stage, { difficulty }?) → run`**(기본 = `stage.difficulty`), `stepRun(run, input, STEP)`, `drainEvents(run) → events[]`, `STEP`, **`enemyDefsFor(difficulty)`**(배수 적용 적 정의 표, 동결) | 순수 |
 | `render.js` | `createRenderer3(ctx, sprites) → { draw(view) }` | 화면 |
 | `sprites.js` | `SPRITE_KEYS3`, `loadSprites3(base) → { get(key), ready }` | I/O |
 | `audio.js` | `createAudio3({ dir }) → { unlock, sfx(name, opts), bgmPlay(name), bgmPause, bgmResume, setVolume, getVolume, setMuted, isMuted, duck }` | I/O |
-| `save.js` | `createSave3(storage) → { get(), getStage(id), updateStage(id, patch), patch(obj), ok }` | I/O |
+| `save.js` | `createSave3(storage) → { get(), getStage(id, version, difficulty), updateStage(id, patch, version, difficulty), getStageVersions(id), patch(obj), ok }`, **`recordKey(version, difficulty)`**, **`BASE_DIFFICULTY`** | I/O |
 | **`advice.js`(신규)** | **`adviceLine(run, stage) → string|null`**, `ADVICE_DEFAULT` | 순수 |
-| `main.js` | `boot(canvas, deps)`(자동 부트는 `#game3`가 있을 때만), `hitButton`, `makeLoop`(누적기, 테스트 가능), `missedLine`, `timeText` | 셸 |
+| `main.js` | `boot(canvas, deps)`(자동 부트는 `#game3`가 있을 때만), `hitButton`, `makeLoop`(누적기, 테스트 가능), `missedLine`, `timeText`, **`DIFF_TOGGLE`**(타이틀 토글 좌표), **`normDifficulty(d)`**(저장값 거르기) | 셸 |
 
 ## 3. 핵심 데이터
 
@@ -47,6 +48,8 @@ r3 에서 새로 들어온 규칙: **게이트 사격 활성 구간(셔터 `armZ
 ```js
 {
   stageId, stageVersion: 1,
+  difficulty: 'normal'|'hard'|'brutal',    // 3-8. 생성 시점에 확정, 판 도중 불변
+  enemyDefs: { grunt, rusher, shooter, elite },   // 3-8. BAL3.enemies 에 난이도 배수를 한 번 적용해 동결한 표 — 규칙은 이것만 읽는다
   z, prevZ, x, tx,
   units: [ { id, dx, dy, hp, fireT } ],     // dx/dy = 대형 오프셋(중심 기준). id는 1부터 증가(nextUnitId)
   nextUnitId,
@@ -193,6 +196,26 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
   중심 간 간격이 아니라 **가장자리 사이 폭**이고, 반폭은 상한 60이 아니라 그 구간의 실제 `formationHalfWidth(n)`이다(벽 밖에서는 압축이 없다). `V3-STAGES STG-6`이 문서가 아니라 데이터로 검사한다.
 - 적 스폰: 스테이지 이벤트 `{ z, kind, n, xs: [..], zs: [..], corridorHw }` — 좌표는 buildStage가 확정(차선 대역 균등 분산 + 지터, 벽 안 금지). 발동 = `ev.z <= run.z`(정예는 `run.boss` 배정). **보스가 있는 동안 z가 멈추므로 스폰·통과 판정도 멈춘다.**
 
+### 3-8. 난이도(r3.3, 2026-09-16)
+
+**근거.** 배치·구조 개정(r3, 검수 반영)을 거친 뒤 이사 실플레이 3회 소감: **"가만히 있으면 손해는 나지만 난이도가 너무 낮아 완전 쉽다."** 원인은 위협의 실질 화력 — 잡졸 hp 2(두 발), 적탄 dmg 1(병사 hp 2 라 한 발로 안 죽음), 접촉 손실 1~2, 정예가 대군에 순삭. 봇 시뮬 합격선(V3-SIM·V3-SIM-POLICY)은 사람 기준과 어긋났다. 그래서 수치를 한 점으로 다시 맞추는 대신 **사람이 직접 지점을 고르는 난이도 선택**을 둔다.
+
+**검수 금지 조항과의 관계.** 검수(`newmode/v3/review/01_GPT_1단계_검수결과.md`)의 금지 = "적 HP 상향으로 F2 를 해결하지 말 것 · 숨은 감쇠 금지"는 **구조 문제(F2)를 수치로 덮는 것**과 **플레이어 모르게 깎는 것**을 막는 조항이다. 난이도 선택은 ① F2 구조 해결(r3 배치·셔터·차폐·배제 쌍)과 별개로 그 **위에** 얹히고 ② 타이틀에서 **플레이어가 명시적으로 고르며** HUD·결과·기록에 표기되므로 숨은 감쇠가 아니다. `normal` 은 배수 전부 ×1 = r3 그대로(기존 검사 174건 무수정 통과, V3-DIFF DIFF-2).
+
+**배수 표(출발값 — `BAL3.difficulty`).** 위협만 올린다. 게이트·보급·무기·병사 hp·armZ·coverZ·벽·시작 병력(성장 축)은 난이도와 무관.
+
+| id | 표기 | enemyHp | eshotDmg | touchDmg | eliteHp | spawnCount | eliteFireRate |
+|---|---|---|---|---|---|---|---|
+| `normal` | 보통(HUD·결과 표기 없음) | ×1 | ×1 | ×1 | ×1 | ×1 | ×1 |
+| `hard` | 어려움 | ×1.5 | ×2 | ×2 | ×1.6 | ×1.4 | ×1.25 |
+| `brutal` | 극한 | ×2.2 | ×3 | ×3 | ×2.4 | ×1.8 | ×1.5 |
+
+- `enemyHp`: grunt/rusher/shooter hp(반올림) → 2/3/4 · 4/6/9 · 6/9/13. `eshotDmg`: shooter·elite 적탄 dmg → 1/2/3(**어려움부터 적탄 1발 = 병사 1명**). `touchDmg`: grunt/rusher/elite 접촉 → 1/2/3 · 2/4/6 · 3/6/9. `eliteHp`: 정예 hp(반올림) → S1 120/192/288 · S2 220/352/528 · S3 500/800/1200. `spawnCount`: **xs 없이 `rows` 로 뿌리는 무리만** n × 배수(반올림) — 1단계에서는 S3 z8800 잡졸 18 → 25 → 32 하나뿐(xs 명시 무리는 회피 통로 규격 STG-6 을 지키려 좌표까지 그대로). `eliteFireRate`: 정예 `shootEvery` ÷ 배수 → 1.0/0.8/0.667 s(저격수 주기는 그대로). 스폰 정의에 `hp` 가 명시된 적은 그 값 그대로(스테이지 고정값 원칙).
+
+**적용 시점(V3-PURE·결정성).** 배수는 **빌드/생성 시점에 한 번**만 적용된다. `buildStage(id, { difficulty })` 가 `stage.difficulty`·rows 스폰 n·정예 hp 를 박고, `createRun(stage)` 가 `stage.difficulty` 를 읽어 `run.difficulty` 와 **`run.enemyDefs`**(`BAL3.enemies` 에 배수를 적용해 동결한 표)를 만든다. `stepRun` 이하 규칙은 `BAL3.enemies` 를 직접 읽지 않고 `run.enemyDefs` 만 읽으므로 **STEP 안에 난이도 분기가 없다**(V3-DIFF DIFF-6 정적 검사). `createRun(stage, { difficulty })` 의 옵션은 합성 스테이지(검사)용 덮어쓰기이고 셸은 항상 `buildStage` 경로만 쓴다. 모르는 id 는 규칙 모듈이 throw — 저장값을 거르는 곳은 셸 `normDifficulty` 하나.
+
+**봇 실측(출발값 표, 2026-09-16).** 이 표는 **봇 결과이지 사람의 성공률이 아니다.** `aim`: normal S1~S3 완주 · hard S1·S3 완주, **S2 는 정예전 전멸**(정예 217/352 잔존) · brutal S1 정예전 전멸(55/288 잔존), S3 전멸(36/1200). `plan`: hard S1·S3, brutal S3 완주. `center`: hard S1 완주, hard·brutal S2·S3 실패. hard S2 는 정예 배수(eliteHp·eliteFireRate)를 ×1.0 까지 내려도 `aim` 이 못 이긴다(잔존 56) — 원인은 적탄 dmg 2 와 옆으로 비키지 않는 봇의 조합(소총 21명이 정예 3발/초를 그대로 받아 화력이 먼저 소진). **표는 출발값으로 두고 사람 플레이로 지점을 찾는다**(보고서 `newmode/v3/build3/difficulty-report.md`, 탐색 기록 포함).
+
 ## 4. STEP 처리 순서(`combat.stepRun(run, input, STEP)`)
 
 `input = { pointerX: number|null, dragDx: number, keyDir: -1|0|1 }`(셸이 STEP 직전에 스냅샷, 호출 후 `dragDx = 0`).
@@ -287,8 +310,9 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
 ## 6. 화면(`render.js`)과 셸(`main.js`)
 
 - 렌더는 `view.now`(셸 시계)만 쓰고 `performance.now()`를 직접 읽지 않는다. DPR 반영(백킹스토어 = CSS 크기 × min(devicePixelRatio, 2)).
-- HUD 상단: `STAGE n 제목` + 목표(남은 거리 m, 정예 등장 후 정예 HP 막대+숫자). 부대 발밑: 병력 수. 우상단: 무기 아이콘·이름. 부대 중심 표시(작은 삼각 마커 — 게이트 칸 판정 기준).
-- 첫 플레이 안내: 출격 후 3초간 "좌우로 드래그 · 쏴서 숫자를 키우세요" 한 줄.
+- HUD 상단: `STAGE n 제목` + 목표(남은 거리 m, 정예 등장 후 정예 HP 막대+숫자). 부대 발밑: 병력 수. 우상단: 무기 아이콘·이름. **무기 칩 왼쪽 옆(x 222~286)에 난이도 태그 — 어려움·극한만**(`BAL3.difficulty[id].short`, normal 은 빈 문자열이라 안 그린다). 부대 중심 표시(작은 삼각 마커 — 게이트 칸 판정 기준). 적 HP 태그의 기준 hp(잡졸은 다쳤을 때만 표시)는 `run.enemyDefs` 를 읽는다.
+- 첫 플레이 안내: 출격 후 3초간 "좌우로 드래그 · 쏴서 숫자를 키우세요" 한 줄(모든 코스 버전·난이도 칸의 attempts 합이 0 일 때만).
+- **타이틀 난이도 토글(r3.3)**: 스테이지 버튼(y 436~) 바로 위 한 줄 — 라벨 "난이도" + 칸 3개(보통/어려움/극한, `main.DIFF_TOGGLE`: x 138 + i×96, y 382, 90×34, 버튼 id `diff_<id>`). 고른 칸 = primary. **클릭 또는 키 1/2/3**(타이틀에서만 — 판 도중 숫자 키는 무시). 선택은 저장 최상위 `difficulty` 에 기억되고, 스테이지 버튼의 기록(sub: 완료·최고·도전 횟수)은 **그 난이도 칸의 기록**이다. 출격은 `buildStage(id, { difficulty })` 로, 그 뒤로는 `run.difficulty` 가 진실(재도전·다음 작전도 같은 난이도).
 - 게이트: 칸 사각형 + 부호 숫자(큰 글씨) + 색. 피격 시 흰 플래시·숫자 튐. 통과 뒤 흐리게.
 - **게이트 셔터(r3)**: `armed === false`인 행은 칸 위에 **회색 빗금 셔터 판**을 덮고 숫자를 **보이되 흐리게** 그린다(무엇이 걸린 판인지 미리 읽게 한다). 도로 위 `run.z + armZ` 위치에 **사격 개시선**(행 색 점선 1줄)을 그려 "여기서부터 쏠 수 있다"를 가르친다. `gateArm` 이벤트 → 셔터 판이 `BAL3.gate.openT`(0.25초) 동안 위로 걷히는 연출 + 효과음 `gateOpen` **1회**. `gateBlock` → 셔터 표면에 작은 **회색** 튐(피격 흰 플래시와 구분). 셔터 연출 타이머는 규칙이 아니라 셸 `fx.gateOpen[rowId]` 가 갖는다(`fx.gateFlash` 와 같은 방식).
 - **보급 차폐·통로 표지(r3)**: `run.z < s.coverZ` 인 통은 회색 막을 덮고, 도로 위 `coverZ` 위치에 **개방선**(청록 점선)을 그린다. 벽의 **확정선**(`z0 − 60`)은 회색 실선으로 따로 그려 **"통로가 정해지고 잠시 뒤에 차폐가 걷힌다"**를 화면에 남긴다(두 줄의 색이 다르다). 벽 앞머리(`z0`)에는 `wall.signs` 를 좌·우 아이콘+숫자로 그린다.
@@ -296,7 +320,7 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
 - 보급: 통 그림(기존 SUPPLY 스프라이트 재사용) 위에 내용물(병사 실루엣 n / 무기 아이콘 / 파란 설비) + 내구 숫자. 파괴 시 보상 팝(0.5초 떠오른 뒤 부대로 흡수). chain 발판은 파란 발판 열 + 각 발판 "+1".
 - 벽: 도로 위 회색 분리대(상단 하이라이트). 정예 등장: 0.8초 "정예 접근!" 경고 배너 + 효과음.
 - 탄: 무기별 색·폭. 유닛마다 그린다(150명 이하). 적탄 5종 그리기는 기존 헬퍼 복제.
-- 상태: `title → run → paused → result(won|lost)`. result: 성공/실패, 생존 병력, 최고 병력, 시간, 처치 + **제안 한 줄(`adviceLine`)** + 실패 시 놓친 것 한 줄(`missedSupplies`·`badGatesPassed`·`lossByTouch/lossByShot`로 생성: 예 "병사 통 2개를 놓침 · −게이트 1회 통과") + 버튼 [다시 도전] [다음 작전(성공 시)] [스테이지 선택]. 저장 실패 시 "기록 저장 안 됨" 한 줄.
+- 상태: `title → run → paused → result(won|lost)`. result: 성공/실패, **제목 `STAGE n 제목 · 어려움`(난이도 짧은 표기를 제목 옆에, normal 은 없음)**, 생존 병력, 최고 병력, 시간, 처치 + **제안 한 줄(`adviceLine`)** + 실패 시 놓친 것 한 줄(`missedSupplies`·`badGatesPassed`·`lossByTouch/lossByShot`로 생성: 예 "병사 통 2개를 놓침 · −게이트 1회 통과") + 버튼 [다시 도전] [다음 작전(성공 시)] [스테이지 선택]. 저장 실패 시 "기록 저장 안 됨" 한 줄.
 - **제안 한 줄(r3, `rush3/advice.js`)**: 있으면 **그것을 크게**, 놓친 것 요약은 그 아래 작게 그린다. 순수 함수 `adviceLine(run, stage)` 가 아래 순위로 **결정적으로**(무작위 없이) 고른다.
 
   | 순위 | 조건 | 문구 |
@@ -315,17 +339,18 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
   - **마우스를 움직이면**(호버·클릭) 눌린 키 상태와 `keyDir`을 해제한다 → 마우스 조작 재개. 키로 다시 움직이려면 키를 다시 눌러야 한다.
   - **자동반복 keydown은 입력이 아니다**: 브라우저가 키를 누르고 있는 동안 보내는 `e.repeat` keydown은 셸(`main.js`)이 걸러 `input.onKey`로 넘기지 않는다(조향 키면 브라우저 기본 동작만 계속 막는다). 최초 1회만 `pointerX`를 해제하므로 **"키를 누른 채 마우스를 움직이면 마우스가 이긴다"가 실제 브라우저에서도 성립한다**(반복까지 넘기면 초당 수십 회 `pointerX`가 다시 지워져 이 규칙이 깨진다). ESC·Space·Enter의 반복도 같은 자리에서 걸러져 동작을 다시 일으키지 않는다.
   - **드래그 우선**: 드래그가 시작되면 `pointerX = null` + `keyDir = 0`(눌린 키 해제)이고, **드래그 중 키 입력은 방향에 반영하지 않는다**(아는 키면 셸에는 `true`로 알려 기본 동작만 막는다). 드래그 중 마우스 이동·둘째 손가락은 기존대로 무시. 드래그가 끝난 뒤 키를 다시 누르면 키 조작이 재개된다.
-- 루프(`makeLoop`): `acc = min(acc + dt, 5·STEP)`(초과 폐기), 일시정지 진입·해제 시 `acc = 0, last = now`, run 상태가 아닌 프레임은 acc 갱신 없음. 프레임당 최대 5 STEP. `window.__rush3Dbg()`로 `{state, stageId, z, x, units, weapon, boss, enemies, bullets}` 노출.
+- 루프(`makeLoop`): `acc = min(acc + dt, 5·STEP)`(초과 폐기), 일시정지 진입·해제 시 `acc = 0, last = now`, run 상태가 아닌 프레임은 acc 갱신 없음. 프레임당 최대 5 STEP. `window.__rush3Dbg()`로 `{state, stageId, difficulty, z, x, units, weapon, boss, enemies, bullets}` 노출(`difficulty` = 판 중이면 `run.difficulty`, 타이틀이면 고른 값).
 - 오디오 이벤트: fire(무기별, 프레임 1회, 볼륨 = min(1, 0.4 + count/40)), crateHit, crateBreak, gateTick, gateFlip, **gateOpen(셔터 열림, 행마다 1회)**, joinMany(3명 이상 합류), weaponSwap, hurt, kill, elite, win, lose. `gateBlock`·`supplyBlock` 은 **소리 없이** 화면 튐만.
 
 ## 7. 저장(`save.js`)
 
-- 키 `starforgeRush.v3`: `{ v: 3, stages: { [id]: { versions: { [stageVersion]: { cleared, attempts, bestSurvivors, bestTime } } } }, lastStage, volume, mute }`.
-- **기록은 stageId + 코스 버전(stageVersion)으로 묶는다.** 코스 버전은 `stages.js`의 `DEFS[id].version`이 단일 출처이고 `buildStage(id).version` · `stageVersion(id)` · `run.stageVersion`으로 흐른다. 배치를 고치면 그 값을 올린다 → 새 버전 기록은 새 칸에 쌓이고 옛 기록은 그대로 남는다. **r3 현재 코스 버전 = 세 스테이지 모두 2**(저장 구조 자체는 바뀌지 않았다).
+- 키 `starforgeRush.v3`: `{ v: 3, stages: { [id]: { versions: { [key]: { cleared, attempts, bestSurvivors, bestTime } } } }, lastStage, difficulty, volume, mute }`. **기록 칸 키 `key`(r3.3) = `${stageVersion}`(normal — 접미 없음, 옛 기록 칸 그대로) | `${stageVersion}:${difficulty}`(어려움 `2:hard`·극한 `2:brutal`)**. `recordKey(version, difficulty)` 가 단일 조립점. 최상위 `difficulty` = 타이틀에서 마지막으로 고른 난이도(문자열이면 그대로 저장, id 판정은 셸 `normDifficulty`).
+- **기록은 stageId + 코스 버전(stageVersion) + 난이도로 묶는다.** 코스 버전은 `stages.js`의 `DEFS[id].version`이 단일 출처이고 `buildStage(id).version` · `stageVersion(id)` · `run.stageVersion`으로 흐른다. 배치를 고치면 그 값을 올린다 → 새 버전 기록은 새 칸에 쌓이고 옛 기록은 그대로 남는다. **r3 현재 코스 버전 = 세 스테이지 모두 2**(저장 구조 자체는 바뀌지 않았다).
 - **마이그레이션**: 구 저장(`stages[id]`에 기록이 바로 있던 형식)은 **지우지 않고 버전 1로 귀속**한다. `versions`가 없거나 그 안에 `1`이 없는데 옛 필드가 남아 있으면 그 값이 버전 1이 된다. 버전 키는 1 이상의 정수만 인정하고 그 밖(문자열·0·소수·NaN)은 1로 본다 — **단, 이미 있는 버전 1 기록을 덮지 않는다.**
 - **귀속 우선순위(먼저 채운 칸은 덮지 않는다)**: ① `versions` 안의 정규 버전 키(`'1'`,`'2'`,…) ② 구 저장의 옛 필드 ③ 정규가 아닌 잡키(1로 봄). 잡키는 **비어 있는 칸에만** 들어가므로, 진짜 버전 1 기록과 잡키가 한 칸에 함께 있어도 진짜 기록이 남는다(원문 키 순서와 무관). 귀속할 자리가 없는 잡키의 값은 버려지되 **실재하는 기록은 절대 지우지 않는다**(무음 데이터 손실 금지 — 이 경로는 `.bak`도 남기지 않으므로 되돌릴 방법이 없다).
-- API: `getStage(id, version = 1)` · `updateStage(id, patch, version = 1)`(그 버전만 깊은 병합, 다른 버전·다른 스테이지 불변) · `getStageVersions(id)`(모든 버전 사본). `patch({ stages })`의 조각이 버전 없이 오면 버전 1 갱신으로 본다.
-- **결과 화면의 신기록 비교·attempts 증가는 같은 버전 안에서만.** 스테이지 선택 화면은 `stageVersion(id)`의 기록을 보여 준다(옛 버전 기록은 저장에 남되 화면에는 안 나온다). 첫 플레이 안내 판정만 모든 버전의 attempts 합을 쓴다.
+- API: `getStage(id, version = 1, difficulty = 'normal')` · `updateStage(id, patch, version = 1, difficulty = 'normal')`(그 버전·난이도 칸만 깊은 병합, 다른 칸·다른 스테이지 불변) · `getStageVersions(id)`(모든 칸 사본 — `'2'`, `'2:hard'` …). `patch({ stages })`의 조각이 버전 없이 오면 버전 1 갱신으로 본다.
+- **정규 칸 키(r3.3)** = `^[1-9][0-9]*(:[a-z][a-z0-9_-]*)?$`. `':normal'` 접미는 정규지만 접미 없는 칸과 같은 칸으로 본다(이미 찬 칸을 덮지 않는다). **모르는 난이도 접미(`'2:nightmare'`)도 실재 기록이므로 제 칸에 보존**한다(지우지 않는다). 대소문자·그 밖 잡키는 종전대로 1 로 보되 찬 칸을 덮지 않는다.
+- **결과 화면의 신기록 비교·attempts 증가는 같은 버전·같은 난이도 칸 안에서만.** 스테이지 선택 화면은 `stageVersion(id)` + 고른 난이도 칸의 기록을 보여 준다(다른 버전·다른 난이도 기록은 저장에 남되 화면에는 안 나온다). 첫 플레이 안내 판정만 모든 칸의 attempts 합을 쓴다.
 - load: `v === 3 && stages가 plain object`가 아니면 원문을 `starforgeRush.v3.bak`에 보존(가능할 때) 후 기본값. 기록 필드는 `Number.isFinite`로 강제. localStorage 접근·setItem·stringify 예외 전부 try, `ok` 플래그.
 - `starforgeRush.v1`은 읽지도 쓰지도 않는다.
 
@@ -339,6 +364,9 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
 - V3-ORDER: 한 발이 앞의 통과 뒤의 게이트를 동시에 처리하지 않음; 동일 STEP에 hp 2 잡졸에 30발 → 2발 소모·kills 1·28발 관통; STEP 5에서 격파된 잡졸이 같은 STEP 8에서 유닛을 깎지 않음(touched=false, kills+1); 유닛 1명 hp 1인 STEP에 통 개봉 +2와 접촉 −1이 겹쳐도 over=false.
 - V3-FIRE: 병사 1/10/30명에서 1초 누적 탄 수 비례; 30명 탄의 x 열 수 ≥ 20(한 점으로 모이지 않음).
 - V3-INPUT-SWITCH: 마우스를 x240에 둔 뒤 오른쪽 키 2초 = 마우스 없이 오른쪽 키 2초와 최종 x 동일(≈391); 키를 놓아도 옛 마우스 위치로 복귀 없음; 키를 누른 채 마우스를 움직이면 마우스가 이김(keyDir 해제·마우스 위치 추종); 드래그 시작이 마우스·키 목표를 지우고 드래그 중 키는 무시, 드래그 종료 뒤 키 재개. **셸 결선**: 마우스가 이긴 뒤 자동반복 keydown(`e.repeat`) 30회가 와도 `pointerX`가 지워지지 않고(조향 키의 기본 동작은 계속 막음) 부대는 마우스 위치를 따라가며, 자동반복 ESC로 일시정지가 뒤집히지 않는다.
+- **V3-DIFF(r3.3, `DIFF-1~6`, `tests/rush3-difficulty.test.mjs`)**: ① 배수 표가 3-8 표 그대로·id 순서·모르는 id 는 `difficultyMult`/`buildStage`/`createRun` 전부 throw ② **normal 은 종전과 완전히 같다** — `buildStage(id) ≡ buildStage(id,{normal})`(deepEqual), `enemyDefsFor('normal') ≡ BAL3.enemies`, 성장 축(게이트·통·벽·시작 병력·무기·길이·armZ)이 세 난이도에서 deepEqual, 병사 hp 2·armZ 340 불변 ③ `enemyDefsFor` — hp 2/3/4·4/6/9·6/9/13, 접촉 1/2/3·2/4/6·3/6/9, 적탄 dmg 1/2/3, 정예 주기 1/0.8/0.667, 그 밖 필드 그대로, 동결 ④ `buildStage` — 정예 hp 120/192/288·220/352/528·500/800/1200, S3 z8800 잡졸 n 18/25/32(두 열·도로 안), xs 명시 스폰은 좌표까지 normal 과 deepEqual, 난이도별로도 호출마다 새 객체 ⑤ **실제 `stepRun`** — 스폰 잡졸 hp, `ev.hp` 명시는 배수 무관, 돌격체 접촉 `hurt.n`, 저격수 적탄 `hurt.n`(어려움부터 `unitLost` 1발), 정예 6초 발사 횟수 6/7/9 ⑥ `stepRun` 이후 소스에 `difficulty`·`BAL3.enemies` 참조 없음(정적), `run.enemyDefs` 동결, 같은 난이도·입력열 결정성.
+- **V3-SIM-DIFF(r3.3, `SD-0~5`)**: 난이도 3 × 스테이지 3 × 정책(aim·center·plan) = **27판**, 결과표를 `t.diagnostic` 으로 출력(보고서가 그 출력을 인용). ⓪ 전부 상한 안 종료 ① normal 종전 그대로(aim 3완주·center S1 만) ② hard: aim S1·S3 완주, **S2 는 정예 등장까지 도달하고 지더라도 정예전에서만 진다(기록)** ③ brutal: aim S1 정예 도달(정예전 결과는 기록), S2·S3 결과만 기록 ④ center 는 hard·brutal S2·S3 실패 유지 ⑤ 같은 봇이면 생존 normal ≥ hard ≥ brutal·손실 반대·peak 은 난이도로 늘지 않는다. **원래 합격선(aim 이 hard 3스테이지·brutal S1 완주)은 출발값 표에서 성립하지 않아**(3-8 봇 실측) ②③ 을 '기록' 으로 낮췄다 — 표를 바꾸지 않고 사실을 적는 쪽을 택했다.
+- **V3-SAVE-VERSION DIFF(r3.3)**: `recordKey` 조립 규칙; hard/brutal 기록이 normal 칸을 덮지 않고 재로드·`patch({stages})` 뒤에도 칸 유지; 옛 저장(난이도 없음)은 키 그대로 normal 칸·hard 는 빈 기록; 손상 케이스(`':normal'` 접미는 찬 칸을 덮지 않음·모르는 접미 보존·대소문자 잡키는 1); 최상위 `difficulty` 기본 normal·기억·형식 아니면 normal. **셸 결선(`rush3-loop`)**: 토글 클릭·키 1/2/3 → 저장 `difficulty`; hard 출격 attempts·결과가 `${ver}:hard` 칸에만, normal 칸(도전 9회·최고 99명) 불변·화면에서만 빠짐; HUD·결과 화면에 '어려움' 표기, normal 에는 없음; 판 도중 숫자 키 무시; 다시 도전도 같은 난이도; 새 boot 가 마지막 난이도를 읽는다.
 - V3-SAVE-VERSION: 구 저장(`stages[id]` 직접 기록) 로드 → 버전 1 귀속·값 보존·bak 없음; v2 기록이 v1 최고 기록을 덮지 않음(양방향); `buildStage(id).version`이 그대로 기록 버전; `versions`가 객체가 아니거나 버전 키가 이상해도 기본값으로 진행(손상 케이스 기존 유지); **유효한 버전 1 기록과 잡키가 한 칸에 함께 있으면 버전 1 기록이 보존된다**(원문에서 잡키가 앞에 와도 동일, `.bak` 없음, 재로드·`updateStage` 뒤에도 유지). **셸 결선**: `DEFS[1].version`을 2로 둔 채 boot → 출격 attempts·결과 기록이 버전 2 칸에만 쌓이고, 버전 1 기록(도전 9회·최고 99명)은 저장에 그대로 남되 스테이지 선택 화면에는 나오지 않는다. **검사는 코스 버전을 1로 못 박지 않는다** — 기록을 읽을 때 `stageVersion(id)`를 쓴다(그러지 않으면 배치 개정으로 version이 올라가는 순간 관련 없는 단언이 터진다).
 - V3-WEAPON: auto 통 파괴 → `weapon='auto'`; 병력 30→1 감소 후에도 유지; rifle 통은 무시.
 - V3-WALL: x 240 무조작 진입 → 한쪽 통로로 스냅(벽 안에 남지 않음, lo ≤ hi); n=1·n=60 모두 유닛 dx 통로 안; 벽 끝 뒤 해제; 아군 탄·적탄 모두 벽에서 소멸; 좌측 shooter가 우측 통로 부대를 쏜 탄이 벽에서 소멸; 드래그 +500 누적 뒤 −20 → 그 STEP에 tx 감소(클램프).

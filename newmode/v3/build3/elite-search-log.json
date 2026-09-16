@@ -1,0 +1,1258 @@
+[
+ {
+  "d": "hard",
+  "eliteHp": 1.6,
+  "eliteFireRate": 1.25,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 9,
+    "peak": 20,
+    "boss": null,
+    "t": 48.8
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 217,
+    "t": 61.7
+   },
+   "3": {
+    "won": true,
+    "units": 33,
+    "peak": 51,
+    "boss": null,
+    "t": 71.3
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.5,
+  "eliteFireRate": 1.25,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 10,
+    "peak": 20,
+    "boss": null,
+    "t": 48.3
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 195,
+    "t": 61.7
+   },
+   "3": {
+    "won": true,
+    "units": 34,
+    "peak": 51,
+    "boss": null,
+    "t": 70.8
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.4,
+  "eliteFireRate": 1.25,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 16,
+    "peak": 20,
+    "boss": null,
+    "t": 43.4
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 173,
+    "t": 61.7
+   },
+   "3": {
+    "won": true,
+    "units": 35,
+    "peak": 51,
+    "boss": null,
+    "t": 70.3
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.3,
+  "eliteFireRate": 1.25,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 16,
+    "peak": 20,
+    "boss": null,
+    "t": 42.9
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 151,
+    "t": 61.7
+   },
+   "3": {
+    "won": true,
+    "units": 35,
+    "peak": 51,
+    "boss": null,
+    "t": 69.7
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.2,
+  "eliteFireRate": 1.25,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.7
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 129,
+    "t": 61.7
+   },
+   "3": {
+    "won": true,
+    "units": 37,
+    "peak": 51,
+    "boss": null,
+    "t": 68.8
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.1,
+  "eliteFireRate": 1.25,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.5
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 107,
+    "t": 61.7
+   },
+   "3": {
+    "won": true,
+    "units": 41,
+    "peak": 51,
+    "boss": null,
+    "t": 65.2
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.0,
+  "eliteFireRate": 1.25,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.3
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 85,
+    "t": 61.7
+   },
+   "3": {
+    "won": true,
+    "units": 42,
+    "peak": 51,
+    "boss": null,
+    "t": 64.6
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.6,
+  "eliteFireRate": 1.15,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 10,
+    "peak": 20,
+    "boss": null,
+    "t": 48.8
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 211,
+    "t": 63.3
+   },
+   "3": {
+    "won": true,
+    "units": 35,
+    "peak": 51,
+    "boss": null,
+    "t": 71.2
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.5,
+  "eliteFireRate": 1.15,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 11,
+    "peak": 20,
+    "boss": null,
+    "t": 48.3
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 189,
+    "t": 63.3
+   },
+   "3": {
+    "won": true,
+    "units": 35,
+    "peak": 51,
+    "boss": null,
+    "t": 70.7
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.4,
+  "eliteFireRate": 1.15,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 16,
+    "peak": 20,
+    "boss": null,
+    "t": 43.4
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 167,
+    "t": 63.3
+   },
+   "3": {
+    "won": true,
+    "units": 36,
+    "peak": 51,
+    "boss": null,
+    "t": 70.2
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.3,
+  "eliteFireRate": 1.15,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.9
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 145,
+    "t": 63.3
+   },
+   "3": {
+    "won": true,
+    "units": 37,
+    "peak": 51,
+    "boss": null,
+    "t": 69.6
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.2,
+  "eliteFireRate": 1.15,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.7
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 123,
+    "t": 63.3
+   },
+   "3": {
+    "won": true,
+    "units": 38,
+    "peak": 51,
+    "boss": null,
+    "t": 68.6
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.1,
+  "eliteFireRate": 1.15,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.5
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 101,
+    "t": 63.3
+   },
+   "3": {
+    "won": true,
+    "units": 42,
+    "peak": 51,
+    "boss": null,
+    "t": 65.1
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.0,
+  "eliteFireRate": 1.15,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.3
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 79,
+    "t": 63.3
+   },
+   "3": {
+    "won": true,
+    "units": 42,
+    "peak": 51,
+    "boss": null,
+    "t": 64.6
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.6,
+  "eliteFireRate": 1.1,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 11,
+    "peak": 20,
+    "boss": null,
+    "t": 48.7
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 205,
+    "t": 64.2
+   },
+   "3": {
+    "won": true,
+    "units": 35,
+    "peak": 51,
+    "boss": null,
+    "t": 71.2
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.5,
+  "eliteFireRate": 1.1,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 11,
+    "peak": 20,
+    "boss": null,
+    "t": 48.2
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 183,
+    "t": 64.2
+   },
+   "3": {
+    "won": true,
+    "units": 36,
+    "peak": 51,
+    "boss": null,
+    "t": 70.6
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.4,
+  "eliteFireRate": 1.1,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 16,
+    "peak": 20,
+    "boss": null,
+    "t": 43.4
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 161,
+    "t": 64.2
+   },
+   "3": {
+    "won": true,
+    "units": 37,
+    "peak": 51,
+    "boss": null,
+    "t": 70.1
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.3,
+  "eliteFireRate": 1.1,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.9
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 139,
+    "t": 64.2
+   },
+   "3": {
+    "won": true,
+    "units": 37,
+    "peak": 51,
+    "boss": null,
+    "t": 69.6
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.2,
+  "eliteFireRate": 1.1,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.7
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 117,
+    "t": 64.2
+   },
+   "3": {
+    "won": true,
+    "units": 41,
+    "peak": 51,
+    "boss": null,
+    "t": 66.1
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.1,
+  "eliteFireRate": 1.1,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.5
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 95,
+    "t": 64.2
+   },
+   "3": {
+    "won": true,
+    "units": 42,
+    "peak": 51,
+    "boss": null,
+    "t": 65.1
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.0,
+  "eliteFireRate": 1.1,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 18,
+    "peak": 20,
+    "boss": null,
+    "t": 42.3
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 73,
+    "t": 64.2
+   },
+   "3": {
+    "won": true,
+    "units": 43,
+    "peak": 51,
+    "boss": null,
+    "t": 64.6
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.6,
+  "eliteFireRate": 1.0,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 12,
+    "peak": 20,
+    "boss": null,
+    "t": 48.7
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 188,
+    "t": 65.9
+   },
+   "3": {
+    "won": true,
+    "units": 37,
+    "peak": 51,
+    "boss": null,
+    "t": 71
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.5,
+  "eliteFireRate": 1.0,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 12,
+    "peak": 20,
+    "boss": null,
+    "t": 48
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 166,
+    "t": 65.9
+   },
+   "3": {
+    "won": true,
+    "units": 38,
+    "peak": 51,
+    "boss": null,
+    "t": 70.5
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.4,
+  "eliteFireRate": 1.0,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 43.2
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 144,
+    "t": 65.9
+   },
+   "3": {
+    "won": true,
+    "units": 38,
+    "peak": 51,
+    "boss": null,
+    "t": 70
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.3,
+  "eliteFireRate": 1.0,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 43
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 122,
+    "t": 65.9
+   },
+   "3": {
+    "won": true,
+    "units": 39,
+    "peak": 51,
+    "boss": null,
+    "t": 69.5
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.2,
+  "eliteFireRate": 1.0,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 17,
+    "peak": 20,
+    "boss": null,
+    "t": 42.7
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 100,
+    "t": 65.9
+   },
+   "3": {
+    "won": true,
+    "units": 42,
+    "peak": 51,
+    "boss": null,
+    "t": 65.9
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.1,
+  "eliteFireRate": 1.0,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 18,
+    "peak": 20,
+    "boss": null,
+    "t": 42.5
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 78,
+    "t": 65.9
+   },
+   "3": {
+    "won": true,
+    "units": 43,
+    "peak": 51,
+    "boss": null,
+    "t": 65
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "hard",
+  "eliteHp": 1.0,
+  "eliteFireRate": 1.0,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 18,
+    "peak": 20,
+    "boss": null,
+    "t": 42.3
+   },
+   "2": {
+    "won": false,
+    "units": 0,
+    "peak": 21,
+    "boss": 56,
+    "t": 65.9
+   },
+   "3": {
+    "won": true,
+    "units": 43,
+    "peak": 51,
+    "boss": null,
+    "t": 64.5
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "brutal",
+  "eliteHp": 2.4,
+  "eliteFireRate": 1.5,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": false,
+    "units": 0,
+    "peak": 20,
+    "boss": 55,
+    "t": 53
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "brutal",
+  "eliteHp": 2.2,
+  "eliteFireRate": 1.5,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": false,
+    "units": 0,
+    "peak": 20,
+    "boss": 31,
+    "t": 53
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "brutal",
+  "eliteHp": 2.0,
+  "eliteFireRate": 1.5,
+  "ok": false,
+  "aim": {
+   "1": {
+    "won": false,
+    "units": 0,
+    "peak": 20,
+    "boss": 7,
+    "t": 53
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ },
+ {
+  "d": "brutal",
+  "eliteHp": 1.8,
+  "eliteFireRate": 1.5,
+  "ok": true,
+  "aim": {
+   "1": {
+    "won": true,
+    "units": 5,
+    "peak": 20,
+    "boss": null,
+    "t": 49.7
+   }
+  },
+  "center": {
+   "2": {
+    "won": false,
+    "units": 0,
+    "over": true
+   },
+   "3": {
+    "won": false,
+    "units": 0,
+    "over": true
+   }
+  }
+ }
+]
