@@ -60,9 +60,9 @@ export function pickX(policy, run) {
 //  무기 초당 dmg(화력 지수 계산용 — 생존 병력 × 이 값)
 export const DPS = { rifle: 2, auto: 4, heavy: 5 };
 
-/** 한 판. 상한 14,400 STEP(4분). 반환 = { run, opened, gates, events } */
-export function playPolicy(id, policy, maxSteps = 14400) {
-  const run = createRun(buildStage(id));
+/** 한 판. 상한 14,400 STEP(4분). 반환 = { run, opened, gates, events }. difficulty 생략 = normal(종전과 같은 판) */
+export function playPolicy(id, policy, maxSteps = 14400, difficulty = 'normal') {
+  const run = createRun(buildStage(id, { difficulty }));
   const opened = [], gates = [], events = {};
   let steps = 0;
   while (!run.over && steps < maxSteps) {

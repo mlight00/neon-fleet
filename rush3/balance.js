@@ -66,6 +66,17 @@ export const BAL3 = deepFreeze({
                // 소환(S3): 4s 마다 grunt 2 (정예 x±40, z = 정예 z −40)
                summonEvery: 4, summonKind: 'grunt', summonN: 2, summonDx: 40, summonDz: -40 },
   },
+  // 난이도 배수(계약서 3-8). 위협만 올리고 성장 축(게이트·보급·무기·병사 hp·armZ·coverZ)은 손대지 않는다.
+  //  normal 은 전부 ×1 = 종전과 완전히 같은 판. 배수는 buildStage/createRun 시점에 한 번 적용되고 stepRun 안에는 난이도 분기가 없다.
+  //  근거: 이사 실플레이 3회 소감 "가만히 있으면 손해는 나지만 난이도가 너무 낮아 완전 쉽다"(2026-09-16). 사람이 직접 지점을 고르게 하는 명시적 선택이다.
+  //   enemyHp      잡졸·돌격체·저격수 hp(반올림)      eshotDmg     저격수·정예 적탄 dmg(어려움부터 1발 = 병사 1명)
+  //   touchDmg     잡졸·돌격체·정예 접촉 피해          eliteHp      정예 hp(반올림)
+  //   spawnCount   xs 없이 rows 로 뿌리는 스폰의 n(반올림, xs 명시 스폰은 그대로)   eliteFireRate 정예 부채꼴 발사 빈도(shootEvery ÷ 배수)
+  difficulty: {
+    normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,   spawnCount: 1,   eliteFireRate: 1 },
+    hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1.5, eshotDmg: 2, touchDmg: 2, eliteHp: 1.6, spawnCount: 1.4, eliteFireRate: 1.25 },
+    brutal: { id: 'brutal', label: '극한',   short: '극한',   enemyHp: 2.2, eshotDmg: 3, touchDmg: 3, eliteHp: 2.4, spawnCount: 1.8, eliteFireRate: 1.5 },
+  },
   // 연출 상수(6장 + 기존 값 이식)
   fx: { shakeDur: 0.25, shakeAmp: 7, hurtFlashDur: 0.35, guideSec: 3, eliteBannerSec: 0.8, rewardPopSec: 0.5,
         fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3 },
@@ -84,3 +95,14 @@ export const BAL3 = deepFreeze({
     ],
   },
 });
+
+// 난이도 id 목록(타이틀 토글 순서 = 표 순서). 데이터 접근만 — 규칙 로직이 아니다.
+export const DIFFICULTY_IDS = Object.freeze(Object.keys(BAL3.difficulty));
+export const DEFAULT_DIFFICULTY = 'normal';
+
+// 난이도 배수 표 한 줄. 모르는 id 는 throw(규칙 모듈이 조용히 normal 로 떨어지지 않게 — 셸이 저장값을 미리 거른다)
+export function difficultyMult(id) {
+  const m = BAL3.difficulty[id];
+  if (!m) throw new Error('unknown difficulty ' + id);
+  return m;
+}

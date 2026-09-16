@@ -1,7 +1,7 @@
 // rush3-save — 계약서 8장 V3-SAVE + 자산 모듈 Node 스모크
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSave3, KEY3, BAK3 } from '../rush3/save.js';
+import { createSave3, KEY3, BAK3, recordKey, BASE_DIFFICULTY } from '../rush3/save.js';
 import { STAGE_IDS, buildStage, stageVersion } from '../rush3/stages.js';
 import { createRun } from '../rush3/combat.js';
 import { SPRITE_KEYS3, loadSprites3 } from '../rush3/sprites.js';
@@ -357,3 +357,113 @@ test('V3-AUDIO: 풀은 이름·파일별 4개까지, src 는 생성 때 고정(�
   assert.equal(pool[0].paused, false, '재사용 객체는 재생 중');
   assert.equal(a.sfx('kill'), true, '동시 상한 12 미만이라 다른 음도 재생');
 }));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-SAVE-VERSION 난이도(계약서 7장·3-8): 기록 칸 키 `${version}`(normal) | `${version}:${difficulty}`
+// ─────────────────────────────────────────────────────────────────────────────
+test('V3-SAVE-VERSION DIFF: recordKey — normal 은 접미 없음(옛 칸 그대로), 그 밖은 version:difficulty, 버전은 1 이상 정수로 정규화', () => {
+  assert.equal(BASE_DIFFICULTY, 'normal');
+  assert.equal(recordKey(2), '2');
+  assert.equal(recordKey(2, 'normal'), '2');
+  assert.equal(recordKey(2, null), '2');
+  assert.equal(recordKey(2, undefined), '2');
+  assert.equal(recordKey(2, 'hard'), '2:hard');
+  assert.equal(recordKey('2', 'brutal'), '2:brutal');
+  assert.equal(recordKey(undefined, 'hard'), '1:hard');
+  assert.equal(recordKey(0, 'hard'), '1:hard');
+  assert.equal(recordKey('x'), '1');
+  assert.equal(recordKey(2.7, 'hard'), '2:hard');
+});
+
+test('V3-SAVE-VERSION DIFF: 난이도별 기록 분리 — hard/brutal 기록이 normal 칸을 덮지 않고 재로드 뒤에도 칸이 유지된다(신기록 비교는 같은 난이도 안에서만)', () => {
+  const st = memStorage();
+  const s = createSave3(st);
+  s.updateStage(2, { attempts: 1 }, 2);
+  s.updateStage(2, { cleared: true, bestSurvivors: 30, bestTime: 50 }, 2);
+  s.updateStage(2, { attempts: 1 }, 2, 'hard');
+  s.updateStage(2, { cleared: true, bestSurvivors: 8, bestTime: 70 }, 2, 'hard');
+  s.updateStage(2, { attempts: 2 }, 2, 'brutal');
+  const normal = { cleared: true, attempts: 1, bestSurvivors: 30, bestTime: 50 };
+  const hard = { cleared: true, attempts: 1, bestSurvivors: 8, bestTime: 70 };
+  const brutal = { cleared: false, attempts: 2, bestSurvivors: 0, bestTime: 0 };
+  const check = (sv) => {
+    assert.deepEqual(sv.getStage(2, 2), normal);
+    assert.deepEqual(sv.getStage(2, 2, 'normal'), normal, "'normal' 을 명시해도 같은 칸");
+    assert.deepEqual(sv.getStage(2, 2, 'hard'), hard);
+    assert.deepEqual(sv.getStage(2, 2, 'brutal'), brutal);
+    assert.deepEqual(sv.getStage(2, 1, 'hard'), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 }, '다른 버전의 hard 는 빈 칸');
+    assert.deepEqual(Object.keys(sv.getStageVersions(2)).sort(), ['2', '2:brutal', '2:hard']);
+  };
+  check(s);
+  //  원문 키도 그대로
+  assert.deepEqual(Object.keys(JSON.parse(st.getItem(KEY3)).stages['2'].versions).sort(), ['2', '2:brutal', '2:hard']);
+  const s2 = createSave3(st);
+  check(s2);
+  assert.equal(st.getItem(BAK3), null);
+  //  hard 의 신기록은 normal 을 건드리지 않고, normal 의 갱신도 hard 를 건드리지 않는다
+  s2.updateStage(2, { bestSurvivors: 40 }, 2, 'hard');
+  assert.equal(s2.getStage(2, 2, 'hard').bestSurvivors, 40);
+  assert.equal(s2.getStage(2, 2).bestSurvivors, 30);
+  s2.updateStage(2, { bestSurvivors: 31 }, 2);
+  assert.equal(s2.getStage(2, 2).bestSurvivors, 31);
+  assert.equal(s2.getStage(2, 2, 'hard').bestSurvivors, 40);
+  //  patch({stages}) 조각도 난이도 칸을 지킨다
+  s2.patch({ stages: { 2: { versions: { '2:brutal': { cleared: true } } } } });
+  assert.deepEqual(s2.getStage(2, 2, 'brutal'), { ...brutal, cleared: true });
+  assert.equal(s2.getStage(2, 2, 'hard').bestSurvivors, 40);
+});
+
+test('V3-SAVE-VERSION DIFF: 옛 저장(난이도 없음)은 그대로 normal 칸 — 로드해도 키가 바뀌지 않고 hard 는 빈 기록에서 시작', () => {
+  const rec = { cleared: true, attempts: 4, bestSurvivors: 12, bestTime: 41.2 };
+  const raw = JSON.stringify({ v: 3, stages: { 1: { versions: { 2: rec } } }, lastStage: 1, volume: 0.5, mute: false });
+  const st = memStorage({ [KEY3]: raw });
+  const s = createSave3(st);
+  assert.equal(st.getItem(BAK3), null);
+  assert.deepEqual(s.getStage(1, 2), rec);
+  assert.deepEqual(s.getStage(1, 2, 'hard'), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 });
+  assert.equal(s.get().difficulty, 'normal', '난이도 필드가 없던 저장은 normal');
+  s.patch({ lastStage: 1 });
+  assert.deepEqual(JSON.parse(st.getItem(KEY3)).stages['1'], { versions: { 2: rec } }, '옛 칸 키 그대로');
+});
+
+test("V3-SAVE-VERSION DIFF: 손상 케이스 — ':normal' 접미는 접미 없는 칸으로 보되 찬 칸을 덮지 않는다 · 모르는 난이도 접미는 제 칸에 보존 · 대소문자·잡키는 1", () => {
+  const recA = { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 };
+  const recB = { cleared: false, attempts: 1, bestSurvivors: 1, bestTime: 1 };
+  const recC = { cleared: true, attempts: 2, bestSurvivors: 7, bestTime: 80 };
+  const recD = { cleared: true, attempts: 5, bestSurvivors: 3, bestTime: 90 };
+  const st = memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {
+    1: { versions: { '2': recA, '2:normal': recB, '2:hard': recC, '2:nightmare': recD, 'abc': { attempts: 3 }, '2:Hard': { attempts: 8 } } },
+    2: { versions: { '2:normal': recB } },
+  } }) });
+  const s = createSave3(st);
+  assert.equal(st.getItem(BAK3), null, '최상위 형식은 맞으니 bak 없음');
+  assert.deepEqual(s.getStage(1, 2), recA, "':normal' 이 실재하는 '2' 칸을 덮지 않는다");
+  assert.deepEqual(s.getStage(1, 2, 'hard'), recC);
+  assert.deepEqual(s.getStage(1, 2, 'nightmare'), recD, '모르는 난이도 접미도 실재 기록이므로 지우지 않는다');
+  assert.deepEqual(s.getStage(1, 1), { cleared: false, attempts: 3, bestSurvivors: 0, bestTime: 0 }, "잡키('abc')는 1 로 본다");
+  assert.deepEqual(Object.keys(s.getStageVersions(1)).sort(), ['1', '2', '2:hard', '2:nightmare']);
+  assert.deepEqual(s.getStage(2, 2), recB, "'2' 칸이 비어 있으면 ':normal' 접미 기록이 그 칸이 된다");
+  //  진행 가능: 갱신·최상위 패치가 예외 없이 되고 다른 칸을 건드리지 않는다
+  s.updateStage(1, { attempts: 10 }, 2, 'hard');
+  s.patch({ lastStage: 1 });
+  assert.equal(s.getStage(1, 2, 'hard').attempts, 10);
+  assert.deepEqual(s.getStage(1, 2), recA);
+  assert.deepEqual(s.getStage(1, 2, 'nightmare'), recD);
+  assert.equal(s.get().lastStage, 1);
+});
+
+test('V3-SAVE-VERSION DIFF: 마지막 난이도(difficulty) — 기본 normal, patch 로 기억, 재로드 유지, 형식이 아니면 normal', () => {
+  const st = memStorage();
+  const s = createSave3(st);
+  assert.equal(s.get().difficulty, 'normal');
+  s.patch({ difficulty: 'hard' });
+  assert.equal(s.get().difficulty, 'hard');
+  assert.equal(JSON.parse(st.getItem(KEY3)).difficulty, 'hard');
+  assert.equal(createSave3(st).get().difficulty, 'hard');
+  for (const bad of [5, null, '', {}]) {
+    const s2 = createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, difficulty: bad }) }));
+    assert.equal(s2.get().difficulty, 'normal', JSON.stringify(bad));
+  }
+  //  save 는 난이도 id 를 판정하지 않는다(그건 셸 normDifficulty 의 몫) — 문자열이면 그대로 둔다
+  assert.equal(createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, difficulty: 'zzz' }) })).get().difficulty, 'zzz');
+});

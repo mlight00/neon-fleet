@@ -1,6 +1,6 @@
 // rush3/combat.js — 전투 STEP 통합(계약서 3-1·3-7·4장). 순수 규칙: 난수·화면·시계 없음(rng import 금지).
 // 모든 좌표는 트랙 z(클수록 앞). 화면 y 변환은 렌더 몫. 규칙은 STEP = 1/60 단위로만 진행한다.
-import { BAL3 } from './balance.js';
+import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
 import { WEAPONS, weaponRank, makeBullet } from './weapons.js';
 import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm } from './gates.js';
 import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward } from './supply.js';
@@ -12,12 +12,32 @@ const SQ = BAL3.squad, ROAD = BAL3.road, EN = BAL3.enemies, LINE_Y = BAL3.view.L
 const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0 });
 const DEG = Math.PI / 180;
 
+// 난이도별 적 정의 표(계약서 3-8). BAL3.enemies 에 배수를 **한 번** 적용한 새 객체 — run 이 이것만 읽으므로 stepRun 안에 난이도 분기가 없다.
+//  enemyHp → grunt/rusher/shooter hp(반올림) · eshotDmg → shooter/elite shot.dmg · touchDmg → grunt/rusher/elite touchDmg
+//  eliteFireRate → elite shootEvery ÷ 배수. r·vz·가속·예고·소환 등 나머지는 그대로. 정예 hp 는 stage.elite.hp(buildStage 가 eliteHp 배수 적용).
+export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY) {
+  const m = difficultyMult(difficulty);
+  const out = {};
+  for (const [kind, d] of Object.entries(EN)) {
+    const e = { ...d };
+    if (d.hp != null) e.hp = Math.round(d.hp * m.enemyHp);
+    if (d.touchDmg) e.touchDmg = Math.round(d.touchDmg * m.touchDmg);
+    if (d.shot) e.shot = Object.freeze({ ...d.shot, dmg: Math.round(d.shot.dmg * m.eshotDmg) });
+    if (kind === 'elite') e.shootEvery = d.shootEvery / m.eliteFireRate;
+    out[kind] = Object.freeze(e);
+  }
+  return Object.freeze(out);
+}
+
 // 3-1 run 생성. 게이트 행·통은 gates/supply 의 make 함수로 다시 만들어 규칙 모듈이 요구하는 내부 필드(rowId/idx·activated/queuedPads/padStart)를 보장한다.
 // 벽·스폰·정예 정의는 stage 것을 그대로 보유(buildStage 가 매번 새 객체라 복사 불필요).
-export function createRun(stage) {
+//  난이도: 기본은 stage.difficulty(buildStage 가 박는다). opts.difficulty 는 합성 스테이지(검사)용 덮어쓰기 — 셸은 항상 buildStage 경로만 쓴다.
+export function createRun(stage, { difficulty } = {}) {
   const weapon = WEAPONS[stage.startWeapon] ? stage.startWeapon : 'rifle';
+  const diff = difficulty ?? stage.difficulty ?? DEFAULT_DIFFICULTY;
   const run = {
     stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null,
+    difficulty: diff, enemyDefs: enemyDefsFor(diff),
     z: 0, prevZ: 0, x: ROAD.startX, tx: ROAD.startX,
     units: [], nextUnitId: 1,
     weapon,
@@ -97,7 +117,7 @@ function spawnDue(run, ev) {
   }
   if (run.elite && !run.eliteSpawned && run.elite.z <= run.z) {
     run.eliteSpawned = true;
-    const E = EN.elite;
+    const E = run.enemyDefs.elite;
     const z = run.z + E.spawnAhead;
     run.boss = { kind: 'elite', x: ROAD.center, z, px: ROAD.center, pz: z, hp: run.elite.hp, max: run.elite.hp, r: E.r,
                  state: 'descend', dir: 1, shootT: E.shootEvery, touchT: 0, spawnT: E.summonEvery, summon: !!run.elite.summon, dead: false };
@@ -110,9 +130,9 @@ function armGates(run, ev) {
   for (const row of run.gateRows) updateGateArm(row, run, ev);
 }
 
-// 적 1기 생성. hp 는 스테이지 정의 고정값(병력 무관)
+// 적 1기 생성. hp 는 스테이지 정의 고정값(병력 무관) — 난이도 배수는 run.enemyDefs 에 이미 들어 있다
 function spawnEnemy(run, kind, x, z, hp) {
-  const d = EN[kind];
+  const d = run.enemyDefs[kind];
   const e = { id: run.nextEnemyId++, kind, x, z, px: x, pz: z, vz: d.vz, hp: hp ?? d.hp, r: d.r, dead: false, touched: false };
   if (kind === 'shooter') { e.shootT = d.shootEvery; e.aimT = 0; }
   run.enemies.push(e);
@@ -235,7 +255,7 @@ function fireAt(run, x, z, tx, tz, shot, fan, spreadRad, ev) {
 function moveEnemies(run, ev, dt) {
   for (const e of run.enemies) {
     if (e.dead) continue;
-    const d = EN[e.kind];
+    const d = run.enemyDefs[e.kind];
     e.px = e.x; e.pz = e.z;
     if (e.kind === 'grunt') {
       const want = run.x - e.x, mv = d.track * dt;
@@ -267,7 +287,7 @@ function shooterAct(run, e, d, ev, dt) {
 
 // 정예: descend(150/s, run.z + 420 까지) → hold(좌우 60/s 왕복). 1.0s 부채꼴 3발, S3 는 4s 마다 잡졸 2 소환
 function bossAct(run, bo, ev, dt) {
-  const E = EN.elite;
+  const E = run.enemyDefs.elite;
   bo.px = bo.x; bo.pz = bo.z;
   if (bo.state === 'descend') {
     bo.z -= E.descendSpeed * dt;
@@ -286,7 +306,7 @@ function bossAct(run, bo, ev, dt) {
     bo.spawnT -= dt;
     if (bo.spawnT <= 0) {
       bo.spawnT += E.summonEvery;
-      const r = EN[E.summonKind].r;
+      const r = run.enemyDefs[E.summonKind].r;
       for (let k = 0; k < E.summonN; k++) {
         const side = k % 2 === 0 ? -1 : 1;
         const x = Math.max(ROAD.x0 + r, Math.min(ROAD.x1 - r, bo.x + side * E.summonDx));
@@ -340,7 +360,7 @@ function moveEshots(run, ev, dt) {
 function contacts(run, ev, dt) {
   for (const e of run.enemies) {
     if (e.dead) continue;
-    const d = EN[e.kind];
+    const d = run.enemyDefs[e.kind];
     if (!d.touchDmg) continue;
     const hits = overlappingUnits(run.units, e.x, e.z, e.r, { x: e.px, z: e.pz }, run);
     if (!hits.length) continue;
@@ -351,7 +371,7 @@ function contacts(run, ev, dt) {
   }
   const bo = run.boss;
   if (bo && !bo.dead) {
-    const E = EN.elite;
+    const E = run.enemyDefs.elite;
     bo.touchT = Math.max(0, bo.touchT - dt);
     if (bo.touchT <= 0) {
       const hits = overlappingUnits(run.units, bo.x, bo.z, bo.r, null, run);

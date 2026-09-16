@@ -14,6 +14,9 @@ const FONT = 'system-ui, sans-serif';
 const ENEMY_FALLBACK = C.enemy;
 const ENEMY_SPRITE = { grunt: 'e_grunt', rusher: 'e_rusher', shooter: 'e_shooter' };
 const ENEMY_LABEL = { grunt: '잡졸', rusher: '돌격체', shooter: '저격수' };
+//  난이도 짧은 표기 색(HUD 태그·결과 제목). normal 은 표기 없음(BAL3.difficulty[id].short 가 빈 문자열)
+const DIFF_COLOR = { hard: C.bulletHeavy, brutal: C.gateNeg };
+const diffShort = (id) => BAL3.difficulty[id]?.short ?? '';
 
 export function createRenderer3(ctx, sprites) {
   const get = (k) => (sprites && typeof sprites.get === 'function' ? sprites.get(k) : null);
@@ -357,8 +360,8 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = C.eshot;
       ctx.beginPath(); ctx.arc(e.x, y, Math.max(3, e.r * 0.28), 0, Math.PI * 2); ctx.fill();
     });
-    //  HP 태그: 잡졸은 다쳤을 때만, 나머지는 항상
-    const base = BAL3.enemies[e.kind]?.hp ?? 0;
+    //  HP 태그: 잡졸은 다쳤을 때만, 나머지는 항상. 기준 hp 는 그 판의 난이도 표(run.enemyDefs)
+    const base = run.enemyDefs?.[e.kind]?.hp ?? BAL3.enemies[e.kind]?.hp ?? 0;
     if (e.kind !== 'grunt' || e.hp < base) drawHpTag(e.x, y + e.r + 16, e.hp);
   }
 
@@ -529,6 +532,18 @@ export function createRenderer3(ctx, sprites) {
     ctx.font = 'bold 16px ' + FONT;
     ctx.fillStyle = w.color;
     ctx.fillText(w.name, 340, 42);
+    //  난이도 태그(어려움·극한만): 무기 칩 왼쪽 옆
+    const ds = diffShort(run.difficulty);
+    if (ds) {
+      ctx.fillStyle = 'rgba(20,35,58,0.82)';
+      roundRect(222, 21, 64, 30, 15);
+      ctx.fill();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 14px ' + FONT;
+      ctx.fillStyle = DIFF_COLOR[run.difficulty] ?? C.hud;
+      ctx.fillText(ds, 254, 41);
+      ctx.textAlign = 'left';
+    }
     //  정예 HP 막대
     if (run.boss) {
       ctx.fillStyle = 'rgba(20,35,58,0.85)';
@@ -592,7 +607,7 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillStyle = b.primary ? 'rgba(255,255,255,0.75)' : 'rgba(243,241,232,0.75)';
         ctx.fillText(b.sub, cx, cy + 12);
       } else {
-        ctx.font = '700 19px ' + FONT;
+        ctx.font = '700 ' + (b.small ? 15 : 19) + 'px ' + FONT;
         ctx.fillText(b.label, cx, cy);
       }
       ctx.textBaseline = 'alphabetic';
@@ -615,13 +630,19 @@ export function createRenderer3(ctx, sprites) {
     ctx.font = '600 16px ' + FONT;
     ctx.fillStyle = 'rgba(20,35,58,0.72)';
     ctx.fillText('쏴서 숫자를 키우고, 부대를 불려라', W / 2, 182);
-    drawImgCentered('m1', W / 2, 300, 170, () => {
+    drawImgCentered('m1', W / 2, 282, 170, () => {
       ctx.fillStyle = C.hero;
-      ctx.beginPath(); ctx.arc(W / 2, 300, 55, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(W / 2, 282, 55, 0, Math.PI * 2); ctx.fill();
     });
+    //  난이도 토글 줄(버튼은 drawButtons — 여기서는 왼쪽 라벨만). 위치는 main.DIFF_TOGGLE(y 382, h 34)
+    ctx.textAlign = 'left';
     ctx.font = '700 15px ' + FONT;
     ctx.fillStyle = 'rgba(20,35,58,0.8)';
-    ctx.fillText('작전을 고르세요', W / 2, 412);
+    ctx.fillText('난이도', 64, 404);
+    ctx.textAlign = 'center';
+    ctx.font = '700 15px ' + FONT;
+    ctx.fillStyle = 'rgba(20,35,58,0.8)';
+    ctx.fillText('작전을 고르세요', W / 2, 430);
     if (view.saveOk === false) {
       ctx.font = '600 13px ' + FONT;
       ctx.fillStyle = C.gateNeg;
@@ -666,7 +687,17 @@ export function createRenderer3(ctx, sprites) {
     ctx.fillText(r.won ? '작전 성공!' : '작전 실패', W / 2, 150);
     ctx.font = '700 16px ' + FONT;
     ctx.fillStyle = 'rgba(243,241,232,0.75)';
-    ctx.fillText('STAGE ' + r.stageId + '  ' + r.title, W / 2, 184);
+    const rds = diffShort(r.difficulty);
+    const head = 'STAGE ' + r.stageId + '  ' + r.title + (rds ? '  ·  ' : '');
+    ctx.fillText(head + rds, W / 2, 184);
+    if (rds) {
+      //  난이도 표기만 색을 달리해 한 번 더 그린다(제목 오른쪽 끝 위치는 measureText 로)
+      const x0 = W / 2 - ctx.measureText(head + rds).width / 2 + ctx.measureText(head).width;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = DIFF_COLOR[r.difficulty] ?? C.hud;
+      ctx.fillText(rds, x0, 184);
+      ctx.textAlign = 'center';
+    }
     const lines = [
       ['생존 병력', r.survivors + '명'],
       ['최고 병력', r.peak + '명'],

@@ -1,7 +1,7 @@
 // rush3-loop — 셸 묶음(계약서 8장 V3-DETERMINISM·V3-INPUT + boot 스모크). DOM 없이 main.js 를 import 한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hitButton, makeLoop, boot, missedLine, timeText } from '../rush3/main.js';
+import { hitButton, makeLoop, boot, missedLine, timeText, DIFF_TOGGLE, normDifficulty } from '../rush3/main.js';
 import { createInput } from '../rush3/input.js';
 import { createRun, stepRun, STEP } from '../rush3/combat.js';
 import { buildStage, stageVersion, DEFS } from '../rush3/stages.js';
@@ -535,4 +535,82 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
   } finally {
     DEFS[1].version = orig;
   }
+});
+
+test('V3-SAVE-VERSION DIFF 셸 결선: 토글 클릭·키 1/2/3 → 난이도 저장, 출격·결과 기록이 `${ver}:hard` 칸에만 쌓이고 normal 칸은 그대로, HUD·결과에 표기', async () => {
+  const ver = stageVersion(1);
+  const { app, canvas, win, frames, save, texts, storage } = await bootFake();
+  //  normal 칸의 기존 기록
+  save.updateStage(1, { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, ver);
+  frames(2);
+  assert.equal(app.getDifficulty(), 'normal');
+  assert.equal(normDifficulty('zzz'), 'normal');
+  assert.ok(texts.some((t) => t.includes('99명')), 'normal 에서는 normal 기록이 보인다');
+  assert.ok(texts.includes('보통') && texts.includes('어려움') && texts.includes('극한'), '토글 3칸이 그려진다: ' + JSON.stringify(texts.slice(-12)));
+  //  '어려움' 칸 클릭(둘째 칸). 논리 좌표 → CSS 절반 배율
+  const T = DIFF_TOGGLE;
+  canvas.fire('pointerdown', { clientX: (T.x0 + (T.w + T.gap) + T.w / 2) / 2, clientY: (T.y + T.h / 2) / 2, pointerType: 'mouse' });
+  assert.equal(app.getState(), 'title', '토글은 출격이 아니다');
+  assert.equal(app.getDifficulty(), 'hard');
+  assert.equal(save.get().difficulty, 'hard', '선택은 저장에 기억');
+  texts.length = 0;
+  frames(1);
+  assert.ok(texts.includes('미도전'), 'hard 칸은 미도전: ' + JSON.stringify(texts));
+  assert.ok(!texts.some((t) => t.includes('99명')), 'normal 기록은 hard 화면에 나오지 않는다');
+  //  키 1/2/3 도 같은 경로(타이틀에서만)
+  win.fire('keydown', { code: 'Digit3' });
+  assert.equal(app.getDifficulty(), 'brutal');
+  win.fire('keydown', { code: 'Digit1' });
+  assert.equal(app.getDifficulty(), 'normal');
+  win.fire('keydown', { code: 'Digit2' });
+  assert.equal(app.getDifficulty(), 'hard');
+  //  출격: run.difficulty = hard, 적 표가 hard, attempts 는 `${ver}:hard` 칸
+  canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
+  assert.equal(app.getState(), 'run');
+  assert.equal(app.getRun().difficulty, 'hard');
+  assert.equal(app.getRun().enemyDefs.shooter.shot.dmg, 2);
+  assert.equal(app.dbg().difficulty, 'hard');
+  assert.equal(save.getStage(1, ver, 'hard').attempts, 1);
+  assert.equal(save.getStage(1, ver).attempts, 9, 'normal 칸 불변');
+  //  진행 중 숫자 키는 난이도를 바꾸지 않는다
+  win.fire('keydown', { code: 'Digit3' });
+  assert.equal(app.getRun().difficulty, 'hard');
+  assert.equal(app.getDifficulty(), 'hard');
+  //  HUD 태그
+  texts.length = 0;
+  frames(1);
+  assert.ok(texts.includes('어려움'), 'HUD 에 난이도 표기: ' + JSON.stringify(texts));
+  //  승리 판을 셸의 정상 경로(run.over → 여운 → finishRun)로 끝낸다
+  frames(30);
+  const run = app.getRun();
+  run.won = true; run.wonAt = 55.5; run.over = true;
+  let guard = 0;
+  while (app.getState() === 'run' && guard++ < 300) frames(1);
+  assert.equal(app.getState(), 'result', 'guard=' + guard);
+  assert.deepEqual(save.getStage(1, ver, 'hard'), { cleared: true, attempts: 1, bestSurvivors: run.units.length, bestTime: 55.5 });
+  assert.deepEqual(save.getStage(1, ver), { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 'hard 기록이 normal 최고 기록을 덮지 않는다');
+  assert.deepEqual(Object.keys(save.getStageVersions(1)).sort(), [String(ver), ver + ':hard']);
+  assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions).sort(), [String(ver), ver + ':hard'], '저장 원문 키');
+  //  결과 화면 제목 옆 표기
+  texts.length = 0;
+  frames(1);
+  assert.ok(texts.some((t) => t.includes('어려움')), '결과 화면에 난이도 표기: ' + JSON.stringify(texts));
+  //  다시 도전도 같은 난이도
+  canvas.fire('pointerdown', { clientX: 120, clientY: (480 + 28) / 2, pointerType: 'mouse' });
+  assert.equal(app.getState(), 'run');
+  assert.equal(app.getRun().difficulty, 'hard');
+  assert.equal(save.getStage(1, ver, 'hard').attempts, 2);
+  //  재로드(새 boot)해도 마지막 난이도가 살아 있다
+  app.toTitle();
+  const s2 = createSave3(storage);
+  assert.equal(s2.get().difficulty, 'hard');
+  //  normal 로 돌아가면 normal 기록이 다시 보이고 HUD 에는 표기가 없다
+  win.fire('keydown', { code: 'Digit1' });
+  texts.length = 0;
+  frames(1);
+  assert.ok(texts.some((t) => t.includes('99명')));
+  app.startRun(1);
+  texts.length = 0;
+  frames(1);
+  assert.ok(!texts.includes('어려움') && !texts.includes('극한'), 'normal HUD 에는 난이도 표기가 없다');
 });

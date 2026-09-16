@@ -1,6 +1,6 @@
 // rush3/stages.js — 기준 전투 3개 고정 배치(계약서 5장). buildStage 는 호출마다 새 객체(구조 공유 금지).
 // 난수는 빌드 시점 좌표 확정용 hashSeed/mulberry32 만(규칙 진행 중 난수 없음).
-import { BAL3 } from './balance.js';
+import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
 import { WEAPONS } from './weapons.js';
 import { hashSeed, mulberry32 } from '../rush/rng.js';
 
@@ -182,9 +182,11 @@ function keepOutOfWalls(x, z, r, walls) {
 //  ev.z = 표 z 그대로 = 발동 지점(combat: ev.z <= run.z). 시드 = hashSeed(id + ':' + ev.z + ':' + i)(계약서 0장)
 //  zs = 절대 트랙 z = ev.z + 760(화면 진입 거리, 정예 스폰 run.z + 760 과 같은 규칙) + 행 오프셋 + 지터
 //  → 발동 순간 zs[i] - run.z >= 760 이라 화면 밖 위에서 등장. combat 은 zs[i] 에 그대로 놓는다(run.z 를 더하지 않는다)
-function makeSpawn(id, sp, walls) {
+//  난이도(3-8): xs 없이 rows 로 뿌리는 무리만 n 을 spawnCount 배(반올림)로 늘린다. xs 명시 무리는 배치 그대로(회피 통로 규격이 깨지지 않게).
+//   시드는 i 만 쓰므로 늘어난 뒤에도 앞 n 개의 지터는 종전과 같다(cols 가 바뀌면 대역 폭은 달라진다).
+function makeSpawn(id, sp, walls, mult) {
   const r = BAL3.enemies[sp.kind].r;
-  const n = sp.n;
+  const n = sp.xs ? sp.n : Math.max(1, Math.round(sp.n * mult.spawnCount));
   const evZ = sp.z;
   const xs = [], zs = [];
   const rows = sp.rows ?? 1;
@@ -215,17 +217,21 @@ function makeSpawn(id, sp, walls) {
 }
 
 // 스테이지 전체를 새 객체로 조립. 재도전 = 재호출(이전 판의 durability/value/passed/opened 가 남지 않는다)
-export function buildStage(id) {
+//  난이도(3-8)는 여기서 한 번 박힌다: stage.difficulty · rows 스폰 n(spawnCount) · 정예 hp(eliteHp, 반올림).
+//  적 hp·적탄·접촉·정예 발사 빈도는 createRun 이 stage.difficulty 를 읽어 run.enemyDefs 로 만든다. 게이트·통·벽·시작 병력·무기는 난이도와 무관.
+//  difficulty 생략 = normal = 종전과 완전히 같은 객체(difficulty 필드만 추가).
+export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY } = {}) {
   const d = def(id);
+  const mult = difficultyMult(difficulty);
   const walls = d.walls.map((w, i) => makeWall(i + 1, w));
   const stage = {
-    id, version: d.version ?? 1,
+    id, version: d.version ?? 1, difficulty,
     title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ,
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
-    spawns: d.spawns.map(sp => makeSpawn(id, sp, walls)),
-    elite: d.elite ? { z: d.elite.z, hp: d.elite.hp, summon: !!d.elite.summon } : null,
+    spawns: d.spawns.map(sp => makeSpawn(id, sp, walls, mult)),
+    elite: d.elite ? { z: d.elite.z, hp: Math.round(d.elite.hp * mult.eliteHp), summon: !!d.elite.summon } : null,
   };
   stage.spawns.sort((a, b) => a.z - b.z);
   return stage;

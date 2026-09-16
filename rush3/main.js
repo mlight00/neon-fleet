@@ -2,7 +2,7 @@
 //  ⚠️모듈 상단에서 DOM 을 만지지 않는다 — Node 테스트가 hitButton/makeLoop 를 그대로 import 한다.
 //  rush/main.js 는 import 하지 않는다(자동 부트가 같은 캔버스에 붙는다). 골격(hitButton/toLogical/spawnBurst/
 //  autoPause/오디오 unlock/ESC/음량 버튼/로드 후 루프 시작/#game3 가드)만 참고해 옮겨 적었다.
-import { BAL3 } from './balance.js';
+import { BAL3, DIFFICULTY_IDS, DEFAULT_DIFFICULTY } from './balance.js';
 import { STAGE_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
@@ -19,6 +19,15 @@ const C = BAL3.colors;
 //  판 종료 뒤 결과 화면까지의 여운(초)
 const OVER_DELAY = { won: 1.3, lost: 1.0 };
 const BGM = { title: 'nf_bgm_title', stage: ['nf_bgm_sector1a', 'nf_bgm_sector2a', 'nf_bgm_sector3a'], boss: ['nf_bgm_boss_sector1', 'nf_bgm_boss_sector2', 'nf_bgm_boss_sector3'] };
+//  타이틀 난이도 토글(계약서 3-8·6장): 스테이지 버튼(y 436~) 바로 위 한 줄. 버튼 id = 'diff_' + 난이도 id
+export const DIFF_TOGGLE = Object.freeze({ x0: 138, y: 382, w: 90, h: 34, gap: 6 });
+//  키 1/2/3 = 보통/어려움/극한(타이틀에서만). code 가 비어 오는 환경은 key 로 대신하므로 둘 다 받는다
+const DIFF_KEYS = Object.freeze({ Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2, 1: 0, 2: 1, 3: 2 });
+
+//  저장값·외부 입력을 난이도 id 로 거른다(모르는 값 → normal). 규칙 모듈(buildStage/createRun)은 모르는 값에 throw 하므로 거르는 곳은 셸뿐이다
+export function normDifficulty(d) {
+  return DIFFICULTY_IDS.includes(d) ? d : DEFAULT_DIFFICULTY;
+}
 
 export function hitButton(buttons, x, y) {
   for (const b of buttons) if (!b.disabled && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b.id;
@@ -109,6 +118,15 @@ export function boot(canvas, deps = {}) {
   let state = 'title', run = null, renderer = null, buttons = [], fx = makeFx();
   //  overT: 판 종료 뒤 결과 화면까지 남은 여운(초). -1 = 아직 종료를 보지 못함
   let overT = -1, result = null;
+  //  타이틀에서 고른 난이도(저장에 기억). 출격 때 buildStage 에 넘기고, 그 뒤로는 run.difficulty 가 진실
+  let difficulty = normDifficulty(save.get().difficulty);
+  function setDifficulty(d) {
+    const nd = normDifficulty(d);
+    if (nd === difficulty) return false;
+    difficulty = nd;
+    save.patch({ difficulty: nd });
+    return true;
+  }
   const loop = makeLoop({ step: STEP, onStep: () => { stepRun(run, input.snapshot(), STEP); } });
 
   //  DPR 반영: 백킹스토어 = CSS 크기 × min(devicePixelRatio, 2)
@@ -129,10 +147,10 @@ export function boot(canvas, deps = {}) {
   }
 
   function startRun(id) {
-    const stage = buildStage(id);
+    const stage = buildStage(id, { difficulty });
     run = createRun(stage);
-    //  기록은 stageId + 코스 버전으로 묶는다(run.stageVersion = stage.version)
-    const ver = run.stageVersion;
+    //  기록은 stageId + 코스 버전 + 난이도로 묶는다(run.stageVersion = stage.version, run.difficulty = stage.difficulty)
+    const ver = run.stageVersion, diff = run.difficulty;
     fx = makeFx();
     result = null;
     overT = -1;
@@ -140,7 +158,7 @@ export function boot(canvas, deps = {}) {
     //  첫 플레이 안내: 지금까지 출격 기록이 없을 때 3초
     const total = STAGE_IDS.reduce((n, s) => n + totalAttempts(s), 0);
     fx.guideT = total === 0 ? FX.guideSec : 0;
-    save.updateStage(id, { attempts: (save.getStage(id, ver).attempts || 0) + 1 }, ver);
+    save.updateStage(id, { attempts: (save.getStage(id, ver, diff).attempts || 0) + 1 }, ver, diff);
     save.patch({ lastStage: id });
     state = 'run';
     loop.start(nowSec());
@@ -167,15 +185,15 @@ export function boot(canvas, deps = {}) {
     au.bgmPlay(BGM.title);
   }
 
-  //  어느 버전으로 몇 번 도전했는지(첫 플레이 안내 판정용 — 코스 버전이 올라가도 초보 안내가 되살아나지 않게)
+  //  어느 버전·난이도로 몇 번 도전했는지(첫 플레이 안내 판정용 — 코스 버전이 올라가거나 난이도를 바꿔도 초보 안내가 되살아나지 않게)
   function totalAttempts(id) {
     return Object.values(save.getStageVersions(id)).reduce((n, r) => n + (r.attempts || 0), 0);
   }
 
-  //  결과 확정 + 저장(attempts 는 출격 때, cleared/best 는 여기서). 신기록 비교는 같은 코스 버전 안에서만
+  //  결과 확정 + 저장(attempts 는 출격 때, cleared/best 는 여기서). 신기록 비교는 같은 코스 버전·같은 난이도 안에서만
   function finishRun() {
-    const id = run.stageId, ver = run.stageVersion;
-    const cur = save.getStage(id, ver);
+    const id = run.stageId, ver = run.stageVersion, diff = run.difficulty;
+    const cur = save.getStage(id, ver, diff);
     const won = !!run.won;
     const survivors = run.units.length;
     const time = won ? run.wonAt ?? run.time : run.time;
@@ -186,9 +204,9 @@ export function boot(canvas, deps = {}) {
       patch.bestSurvivors = Math.max(cur.bestSurvivors || 0, survivors);
       patch.bestTime = cur.bestTime > 0 ? Math.min(cur.bestTime, time) : time;
     }
-    save.updateStage(id, patch, ver);
+    save.updateStage(id, patch, ver, diff);
     result = {
-      stageId: id, stageVersion: ver, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
+      stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
       missedLine: missedLine(run), advice: adviceLine(run, run), isBest, saveOk: save.ok,
       nextId: won && STAGE_IDS.includes(id + 1) ? id + 1 : null,
     };
@@ -296,11 +314,16 @@ export function boot(canvas, deps = {}) {
     const v = { state, now, buttons: [], saveOk: save.ok };
     if (state === 'title') {
       const last = lastStageId();
-      v.buttons = STAGE_IDS.map((id, i) => {
-        const m = stageMeta(id), st = save.getStage(id, stageVersion(id));
+      v.difficulty = difficulty;
+      //  난이도 토글 3칸(고른 칸 = primary). 스테이지 버튼의 기록(sub)도 그 난이도 칸의 기록이다
+      const T = DIFF_TOGGLE;
+      v.buttons = DIFFICULTY_IDS.map((d, i) => ({ id: 'diff_' + d, x: T.x0 + i * (T.w + T.gap), y: T.y, w: T.w, h: T.h, label: BAL3.difficulty[d].label, primary: d === difficulty, small: true }));
+      for (let i = 0; i < STAGE_IDS.length; i++) {
+        const id = STAGE_IDS[i];
+        const m = stageMeta(id), st = save.getStage(id, stageVersion(id), difficulty);
         const sub = st.cleared ? '완료 · 최고 ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전';
-        return { id: 'stage' + id, x: 60, y: 436 + i * 76, w: 360, h: 62, label: 'STAGE ' + id + '  ' + m.title, sub, primary: last === id };
-      });
+        v.buttons.push({ id: 'stage' + id, x: 60, y: 436 + i * 76, w: 360, h: 62, label: 'STAGE ' + id + '  ' + m.title, sub, primary: last === id });
+      }
       v.buttons.push({ id: 'mute', x: 422, y: 14, w: 44, h: 44, label: au.isMuted() ? '🔇' : '🔊' });
     } else if (run) {
       v.run = run;
@@ -348,7 +371,8 @@ export function boot(canvas, deps = {}) {
     }
     au.sfx('click');
     if (state === 'title') {
-      if (id.startsWith('stage')) startRun(Number(id.slice(5)));
+      if (id.startsWith('diff_')) setDifficulty(id.slice(5));
+      else if (id.startsWith('stage')) startRun(Number(id.slice(5)));
     } else if (state === 'run') {
       if (id === 'pause') pause();
     } else if (state === 'paused') {
@@ -401,6 +425,11 @@ export function boot(canvas, deps = {}) {
         return;
       }
       if (input.onKey(code, true)) { if (e.preventDefault) e.preventDefault(); return; }
+      //  타이틀에서 1/2/3 = 난이도 선택(클릭과 같은 경로)
+      if (state === 'title' && DIFF_KEYS[code] !== undefined) {
+        if (setDifficulty(DIFFICULTY_IDS[DIFF_KEYS[code]])) au.sfx('click');
+        return;
+      }
       if (code === 'Space' || code === 'Enter') {
         if (state === 'title') startRun(lastStageId());
         else if (state === 'result') startRun(result.stageId);
@@ -413,7 +442,8 @@ export function boot(canvas, deps = {}) {
 
   //  개발 콘솔 관찰용(게임 동작에 영향 없음)
   const dbg = () => ({
-    state, stageId: run ? run.stageId : null, z: run ? Math.round(run.z) : 0, x: run ? Math.round(run.x) : 0,
+    state, stageId: run ? run.stageId : null, difficulty: run ? run.difficulty : difficulty,
+    z: run ? Math.round(run.z) : 0, x: run ? Math.round(run.x) : 0,
     units: run ? run.units.length : 0, weapon: run ? run.weapon : null, boss: run ? !!run.boss : false,
     enemies: run ? run.enemies.length : 0, bullets: run ? run.bullets.length : 0,
   });
@@ -445,7 +475,8 @@ export function boot(canvas, deps = {}) {
     raf(frame);
   });
 
-  return { dbg, ready, startRun, pause, resume, toTitle, getState: () => state, getRun: () => run, getFx: () => fx, loop, input };
+  return { dbg, ready, startRun, pause, resume, toTitle, getState: () => state, getRun: () => run, getFx: () => fx, loop, input,
+           getDifficulty: () => difficulty, setDifficulty };
 }
 
 if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'));
