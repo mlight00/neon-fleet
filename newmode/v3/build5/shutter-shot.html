@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>셔터 표현 육안 검증 하네스(N2)</title>
+<style>html,body{margin:0;background:#05080E}canvas{display:block}</style>
+</head>
+<body>
+<!-- 2026-09-17 2차 검수 N2(셔터 표현) 육안 검증용 하네스. 게임 파일은 손대지 않고 rush3 모듈만 불러 쓴다.
+     ⚠️캔버스 id 가 game3 가 아니라 main.js 자동 부트가 붙지 않는다(셸 상태기계 대신 여기서 직접 그린다). -->
+<canvas id="shot" width="480" height="800"></canvas>
+<script type="module">
+import { buildStage } from '../../../rush3/stages.js';
+import { createRun, stepRun, drainEvents, STEP } from '../../../rush3/combat.js';
+import { createRenderer3 } from '../../../rush3/render.js';
+import { loadSprites3 } from '../../../rush3/sprites.js';
+import { GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
+         isFixedGateRow } from '../../../rush3/main.js';
+import { hashSeed } from '../../../rush/rng.js';
+import { BAL3 } from '../../../rush3/balance.js';
+
+const canvas = document.getElementById('shot');
+const ctx = canvas.getContext('2d');
+let renderer = null, run = null;
+//  main.makeFx() 와 같은 모양(렌더가 읽는 필드만)
+const fx = { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, gateTip: {}, gateTipSeen: {},
+             shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, shutterT: 0, shutterText: null,
+             burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null, lotOpen: 0, lotSeen: false, lotSame: false };
+
+function view(now) {
+  return { state: 'run', now, saveOk: true, run, fx,
+           hud: { distM: Math.max(0, Math.round((run.length - run.z) / 10)) },
+           buttons: [{ id: 'pause', x: 422, y: 14, w: 44, h: 44, label: '❚❚' }] };
+}
+
+//  S2(첫 게이트 z1140 에 셔터가 걸려 있다)를 시작한다
+window.__start = (stageId = 2, difficulty = 'normal') => {
+  run = createRun(buildStage(stageId, { difficulty }));
+  for (const k of Object.keys(fx.gateTip)) delete fx.gateTip[k];
+  for (const k of Object.keys(fx.gateOpen)) delete fx.gateOpen[k];
+  fx.shutterT = 0; fx.shutterText = null;
+  return { gates: run.gateRows.map((r) => ({ id: r.id, z: r.z, armZ: r.armZ, armed: r.armed })) };
+};
+
+//  zTarget 까지 진행. tx 고정으로 차선을 정한다(셸 입력 계층 없이도 조향된다)
+window.__advance = (zTarget, tx = 240) => {
+  let n = 0;
+  while (run.z < zTarget && !run.over && n < 20000) {
+    run.tx = tx;
+    stepRun(run, { pointerX: null, dragDx: 0, keyDir: 0 }, STEP);
+    drainEvents(run);
+    n++;
+  }
+  const r = run.gateRows[0];
+  return { z: Math.round(run.z), x: Math.round(run.x), units: run.units.length,
+           g1: { armed: r.armed, passed: r.passed, values: r.cells.map((c) => c.value) } };
+};
+
+//  셸이 하는 안내 결선을 사진용으로 그대로 재현한다(main.updateShutterGuide · gateArm 처리와 같은 값)
+window.__tipClosed = (rowId = 'g1') => { fx.gateTip[rowId] = { text: GATE_TIP_CLOSED, t: BAL3.fx.gateTipSec }; return GATE_TIP_CLOSED; };
+window.__tipOpen = (rowId = 'g1') => { fx.gateTip[rowId] = { text: GATE_TIP_OPEN, t: BAL3.fx.gateTipSec }; return GATE_TIP_OPEN; };
+window.__clearBanner = () => { fx.shutterT = 0; fx.shutterText = null; return true; };
+window.__banner = () => { fx.shutterT = BAL3.fx.shutterGuideSec; fx.shutterText = SHUTTER_GUIDE_TEXT; return SHUTTER_GUIDE_TEXT; };
+//  열리는 도중(판이 위로 걷히는 중)을 멈춰 찍는다. 0 = 다 걷힘 · gate.openT = 막 열리기 시작
+window.__setGateOpen = (rowId, v) => { fx.gateOpen[rowId] = v; return v; };
+//  사진용: 화면의 아군 탄만 지운다(숫자 위에 탄이 겹치지 않게). 규칙에는 영향이 없다
+window.__clearShots = () => { run.bullets.length = 0; return true; };
+window.__draw = (now = 1) => { renderer.draw(view(now)); return true; };
+
+//  수정 라운드 1(2026-09-17): 확정 손실 행 한 화면을 찍기 위한 랜덤 길 판.
+//   pick 이 걸리는 시드를 찾아 S3 를 시작하고, 그 행의 id 를 돌려준다(칸은 우측 통로 [252,400)).
+window.__startLot = (pick, difficulty = 'normal') => {
+  let seed = null;
+  for (let i = 0; i < 40 && seed === null; i++) {
+    const cand = hashSeed('lot:3:0:' + (1700000000000 + i * 86400000));
+    if (buildStage(3, { lotterySeed: cand }).lottery.pick === pick) seed = cand;
+  }
+  if (seed === null) return { error: 'seed not found: ' + pick };
+  const stage = buildStage(3, { difficulty, lotterySeed: seed });
+  run = createRun(stage);
+  for (const k of Object.keys(fx.gateTip)) delete fx.gateTip[k];
+  for (const k of Object.keys(fx.gateOpen)) delete fx.gateOpen[k];
+  fx.shutterT = 0; fx.shutterText = null; fx.lotSeen = false; fx.lotOpen = 0;
+  const row = run.gateRows.find((r) => r.id === stage.lottery.rowId);
+  return { pick: stage.lottery.pick, rowId: stage.lottery.rowId, z: row.z, armZ: row.armZ,
+           cells: row.cells.map((c) => [c.value, c.maxValue]), fixed: isFixedGateRow(row) };
+};
+//  셸(main.js gateArm 처리)과 **같은 판정**으로 열림 문구를 고른다 — 사진이 실제 게임 문구와 어긋나지 않게
+window.__tipArm = (rowId) => {
+  const row = run.gateRows.find((r) => r.id === rowId);
+  const text = isFixedGateRow(row) ? GATE_TIP_OPEN_FIXED : GATE_TIP_OPEN;
+  fx.gateTip[rowId] = { text, t: BAL3.fx.gateTipSec };
+  return text;
+};
+//  랜덤 길 '?' 상자가 걷힌 상태로 둔다(공개선을 이미 지난 뒤의 화면)
+window.__revealLot = () => { fx.lotSeen = true; fx.lotOpen = 0; return true; };
+window.__rowInfo = (rowId) => {
+  const r = run.gateRows.find((x) => x.id === rowId);
+  return { id: r.id, armed: r.armed, passed: r.passed, values: r.cells.map((c) => c.value), z: Math.round(run.z), units: run.units.length };
+};
+
+const sprites = loadSprites3('../../../assets/rush/');
+Promise.resolve(sprites.ready ?? sprites).then(() => { renderer = createRenderer3(ctx, sprites); window.__READY = true; });
+</script>
+</body>
+</html>
