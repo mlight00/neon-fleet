@@ -7,7 +7,7 @@ import { STAGE_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3 } from './render.js';
+import { createRenderer3, isTrapGateRow } from './render.js';
 import { loadSprites3 } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
@@ -37,11 +37,8 @@ export const SHUTTER_GUIDE_TEXT = Object.freeze(['회색 셔터는 잠긴 게이
  *  ⚠️이런 행에 '지금 쏘면 +1' 을 띄우면 같은 화면에 이미 붙어 있는 '확정' 꼬리표와 정면으로 어긋나,
  *   N2 가 없애려던 '맞고 있는데 왜 숫자가 안 변하지?' 를 바로 그 행에서 새로 만든다(2026-09-17 수정 라운드 1).
  *  판정 조건은 render.js 의 '확정' 꼬리표와 같은 식이다 — 글과 꼬리표가 언제나 같은 행에 함께 뜬다. */
-export function isFixedGateRow(row) {
-  const cells = row && Array.isArray(row.cells) ? row.cells : null;
-  if (!cells || cells.length === 0) return false;
-  return cells.every((c) => c.value < 0 && c.maxValue != null && c.maxValue <= c.value);
-}
+//  ⚠️판정식은 render.isTrapGateRow 한 곳에만 둔다 — 화면의 함정 외형과 셸의 문구가 갈라지지 않게 같은 함수를 쓴다
+export const isFixedGateRow = isTrapGateRow;
 
 //  저장값·외부 입력을 난이도 id 로 거른다(모르는 값 → normal). 규칙 모듈(buildStage/createRun)은 모르는 값에 throw 하므로 거르는 곳은 셸뿐이다
 export function normDifficulty(d) {
@@ -321,6 +318,13 @@ export function boot(canvas, deps = {}) {
   }
 
   //  연출 이벤트 소비(프레임 1회, drainEvents). 규칙 상태는 읽기만 한다
+  const rowById = (id) => run.gateRows.find((r) => r.id === id) ?? null;
+  //  '?' 상자가 아직 덮고 있는 랜덤 길 물체인가(통로 확정선 전) — 계약서 3-9 '확정 전에 내용이 새지 않는다'.
+  //  ⚠️확정선 전에도 비행 중인 탄은 막힌다(gateBlock). 그 막힘에 함정 전용 표현(붉은 스파크·trapHit)을 쓰면
+  //   플레이어가 통로를 고르기 전에 '이번 판은 함정'임을 소리·색으로 알아낸다 — 공개 전에는 종전 셔터 표현으로 되돌린다.
+  const hiddenRow = (id) => { const lot = run.lottery; return !!(lot && lot.rowId === id && run.z < lot.revealZ); };
+  //  공개된 함정 행인가 = 그리는 쪽(render.isTrapGateRow)이 봉쇄 외형을 쓰는 바로 그 시점부터만 참
+  const trapShown = (id) => !hiddenRow(id) && isFixedGateRow(rowById(id));
   function handleEvents(events) {
     collectLotteryOutcome(run.lotteryOutcome, events, run);
     for (const ev of events) {
@@ -349,9 +353,27 @@ export function boot(canvas, deps = {}) {
           fx.sfx.push(['gateOpen']);
           break;
         }
-        //  막힌 탄: 작은 회색 스파크 + 금속 튕김(색만으로 구분하지 않는다 — 2026-09-17 2차 검수 N2-④)
-        case 'gateBlock': spawnBurst(fx, ev.x, sy(ev.z), 6, false, C.wall); fx.sfx.push(['gateClang']); break;
-        case 'gateHit': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateTick']); break;
+        //  막힌 탄: 작은 회색 스파크 + 금속 튕김(색만으로 구분하지 않는다 — 2026-09-17 2차 검수 N2-④).
+        //  ⚠️함정 행(붉은 봉쇄 장치)은 셔터가 아니다 — 둔탁한 차단음 + 붉은 스파크로 '이 장치에는 사격이 안 먹힌다'를 알린다(이사 결정 ③).
+        //   단 **'?' 상자가 걷힌 뒤부터**다(trapShown) — 공개 전에는 함정도 꽝 게이트도 똑같이 gateClang + 회색이어야 내용이 새지 않는다
+        case 'gateBlock': {
+          const trap = trapShown(ev.id);
+          spawnBurst(fx, ev.x, sy(ev.z), 6, false, trap ? C.warn : C.wall);
+          fx.sfx.push([trap ? 'trapHit' : 'gateClang']);
+          break;
+        }
+        //  열린 행에 맞은 탄: 값이 올라 흰 플래시 + 숫자음. 함정 행은 값이 그대로라 같은 차단 표현을 쓴다(플래시·숫자음 없음)
+        case 'gateHit': {
+          const hitRow = rowById(ev.id);
+          if (trapShown(ev.id)) {
+            spawnBurst(fx, ev.x, sy(hitRow ? hitRow.z : run.z), 6, false, C.warn);
+            fx.sfx.push(['trapHit']);
+            break;
+          }
+          fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC;
+          fx.sfx.push(['gateTick']);
+          break;
+        }
         case 'gateFlip': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateFlip']); floater(fx, ev.x, sy(run.gateRows.find((r) => r.id === ev.id)?.z ?? run.z) - 40, '반전!', C.gatePos, true); break;
         case 'gatePass': {
           if (ev.idx < 0) { floater(fx, run.x, LINE_Y - 90, '우회', C.gateZero); break; }
@@ -467,9 +489,12 @@ export function boot(canvas, deps = {}) {
         ];
       } else if (state === 'result') {
         v.result = result;
+        //  랜덤 길이 있는 판(결과 한 줄이 있는 판)은 [다시 도전] 아래에 부연 한 줄이 들어간다(render.RETRY_LOTTERY_NOTE).
+        //  그 글 자리(22px)만큼 아래 버튼을 내린다 — 안 내리면 글이 다음 버튼에 깔린다
+        const noteGap = result.lottery ? 22 : 0;
         const bs = [{ id: 'retry', x: 120, y: 480, w: 240, h: 56, label: '다시 도전', primary: !result.nextId }];
-        if (result.nextId) bs.push({ id: 'next', x: 120, y: 548, w: 240, h: 56, label: '다음 작전', sub: 'STAGE ' + result.nextId + '  ' + stageMeta(result.nextId).title, primary: true });
-        bs.push({ id: 'title', x: 120, y: result.nextId ? 620 : 552, w: 240, h: 44, label: '스테이지 선택' });
+        if (result.nextId) bs.push({ id: 'next', x: 120, y: 548 + noteGap, w: 240, h: 56, label: '다음 작전', sub: 'STAGE ' + result.nextId + '  ' + stageMeta(result.nextId).title, primary: true });
+        bs.push({ id: 'title', x: 120, y: (result.nextId ? 620 : 552) + noteGap, w: 240, h: 44, label: '스테이지 선택' });
         v.buttons = bs;
       }
     }
@@ -584,7 +609,11 @@ export function boot(canvas, deps = {}) {
       if (row.armZ == null || row.armed || row.passed) continue;
       if (fx.gateTipSeen[row.id]) continue;
       if (row.z - run.z > BAL3.enterZ) continue;
+      //  ⚠️공개 판정이 함정 판정보다 **먼저**다 — '?' 상자 뒤의 행은 함정인지 아닌지를 여기서도 보지 않는다(계약서 3-9)
       if (lot && lot.rowId === row.id && run.z < lot.revealZ) continue;
+      //  ⚠️공개된 함정 행(확정 손실)은 셔터 수업이 아니다 — '가까워지면 열림'은 이 행에서 지킬 수 없는 약속이라 띄우지 않는다(이사 결정 ③).
+      //   화면도 같은 판단을 한다(render.isTrapGateRow → 봉쇄 외형). 첫 셔터 배너도 여기서 소진하지 않는다
+      if (isFixedGateRow(row)) continue;
       fx.gateTipSeen[row.id] = true;
       fx.gateTip[row.id] = { text: GATE_TIP_CLOSED, t: FX.gateTipSec };
       if (!save.get().seenShutter) {

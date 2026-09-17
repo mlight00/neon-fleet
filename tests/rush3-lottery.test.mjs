@@ -11,6 +11,7 @@ import { hitGateCell, passGateRow, updateGateArm, cellAt } from '../rush3/gates.
 import { makeUnit, layoutUnits, addUnits } from '../rush3/squad.js';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 import { lotteryLine, emptyLotteryOutcome, collectLotteryOutcome } from '../rush3/main.js';
+import { isTrapGateRow } from '../rush3/render.js';
 import { adviceLine } from '../rush3/advice.js';
 import { BAL3 } from '../rush3/balance.js';
 import { WEAPONS } from '../rush3/weapons.js';
@@ -649,4 +650,19 @@ test('V3-LOTTERY LOT-10b: 좌 통을 못 연 판의 결과 제안 한 줄이 그
   assert.equal(line, left.hint, '2순위(놓친 통)로 좌 통 hint 가 출력된다');
   assert.ok(!STALE.test(line), '결과 화면에 빈 길 시절 문구가 나온다: ' + line);
   assert.ok(/랜덤 길/.test(line));
+});
+
+test('V3-LOTTERY LOT-6c: 뽑은 쪽(stage.lottery.trap)과 화면 판정(isTrapGateRow)이 확정 손실에서만 함께 참이다', () => {
+  //  ⚠️풀의 '확정 손실' 정의는 한 가지다 — good:false 이면서 상한이 자기 값. 뽑는 쪽과 그리는 쪽이 다른 조건을 쓰면
+  //   함정 외형이 엉뚱한 칸에 붙거나(또는 붙지 않고) 문구만 남는다. 여기서 두 판정을 같은 판에서 맞대어 본다.
+  for (const id of POOL_IDS) {
+    const st = stageFor(id);
+    const entry = POOL.find((p) => p.id === id);
+    const expected = entry.kind === 'gate' && !entry.good && entry.maxValue === entry.value;
+    assert.equal(st.lottery.trap, expected, id + ': stage.lottery.trap');
+    const row = lotRow(st);
+    assert.equal(isTrapGateRow(row ?? null), expected, id + ': 화면 판정(isTrapGateRow)');
+  }
+  //  확정 손실은 trapGate 하나뿐이다(둘 다 참인 항목이 늘면 여기서 걸린다)
+  assert.deepEqual(POOL_IDS.filter((id) => stageFor(id).lottery.trap), ['trapGate']);
 });

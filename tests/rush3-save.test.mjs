@@ -237,7 +237,9 @@ test('V3-SPRITES: 키 목록 11개 고정·Node 에서 loadSprites3 는 전부 n
 test('V3-AUDIO: Node 에서 createAudio3 는 예외 없이 no-op, 이름 목록 고정', () => {
   const need = ['fire_rifle', 'fire_auto', 'fire_heavy', 'crateHit', 'crateBreak', 'gateTick', 'gateFlip', 'joinMany', 'weaponSwap', 'hurt', 'kill', 'elite', 'win', 'lose', 'click',
     //  2026-09-17 2차 검수: 셔터에 막힌 탄(금속 튕김) · 랜덤 길 위험 공개(중립 경고음) — 색·이름만이 아니라 소리로도 구분한다
-    'gateOpen', 'gateClang', 'lotWarn'];
+    'gateOpen', 'gateClang', 'lotWarn',
+    //  r3.7 함정 게이트 차단음. 이름이 SFX 맵에서 사라져도 아래 파일 존재 검사(SFX_NAMES3 순회)와 셸 검사(가짜 오디오가 모르는 이름도 true)는 못 잡는다 — 여기서만 잡힌다
+    'trapHit'];
   for (const n of need) assert.ok(SFX_NAMES3.includes(n), n);
   const a = createAudio3({ dir: 'assets/sound/' });
   a.unlock();

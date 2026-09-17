@@ -17,6 +17,18 @@ const ENEMY_LABEL = { grunt: '잡졸', rusher: '돌격체', shooter: '저격수'
 //  사격 개시선 옆 안내(계약서 6장 N2-⑤). ⚠️선을 넘는 주체는 **게이트**다 — 플레이어가 넘는다는 뜻으로 읽히면
 //   벽의 통로 확정선과 헷갈린다(2026-09-17 2차 검수 N2-④).
 export const ARM_LINE_TEXT = '이 선 안으로 온 게이트를 쏠 수 있어요';
+//  함정 게이트 = 랜덤 길 ⑤(BAL3.lottery.pool 의 good:false 이면서 maxValue === value). 모든 칸이 음수이고 상한이 자기 값 이하라
+//   몇 발을 맞아도 값이 그대로다(gates.js 값 갱신 공식). 셸의 isFixedGateRow 가 이 함수를 그대로 쓴다 —
+//   외형·꼬리표·짧은 글이 언제나 같은 행에서 같은 말을 하도록 판정식을 한 곳에만 둔다.
+export function isTrapGateRow(row) {
+  const cells = row && Array.isArray(row.cells) ? row.cells : null;
+  if (!cells || cells.length === 0) return false;
+  return cells.every((c) => c.value < 0 && c.maxValue != null && c.maxValue <= c.value);
+}
+//  함정 칸 옆 배지(2026-09-17 이사 결정 ③ 함정 외형 A) — 이 장치에는 사격이 안 먹힌다
+export const TRAP_BADGE_TEXT = '쏴도 안 줄어듦';
+//  결과 화면 [다시 도전] 아래 부연(2026-09-17 이사 결정 ①) — 랜덤 길은 재도전마다 새로 뽑는다
+export const RETRY_LOTTERY_NOTE = '랜덤 길은 새로 추첨';
 //  칸 위 짧은 글의 화면 상단 한계(HUD 아래). 행이 화면 밖에서 들어오는 동안에도 글이 보이게 여기에 붙인다
 const TIP_MIN_Y = 96;
 //  난이도 짧은 표기 색(HUD 태그·결과 제목). normal 은 표기 없음(BAL3.difficulty[id].short 가 빈 문자열)
@@ -168,9 +180,11 @@ export function createRenderer3(ctx, sprites) {
     ctx.restore();
   }
 
-  //  잠김 표시(계약서 6장 N2-②): 숫자를 가리지 않는 칸 모서리의 작은 자물쇠. 색만으로 구분하지 않기 위한 형태 신호다
-  function drawLockBadge(x, y) {
+  //  잠김 표시(계약서 6장 N2-②): 숫자를 가리지 않는 칸 모서리의 작은 자물쇠. 색만으로 구분하지 않기 위한 형태 신호다.
+  //  scale 을 주면 같은 모양을 그 배율로 키워 그린다(함정 칸의 큰 자물쇠 — 2026-09-17 이사 결정 ③).
+  function drawLockBadge(x, y, scale = 1) {
     ctx.save();
+    if (scale !== 1) { ctx.translate(x, y); ctx.scale(scale, scale); x = 0; y = 0; }
     //  고리(열린 반원) → 몸통 순서. 회색 판 위에서도 보이게 어두운 테두리를 먼저 깐다
     ctx.strokeStyle = C.outline;
     ctx.lineWidth = 5;
@@ -191,20 +205,74 @@ export function createRenderer3(ctx, sprites) {
     ctx.restore();
   }
 
+  //  함정 칸의 붉은 봉쇄 바: 칸 폭을 가로지르는 굵은 붉은 바 + 대각 줄무늬. 숫자보다 **먼저** 그려 숫자를 가리지 않는다.
+  //  ⚠️셔터(회색 빗금)와 달리 걷히지 않는다 — 통과한 뒤에도 행 기본 불투명도(0.32)로 흐리게 남아 '여기서 잃었다'가 화면에 남는다
+  function drawTrapBar(c, y) {
+    const x0 = c.x0 + 3, w = c.x1 - c.x0 - 6;
+    const bh = 30, by = y - bh / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, by, w, bh);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(122,26,34,0.92)';
+    ctx.fillRect(x0, by, w, bh);
+    ctx.strokeStyle = 'rgba(255,106,61,0.85)';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    for (let k = -bh; k < w + bh; k += 18) {
+      ctx.moveTo(x0 + k, by + bh);
+      ctx.lineTo(x0 + k + bh, by);
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = C.warn;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x0, by, w, bh);
+  }
+
+  //  함정 배지('쏴도 안 줄어듦'): 칸 **위**에 표지판처럼 띄운다.
+  //  ⚠️옆 차선에 두면 반대편 통로의 보급 통·벽에 가려진다(2026-09-17 렌더 실측 — 왼쪽 통이 배지를 덮었다).
+  //   칸 위 짧은 글(y-vis/2-34 부터 26px)보다 더 위에 두어 둘이 겹치지 않게 한다
+  function drawTrapBadge(row, y, vis) {
+    const cells = row.cells;
+    const x0 = cells[0].x0, x1 = cells[cells.length - 1].x1;
+    const bw = 118, bh = 24;
+    const bx = (x0 + x1) / 2;
+    const by = Math.max(TIP_MIN_Y + 40, y - vis / 2 - 48);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(60,10,16,0.88)';
+    roundRect(bx - bw / 2, by - bh / 2, bw, bh, 8);
+    ctx.fill();
+    ctx.strokeStyle = C.warn;
+    ctx.lineWidth = 2;
+    roundRect(bx - bw / 2, by - bh / 2, bw, bh, 8);
+    ctx.stroke();
+    outlinedText(TRAP_BADGE_TEXT, bx, by, 13, C.hud, 'bold', 3);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
   //  게이트 행: 칸 사각형 + 부호 숫자 + 색. 피격 흰 플래시·숫자 튐(셸 fx.gateFlash 타이머, 규칙의 cell.flashT 는 읽지 않는다). 통과 뒤 흐리게
   //  셔터(armZ): 아직 안 열린 행은 회색 빗금 판을 덮되 **숫자·부호는 판 위에 선명하게** 그리고(2026-09-17 검수 N2-①),
   //   잠김은 칸 모서리의 작은 자물쇠로 따로 알린다(N2-②). 열리는 순간(fx.gateOpen)에는 판이 위로 걷힌다.
+  //  ⚠️함정 행(isTrapGateRow)은 셔터 표현을 **하나도** 쓰지 않는다 — 개시선·회색 빗금·작은 자물쇠·닫힘 안내를 전부 건너뛴다.
+  //   '가까워지면 열림'을 배운 사람에게 열려도 안 오르는 칸을 셔터 모양으로 보여주면 규칙을 두 번 가르치는 셈이다.
+  //   대신 붉은 봉쇄 바 + 큰 자물쇠 + 배지로 '사격이 안 먹히는 장치'를 즉시 알린다(2026-09-17 이사 결정 ③ 함정 외형 A).
+  //   ⚠️armZ·armed 규칙 자체는 건드리지 않는다 — 바뀌는 것은 그리기뿐이다.
   function drawGateRow(row, sy, fx, runZ) {
     const y = sy(row.z);
     if (y < -60 || y > H + 60) return;
     const vis = 58;
+    const trap = isTrapGateRow(row);
     const flashMap = fx && fx.gateFlash ? fx.gateFlash : null;
     //  0 = 완전히 닫힘 · 1 = 완전히 열림
     const openLeft = fx && fx.gateOpen ? (fx.gateOpen[row.id] ?? 0) : 0;
     const openT = BAL3.gate.openT || 0.25;
-    const shut = row.passed ? 0 : row.armed ? (openLeft > 0 ? openLeft / openT : 0) : 1;
+    const shut = trap || row.passed ? 0 : row.armed ? (openLeft > 0 ? openLeft / openT : 0) : 1;
     //  사격 개시선: 아직 닫힌 행이면 도로 위 run.z + armZ 위치에 점선 1줄("여기서부터 쏠 수 있다")
-    if (!row.armed && !row.passed && row.armZ != null && runZ != null) {
+    if (!trap && !row.armed && !row.passed && row.armZ != null && runZ != null) {
       const ay = LINE_Y - row.armZ;
       if (ay > -10 && ay < H + 10) {
         ctx.save();
@@ -233,11 +301,13 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = flash > 0 ? 'rgba(255,255,255,' + (0.35 + flash * 0.5) + ')' : 'rgba(16,22,31,0.66)';
       roundRect(c.x0 + 3, y - vis / 2, c.x1 - c.x0 - 6, vis, 10);
       ctx.fill();
-      ctx.strokeStyle = col;
+      ctx.strokeStyle = trap ? C.warn : col;
       ctx.lineWidth = 4;
       roundRect(c.x0 + 3, y - vis / 2, c.x1 - c.x0 - 6, vis, 10);
       ctx.stroke();
       const cx = (c.x0 + c.x1) / 2;
+      //  함정 칸: 붉은 봉쇄 바(숫자 아래). 셔터 판은 그리지 않는다
+      if (trap) drawTrapBar(c, y);
       //  셔터 판(회색 빗금) — 숫자보다 **먼저** 그린다. 열리는 동안 남은 판이 위쪽으로 줄어든다(문이 위로 걷히는 동작)
       if (shut > 0) {
         const hh = vis * shut;
@@ -257,7 +327,7 @@ export function createRenderer3(ctx, sprites) {
         ctx.stroke();
         ctx.restore();
       }
-      //  숫자: 피격 직후 살짝 튄다. **셔터 위에 같은 불투명도로** 그린다(닫혀 있어도 무엇이 걸린 판인지 그대로 읽힌다)
+      //  숫자: 피격 직후 살짝 튄다. **셔터·봉쇄 바 위에 같은 불투명도로** 그린다(가려도 무엇이 걸린 판인지 그대로 읽힌다)
       const px = 38 + Math.round(flash * 8);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -269,14 +339,18 @@ export function createRenderer3(ctx, sprites) {
         outlinedText('확정', cx, y + vis / 2 + 13, 16, col, 'bold', 4);
       }
       ctx.textBaseline = 'alphabetic';
-      //  잠김 아이콘: 칸 왼쪽 위 모서리(숫자 자리를 비켜 간다). 색이 아니라 형태로 '아직 안 열렸다'를 알린다.
-      //  ⚠️판이 걷히는 중(armed 직후)에는 이미 잠김이 풀렸으므로 그리지 않는다 — 셔터 판만 남아 걷힌다
-      if (!row.armed && !row.passed) drawLockBadge(c.x0 + 20, y - vis / 2 + 15);
+      //  자물쇠: 함정 칸은 **크게**(봉쇄 장치의 일부) · 닫힌 셔터 칸은 왼쪽 위 모서리에 작게(숫자 자리를 비켜 간다).
+      //  ⚠️셔터가 걷히는 중(armed 직후)에는 이미 잠김이 풀렸으므로 그리지 않는다 — 셔터 판만 남아 걷힌다
+      if (trap) drawLockBadge(c.x0 + 20, y, 1.4);
+      else if (!row.armed && !row.passed) drawLockBadge(c.x0 + 20, y - vis / 2 + 15);
       ctx.globalAlpha = base;
     }
+    //  함정 배지는 아직 안 지난 행에만(지난 뒤에는 봉쇄 바만 흐리게 남는다)
+    if (trap && !row.passed) drawTrapBadge(row, y, vis);
     //  짧은 안내 글(N2-③): 닫힌 동안 '가까워지면 열림' · 처음 열릴 때 '지금 쏘면 +1'. 각 BAL3.fx.gateTipSec 초, 칸 위
+    //  ⚠️함정 행이 아직 안 열렸을 때는 셸이 무엇을 넣어 두었든 그리지 않는다 — '가까워지면 열림'은 이 행에 맞지 않는 약속이다
     const tip = fx && fx.gateTip ? fx.gateTip[row.id] : null;
-    if (tip && tip.t > 0) {
+    if (tip && tip.t > 0 && !(trap && !row.armed)) {
       const tipSec = BAL3.fx.gateTipSec || 1.2;
       const rx = (row.cells[0].x0 + row.cells[row.cells.length - 1].x1) / 2;
       //  ⚠️행이 화면 위쪽 끝에서 들어올 때는 칸 위가 화면 밖이다 — 그 동안에는 HUD 아래(y 96)에 붙여 두고,
@@ -823,6 +897,18 @@ export function createRenderer3(ctx, sprites) {
       ctx.font = 'bold 16px ' + FONT;
       ctx.fillStyle = C.gold;
       ctx.fillText('신기록!', W / 2, y + 68);
+    }
+    //  [다시 도전] 바로 아래 작은 부연(2026-09-17 이사 결정 ①): 랜덤 길이 있는 스테이지는 **재도전마다 길을 새로 뽑는다**.
+    //  ⚠️결과 한 줄(r.lottery)이 있는 판 = 그 스테이지에 랜덤 길이 있는 판이다. 버튼 자리는 셸(main.js)이 잡고,
+    //   셸은 이 한 줄이 들어갈 만큼 아래 버튼을 내려 둔다(겹치면 글이 버튼에 깔린다).
+    if (r.lottery) {
+      const retry = (view.buttons ?? []).find((b) => b.id === 'retry');
+      if (retry) {
+        ctx.textAlign = 'center';
+        ctx.font = '600 13px ' + FONT;
+        ctx.fillStyle = 'rgba(246,200,74,0.85)';
+        ctx.fillText(RETRY_LOTTERY_NOTE, retry.x + retry.w / 2, retry.y + retry.h + 16);
+      }
     }
     if (r.saveOk === false) {
       ctx.font = '600 13px ' + FONT;

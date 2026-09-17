@@ -241,7 +241,8 @@ export function lotteryPick(seed = LOTTERY_DEFAULT_SEED) {
  *  통(soldier/weapon/chain) = z6300 x330 + coverZ(= 좌 통과 같은 비행시간 보정선)
  *  게이트 = 우 칸 한 칸(bypass). 셔터 개방선을 통의 차폐 개방선과 같은 z(openZ)로 맞춘다 —
  *   기본 armZ(340)면 확정 전에 쏜 탄이 셔터가 열린 뒤 도착해 값을 바꾼다(통 쪽 누출과 같은 계열).
- *  stage.lottery = { pick, idx, seed, good, label, kind, z, x, revealZ, openZ, wallId, supplyId, rowId } — 셸이 결과 한 줄·'?' 연출에 쓴다. */
+ *  stage.lottery = { pick, idx, seed, good, label, kind, trap, z, x, revealZ, openZ, wallId, supplyId, rowId } — 셸이 결과 한 줄·'?' 연출에 쓴다.
+ *  trap = 확정 손실 게이트(상한이 자기 값이라 쏴도 안 줄어든다) 여부 — 화면의 함정 외형(render.isTrapGateRow)과 같은 조건을 뽑은 쪽에서도 알린다. */
 function applyLottery(d, stage, seed) {
   const cfg = d.lottery;
   if (!cfg) { stage.lottery = null; return; }
@@ -267,7 +268,8 @@ function applyLottery(d, stage, seed) {
     supplyId = sup.id;
     stage.supplies.push(sup);
   }
-  stage.lottery = { pick: entry.id, idx, seed: useSeed, good: !!entry.good, label: entry.label, kind: entry.kind,
+  const trap = entry.kind === 'gate' && !entry.good && entry.maxValue === entry.value;
+  stage.lottery = { pick: entry.id, idx, seed: useSeed, good: !!entry.good, label: entry.label, kind: entry.kind, trap,
                     z: cfg.z, x: cfg.x, revealZ, openZ, wallId: wall.id, supplyId, rowId };
 }
 

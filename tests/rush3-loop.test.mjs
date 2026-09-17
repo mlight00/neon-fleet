@@ -9,6 +9,7 @@ import { createInput } from '../rush3/input.js';
 import { createRun, stepRun, STEP } from '../rush3/combat.js';
 import { buildStage, stageVersion, DEFS, LOTTERY_DEFAULT_SEED } from '../rush3/stages.js';
 import { createSave3 } from '../rush3/save.js';
+import { RETRY_LOTTERY_NOTE } from '../rush3/render.js';
 import { BAL3 } from '../rush3/balance.js';
 import { hashSeed } from '../rush/rng.js';
 
@@ -241,14 +242,15 @@ test('V3-SHELL: main.js 는 DOM 없이 import 되고 hitButton 은 사각형 안
 });
 
 // ── boot 스모크: 가짜 캔버스(기록 ctx)·가짜 시계·rAF 큐로 타이틀 → 출격 → 일시정지 → 완주 → 결과 → 저장까지 ──
-function fakeCanvas(calls, texts = []) {
+function fakeCanvas(calls, texts = [], rec = null) {
   const grad = { addColorStop() {} };
   const ctx = new Proxy({ canvas: null }, {
     get(t, k) {
       if (k in t) return t[k];
       if (typeof k !== 'string') return undefined;
       //  texts: 화면에 실제로 찍힌 글(버튼 label/sub 검사용)
-      return (...args) => { calls.push(k); if (k === 'fillText') texts.push(String(args[0])); if (k.startsWith('create')) return grad; if (k === 'measureText') return { width: 10 }; return undefined; };
+      //  rec: **켠 동안만** 인자(좌표)까지 남기는 기록. 기본은 꺼짐 — 한 판에 수천 프레임을 돌리는 검사들이 있어, 필요한 한 프레임만 켠다
+      return (...args) => { calls.push(k); if (rec && rec.on) rec.ops.push({ op: k, args }); if (k === 'fillText') texts.push(String(args[0])); if (k.startsWith('create')) return grad; if (k === 'measureText') return { width: 10 }; return undefined; };
     },
     set(t, k, v) { t[k] = v; return true; },
   });
@@ -303,7 +305,9 @@ function fakeWin() {
 async function bootFake(opts = {}) {
   const calls = [];
   const texts = [];
-  const canvas = fakeCanvas(calls, texts);
+  //  rec.on 을 켠 프레임만 인자까지 기록한다(버튼 상자·글자의 실제 좌표를 그리기에서 꺼내려고)
+  const rec = { on: false, ops: [] };
+  const canvas = fakeCanvas(calls, texts, rec);
   const win = fakeWin();
   const queue = [];
   let nowMs = 1000;
@@ -315,7 +319,7 @@ async function bootFake(opts = {}) {
   await app.ready;
   //  프레임 n 개를 dt(ms) 간격으로 돌린다
   const frames = (n, dtMs = 1000 / 60) => { for (let i = 0; i < n; i++) { nowMs += dtMs; const f = queue.shift(); f(nowMs); } };
-  return { app, canvas, win, calls, texts, frames, save, audio, storage, now: () => nowMs };
+  return { app, canvas, win, calls, texts, rec, frames, save, audio, storage, now: () => nowMs };
 }
 //  랜덤 길 시드를 고정한 boot 스모크(연출·효과음까지 보려면 bootLot 이 아니라 이쪽 — 프레임·오디오 기록이 필요하다)
 const bootFakeLot = (dateNow) => bootFake({ dateNow });
@@ -854,4 +858,162 @@ test('V3-SHELL-LOTTERY-OUT: 위험 항목 공개는 중립 경고음이고, 피�
   assert.equal(run().lotteryOutcome.applied, -10);
   assert.ok(lossSfx.includes('hurt'), '실제 손실이 나는 프레임에 피격음: ' + JSON.stringify(lossSfx));
   assert.equal(lotteryLine(run()), '랜덤 길: 함정 피해 −10명');
+});
+
+//  랜덤 길 추첨이 pick 으로 걸리는 시각(셸의 시드 조립 규칙 그대로) — 검사는 결정적이어야 한다
+function lotteryTimeFor(pick, base = 1_700_000_000_000) {
+  for (let i = 0; i < 40; i++) {
+    const t = base + i * 86_400_000;
+    if (buildStage(3, { lotterySeed: hashSeed('lot:3:0:' + t) }).lottery.pick === pick) return t;
+  }
+  return null;
+}
+
+/** S3 를 우측 통로 고정으로 굴리며 함정/꽝 게이트 행의 소리를 **'?' 가 걷히기 전 / 걷힌 뒤·개시선 전** 두 창으로 나눠 모은다.
+ *  ⚠️창을 나누지 않으면 공개 전에 난 소리만으로도 '함정 소리가 난다'가 통과해 버린다(2026-09-17 수정 라운드 1 지적 1).
+ *  ⚠️소리를 고르는 것은 handleEvents 이고 그 판단 기준이 **그 프레임의 run.z** 이므로, 프레임을 돌린 뒤의 z 로 나눠야 코드와 같은 창이 된다. */
+async function trapWindows(pick) {
+  const when = lotteryTimeFor(pick);
+  assert.ok(when, pick + ': 그 추첨이 걸리는 시각을 찾았다');
+  const boot = await bootFakeLot(() => when);
+  const { app, audio, frames } = boot;
+  app.startRun(3);
+  const run = () => app.getRun();
+  const rowId = run().lottery.rowId;
+  const row = () => run().gateRows.find((r) => r.id === rowId);
+  //  앞 게이트(z4000)의 소리가 섞이지 않게 z 4200 이후부터 듣는다
+  let guard = 0;
+  while (run().z < 4200 && guard++ < 4000) { app.input.state.pointerX = run().z >= 4000 ? 330 : 240; frames(1); }
+  assert.ok(guard < 4000, pick + ': z4200 까지 왔다');
+  const hidden = [], shownClosed = [];
+  let tipWhileClosed = 'none';
+  guard = 0;
+  while (!row().armed && guard++ < 4000) {
+    const from = audio.played.length;
+    app.input.state.pointerX = 330;
+    frames(1);
+    const heard = audio.played.slice(from).map((p) => p[0]);
+    (run().z < run().lottery.revealZ ? hidden : shownClosed).push(...heard);
+    //  ⚠️행이 열리는 프레임에는 '쏴도 그대로예요'(열림 문구)가 들어온다 — 닫힌 동안만 본다
+    if (run().z >= run().lottery.revealZ && !row().armed && app.getFx().gateTip[rowId]) tipWhileClosed = app.getFx().gateTip[rowId].text;
+  }
+  assert.ok(guard < 4000, pick + ': 개시선까지 왔다');
+  return { ...boot, run, row, rowId, hidden, shownClosed, tipWhileClosed };
+}
+const kinds = (list) => [...new Set(list)].sort();
+
+test('V3-SHELL-TRAP: 함정 게이트에 막힌 탄은 둔탁한 차단음(trapHit) — 셔터의 금속 튕김·숫자음을 쓰지 않는다', async () => {
+  //  ⚠️소리는 규칙이 아니라 셸이 고른다. 화면을 봉쇄 장치로 바꿔 놓고 소리만 셔터(gateClang)로 두면
+  //   '잠깐 막힌 것'과 '아예 안 먹히는 장치'가 다시 섞인다(2026-09-17 이사 결정 ③).
+  const { app, audio, frames, run, rowId, shownClosed, tipWhileClosed } = await trapWindows('trapGate');
+  assert.equal(run().lottery.pick, 'trapGate');
+  //  ① 은 **공개 뒤·개시선 전** 창에서만 본다 — 공개 전 소리로 통과하면 안 된다
+  assert.ok(shownClosed.includes('trapHit'), '공개 뒤 막힌 탄에 둔탁한 차단음: ' + JSON.stringify(kinds(shownClosed)));
+  assert.ok(!shownClosed.includes('gateClang'), '공개 뒤에는 셔터의 금속 튕김을 쓰지 않는다: ' + JSON.stringify(kinds(shownClosed)));
+  //  공개된 뒤에도 '가까워지면 열림' 은 뜨지 않는다 — 이 행에서는 지킬 수 없는 약속이다
+  assert.equal(tipWhileClosed, 'none', '함정 행에 닫힘 안내를 띄우지 않는다: ' + tipWhileClosed);
+  //  열린 뒤 맞는 탄도 같은 차단음(값이 그대로라 숫자음·흰 플래시를 쓰지 않는다)
+  const from2 = audio.played.length;
+  let guard = 0;
+  while (!run().lotteryOutcome.passed && guard++ < 1200) { app.input.state.pointerX = 330; frames(1); }
+  assert.ok(guard < 1200, '함정 게이트를 통과했다');
+  const heard2 = audio.played.slice(from2).map((p) => p[0]);
+  assert.ok(heard2.includes('trapHit'), '열린 뒤에도 차단음: ' + JSON.stringify(kinds(heard2)));
+  assert.ok(!heard2.includes('gateTick'), '값이 안 오르는 칸에 숫자 증가음을 내지 않는다: ' + JSON.stringify(kinds(heard2)));
+  assert.deepEqual(app.getFx().gateFlash, {}, '값이 안 오르므로 흰 플래시도 없다');
+  assert.equal(rowId, run().lottery.rowId);
+});
+
+test('V3-SHELL-TRAP: 확정선 전에는 함정도 꽝 게이트와 똑같이 들린다 — 통로를 고르기 전에 내용이 새지 않는다', async () => {
+  //  ⚠️'?' 상자는 눈만 가린다. 확정선 전에도 비행 중인 탄은 막히고(gateBlock), 그 막힘에 함정 전용 소리·색을 쓰면
+  //   플레이어가 통로를 고르기 **약 300px 전에** '이번 판은 함정'임을 알아낸다(계약서 3-9, 2026-09-17 수정 라운드 1 지적 1).
+  const trap = await trapWindows('trapGate');
+  const bad = await trapWindows('badGate');
+  assert.equal(trap.run().lottery.revealZ, bad.run().lottery.revealZ, '두 판의 확정선이 같다(같은 벽)');
+  //  ① 확정선 전 창에 실제로 막힘이 있었다 — 창이 비어 있으면 아래 단언들이 공짜로 통과한다
+  assert.ok(trap.hidden.length > 0 && bad.hidden.length > 0, '확정선 전에 들린 소리가 있다(창이 비지 않았다)');
+  assert.ok(trap.hidden.includes('gateClang'), '확정선 전 막힌 탄은 종전 셔터 소리로 들린다: ' + JSON.stringify(kinds(trap.hidden)));
+  //  ② 함정 전용 소리는 확정선 전에 한 번도 나지 않는다
+  assert.equal(trap.hidden.filter((n) => n === 'trapHit').length, 0, '확정선 전 trapHit 0건: ' + JSON.stringify(kinds(trap.hidden)));
+  //  ③ 함정 판과 꽝 판이 확정선 전에는 **같은 소리 집합**이다(귀로 두 갈래를 가를 수 없다)
+  assert.deepEqual(kinds(trap.hidden), kinds(bad.hidden), '확정선 전 소리 집합이 두 판에서 같다');
+  //  ④ 갈라지는 것은 공개 뒤부터다 — 함정만 trapHit, 꽝은 종전 gateClang
+  assert.ok(trap.shownClosed.includes('trapHit'), '공개 뒤 함정은 차단음: ' + JSON.stringify(kinds(trap.shownClosed)));
+  assert.ok(!bad.shownClosed.includes('trapHit'), '꽝 게이트는 공개 뒤에도 차단음을 쓰지 않는다: ' + JSON.stringify(kinds(bad.shownClosed)));
+  assert.ok(bad.shownClosed.includes('gateClang'), '꽝 게이트는 공개 뒤에도 셔터 소리: ' + JSON.stringify(kinds(bad.shownClosed)));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-SHELL-RESULT-LAYOUT(2026-09-17 2차 검수 후속) — 결과 화면 버튼 자리의 **셸 결선**.
+//  [다시 도전] 아래 부연 한 줄(render.RETRY_LOTTERY_NOTE)은 render 가 그리지만, 그 글이 들어갈 자리를 비워 두는 것은
+//  셸(main.js view() 의 noteGap)이다. ⚠️표현 검사(V3-RENDER-TRAP)는 buttons 를 **직접 만들어 넣어** 그리므로
+//  셸의 자리 계산을 한 줄도 밟지 않는다 — noteGap 을 0 으로 지워도 그 검사는 통과하고, 실게임에서만 글이 아래 버튼에 깔린다.
+//  그래서 여기서는 실제로 한 판을 굴려 결과 화면을 **그린 뒤**, 찍힌 글과 버튼 상자의 좌표를 화면에서 꺼내 본다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+//  drawButtons 는 버튼마다 둥근 상자를 두 번(채우기·테두리) 그린 뒤 글자를 찍는다.
+//  render 의 roundRect = moveTo + arcTo×4 이고, 첫 arcTo 인자가 (x+w, y, x+w, y+h, r) · 셋째가 (x, y+h, x, y, r) 이라
+//  글자 바로 앞 arcTo 8개에서 두 겹의 상자를 되살릴 수 있다. 주 버튼은 안쪽 상자가 1px 작으므로 **바깥쪽**이 셸이 정한 자리다.
+function buttonBoxOf(ops, label) {
+  const i = ops.findIndex((o) => o.op === 'fillText' && o.args[0] === label);
+  assert.ok(i >= 0, '화면에 [' + label + '] 글자가 있다');
+  const arcs = [];
+  for (let j = i - 1; j >= 0 && arcs.length < 8; j--) if (ops[j].op === 'arcTo') arcs.unshift(ops[j].args);
+  assert.equal(arcs.length, 8, '[' + label + '] 앞에 버튼 상자 두 겹(arcTo 8개)이 있다');
+  const box = (a, c) => ({ left: c[0], top: a[1], right: a[0], bottom: a[3] });
+  const [b1, b2] = [box(arcs[0], arcs[2]), box(arcs[4], arcs[6])];
+  return b1.top <= b2.top ? b1 : b2;
+}
+
+//  딱 한 프레임만 좌표까지 기록해 돌려준다(그 판의 결과 화면이 실제로 그려진 모습)
+function recordFrame(b) {
+  b.rec.ops.length = 0;
+  b.rec.on = true;
+  b.frames(1);
+  b.rec.on = false;
+  return b.rec.ops;
+}
+
+//  봇 정책(위 스모크와 같은 botX)으로 결과 화면까지 굴린다
+async function botToResult(b, stageId, guardMax = 20000) {
+  b.app.startRun(stageId);
+  let guard = 0;
+  while (b.app.getState() === 'run' && guard++ < guardMax) {
+    b.app.input.state.pointerX = botX(b.app.getRun()) ?? 240;
+    b.frames(1);
+  }
+  assert.equal(b.app.getState(), 'result', 'S' + stageId + ' 가 결과 화면까지 갔다 guard=' + guard);
+}
+
+test('V3-SHELL-RESULT-LAYOUT: 랜덤 길이 있는 판은 셸이 아래 버튼을 부연 한 줄만큼 내린다 — 글이 버튼에 깔리지 않는다', async () => {
+  //  시드 고정(셸의 조립 규칙 그대로) — S3 는 어느 시드로도 랜덤 길이 있는 판이라 결과에 부연이 뜬다
+  const b = await bootFakeLot(() => 1_700_000_000_000);
+  await botToResult(b, 3);
+  const ops = recordFrame(b);
+  //  ① 부연이 실제로 찍혔다
+  const note = ops.find((o) => o.op === 'fillText' && o.args[0] === RETRY_LOTTERY_NOTE);
+  assert.ok(note, '랜덤 길 판의 결과 화면에 부연 한 줄이 찍힌다');
+  const retry = buttonBoxOf(ops, '다시 도전');
+  assert.equal(retry.top, 480, '[다시 도전] 은 제자리');
+  assert.equal(note.args[1], (retry.left + retry.right) / 2, '부연은 [다시 도전] 가운데 정렬');
+  assert.ok(note.args[2] > retry.bottom, '부연은 [다시 도전] 아래: 글 y=' + note.args[2] + ' 버튼 아래끝=' + retry.bottom);
+  //  ② 그 아래 버튼([스테이지 선택] — S3 는 마지막 판이라 [다음 작전] 이 없다)이 부연과 겹치지 않는다
+  const hasNext = ops.some((o) => o.op === 'fillText' && o.args[0] === '다음 작전');
+  const below = buttonBoxOf(ops, hasNext ? '다음 작전' : '스테이지 선택');
+  assert.equal(below.bottom - below.top, hasNext ? 56 : 44, '아래 버튼 상자를 제대로 집었다');
+  assert.ok(note.args[2] + 4 <= below.top,
+    '부연 아래로 버튼이 내려와야 한다 — 글 y=' + note.args[2] + ' 아래 버튼 top=' + below.top + '(셸의 noteGap 이 0 이면 여기서 깔린다)');
+  //  ③ 내려온 양 = 부연 한 줄 자리(22px). 기본 자리는 552(아래 대조군과 같은 수)
+  assert.equal(below.top, 552 + 22, '[스테이지 선택] 이 기본 자리 552 에서 22px 내려와 있다');
+});
+
+test('V3-SHELL-RESULT-LAYOUT: 랜덤 길이 없는 판(대조군)은 부연이 없고 버튼이 기본 자리 그대로다', async () => {
+  const b = await bootFake();
+  await botToResult(b, 1);
+  const ops = recordFrame(b);
+  assert.ok(!ops.some((o) => o.op === 'fillText' && o.args[0] === RETRY_LOTTERY_NOTE), '랜덤 길이 없으면 부연도 없다');
+  //  봇은 S1 을 깬다 → [다음 작전] 이 있는 배치(548·620). 자리를 내리는 일이 없어야 한다
+  assert.equal(buttonBoxOf(ops, '다시 도전').top, 480);
+  assert.equal(buttonBoxOf(ops, '다음 작전').top, 548, '기본 자리');
+  assert.equal(buttonBoxOf(ops, '스테이지 선택').top, 620, '기본 자리');
 });

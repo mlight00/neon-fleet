@@ -18,6 +18,9 @@ const SFX = {
   gateClang:  ['nf_sfx_shield_pop_1', 'nf_sfx_shield_pop_2'],
   //  랜덤 길 위험 항목 공개 = 중립 경고음(피격음이 아니다 — 무력화 성공을 흐리지 않게, 2026-09-17 검수 N4)
   lotWarn:    ['nf_sfx_telegraph_1'],
+  //  함정(확정 손실) 게이트에 탄이 맞음 = 둔탁한 차단음. 셔터의 금속 튕김(gateClang)과 다른 계열이라
+  //   '잠깐 막힌 것'과 '아예 안 먹히는 장치'가 소리로도 구분된다(2026-09-17 이사 결정 ③)
+  trapHit:    ['nf_sfx_hit_1', 'nf_sfx_hit_2'],
   //  3명 이상 합류·무기 교체
   joinMany:   ['nf_sfx_evolve_1'],
   weaponSwap: ['nf_sfx_buy_1'],
@@ -30,10 +33,10 @@ const SFX = {
   click:      ['nf_sfx_click_1'],
 };
 //  이름별 스로틀(초). 기본 0.045, 아래는 예외
-const THROTTLE = { crateHit: 0.03, kill: 0.08, hurt: 0.25, gateTick: 0.03, gateClang: 0.09 };
+const THROTTLE = { crateHit: 0.03, kill: 0.08, hurt: 0.25, gateTick: 0.03, gateClang: 0.09, trapHit: 0.09 };
 const THROTTLE_DEFAULT = 0.045;
 const VOL = { fire_rifle: 0.11, fire_auto: 0.11, fire_heavy: 0.14, crateHit: 0.35, crateBreak: 0.7, gateTick: 0.4, gateFlip: 0.6, gateOpen: 0.45,
-              gateClang: 0.3, lotWarn: 0.55,
+              gateClang: 0.3, lotWarn: 0.55, trapHit: 0.4,
               joinMany: 0.8, weaponSwap: 0.6, hurt: 0.55, kill: 0.4, elite: 0.8, win: 0.8, lose: 0.75, click: 0.5 };
 //  이름별 Audio 풀 크기(순환) · 전체 동시 재생 상한
 const POOL_SIZE = 4;
