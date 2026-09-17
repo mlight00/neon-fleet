@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>랜덤 길 렌더 검증 하네스</title>
+<style>html,body{margin:0;background:#05080E}canvas{display:block}</style>
+</head>
+<body>
+<!-- 랜덤 길(계약서 3-9) 브라우저 육안 검증용 하네스. 게임 파일은 손대지 않고 rush3 모듈만 불러 쓴다.
+     ⚠️캔버스 id 가 game3 가 아니라 main.js 자동 부트가 붙지 않는다(셸 상태기계 대신 여기서 직접 그린다). -->
+<canvas id="shot" width="480" height="800"></canvas>
+<script type="module">
+import { buildStage, lotteryPick } from '../../../rush3/stages.js';
+import { createRun, stepRun, drainEvents, STEP } from '../../../rush3/combat.js';
+import { createRenderer3 } from '../../../rush3/render.js';
+import { loadSprites3 } from '../../../rush3/sprites.js';
+import { lotteryLine, missedLine, timeText } from '../../../rush3/main.js';
+import { adviceLine } from '../../../rush3/advice.js';
+import { BAL3 } from '../../../rush3/balance.js';
+import { hashSeed } from '../../../rush/rng.js';
+
+const canvas = document.getElementById('shot');
+const ctx = canvas.getContext('2d');
+let renderer = null, run = null, stage = null;
+//  main.makeFx() 와 같은 모양(렌더가 읽는 필드만)
+const fx = { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, shakeT: 0, hurtT: 0, guideT: 0,
+             eliteT: 0, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null, lotOpen: 0, lotSeen: false, lotSame: false };
+
+//  main.view(now) 의 run 분기와 같은 모양
+function view(now) {
+  return { state: 'run', now, saveOk: true, run, fx,
+           hud: { distM: Math.max(0, Math.round((run.length - run.z) / 10)) },
+           buttons: [{ id: 'pause', x: 422, y: 14, w: 44, h: 44, label: '❚❚' }] };
+}
+
+/** 시드를 주고 S3 를 시작한다. seedKey = 'lot:3:<i>' 형식(검사와 같은 조립 규칙) */
+window.__start = (seedKey, difficulty = 'normal') => {
+  stage = buildStage(3, { difficulty, lotterySeed: hashSeed(seedKey) });
+  run = createRun(stage);
+  fx.lotOpen = 0; fx.lotSeen = false; fx.lotSame = false;
+  return stage.lottery;
+};
+
+/** zTarget 까지 진행. tx 를 매 STEP 고정해 통로를 고른다(pointerX 는 안 쓴다 — 셸 입력 계층 없이도 조향된다).
+ *  main.frame 의 랜덤 길 공개 처리(fx.lotSeen/lotOpen)를 같은 조건으로 따라 한다. */
+window.__advance = (zTarget, tx = 240) => {
+  let n = 0;
+  while (run.z < zTarget && !run.over && n < 20000) {
+    run.tx = tx;
+    stepRun(run, { pointerX: null, dragDx: 0, keyDir: 0 }, STEP);
+    drainEvents(run);
+    if (run.lottery && !fx.lotSeen && run.z >= run.lottery.revealZ) { fx.lotSeen = true; fx.lotOpen = BAL3.lottery.openT; }
+    n++;
+  }
+  return { z: Math.round(run.z), x: Math.round(run.x), units: run.units.length, steps: n };
+};
+
+//  '?' 상자가 걷히는 연출을 원하는 지점에서 멈춰 찍는다(0 = 다 걷힘 · openT = 완전히 덮임)
+window.__setLotOpen = (v) => { fx.lotOpen = v; };
+//  사진용: 화면의 아군 탄만 지운다(숫자 위에 탄이 겹치면 '−10' 이 '+10' 처럼 보인다). 규칙에는 영향이 없다
+window.__clearShots = () => { run.bullets.length = 0; return true; };
+window.__draw = (now = 1) => { renderer.draw(view(now)); return true; };
+window.__lot = () => (run ? run.lottery : null);
+
+//  결과 화면 제안 한 줄 검증용: w3 좌 통만 '놓침'으로 만든다(수정 라운드 1 — hint 문구 육안 확인)
+//  ⚠️강제 상태다. 실제로는 좌 통로를 고르고 내구 20 통을 못 깬 판에서 나온다(논리 경로는 LOT-10b 가 잠근다)
+window.__missLeft = () => {
+  for (const c of run.supplies) c.missed = false;
+  const left = run.supplies.find((c) => c.z === 6300 && c.x === 150);
+  left.missed = true; left.opened = false;
+  run.missedSupplies = 1;
+  return left.hint;
+};
+
+//  결과 화면(랜덤 길 한 줄 확인용)
+window.__drawResult = (won = true) => {
+  const r = { stageId: run.stageId, stageVersion: run.stageVersion, difficulty: run.difficulty, title: run.title,
+              won, survivors: run.units.length, peak: run.peak, time: run.time, timeText: timeText(run.time), kills: run.kills,
+              missedLine: missedLine(run), advice: adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }),
+              isBest: false, saveOk: true, nextId: null };
+  //  ⚠️render.draw 는 view.run 이 있어야 result 분기로 들어간다(main.view 가 늘 run 을 싣는다)
+  renderer.draw({ state: 'result', now: 1, saveOk: true, result: r, run, fx,
+                  hud: { distM: 0 },
+                  buttons: [{ id: 'retry', x: 120, y: 480, w: 240, h: 56, label: '다시 도전', primary: true },
+                            { id: 'title', x: 120, y: 552, w: 240, h: 44, label: '스테이지 선택' }] });
+  return r.lottery;
+};
+
+const sprites = loadSprites3('../../../assets/rush/');
+Promise.resolve(sprites.ready ?? sprites).then(() => { renderer = createRenderer3(ctx, sprites); window.__READY = true; });
+</script>
+</body>
+</html>

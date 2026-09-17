@@ -4,6 +4,7 @@
 **r3(2026-09-11) = 외부 검수(F2·F3·Q1·Q2·Q4·후속개선) 반영 배치·규칙 개정.** 근거 문서 = `newmode/v3/DESIGN_r3_draft.md`(승인된 개정안 r3.2), 검수 = `newmode/v3/review/01_GPT_1단계_검수결과.md`.
 r3 에서 새로 들어온 규칙: **게이트 사격 활성 구간(셔터 `armZ`)** · **보급 통 차폐(`coverZ`, 비행시간 보정선)와 배제 쌍(`pairId`)** · **구조적 획득 불가 집계(`skipped`)** · **잡졸 직진(`track 0`)** · **통로 안내 표지(`wall.signs`)·회피 통로 규격(`spawns[].corridorHw`)** · **결과 제안 한 줄(`rush3/advice.js`)** · 세 스테이지 **코스 버전 2**. 기준 문서: `newmode/v3/spec/01_스타포지러시_재기획_v3.md`, `03_구현담당자_전달서.md`. 기존 코드 분석: `newmode/v3/analysis/01~06`.
 **r3.3(2026-09-16) = 난이도 선택(보통/어려움/극한) 추가** — §3-8(배수 표·근거·검수 금지 조항과의 관계), §6(타이틀 토글·HUD·결과 표기), §7(기록 칸 키 `버전:난이도`), §8(V3-DIFF·V3-SIM-DIFF·V3-SAVE-VERSION DIFF). 코스 배치·규칙 STEP 은 손대지 않았다(normal = r3 그대로).
+**r3.4(2026-09-17, 이사 지시) = S3 빈 길 → 랜덤 길(로또)** — §3-9 신설(풀·시드·결정성 예외), §5 S3 표 선택 D, §6(‘?’ 표지·가림 상자·결과 한 줄), §8 `V3-LOTTERY`. 근거 = 이사 지시(2026-09-16) **"3스테이지에 빈 길은 무의미하다. 당연히 그 길로 안 간다. 빈 길이 아니라 랜덤 길을 만들어서 진입 시마다 로또처럼 좋거나 꽝인 선택이 랜덤으로 나오게 해 주자."** 보고서 = `newmode/v3/build4/lottery-report.md`. **수정 라운드 1(2026-09-17)**: S3 좌 통 `hint` 를 랜덤 길 기준으로 고치고(빈 길 시절 문구 잔류), 셸 시드 조립 결선 검사 `V3-SHELL-LOTTERY` 와 문구 회귀 검사 `LOT-10`·`LOT-10b` 를 추가했다. **수정 라운드 2(2026-09-17)**: 풀 ⑤ 를 `rusher4`(돌격체 4 — 이 지점 병력 68~69 에 접촉 전 전멸해 세 난이도 모두 손실 0 이었다 = 꽝이 아니었다)에서 **`trapGate`(−10 확정 손실 게이트)** 로 바꾸고, `coverZFor` 비행시간 보정선에 **1 STEP 지연 + 대형 깊이** 두 항을 더했다(§3-3 — 네 지점 `coverZ` 갱신, 랜덤 길 게이트의 셔터도 같은 선으로). 배치가 바뀐 곳은 여전히 **S3 분리벽 `w3` 우측 통로 하나**다. 다만 `coverZ` 는 규칙 공식이라 **배제 쌍 네 지점이 함께 갱신**됐다(S2 w1 1904→1953 · S3 p1 2475→2524 · p2 3210→3259 · S3 c9/랜덤 길 6046→6094). 통·게이트·무기·병사 hp·난이도 표는 그대로다.
 **r3.3 후속(2026-09-16, 이사 결정) = 타이틀 초기 선택을 `brutal`(극한)로** — "극한으로 모든 스테이지 격파 → 극한을 기본으로". **규칙 계층 기본은 `normal` 그대로**이고 바뀐 것은 셸이 처음 보여 주는 칸뿐이다. §3-8 '두 가지 기본값', §6 토글, §7 저장 참조.
 이 문서는 구현 담당(사람·에이전트)이 공유하는 **모듈 경계와 규칙의 단일 진실**이다. 수치는 시제품 출발값이며 `rush3/balance.js`·`rush3/stages.js`가 최종 값을 가진다.
 
@@ -14,6 +15,7 @@ r3 에서 새로 들어온 규칙: **게이트 사격 활성 구간(셔터 `armZ
 - 게임 규칙은 순수 함수·순수 상태(`rush3/combat.js` 외 순수 모듈)로 두고 `node:test`로 잠근다. 화면(render)·입력·루프(main)는 규칙을 호출만 한다. **규칙 모듈은 `Math.random`·rng를 import하지 않는다**(정적 검사 테스트).
 - **고정 시간 간격**: 규칙은 `STEP = 1/60`초 단위로만 진행한다. 30/60/120Hz 화면에서 같은 STEP별 입력열이면 같은 결과.
 - 스테이지는 **고정 배치**. 스폰 좌표·지터까지 `buildStage(id)`가 `hashSeed(stageId + ':' + ev.z + ':' + i)`로 빌드 시점에 확정해 데이터에 박는다. 재도전 = `buildStage` 재호출(새 객체, 이전 판의 durability/value/passed/opened가 남지 않는다).
+- **명시적 예외 하나 = 랜덤 길(§3-9).** S3 분리벽 `w3` 우측 통로만 **판마다 내용이 바뀐다**(셸이 넘기는 `lotterySeed`). 근거 = 이사 지시(2026-09-16) "빈 길이 아니라 랜덤 길". 그래도 **한 판 안에서는 여전히 고정 배치**다 — 추첨은 `buildStage` 시점에 한 번이고 `stepRun` 안에는 난수도 분기도 없다. 시드를 주지 않으면 `LOTTERY_DEFAULT_SEED`로 결정적(검사·봇 시뮬의 기준선).
 - 연출 난수(파편 각도 등)는 셸/렌더 전용 스트림이며 규칙 상태를 읽거나 쓰지 않는다. 시각 효과에 전역 `Math.random` 금지.
 
 ## 1. 좌표계
@@ -28,8 +30,8 @@ r3 에서 새로 들어온 규칙: **게이트 사격 활성 구간(셔터 `armZ
 
 | 파일 | export | 순수 |
 |---|---|---|
-| `balance.js` | `BAL3` (동결된 객체, **`BAL3.difficulty` 배수 표 포함**), **`DIFFICULTY_IDS`**, **`DEFAULT_DIFFICULTY`**, **`difficultyMult(id)`**(표 한 줄, 모르는 id 는 throw) | 데이터 |
-| `stages.js` | `STAGE_IDS`, `DEFS`, **`buildStage(id, { difficulty = 'normal' }) → stage`**(`stage.difficulty` 포함), `stageMeta(id)`, `stageVersion(id)`, **`coverZFor(wallZ0, supplyZ)`**, **`VZ_MIN`** | 순수 |
+| `balance.js` | `BAL3` (동결된 객체, **`BAL3.difficulty` 배수 표·`BAL3.lottery` 랜덤 길 풀 포함**), **`DIFFICULTY_IDS`**, **`DEFAULT_DIFFICULTY`**, **`difficultyMult(id)`**(표 한 줄, 모르는 id 는 throw) | 데이터 |
+| `stages.js` | `STAGE_IDS`, `DEFS`, **`buildStage(id, { difficulty = 'normal', lotterySeed }) → stage`**(`stage.difficulty`·**`stage.lottery`** 포함), `stageMeta(id)`, `stageVersion(id)`, **`coverZFor(wallZ0, supplyZ)`**, **`VZ_MIN`**, **`MAX_DY`**, **`lotteryPick(seed)`**, **`LOTTERY_DEFAULT_SEED`** | 순수 |
 | `weapons.js` | `WEAPONS`, `weaponRank(id)`, `makeBullet(weaponId, x, z, ownerId)` | 순수 |
 | `gates.js` | `makeGateRow(def) → row`, **`updateGateArm(row, run, events)`**, **`hitGateCell(row, cell, bullet, events)`**, `passGateRow(row, run, events)`, `cellAt(row, x)`, `gateColor(value)`, `gateLabel(value)`, `sweepContactGate(row, cell, bullet)`, `sweepHitsGate(row, cell, bullet)`, `GATE_ARM_Z` | 순수 |
 | `supply.js` | `makeSupply(def)`, `hitSupply(s, bullet, events, run)`, `passSupply(s, run, events)`, `takePads(s, run, events)`, `supplyActive(s)`, **`supplyCovered(s, run)`**, **`structurallyLost(s, run)`**, `supplyReward(s)`, `sweepContactSupply(s, bullet)`, `sweepHitsSupply(s, bullet)`, `activateChain(s, events)`, `applySupplyReward(reward, run, events, opts)`, `WALL_LEAD` | 순수 |
@@ -40,7 +42,7 @@ r3 에서 새로 들어온 규칙: **게이트 사격 활성 구간(셔터 `armZ
 | `audio.js` | `createAudio3({ dir }) → { unlock, sfx(name, opts), bgmPlay(name), bgmPause, bgmResume, setVolume, getVolume, setMuted, isMuted, duck }` | I/O |
 | `save.js` | `createSave3(storage) → { get(), getStage(id, version, difficulty), updateStage(id, patch, version, difficulty), getStageVersions(id), patch(obj), ok }`, **`recordKey(version, difficulty)`**, **`BASE_DIFFICULTY`** | I/O |
 | **`advice.js`(신규)** | **`adviceLine(run, stage) → string|null`**, `ADVICE_DEFAULT` | 순수 |
-| `main.js` | `boot(canvas, deps)`(자동 부트는 `#game3`가 있을 때만), `hitButton`, `makeLoop`(누적기, 테스트 가능), `missedLine`, `timeText`, **`DIFF_TOGGLE`**(타이틀 토글 좌표), **`normDifficulty(d)`**(저장값 거르기) | 셸 |
+| `main.js` | `boot(canvas, deps)`(자동 부트는 `#game3`가 있을 때만), `hitButton`, `makeLoop`(누적기, 테스트 가능), `missedLine`, `timeText`, **`DIFF_TOGGLE`**(타이틀 토글 좌표), **`normDifficulty(d)`**(저장값 거르기), **`lotteryLine(run, { weaponSame })`**(랜덤 길 결과 한 줄, 순수) | 셸 |
 
 ## 3. 핵심 데이터
 
@@ -60,7 +62,9 @@ r3 에서 새로 들어온 규칙: **게이트 사격 활성 구간(셔터 `armZ
   enemies: [ { id, kind, x, z, pz, vz, hp, r, dead, touched, ... } ],
   eshots: [ { x, z, pz, vx, vz, dmg, r, dead } ],
   boss: null | { kind:'elite', x, z, hp, max, r, state:'descend'|'hold', dir, shootT, touchT, spawnT, dead },
-  wallSide: {},                              // wallId → 'L'|'R'
+  wallSide: {},                              // wallId → 'L'|'R' (벽을 빠져나가면 삭제)
+  wallSideLog: {},                           // 지나온 벽의 통로 선택(지워지지 않는다 — 결과 화면이 읽는다)
+  lottery: null | { pick, idx, seed, good, label, kind, z, x, revealZ, openZ, wallId, supplyId, rowId },  // 3-9. buildStage 가 박는다. 규칙은 읽지 않는다
   pendingRewards: [],                        // STEP 5에서 쌓고 9에서 적용
   time, peak, kills, lossByTouch, lossByShot, lossByGate,
   missedSupplies,          // 얻을 수 있었는데 못 얻은 통(실제 기회 손실)
@@ -109,12 +113,23 @@ cell = { x0, x1, value, maxValue, flashT: 0 }      // [x0, x1) 반열림, value�
 **`coverZ`는 통로 확정선이 아니라 '비행시간 보정선'이다.**
 
 ```
-coverZ = ceil( commitZ + (s.z − commitZ) × scroll / vzMin )      commitZ = wall.z0 − 60
-scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
+coverZ = ceil( C + (s.z + MAX_DY − C) × scroll / vzMin )      C = wall.z0 − 60 + scroll × STEP
+scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)   ·   STEP = 1/60
+MAX_DY = 159 = 유닛 상한(150명)까지 채운 대형의 dy 최대 (stages.MAX_DY, squad.formation 에서 계산)
 ```
 
-확정선(`wall.z0 − 60`)에 두면 **확정 직전에 발사돼 아직 비행 중인 탄**이 차폐가 걷힌 뒤 반대편 통에 도착해 배제가 뚫린다(검수 F3 계열). 확정 직전에 쏜 가장 느린 탄이 통에 닿는 순간의 `run.z`까지 차폐를 유지하면 **확정 전에 발사된 탄은 하나도 반대편 통에 닿지 못한다.** 값은 `stages.coverZFor(wallZ0, supplyZ)`가 계산하고 `V3-SUPPLY-PAIR PAIR-4c`·`V3-STAGES STG-4 ④`가 잠근다.
-**⚠ `vzMin`보다 느린 무기·투사체를 추가하면 네 지점의 `coverZ`가 전부 부족해져 배제가 다시 열린다.** `PAIR-4c`가 먼저 실패하도록 걸어 두었다.
+확정선(`wall.z0 − 60`)에 두면 **확정 직전에 발사돼 아직 비행 중인 탄**이 차폐가 걷힌 뒤 반대편 통에 도착해 배제가 뚫린다(검수 F3 계열). 확정 직전에 쏜 가장 느린 탄이 통에 닿는 순간의 `run.z`까지 차폐를 유지하면 **확정 전에 발사된 탄은 하나도 반대편 통에 닿지 못한다.**
+
+**보정 두 항(2026-09-17 수정 라운드 2).** r3 의 공식은 `commitZ`(=`wall.z0 − 60`)에서 **부대 중심**이 쏜 탄만 셈해 두 가지를 놓쳤다.
+1. **1 STEP 지연** — `clampCenter`는 `stepRun` 1단계에서 **직전 STEP의 `run.z`** 로 통로를 판정한다(4장 순서). 그래서 아직 통로 제약을 받지 않은 대형이 쏘는 마지막 STEP 은 `commitZ`가 아니라 `commitZ + scroll × STEP`(≈ +3.17px)이다.
+2. **대형 깊이** — 탄은 부대 중심이 아니라 **`run.z − dy`** 에서 출발한다(4장 4단계). 뒷줄 유닛이 쏜 탄은 `dy`만큼 더 날아가야 해서 **가장 늦게** 도착한다.
+
+⚠️**두 항이 빠져 있으면 대형이 커질수록 뚫린다.** 실측(2026-09-17): 확정 직전까지 `x 239`에서 중화기로 쏘다가 좌측으로 확정한 판에서, 옛 공식의 `coverZ 6046` 을 쓰면 `run.z 6051.50`에 탄 1발이 도착해 랜덤 길 통의 내구가 **14 → 11** 로 줄었다(병력 80). 새 공식(`6094`)에서는 같은 판에서 도달 0 이다. 값은 `stages.coverZFor(wallZ0, supplyZ)`가 계산한다.
+
+**검사 범위(2026-09-17 검수 지적 2 반영).** `PAIR-4c`·`STG-4 ④`는 원래 **`pairId` 가 있는 통만** 돌아서, 짝이 없는 S3 좌 통 `c9`(z6300, `coverZ` 6094)와 **판마다 바뀌는 랜덤 길 통**이 공식 검사에서 통째로 빠져 있었다(`c9` 를 옛 값 `6046` 으로 되돌려도 검사 전건이 통과했다 — 변이 검사로 확인). 지금은 두 검사 모두 **`coverZ` 를 가진 모든 통**을 돈다: 벽 활성 구간(`wall.z0 − 60 … wall.z1`) 안에 있으면 공식 일치를 보고, 기본 시드의 랜덤 길은 게이트라 통이 안 나오므로 **통이 나오는 시드로 S3 판을 더 만들어** 랜덤 길 통까지 함께 본다. 스테이지마다 검사한 통 개수(`S1 0 · S2 2 · S3 6`, 랜덤 길이 통이면 7)도 함께 못 박아 두어, 통에서 `coverZ` 를 떼어 내 검사를 빠져나가는 변경도 실패한다.
+**벽 밖에서 `coverZ` 를 갖는 통은 선택 C 의 z3900 통(`c8`) 하나뿐인 예외다.** 이 통은 벽이 아니라 **게이트(z4000)와 사격창을 나눠 쓰는 '저울'** 이라 차폐선이 그 게이트의 셔터 개시선(`4000 − gate.armZ = 3660`)이다. 두 검사가 이 예외를 `c8` 이라는 이름으로 못 박아 두었으므로, 다른 통이 벽 밖에서 `coverZ` 를 가지면 실패한다.
+실사격 쪽은 `V3-LOTTERY LOT-3b` 가 **양방향**으로 잠근다: 좌측 확정 → 우측 랜덤 길 도달 0(대조군 = 옛 공식), 우측 확정 → **좌 통 `c9`** 도달 0(대조군 = `c9.coverZ` 만 6046 으로 되돌린 같은 판, 대형을 상한 150 까지 채우면 시드 5종 전부에서 뚫린다).
+**⚠ `vzMin`보다 느린 무기·투사체를 추가하거나 `squad.unitCap`(대형 깊이)을 올리면 차폐를 쓰는 모든 지점(배제 쌍 4 + 좌 통 `c9` + 랜덤 길 통)의 `coverZ`가 전부 부족해져 배제가 다시 열린다.** `PAIR-4c`·`STG-4 ④`가 먼저 실패하도록 걸어 두었다.
 
 **배제는 벽 + `coverZ` 가 한 세트다.** 벽만 두면 확정 **전에** 사거리로 양쪽을 다 먹고, `coverZ`만 두면 확정 뒤에 반대편으로 옮겨 먹는다. **같은 z에 좌·우를 놓는 것만으로는 배제가 아니다**(사거리 662px = 3.48초 동안 좌↔우 이동은 0.72초).
 **⚠ 통은 벽 끝(`wall.z1`)보다 최소 1 STEP(≈3.2px) 앞에 둔다.** `clampCenter`는 `run.z > wall.z1`인 STEP에 `run.wallSide[w.id]`를 지우고 `passSupply`는 같은 STEP의 뒤쪽에서 돌기 때문이다.
@@ -226,6 +241,49 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
 
 **봇 실측(출발값 표, 2026-09-16).** 이 표는 **봇 결과이지 사람의 성공률이 아니다.** `aim`: normal S1~S3 완주 · hard S1·S3 완주, **S2 는 정예전 전멸**(정예 217/352 잔존) · brutal S1 정예전 전멸(55/288 잔존), S3 전멸(36/1200). `plan`: hard S1·S3, brutal S3 완주. `center`: hard S1 완주, hard·brutal S2·S3 실패. hard S2 는 정예 배수(eliteHp·eliteFireRate)를 ×1.0 까지 내려도 `aim` 이 못 이긴다(잔존 56) — 원인은 적탄 dmg 2 와 옆으로 비키지 않는 봇의 조합(소총 21명이 정예 3발/초를 그대로 받아 화력이 먼저 소진). **표는 출발값으로 두고 사람 플레이로 지점을 찾는다**(보고서 `newmode/v3/build3/difficulty-report.md`, 탐색 기록 포함).
 
+### 3-9. 랜덤 길(r3.4, 2026-09-17)
+
+**근거.** 이사 지시(2026-09-16): **"3스테이지에 빈 길은 무의미하다. 당연히 그 길로 안 간다. 빈 길이 아니라 랜덤 길을 만들어서 진입 시마다 로또처럼 좋거나 꽝인 선택이 랜덤으로 나오게 해 주자."** r3 의 S3 선택 D 는 좌(병사 10 + 저격수 2) vs 우(빈 통로, 보상 0)였다. 빈 쪽은 **고르지 않는 것이 항상 옳아** 선택이 아니었다. 대상은 **S3 분리벽 `w3` 우측 통로 하나**이고 다른 선택(A·B·C)·S1·S2·난이도 표의 **배치**는 손대지 않았다(§3-3 `coverZ` 공식 보정만 네 지점에 함께 반영됐다).
+
+**표지.** 벽 `w3` 의 `signs.R = { kind: 'lottery' }` → 벽 앞머리에 **'?'** 로 그린다. 좌측 표지(병사 10)는 그대로라 **"아는 쪽 vs 모르는 쪽"** 의 저울이 된다.
+
+**풀(출발값 — `BAL3.lottery.pool`). 균등 1/5, 좋음 3 : 꽝 2.**
+
+| # | id | 좋음 | 종류 | 내용 | 배치 |
+|---:|---|---|---|---|---|
+| ① | `soldier8` | 좋음 | 통 `soldier` | 내구 14 · 병사 8 | z 6300 · x 330 · `coverZ 6094` |
+| ② | `heavy` | 좋음 | 통 `weapon` | 내구 24 · 중화기(이미 heavy 면 `weaponSame`) | 〃 |
+| ③ | `chain6` | 좋음 | 통 `chain` | 내구 8 · 발판 6 · 최대 12(발판은 **우측 차선 x 330**) | 〃 |
+| ④ | `badGate` | 꽝 | 게이트 한 칸 | `[252,400)` 값 **−15 · 상한 0**(쏘면 0 까지 무효화 가능) | z 6300 · `bypass` · `armZ = z − openZ`(=206) |
+| ⑤ | `trapGate` | 꽝 | 게이트 한 칸 | `[252,400)` 값 **−10 · 상한 −10**(= 자기 값, **쏴도 오르지 않는 확정 손실**) | 〃 |
+
+- 통 3종의 `coverZ`는 **좌측 통(z6300)과 같은 비행시간 보정선** `coverZFor(6000, 6300) = 6094`이다(§3-3 공식 그대로).
+- ④ 는 한 칸 행(`bypass: true`)이라 **좌측 통로로 가면 걸리지 않는다**. 상한 0 = "쏘는 만큼 무효로 만들 수는 있어도 이득으로 뒤집을 수는 없다".
+- ⑤ 도 한 칸 행이다. **상한이 자기 값**이라 `hitGateCell`의 `min(maxValue, value + 1)`이 값을 움직이지 못한다 — 탄은 흡수되고 `gateHit` 신호(흰 플래시)는 나지만 숫자는 그대로다. 화면에는 숫자 아래 **'확정' 꼬리표**를 붙여 "안 먹히는 이유"를 남긴다(§6-1).
+- **⚠️꽝은 '병력이 실제로 줄어드는 것'이어야 한다.** r3.4 초안의 ⑤ 는 돌격체 4(`kind: 'enemy'`)였는데, 이 지점의 병력은 68~69 라 돌격체가 **접촉 전에 전멸**했다. 2026-09-17 실측: 우측 통로를 고른 판이 보통 69→69(`lossByTouch` 0, `kills` +4) · 어려움 68→68 · 극한 68→68 — 세 난이도 모두 **손실 0 + 공짜 처치**였고, 결과 한 줄만 '꽝'이라고 적는 상태였다. 배치를 당기거나(전방 200px) 수를 늘려도(8·12기) 결과가 같았다(비행 중인 아군 탄이 스폰 즉시 지운다). 그래서 ⑤ 를 **확정 손실 게이트**로 바꿨고, 풀에 `kind: 'enemy'` 는 더 이상 없다. `LOT-6b` 가 난이도 3종에서 '우측 선택 = 확정 손실 10 · 좌측보다 병력 15 이상 적다'를 잠근다.
+
+**시드 = 판마다 다르다.** `buildStage(id, { difficulty, lotterySeed })`. 셸(`main.js startRun`)이 `hashSeed('lot:' + stageId + ':' + attempts + ':' + dateNow())`를 넘긴다. **시계는 셸에만 있고**(`deps.dateNow` 로 주입 가능 — 셸 결선 검사 `V3-SHELL-LOTTERY`(`tests/rush3-loop.test.mjs`)가 이 조립을 고정한다: 같은 시각·같은 `attempts` 면 재현, 시각이나 `attempts` 가 바뀌면 시드가 바뀐다, 기본 시드로 고정되지 않는다) 규칙 계층은 받은 시드로 `mulberry32`를 **한 번** 돌린다. 그래서 **규칙 난수는 여전히 0**이고 V3-PURE 도 그대로다(추첨은 `stages.js` 안, `stepRun` 밖).
+- `lotterySeed`를 주지 않으면 `LOTTERY_DEFAULT_SEED`(= `hashSeed('rush3:lottery:default')`). 검사·봇 시뮬의 기준선이며 이 경로에서는 `buildStage(3)` 두 번이 deepEqual 이다.
+- **재도전 버튼도 새 시드**다(`attempts` 와 시계가 모두 바뀐다). §0 '재도전 동일 배치' 원칙의 **명시적 예외**이며 근거는 위 이사 지시다. 같은 시각으로 두 번 출격해도 시드가 달라지는 것을 `V3-SHELL-LOTTERY` 가 잠근다.
+- 결과는 `stage.lottery` → `run.lottery` 로 흐른다: `{ pick, idx, seed, good, label, kind, z, x, revealZ, openZ, wallId, supplyId, rowId }`. **규칙은 이 필드를 읽지 않는다**(셸의 결과 한 줄·'?' 연출 전용, `V3-LOTTERY LOT-8` 정적 검사).
+
+**안내 문구.** 좌측 통(c9)의 `hint` 와 벽 표지 `signs.R` 는 **같은 말을 해야 한다** — 우측은 '없음'이 아니라 **'판마다 달라지는 랜덤 길'**이다. 이 문구는 결과 화면 제안 한 줄(§6-2 우선순위 2 '놓친 통')로 실제 출력되므로, 빈 길 시절 표현('빈 길'·'아무것도 없'·'보상 0'·'안전하지만')이 `w3` 구간(z 5400~7200)의 통·게이트 `hint` 에 남아 있으면 안 된다(`V3-LOTTERY LOT-10`·`LOT-10b` 가 잠근다).
+
+**가림과 공개.** 통로 확정선 `revealZ = wall.z0 − 60`(=5940) 전에는 우측 통로의 실제 물체를 그리지 않고 **'?' 상자**로 덮는다. 사격은 기존 두 장치가 그대로 막는다 — 통이면 `coverZ`(흡수·내구 불변, `supplyBlock`), 게이트면 셔터(흡수·값 불변, `gateBlock`). **두 개방선은 같은 z `openZ = coverZFor(6000, 6300) = 6094`** 다: 게이트도 기본 `armZ 340`(개방선 5960)이 아니라 `armZ = z − openZ`(=206)를 쓴다. 기본 340 이면 셔터가 확정선 20px 뒤에 열려 **확정 전에 쏜 비행 중인 탄**이 도착해 값을 바꾸기 때문이다(통 쪽 누출과 같은 계열 — §3-3 보정 두 항). **`openZ > revealZ`** 라 확정 전에 내용이 새지 않는다. 확정을 넘는 프레임에 상자가 0.25초(`BAL3.lottery.openT`)에 걸쳐 걷히고 효과음 1회(좋음 `gateFlip` / 꽝 `hurt` 재사용).
+
+**결과 한 줄(`main.lotteryLine(run, { weaponSame })`, 순수).** 우측을 골랐으면 그 판의 결과, 좌측을 골랐으면 **놓친 내용을 공개**한다(감추지 않는다).
+
+| 상황 | 문구 |
+|---|---|
+| 좌측 선택 · 좋음 | `오른쪽 랜덤 길은 이번 판엔 병사 8 이었습니다` |
+| 좌측 선택 · 꽝 | `오른쪽 랜덤 길은 이번 판엔 꽝(−10 확정 게이트)이었습니다` |
+| 우측 선택 · 획득 | `랜덤 길: 병사 8 획득` |
+| 우측 선택 · 못 열었음 | `랜덤 길: 병사 8 — 열지 못했습니다` |
+| 우측 선택 · 무기가 동급 | `랜덤 길: 중화기 — 이미 같은 무기였습니다` |
+| 우측 선택 · 꽝 | `랜덤 길: 꽝 −10 확정 게이트` |
+
+좌측을 고른 판에서 우측 통은 `structurallyLost`(벽 배제)로 **`skipped`** 가 된다 — '놓침'으로 세지 않고 `adviceLine` 후보에서도 빠진다(§3-3). 랜덤 길 한 줄은 그것과 **별도 줄**이라 제안 문구를 밀어내지 않는다.
+
 ## 4. STEP 처리 순서(`combat.stepRun(run, input, STEP)`)
 
 `input = { pointerX: number|null, dragDx: number, keyDir: -1|0|1 }`(셸이 STEP 직전에 스냅샷, 호출 후 `dragDx = 0`).
@@ -275,7 +333,7 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
 |---|---|---|---|
 | 1140 | 6.0s | 게이트 행: 좌 `[80,240)` **+1(칸 상한 3)** / 우 `[240,400)` **−20(칸 상한 20)** | **`armZ 340`**, `hint`. 검수 의견대로 **양쪽 모두 음수인 행을 늘리지 않고** '안전한 작은 확정 보상 vs 도전 큰 음수'로 바꿨다 |
 | 1800~3000 | | **분리벽** x 228~252 + **통로 안내 표지**(좌: 병사 3 / 우: 기관총) | **`signs`** |
-| 2300 | 12.1s | 좌 병사 통 x 120 내구 6 병사 3 / 우 무기 통 x 326 `auto` 내구 12 | **둘 다 `coverZ 1904`(= 확정선 1740 + 비행 보정 164) · `pairId 'w1'`**, `hint` |
+| 2300 | 12.1s | 좌 병사 통 x 120 내구 6 병사 3 / 우 무기 통 x 326 `auto` 내구 12 | **둘 다 `coverZ 1953`(= 확정선 1740 + 비행 보정 213) · `pairId 'w1'`**, `hint` |
 | 3600 | 18.9s | grunt **4**(xs 95/137/179/221) + rusher 4 (xs 110/215/265/370) | grunt **`corridorHw: 61`** — 오른쪽 도로 끝까지 165px ≥ 필요 폭 132. 돌격체는 통로 규격 대상이 아니다(비켜야 하는 위협) |
 | 4600 | 24.2s | shooter 3 (x 150, 240, 330; 도로 고정) | |
 | 5400 | 28.4s | 게이트 행: 좌 **+2(칸 상한 12)** / 우 **−20(칸 상한 40)** | **`armZ 340`**, `hint` |
@@ -293,20 +351,22 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
 | 1500 | — | 병사 통 x320 내구 5 병사 2 | 우로(이동 학습) |
 | 1900 | 병사 통 x160 내구 6 병사 3 | — | 좌로 |
 | **2400~2900** | **차폐벽 `w1` x228~252 + 표지**(좌: 연속증원 / 우: 병사 5) | | **선택 A 확정선 `run.z 2340`** |
-| **2800** | **연속증원 x150** 내구 10 · 발판 5 · 최대 15 | **병사 통 x330** 내구 10 병사 5 | **선택 A** `pairId 'p1'` · 둘 다 **`coverZ 2475`** |
+| **2800** | **연속증원 x150** 내구 10 · 발판 5 · 최대 15 | **병사 통 x330** 내구 10 병사 5 | **선택 A** `pairId 'p1'` · 둘 다 **`coverZ 2524`** |
 | **3150~3550** | **차폐벽 `w2` + 표지**(좌: 기관총 / 우: 중화기) | | **선택 B 확정선 `run.z 3090`** |
-| **3500** | 무기 통 **`auto`** x150 내구 12 | 무기 통 **`heavy`** x330 내구 **24** | **선택 B** `pairId 'p2'` · 둘 다 **`coverZ 3210`** |
+| **3500** | 무기 통 **`auto`** x150 내구 12 | 무기 통 **`heavy`** x330 내구 **24** | **선택 B** `pairId 'p2'` · 둘 다 **`coverZ 3259`** |
 | 3900 | 병사 통 x150 내구 **24** 병사 4 · **`coverZ 3660`** | — | **선택 C 의 저울**(게이트 사격창과 겹친다 — 벽 배제가 아니다) |
 | **4000** | 게이트 좌 **+3(칸 상한 12)** | 게이트 우 **−25(칸 상한 40)** | **선택 C** `armZ 340`, `hint` |
 | 5200 | grunt 14 (2열, 통로 없음) | | 탄막 |
-| 6000~7200 | 분리벽 `w3` x228~252 + 표지(좌: 병사 10 / 우: 없음) | | **선택 D 확정선 `run.z 5940`** |
-| **6300** | 병사 통 x150 내구 20 **병사 10** · **`coverZ 6046`** + shooter 2 (x120 / 190) | (빈 통로 = 안전) | **선택 D** — 오른쪽 고정은 여기서 보상 0 |
+| 6000~7200 | 분리벽 `w3` x228~252 + 표지(좌: 병사 10 / 우: **'?' 랜덤 길**) | | **선택 D 확정선 `run.z 5940`** |
+| **6300** | 병사 통 x150 내구 20 **병사 10** · **`coverZ 6094`** + shooter 2 (x120 / 190) | **랜덤 길(3-9)** — 판마다 5종 중 1개(병사 8 / 중화기 / 연속 증원 / −15 게이트 / **−10 확정 게이트**) | **선택 D** — r3.4 이사 지시로 '빈 길' → '아는 쪽 vs 로또' |
 | 8000 | rusher 6 (xs 100/160/210/270/320/380) | | |
 | 8800 | grunt 18 (2열) + shooter 3 (130/240/350) | | |
 | 10600 | 정예 hp 500 · 4s 마다 잡졸 2 소환 | | |
 | length 11000 | | | |
 
 **구조적으로 배타적인 경로 변경 = 3회**(A·B·D, 벽 + `coverZ`) **+ 사격창 저울 1회**(C). 검수가 요구한 "S3 최소 2회"를 넘긴다.
+
+**선택 D 는 r3.4 에서 '랜덤 길'이 됐다(§3-9).** 이전의 우측 빈 통로는 보상 0 이라 **고르지 않는 것이 항상 옳았고**, 그래서 선택이 아니었다(이사 지시 2026-09-16). 지금은 좌 = **아는 보상**(병사 10, 대신 저격수 2), 우 = **모르는 보상**(균등 1/5 로 좋음 3 : 꽝 2)이다. 배제 구조(벽 `w3` + `coverZ 6094`)는 그대로라 **한쪽만 얻는다**는 성질도 그대로다. 꽝 2 는 둘 다 실제 손해다 — ④ 는 화력으로 0 까지 막을 수 있고, ⑤ 는 **막을 수 없는 −10**이다(실측: 벽을 빠져나온 자리에서 좌 79 vs 우 59, 세 난이도 모두 게이트 손실 10).
 
 **선택 C 는 배제가 아니라 저울이다.** 통(z3900)의 `coverZ 3660` 은 게이트 셔터 개방선(`4000 − 340`)과 같은 값이라, 통과 게이트 우 칸이 **같은 사격창을 나눠 쓴다**. 다만 이 저울은 **병력 상한 안에서만** 성립한다 — 소총 30 / 기관총 12 / 중화기 25 를 넘는 대군은 창 안에서도 탄이 남아 **통과 +40 을 둘 다 가져간다**. "1발 = +1, 숨은 감쇠 없음"을 지키는 한 피할 수 없으므로 감추지 않고 적는다(`V3-SIM-POLICY POL-9` 는 이 경우를 실패시키지 않고 기록한다).
 
@@ -322,10 +382,12 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
 - 렌더는 `view.now`(셸 시계)만 쓰고 `performance.now()`를 직접 읽지 않는다. DPR 반영(백킹스토어 = CSS 크기 × min(devicePixelRatio, 2)).
 - HUD 상단: `STAGE n 제목` + 목표(남은 거리 m, 정예 등장 후 정예 HP 막대+숫자). 부대 발밑: 병력 수. 우상단: 무기 아이콘·이름. **무기 칩 왼쪽 옆(x 222~286)에 난이도 태그 — 어려움·극한만**(`BAL3.difficulty[id].short`, normal 은 빈 문자열이라 안 그린다). 부대 중심 표시(작은 삼각 마커 — 게이트 칸 판정 기준). 적 HP 태그의 기준 hp(잡졸은 다쳤을 때만 표시)는 `run.enemyDefs` 를 읽는다.
 - 첫 플레이 안내: 출격 후 3초간 "좌우로 드래그 · 쏴서 숫자를 키우세요" 한 줄(모든 코스 버전·난이도 칸의 attempts 합이 0 일 때만).
-- **타이틀 난이도 토글(r3.3)**: 스테이지 버튼(y 436~) 바로 위 한 줄 — 라벨 "난이도" + 칸 3개(보통/어려움/극한, `main.DIFF_TOGGLE`: x 138 + i×96, y 382, 90×34, 버튼 id `diff_<id>`). 고른 칸 = primary. **클릭 또는 키 1/2/3**(타이틀에서만 — 판 도중 숫자 키는 무시). **저장에 난이도가 없으면(첫 방문·옛 저장) 처음 켜져 있는 칸은 '극한'**(`DEFAULT_PICK_DIFFICULTY`, 2026-09-16 이사 결정 — §3-8 '두 가지 기본값'). 규칙 기본 `DEFAULT_DIFFICULTY = normal` 과는 다른 값이며, 셸 `normDifficulty` 는 모르는 값도 이 초기 선택으로 떨어뜨린다. 선택은 저장 최상위 `difficulty` 에 기억되고, 스테이지 버튼의 기록(sub: 완료·최고·도전 횟수)은 **그 난이도 칸의 기록**이다. 출격은 `buildStage(id, { difficulty })` 로, 그 뒤로는 `run.difficulty` 가 진실(재도전·다음 작전도 같은 난이도).
+- **타이틀 난이도 토글(r3.3)**: 스테이지 버튼(y 436~) 바로 위 한 줄 — 라벨 "난이도" + 칸 3개(보통/어려움/극한, `main.DIFF_TOGGLE`: x 138 + i×96, y 382, 90×34, 버튼 id `diff_<id>`). 고른 칸 = primary. **클릭 또는 키 1/2/3**(타이틀에서만 — 판 도중 숫자 키는 무시). **저장에 난이도가 없으면(첫 방문·옛 저장) 처음 켜져 있는 칸은 '극한'**(`DEFAULT_PICK_DIFFICULTY`, 2026-09-16 이사 결정 — §3-8 '두 가지 기본값'). 규칙 기본 `DEFAULT_DIFFICULTY = normal` 과는 다른 값이며, 셸 `normDifficulty` 는 모르는 값도 이 초기 선택으로 떨어뜨린다. 선택은 저장 최상위 `difficulty` 에 기억되고, 스테이지 버튼의 기록(sub: 완료·최고·도전 횟수)은 **그 난이도 칸의 기록**이다. 출격은 `buildStage(id, { difficulty, lotterySeed })` 로, 그 뒤로는 `run.difficulty` 가 진실(재도전·다음 작전도 같은 난이도). **`lotterySeed = hashSeed('lot:' + id + ':' + attempts + ':' + dateNow())`** — 판마다 다르다(§3-9, `deps.dateNow` 로 주입 가능).
 - 게이트: 칸 사각형 + 부호 숫자(큰 글씨) + 색. 피격 시 흰 플래시·숫자 튐. 통과 뒤 흐리게.
 - **게이트 셔터(r3)**: `armed === false`인 행은 칸 위에 **회색 빗금 셔터 판**을 덮고 숫자를 **보이되 흐리게** 그린다(무엇이 걸린 판인지 미리 읽게 한다). 도로 위 `run.z + armZ` 위치에 **사격 개시선**(행 색 점선 1줄)을 그려 "여기서부터 쏠 수 있다"를 가르친다. `gateArm` 이벤트 → 셔터 판이 `BAL3.gate.openT`(0.25초) 동안 위로 걷히는 연출 + 효과음 `gateOpen` **1회**. `gateBlock` → 셔터 표면에 작은 **회색** 튐(피격 흰 플래시와 구분). 셔터 연출 타이머는 규칙이 아니라 셸 `fx.gateOpen[rowId]` 가 갖는다(`fx.gateFlash` 와 같은 방식).
 - **보급 차폐·통로 표지(r3)**: `run.z < s.coverZ` 인 통은 회색 막을 덮고, 도로 위 `coverZ` 위치에 **개방선**(청록 점선)을 그린다. 벽의 **확정선**(`z0 − 60`)은 회색 실선으로 따로 그려 **"통로가 정해지고 잠시 뒤에 차폐가 걷힌다"**를 화면에 남긴다(두 줄의 색이 다르다). 벽 앞머리(`z0`)에는 `wall.signs` 를 좌·우 아이콘+숫자로 그린다.
+- **확정 손실 칸(r3.4 수정 라운드 2)**: 칸의 `maxValue`가 자기 값 이하이고 값이 음수면(= 쏴도 오르지 않는 칸, 랜덤 길 ⑤) 숫자 아래에 같은 색 **'확정' 꼬리표**를 붙인다. 흰 플래시는 그대로 나되 숫자가 안 움직이는 이유를 화면에 남기기 위한 것이다.
+- **랜덤 길(r3.4, §3-9)**: 벽 `w3` 앞머리의 우측 표지는 금색 **'?' + '랜덤'**. 확정선(`run.lottery.revealZ`) 전에는 우측 통로의 실제 물체(통 또는 게이트 행)를 **그리지 않고** 금색 테두리의 회색 **'?' 상자**로 덮는다(`drawLotteryBox`). 확정을 넘는 프레임에 셸이 `fx.lotOpen = BAL3.lottery.openT`(0.25s)를 켜고 상자가 옅어지며 걷힌다. 같은 프레임에 효과음 **1회** — 좋음 `gateFlip` / 꽝 `hurt` 재사용(`fx.lotSeen` 으로 한 번만). 결과 화면에는 제목 아래(y 212)에 금색 **랜덤 길 한 줄**(`lotteryLine`)을 제안 한 줄과 **별도 줄**로 그린다. 무기 통이 동급이라 교체되지 않은 판은 셸이 `fx.lotSame` 을 켜 문구가 '획득'이라 거짓말하지 않게 한다.
 - **`skipped` 통(r3)**: '밀려나며 사라지는' `missed` 연출과 달리 **흐려지며 뒤로 빠진다**(실수가 아니라는 신호). 떠오르는 문구도 '놓침'이 아니라 '다른 길'.
 - 보급: 통 그림(기존 SUPPLY 스프라이트 재사용) 위에 내용물(병사 실루엣 n / 무기 아이콘 / 파란 설비) + 내구 숫자. 파괴 시 보상 팝(0.5초 떠오른 뒤 부대로 흡수). chain 발판은 파란 발판 열 + 각 발판 "+1".
 - 벽: 도로 위 회색 분리대(상단 하이라이트). 정예 등장: 0.8초 "정예 접근!" 경고 배너 + 효과음.
@@ -350,7 +412,7 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
   - **자동반복 keydown은 입력이 아니다**: 브라우저가 키를 누르고 있는 동안 보내는 `e.repeat` keydown은 셸(`main.js`)이 걸러 `input.onKey`로 넘기지 않는다(조향 키면 브라우저 기본 동작만 계속 막는다). 최초 1회만 `pointerX`를 해제하므로 **"키를 누른 채 마우스를 움직이면 마우스가 이긴다"가 실제 브라우저에서도 성립한다**(반복까지 넘기면 초당 수십 회 `pointerX`가 다시 지워져 이 규칙이 깨진다). ESC·Space·Enter의 반복도 같은 자리에서 걸러져 동작을 다시 일으키지 않는다.
   - **드래그 우선**: 드래그가 시작되면 `pointerX = null` + `keyDir = 0`(눌린 키 해제)이고, **드래그 중 키 입력은 방향에 반영하지 않는다**(아는 키면 셸에는 `true`로 알려 기본 동작만 막는다). 드래그 중 마우스 이동·둘째 손가락은 기존대로 무시. 드래그가 끝난 뒤 키를 다시 누르면 키 조작이 재개된다.
 - 루프(`makeLoop`): `acc = min(acc + dt, 5·STEP)`(초과 폐기), 일시정지 진입·해제 시 `acc = 0, last = now`, run 상태가 아닌 프레임은 acc 갱신 없음. 프레임당 최대 5 STEP. `window.__rush3Dbg()`로 `{state, stageId, difficulty, z, x, units, weapon, boss, enemies, bullets}` 노출(`difficulty` = 판 중이면 `run.difficulty`, 타이틀이면 고른 값).
-- 오디오 이벤트: fire(무기별, 프레임 1회, 볼륨 = min(1, 0.4 + count/40)), crateHit, crateBreak, gateTick, gateFlip, **gateOpen(셔터 열림, 행마다 1회)**, joinMany(3명 이상 합류), weaponSwap, hurt, kill, elite, win, lose. `gateBlock`·`supplyBlock` 은 **소리 없이** 화면 튐만.
+- 오디오 이벤트: fire(무기별, 프레임 1회, 볼륨 = min(1, 0.4 + count/40)), crateHit, crateBreak, gateTick, gateFlip, **gateOpen(셔터 열림, 행마다 1회)**, joinMany(3명 이상 합류), weaponSwap, hurt, kill, elite, win, lose. `gateBlock`·`supplyBlock` 은 **소리 없이** 화면 튐만. **랜덤 길 공개(r3.4)는 판당 1회** — 좋음이면 `gateFlip`, 꽝이면 `hurt` 를 재사용한다(새 파일 없음).
 
 ## 7. 저장(`save.js`)
 
@@ -387,11 +449,13 @@ scroll = 190 (balance.js)   ·   vzMin = 650 (가장 느린 탄 = heavy.vz)
 - V3-DETERMINISM: STEP 인덱스별 입력열 하나를 30/60/120Hz dt 열에 얹어 `makeLoop`로 돌려 STEP 수·최종 상태 동일; dt 3초 프레임 1개 → 정확히 5 STEP, 이어지는 16.7ms → 1 STEP.
 - V3-PURE: `rush3/{combat,gates,supply,squad,weapons,**advice**,stages}.js` 소스에 `Math.random`·`rng` import가 없다(정적 검사 — 소스 정규식 대조는 이 1건뿐). `stages.js` 만 빌드 시점 좌표 확정용 rng 를 쓴다.
 - V3-STAGES: 행별 칸 합집합(bypass 아닌 행 80~400 완전 피복), 적 스폰 좌표가 벽 안에 없음, 첫 물체 z ≥ 1100, 정예 z < length.
-- **V3-GATE-ARM(r3, `ARM-1~7`)**: 닫힌 셔터(전방 341px)에 탄 10발 → 값 불변·탄 전부 흡수·`gateBlock` 10 / `gateHit` 0; `row.z − run.z <= 340`이 되는 STEP에 `gateArm` **정확히 1회**; `armed` 뒤에는 1발 = +1(상한·`gateFlip` 그대로); `armZ: null` 행은 생성 직후 `armed`이고 `gateArm` 없음; 스테이지별 지정(S1 g1 = null, 나머지 340); **실측 회귀** 소총 1명 5발·기관총 1명 9발(±1); 셔터가 닫힌 동안 셔터보다 **먼** 적은 안 맞고 가까운 적은 정상 피격.
+- **V3-GATE-ARM(r3, `ARM-1~7`)**: 닫힌 셔터(전방 341px)에 탄 10발 → 값 불변·탄 전부 흡수·`gateBlock` 10 / `gateHit` 0; `row.z − run.z <= 340`이 되는 STEP에 `gateArm` **정확히 1회**; `armed` 뒤에는 1발 = +1(상한·`gateFlip` 그대로); `armZ: null` 행은 생성 직후 `armed`이고 `gateArm` 없음; 스테이지별 지정(S1 g1 = null, 코스 행은 전부 340, **랜덤 길이 뽑은 게이트 행만 `z − openZ`**); **실측 회귀** 소총 1명 5발·기관총 1명 9발(±1); 셔터가 닫힌 동안 셔터보다 **먼** 적은 안 맞고 가까운 적은 정상 피격.
 - **V3-SIM-POLICY(r3, `POL-1~9`)**: 8정책(center·center±1·left·right·sway·**aim**(탐욕)·**plan**(계획)) × 3스테이지 = **24판**을 `createRun/stepRun` 으로 돌린다(입력은 `{pointerX}` 만, 한 판 상한 14,400 STEP). ① 24판 전부 상한 안 종료 ② S1 `center` 성공 유지 ③ S2 `center` 실패·`plan`·`aim` 성공 ④ S2 `aim` 은 벽 쌍 중 정확히 1개만 `opened`·나머지 `skipped` ⑤ S3 `plan.peak >= 1.25 × max(left, right)` ⑥ 화력 지수(생존 × 무기 초당 dmg: rifle 2 / auto 4 / heavy 5)에서도 같은 배수 ⑦ **조합 금지**(고정 정책 5종은 연속증원 + 우 칸 상한, 중화기 + z6300 통을 동시에 못 얻는다 — 개수 상한이 아니다) ⑧ `plan.peak > sway.peak` 이고 `plan.peak >= aim.peak`, 구분 축은 **z4000 게이트 칸 선택**(탐욕 봇은 값이 큰 좌 +3, 계획 봇은 상한이 큰 우 −25 → +40) ⑨ **선택 C 저울**(3900 통을 열고도 우 칸 상한을 채운 판은 병력 상한 초과 예외로 기록만).
   > 이 표는 **봇 정책의 결과**다. **자동 시뮬 결과를 사람의 성공률로 옮겨 적지 않는다.** 1판 결정적 시뮬이라 분포도 아니다.
-- **V3-SUPPLY-PAIR / COVER(r3)**: `PAIR-1` 쌍 중 하나를 열고 다른 하나를 지나면 `skipped`(파트너를 연 STEP이 아니라 **통 z를 지나는 STEP에만 1회**, 지나간 chain은 `locked`); `PAIR-2` 벽·차폐 없는 쌍은 둘 다 `missed`; `PAIR-3` 짝도 벽도 없으면 종전대로; `PAIR-4` 실제 S3 의 `p1`·`p2` 가 8정책 전부에서 최대 1개 + 합성 쌍(병력 5·10·15·25·40)도 최대 1개이고 **벽을 빼면 둘 다 열린다(대조군)**; `PAIR-4b` **확정 직전 대시 정책**(구간별 목표 x 스크립트를 `T = commitZ − 400 … commitZ` 로 훑고 좌→우·우→좌 양방향)에서도 동시 개봉 0건; `PAIR-4c` 배제 쌍의 `coverZ` 가 비행시간 보정선 공식과 정확히 같다(무기가 추가돼 `vzMin` 이 내려가면 **이 검사가 먼저 실패한다**); `PAIR-5` 우 통로를 고르고 우 통을 못 깨면 좌 `skipped` · 우 `missed`; `COVER-1` 차폐 앞 탄 20발 → 내구 불변·전부 흡수·`supplyBlock` 20; `COVER-2` 개방 뒤 정상 개봉; `COVER-3` `coverZ` 가 null 이면 현행과 동일.
-- **V3-STAGES 갱신(r3, `STG-1~9`)**: 세 스테이지 `version === 2`; 모든 게이트 행에 `armZ`(number|null)·`armed` 초기값; **좌우 분산**(통·칸 x 가 양쪽에 존재); **배제 쌍의 형식**(같은 `pairId` 정확히 2개·좌우 1개씩·둘 다 벽 활성 구간 안·`coverZ` 가 **공식 값**(확정선이 아니다)·통 z ≤ `wall.z1 − 4`·`coverZ < s.z`·한쪽 통로에서만 닿는 형상); **표지와 내용 일치**; **회피 통로**(`corridorHw != null` 인 무리는 가장자리 간격 ≥ `2 × corridorHw + 10` 인 틈이 열마다 1개 이상); 스폰마다 `corridorHw` 필드; **인접한 두 벽 사이 이동 여유 ≥ 137px**.
+- **V3-SUPPLY-PAIR / COVER(r3)**: `PAIR-1` 쌍 중 하나를 열고 다른 하나를 지나면 `skipped`(파트너를 연 STEP이 아니라 **통 z를 지나는 STEP에만 1회**, 지나간 chain은 `locked`); `PAIR-2` 벽·차폐 없는 쌍은 둘 다 `missed`; `PAIR-3` 짝도 벽도 없으면 종전대로; `PAIR-4` 실제 S3 의 `p1`·`p2` 가 8정책 전부에서 최대 1개 + 합성 쌍(병력 5·10·15·25·40)도 최대 1개이고 **벽을 빼면 둘 다 열린다(대조군)**; `PAIR-4b` **확정 직전 대시 정책**(구간별 목표 x 스크립트를 `T = commitZ − 400 … commitZ` 로 훑고 좌→우·우→좌 양방향)에서도 동시 개봉 0건; `PAIR-4c` **`coverZ` 를 가진 모든 통**(배제 쌍 4 + 짝 없는 좌 통 `c9` + 랜덤 길 통 — 통이 나오는 시드로 S3 판을 더 만들어 함께 본다)의 `coverZ` 가 비행시간 보정선 공식(**1 STEP 지연 + 대형 깊이 `MAX_DY` 포함**)과 정확히 같고 검사한 통 개수까지 고정한다. **벽 밖 `coverZ` 는 선택 C 의 z3900 통(`c8`, 게이트 z4000 과 사격창을 나눠 쓰는 '저울' → 차폐선 = `4000 − gate.armZ` = 3660) 하나만 예외**로 허용한다(무기가 추가돼 `vzMin` 이 내려가거나 `unitCap` 이 올라가면 **이 검사가 먼저 실패한다**); `PAIR-5` 우 통로를 고르고 우 통을 못 깨면 좌 `skipped` · 우 `missed`; `COVER-1` 차폐 앞 탄 20발 → 내구 불변·전부 흡수·`supplyBlock` 20; `COVER-2` 개방 뒤 정상 개봉; `COVER-3` `coverZ` 가 null 이면 현행과 동일.
+- **V3-STAGES 갱신(r3, `STG-1~9`)**: 세 스테이지 `version === 2`; 모든 게이트 행에 `armZ`(number|null)·`armed` 초기값; **좌우 분산**(통·칸 x 가 양쪽에 존재); **배제 쌍의 형식**(같은 `pairId` 정확히 2개·좌우 1개씩·둘 다 `coverZ` 와 벽 활성 구간을 함께 가짐) + **`coverZ` 를 가진 모든 통**(`pairId` 가 없는 `c9`·랜덤 길 통 포함)이 `coverZ` 가 **공식 값**(확정선이 아니다 — 1 STEP 지연·대형 깊이 포함)·통 z ≤ `wall.z1 − 4`·`coverZ < s.z`·한쪽 통로에서만 닿는 형상을 지킴(벽 밖 예외는 `c8` 하나, 검사한 통 개수도 고정); **표지와 내용 일치**; **회피 통로**(`corridorHw != null` 인 무리는 가장자리 간격 ≥ `2 × corridorHw + 10` 인 틈이 열마다 1개 이상); 스폰마다 `corridorHw` 필드; **인접한 두 벽 사이 이동 여유 ≥ 137px**.
+- **V3-LOTTERY(r3.4, `LOT-1~10b`, `tests/rush3-lottery.test.mjs`)**: `LOT-1` 시드를 고정하면 `buildStage(3,{lotterySeed})` 두 번이 deepEqual(호출마다 새 객체)·시드를 생략하면 `LOTTERY_DEFAULT_SEED` 기준선·S1·S2 는 `stage.lottery === null`·시드 20개에서 서로 다른 결과가 나온다; `LOT-2` **시드 20개에서 풀 5종이 전부 최소 1회** 등장하고 풀 밖 결과가 없다(`idx` = 풀 인덱스, 좋음 3 : 꽝 2); `LOT-2b` **검사용 대표 시드 표 `SEED_OF` 의 키가 풀 id 와 정확히 일치**하고 각 시드가 실제로 그 항목을 뽑는다 + 좋음 3 / 꽝 2 의 **id 목록**을 고정한다 — 풀에서 항목을 빼거나 이름을 바꾸면 `SEED_OF[없는 id]` 가 `undefined` 가 되어 `buildStage` 가 **기본 시드로 조용히 폴백**하고, 그 루프는 다른 판을 한 번 더 검사하면서 통과해 버린다(2026-09-17 검수 지적 1: 삭제된 `rusher4` 를 돌던 꽝 2종 루프가 `badGate` 를 두 번 보고 `trapGate` 를 한 번도 안 봤다). `stageFor`·`LOT-7` 에도 `assert.ok(SEED_OF[id])` 가 붙어 있다; `LOT-3` **확정선 전 사격은 흡수**되고 내구·게이트 값이 불변(`supplyBlock` 20 / `gateBlock` 10, `supplyHit`·`gateHit` 0)이며 차폐·셔터가 열린 뒤에는 정상 처리(`gateArm` 정확히 1회) — 통 3종의 `coverZ`·게이트의 셔터 개방선이 **둘 다 `revealZ` 보다 뒤**임을 함께 잠근다; `LOT-4` 좋음 3종 보상(병사 통 내구 14 → 정확히 +8 · 중화기 내구 24 → 교체, 이미 heavy 면 `weaponSame` · 연속 증원 내구 8 → 발판 6 에서 최대 12 까지, 발판 x 330 = 우측 차선); `LOT-5` 꽝 게이트 `[252,400)` −15·상한 0 — 유효탄 15발에 0(gateFlip 1회)·그 뒤로 0 고정·0 통과는 무효과, 안 쏘고 통과하면 `|value| = 15` 손실(`badGatesPassed` 1); `LOT-3b` **실사격 회귀(양방향)** — ① 확정 직전까지 `x 239`에서 중화기로 쏘다가 **좌측**으로 확정하는 판(대형 80)을 시드 5종에서 돌려 반대편 랜덤 길에 `supplyHit`·`supplyOpen`·`gateHit` 가 **0건**임을 확인한다(**대조군**: 같은 판의 차폐선을 옛 공식으로 되돌리면 3건 이상 뚫린다). ② `x 241`에서 쏘다가 **우측(랜덤 길)** 으로 확정하는 판에서 **좌 통 `c9`** 에 `supplyHit`·`supplyOpen` 이 **0건**이다 — 대형을 상한(`squad.unitCap` 150)까지 채워야 공식이 전제한 `MAX_DY` 깊이가 나오고, **대조군**으로 `run` 객체의 `c9.coverZ` 만 옛 값 `6046` 으로 바꾸면 시드 5종 **전부**에서 뚫린다(내구 20 → 11). 공식 일치만 보는 검사로는 못 잡는 경로다; `LOT-6` 꽝 ⑤ 확정 손실 게이트 `[252,400)` −10·상한 −10 — 셔터가 열린 뒤 40발을 넣어도 값이 그대로이고(`gateFlip` 0 · `gateHit` 40) 통과하면 정확히 10 을 잃는다, `LOT-6b` **난이도 3종(보통·어려움·극한) 전부** 우측 통로를 고른 판은 `lossByGate === 10`·좌측 선택보다 벽 끝(z 7200) 병력이 **15 이상 적다**·그래도 완주는 된다(결과표는 `t.diagnostic`); `LOT-7` **좌측 통로를 고르면 랜덤 길 통은 `skipped`(`missed` 아님)** 이고 결과 한 줄이 이번 판 내용을 공개, `LOT-7b` 우측을 고르면 획득/꽝/동급 무기 문구가 그대로 나오고 좌 통(c9)이 `skipped` 가 된다; `LOT-8` **`stepRun` 이후 소스에 `lottery`·'랜덤 길' 참조 없음**(정적) + 규칙 모듈 6개에 `Math.random`·rng import 없음; `LOT-9` **봇 회귀** — S3(normal) 시드 5종에서 `plan`·`aim` 완주 유지, `center` 실패 유지, `plan` 은 매번 w3 좌측이고 생존·최고·무기가 시드와 무관하게 같다(결과표는 `t.diagnostic`); `LOT-10` **`w3` 구간(z 5400~7200) 통·게이트의 `hint` 에 빈 길 시절 표현이 없다**(`빈 길`·`아무것도 없`·`보상 0`·`안전하지만`) + 표지 `signs.R.kind === 'lottery'` 와 좌 통 `hint` 의 '랜덤 길' 이 함께 있다, `LOT-10b` 좌 통을 놓친 판의 `adviceLine` 이 그 `hint` 를 그대로 내보낸다(문구가 죽은 데이터가 아님을 실제 출력 경로로 확인).
+- **V3-SHELL-LOTTERY(r3.4, `tests/rush3-loop.test.mjs`)**: 셸의 시드 조립 결선. `deps.dateNow` 를 고정해 ① 같은 시각·같은 `attempts` 면 시드·추첨·결과 한 줄이 재현되고 ② 시각이 다르면 시드가 달라지며 ③ **재도전(같은 시각, `attempts` +1)도 새 시드**를 받고 ④ 시각 12개에서 시드 12개·추첨 2종 이상이 나오며 어느 판도 `LOTTERY_DEFAULT_SEED` 로 고정되지 않는다. **규칙 계층 검사(V3-LOTTERY)는 시드를 직접 넣으므로 이 결선이 빠지면 `main.js` 에서 `lotterySeed` 인자를 지워도 전부 통과한다** — '판마다 다르다'를 잠그는 것은 이 검사뿐이다.
 - **V3-GRUNT-STRAIGHT(r3)**: `grunt.track === 0`이고, 부대가 좌우로 크게 움직여도 잡졸 `x` 가 변하지 않는다.
 - **V3-HINT(r3, `tests/rush3-advice.test.mjs`)**: `adviceLine(run, stage)` 이 6장 우선순위대로 결정적으로 고르고, **`skipped` 통은 후보에서 제외**되며, 실제 배치의 통·게이트가 `hint` 문구를 갖는다.
 - V3-SIM: 봇(가장 가까운 통/양수 칸 차선으로 tx 이동) S1·S2·S3 완주; 무조작 봇(tx 240 고정) S1 완주; 정예 격파 후 1 STEP 안에 won.
