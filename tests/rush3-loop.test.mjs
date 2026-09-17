@@ -1,10 +1,10 @@
 // rush3-loop — 셸 묶음(계약서 8장 V3-DETERMINISM·V3-INPUT + boot 스모크). DOM 없이 main.js 를 import 한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hitButton, makeLoop, boot, missedLine, timeText, DIFF_TOGGLE, normDifficulty } from '../rush3/main.js';
+import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine, DIFF_TOGGLE, normDifficulty } from '../rush3/main.js';
 import { createInput } from '../rush3/input.js';
 import { createRun, stepRun, STEP } from '../rush3/combat.js';
-import { buildStage, stageVersion, DEFS } from '../rush3/stages.js';
+import { buildStage, stageVersion, DEFS, LOTTERY_DEFAULT_SEED } from '../rush3/stages.js';
 import { createSave3 } from '../rush3/save.js';
 import { BAL3 } from '../rush3/balance.js';
 
@@ -645,4 +645,55 @@ test('V3-SAVE-VERSION DIFF 새 사용자: 저장이 없으면 타이틀 초기 �
   texts.length = 0;
   frames(1);
   assert.ok(!texts.includes('어려움') && !texts.includes('극한'), 'normal HUD 에는 난이도 표기가 없다: ' + JSON.stringify(texts));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-SHELL-LOTTERY — 랜덤 길 시드 결선(계약서 3-9). 규칙 계층 검사(V3-LOTTERY)는 시드를 직접 넣어 보지만,
+//  '판마다 다르다'를 만드는 것은 셸의 시드 조립(stageId·attempts·dateNow)이라 여기서만 잠글 수 있다.
+//  이 검사가 없으면 main.js 에서 lotterySeed 인자를 지워도 다른 검사가 전부 통과하고, 실게임은 기본 시드 하나에 고정된다.
+// ─────────────────────────────────────────────────────────────────────────────
+async function bootLot(dateNow, storage = fakeStorage()) {
+  const queue = [];
+  const save = createSave3(storage);
+  const app = boot(fakeCanvas([]), { win: null, doc: null, raf: (f) => queue.push(f), now: () => 0,
+    save, audio: fakeAudio(), dateNow, sprites: { get: () => null, ready: new Set() } });
+  await app.ready;
+  return { app, save, storage };
+}
+//  한 판 출격하고 그 판의 랜덤 길 정보를 돌려준다(결과 화면 한 줄도 같은 run.lottery 를 읽는다)
+async function lotOf(t, storage) {
+  const { app } = await bootLot(() => t, storage);
+  app.startRun(3);
+  const run = app.getRun();
+  return { seed: run.lottery.seed, pick: run.lottery.pick, line: lotteryLine(run, {}) };
+}
+
+test('V3-SHELL-LOTTERY: 셸이 시계·재도전 횟수로 시드를 만든다 — 같은 시각은 재현, 시각·재도전이 바뀌면 시드가 바뀐다', async () => {
+  const T = 1_700_000_000_000;
+  //  ① 같은 dateNow · 같은 attempts(각각 새 저장) → 같은 시드·같은 추첨·같은 결과 한 줄
+  const a = await lotOf(T), b = await lotOf(T);
+  assert.equal(a.seed, b.seed, '같은 시각·같은 재도전 횟수면 시드가 재현된다');
+  assert.equal(a.pick, b.pick);
+  assert.equal(a.line, b.line);
+  //  ② 시각만 바꾸면 시드가 달라진다
+  const c = await lotOf(T + 1);
+  assert.notEqual(c.seed, a.seed, '시각이 다르면 시드가 달라져야 한다');
+  //  ③ [다시 도전] — 같은 시각이라도 attempts 가 오르면 시드가 바뀐다(계약서 3-9 = 재도전 동일 배치의 명시적 예외)
+  const { app } = await bootLot(() => T);
+  app.startRun(3);
+  const first = app.getRun().lottery.seed;
+  app.startRun(3);
+  const second = app.getRun().lottery.seed;
+  assert.equal(first, a.seed, '첫 출격은 새 저장 기준선과 같다');
+  assert.notEqual(second, first, '재도전은 새 시드를 받는다');
+  //  ④ 기본 시드에 고정돼 있지 않고, 시각을 흩뿌리면 실제로 다른 추첨이 나온다(로또가 살아 있다)
+  const picks = new Set(), seeds = new Set();
+  for (let i = 0; i < 12; i++) {
+    const r = await lotOf(T + i * 86_400_000);
+    assert.notEqual(r.seed, LOTTERY_DEFAULT_SEED, '셸이 기본 시드로 고정하면 안 된다');
+    picks.add(r.pick);
+    seeds.add(r.seed);
+  }
+  assert.equal(seeds.size, 12, '시각 12개 → 시드 12개');
+  assert.ok(picks.size >= 2, '시각이 달라도 같은 추첨만 나온다: ' + JSON.stringify([...picks]));
 });

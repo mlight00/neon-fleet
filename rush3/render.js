@@ -209,6 +209,12 @@ export function createRenderer3(ctx, sprites) {
       const numAlpha = 1 - shut * 0.55;
       ctx.globalAlpha = (row.passed ? 0.32 : 0.92) * numAlpha;
       outlinedText(gateLabel(c.value), cx, y, px, flash > 0.5 ? C.gateFlash : col, 'bold', 6);
+      //  확정 손실 칸(상한이 자기 값 = 쏴도 오르지 않는다, 랜덤 길 ⑤): 칸 아래에 '확정' 꼬리표를 붙여 '안 먹히는 이유'를 화면에 남긴다
+      //  ⚠️숫자와 겹치지 않게 칸 **바깥**(아래)에 그린다 — 숫자가 38px 라 칸 안에서는 밑줄이 물린다
+      if (c.value < 0 && c.maxValue != null && c.maxValue <= c.value) {
+        ctx.globalAlpha = (row.passed ? 0.32 : 0.92) * numAlpha;
+        outlinedText('확정', cx, y + vis / 2 + 13, 16, col, 'bold', 4);
+      }
       ctx.globalAlpha = row.passed ? 0.32 : 0.92;
       ctx.textBaseline = 'alphabetic';
       //  셔터 판(회색 빗금). 열리는 동안 위로 걷힌다

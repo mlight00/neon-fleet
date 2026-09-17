@@ -1,7 +1,7 @@
 // rush3-stages — 스테이지 3개 고정 배치·무기 정의·수치 동결을 잠근다(계약서 5·3-4장, V3-STAGES).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STAGE_IDS, buildStage, stageMeta, stageVersion, coverZFor, VZ_MIN } from '../rush3/stages.js';
+import { STAGE_IDS, buildStage, stageMeta, stageVersion, coverZFor, VZ_MIN, MAX_DY, lotteryPick } from '../rush3/stages.js';
 import { WEAPONS, weaponRank, makeBullet } from '../rush3/weapons.js';
 import { BAL3 } from '../rush3/balance.js';
 
@@ -210,29 +210,68 @@ test('V3-STAGES STG-3: 좌우 분산 — 스테이지마다 통·게이트 칸�
   }
 });
 
-test('V3-STAGES STG-4: 배제 쌍의 형식(같은 pairId 2개·좌우 1개씩·벽 안·coverZ 공식·벽 끝 여유·통보다 앞)', () => {
+//  랜덤 길(3-9) 통이 나오는 시드. 기본 시드의 랜덤 길은 **게이트**라 buildStage(3) 만 보면 랜덤 길 통을 한 번도 검사하지 못한다.
+//   정수 시드를 앞에서부터 훑어 풀의 통 종류마다 첫 시드를 고른다(결정적이고 파일 밖 의존이 없다).
+function lotterySupplySeeds() {
+  const want = new Set(BAL3.lottery.pool.filter((p) => p.kind !== 'gate').map((p) => p.id));
+  const out = new Map();
+  for (let seed = 1; seed <= 20000 && out.size < want.size; seed++) {
+    const { entry } = lotteryPick(seed);
+    if (want.has(entry.id) && !out.has(entry.id)) out.set(entry.id, seed);
+  }
+  assert.equal(out.size, want.size, '랜덤 길 통 시드를 못 찾았다: ' + JSON.stringify([...out.keys()]));
+  return [...out];
+}
+
+test('V3-STAGES STG-4: 배제 쌍의 형식(같은 pairId 2개·좌우 1개씩) + 차폐를 가진 모든 통(c9·랜덤 길 통 포함)의 벽·coverZ 공식·여유·통로 배타', () => {
   const vzMin = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
-  for (const id of STAGE_IDS) {
-    const st = buildStage(id);
+  //  ⚠ 옛 ③④는 'pairId 있는 통만' 돌아 S3 좌 통 c9(z6300, coverZ 6094)와 랜덤 길 통이 빠져 있었다
+  //   (c9 를 옛 값 6046 으로 되돌려도 검사 전건이 통과했다 — 2026-09-17 변이 검사). 이제 coverZ 가 있으면 전부 본다.
+  const stages = STAGE_IDS.map((id) => ({ id, st: buildStage(id), tag: 'S' + id }));
+  for (const [pick, seed] of lotterySupplySeeds()) stages.push({ id: 3, st: buildStage(3, { lotterySeed: seed }), tag: 'S3(랜덤 길=' + pick + ')' });
+
+  for (const { id, st, tag } of stages) {
+    //  ①② 배제 쌍의 형식 — 같은 pairId 가 정확히 2개, 좌·우 1개씩. ③ 쌍은 차폐 + 벽을 함께 갖는다
     const pairs = {};
     for (const s of st.supplies) if (s.pairId) (pairs[s.pairId] ??= []).push(s);
     for (const [pid, list] of Object.entries(pairs)) {
-      assert.equal(list.length, 2, 'S' + id + ' ' + pid + ' 은 정확히 2개');                        // ①
-      assert.equal(list.filter((s) => s.x < 240).length, 1, 'S' + id + ' ' + pid + ' 좌 1개');       // ②
-      assert.equal(list.filter((s) => s.x >= 240).length, 1, 'S' + id + ' ' + pid + ' 우 1개');
+      assert.equal(list.length, 2, tag + ' ' + pid + ' 은 정확히 2개');                          // ①
+      assert.equal(list.filter((s) => s.x < 240).length, 1, tag + ' ' + pid + ' 좌 1개');         // ②
+      assert.equal(list.filter((s) => s.x >= 240).length, 1, tag + ' ' + pid + ' 우 1개');
       for (const s of list) {
-        const wall = st.walls.find((w) => w.z0 - LEAD <= s.z && s.z <= w.z1);
-        assert.ok(wall, 'S' + id + ' ' + s.id + ' 이 벽 활성 구간 안에 있어야 한다');                 // ③
-        const commitZ = wall.z0 - LEAD;
-        assert.equal(s.coverZ, Math.ceil(commitZ + (s.z - commitZ) * BAL3.scroll / vzMin),
-          'S' + id + ' ' + s.id + ' coverZ 는 비행시간 보정선(확정선 ' + commitZ + ' 이 아니다)');    // ④
-        assert.ok(s.z <= wall.z1 - 4, 'S' + id + ' ' + s.id + ' 은 벽 끝보다 최소 1 STEP 앞');       // ⑤
-        assert.ok(s.coverZ < s.z, 'S' + id + ' ' + s.id + ' coverZ 는 통보다 앞');                   // ⑥
-        //  통 원이 좌·우 통로 중 정확히 한쪽에서만 닿는다(벽 배제가 실제로 성립하는 형상)
-        const inL = s.x - s.r <= wall.x0, inR = s.x + s.r >= wall.x1;
-        assert.ok(inL !== inR, 'S' + id + ' ' + s.id + ' 은 한쪽 통로에서만 닿아야 한다');
+        assert.ok(s.coverZ != null, tag + ' ' + s.id + ' 배제 쌍에 coverZ 가 없다');              // ③
+        assert.ok(st.walls.some((w) => w.z0 - LEAD <= s.z && s.z <= w.z1), tag + ' ' + s.id + ' 이 벽 활성 구간 안에 있어야 한다');
       }
     }
+    //  ④~⑦ 차폐(coverZ)를 가진 **모든** 통 — pairId 가 없어도(c9·랜덤 길 통) 같은 공식·여유·통로 배타를 지킨다
+    let covered = 0;
+    for (const s of st.supplies) {
+      if (s.coverZ == null) continue;
+      const wall = st.walls.find((w) => w.z0 - LEAD <= s.z && s.z <= w.z1);
+      if (!wall) {
+        //  예외 1건 — 선택 C 의 z3900 통(S3 c8)은 벽이 아니라 **게이트(z4000)와 사격창을 나눠 쓰는 '저울'** 이다.
+        //   차폐선 = 그 게이트의 셔터 개시선(4000 − BAL3.gate.armZ = 3660). 다른 통이 벽 밖에서 coverZ 를 갖는 것은 허용하지 않는다.
+        assert.equal(id, 3, tag + ' ' + s.id + ': 벽 밖 coverZ 는 S3 에만 있다');
+        assert.equal(s.id, 'c8', tag + ' ' + s.id + ': 벽 밖 coverZ 예외는 S3 c8(저울) 하나뿐이다');
+        assert.equal(s.coverZ, 4000 - BAL3.gate.armZ, tag + ' c8 의 차폐선은 게이트 z4000 셔터 개시선');
+        covered++;
+        continue;
+      }
+      //  ④ 비행시간 보정선: 확정선이 아니라 ①1 STEP 지연(확정 판정이 직전 STEP z 로 이뤄진다) + ②대형 깊이(탄 출발 z = run.z - dy)까지 얹은 값
+      const commitZ = wall.z0 - LEAD + BAL3.scroll * BAL3.STEP;
+      assert.equal(s.coverZ, Math.ceil(commitZ + (s.z + MAX_DY - commitZ) * BAL3.scroll / vzMin),
+        tag + ' ' + s.id + ' coverZ 는 비행시간 보정선(확정선 ' + (wall.z0 - LEAD) + ' 이 아니다)');
+      assert.equal(s.coverZ, coverZFor(wall.z0, s.z), tag + ' ' + s.id + ' coverZ 는 stages.coverZFor 과 같다');
+      assert.ok(s.z <= wall.z1 - 4, tag + ' ' + s.id + ' 은 벽 끝보다 최소 1 STEP 앞');            // ⑤
+      assert.ok(s.coverZ < s.z, tag + ' ' + s.id + ' coverZ 는 통보다 앞');                        // ⑥
+      //  ⑦ 통 원이 좌·우 통로 중 정확히 한쪽에서만 닿는다(벽 배제가 실제로 성립하는 형상)
+      const inL = s.x - s.r <= wall.x0, inR = s.x + s.r >= wall.x1;
+      assert.ok(inL !== inR, tag + ' ' + s.id + ' 은 한쪽 통로에서만 닿아야 한다');
+      covered++;
+    }
+    //  검사 대상 개수를 못 박는다 — 통에서 coverZ 를 떼어 내 검사를 빠져나가는 변경을 여기서 잡는다
+    const wantCovered = id === 1 ? 0 : id === 2 ? 2 : (st.lottery && st.lottery.supplyId ? 7 : 6);
+    assert.equal(covered, wantCovered, tag + ': 차폐(coverZ) 통 개수');
   }
   //  S2 는 1쌍, S3 는 2쌍
   assert.equal(new Set(buildStage(2).supplies.filter((s) => s.pairId).map((s) => s.pairId)).size, 1);
@@ -315,9 +354,9 @@ test('V3-STAGES: 통에 coverZ·pairId·hint 필드가 전부 있고 초기 skip
     assert.ok(s.coverZ === null || typeof s.coverZ === 'number');
   }
   //  coverZFor 는 계약서 §3-3 공식 그대로
-  assert.equal(coverZFor(1800, 2300), 1904);
-  assert.equal(coverZFor(2400, 2800), 2475);
-  assert.equal(coverZFor(3150, 3500), 3210);
-  assert.equal(coverZFor(6000, 6300), 6046);
+  assert.equal(coverZFor(1800, 2300), 1953);
+  assert.equal(coverZFor(2400, 2800), 2524);
+  assert.equal(coverZFor(3150, 3500), 3259);
+  assert.equal(coverZFor(6000, 6300), 6094);
   assert.equal(VZ_MIN, 650);
 });

@@ -2,6 +2,7 @@
 // 난수는 빌드 시점 좌표 확정용 hashSeed/mulberry32 만(규칙 진행 중 난수 없음).
 import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
 import { WEAPONS } from './weapons.js';
+import { formation } from './squad.js';
 import { hashSeed, mulberry32 } from '../rush/rng.js';
 
 export const STAGE_IDS = [1, 2, 3];
@@ -13,14 +14,18 @@ const ENTER = BAL3.enterZ;
 const WALL_LEAD = BAL3.squad.wallLead;
 //  가장 느린 탄 속도(현재 heavy 650). coverZ 공식이 여기에 매달려 있다(더 느린 무기를 넣으면 배제가 다시 열린다)
 export const VZ_MIN = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
+//  대형 최대 깊이(유닛 상한까지 채운 대형의 dy 최대). 탄은 부대 중심이 아니라 run.z - dy 에서 출발하므로 그만큼 더 날아간다
+export const MAX_DY = Math.max(...formation(BAL3.squad.unitCap).map((p) => p.dy));
 
-/** 배제 쌍의 차폐 개방선 = '비행시간 보정선'(개정 r3 §3-3).
- *  통로 확정선(commitZ = wall.z0 - 60)에 두면 확정 **직전에 쏜 탄**이 차폐가 걷힌 뒤 반대편 통에 도착해 배제가 뚫린다.
- *  확정 직전에 쏜 가장 느린 탄이 통에 닿는 순간의 run.z 까지 차폐를 유지한다.
- *    coverZ = ceil( commitZ + (s.z - commitZ) × scroll / vzMin ) */
+/** 배제 쌍의 차폐 개방선 = '비행시간 보정선'(개정 r3 §3-3 · 2026-09-17 보정).
+ *  통로 확정선(wall.z0 - 60)에 두면 확정 **직전에 쏜 탄**이 차폐가 걷힌 뒤 반대편 통에 도착해 배제가 뚫린다.
+ *  확정 직전에 쏜 가장 느린 탄이 통에 닿는 순간의 run.z 까지 차폐를 유지한다. 보정 2가지가 함께 들어간다:
+ *   ① 1 STEP 지연 — clampCenter 는 직전 STEP 의 run.z 로 통로를 확정하므로, 아직 제약 없는 대형이 쏘는 마지막 STEP 은 확정선 + scroll×STEP 이다.
+ *   ② 대형 깊이 — 탄 출발 z 는 run.z - dy 라 목표까지 최대 MAX_DY 만큼 더 날아간다(뒷줄 유닛이 쏜 탄이 가장 늦게 닿는다).
+ *    coverZ = ceil( C + (s.z + MAX_DY - C) × scroll / vzMin ),  C = wall.z0 - 60 + scroll × STEP */
 export function coverZFor(wallZ0, supplyZ) {
-  const commitZ = wallZ0 - WALL_LEAD;
-  return Math.ceil(commitZ + (supplyZ - commitZ) * BAL3.scroll / VZ_MIN);
+  const commitZ = wallZ0 - WALL_LEAD + BAL3.scroll * BAL3.STEP;
+  return Math.ceil(commitZ + (supplyZ + MAX_DY - commitZ) * BAL3.scroll / VZ_MIN);
 }
 
 // 표 그대로의 스테이지 정의. z 는 계약서 표의 z(정지물 = 부대 줄에 도달하는 위치, 스폰 = 발동 지점 ev.z)
@@ -61,9 +66,9 @@ export const DEFS = {
     ],
     supplies: [
       //  분리벽 안 필수 선택: 병력(좌) vs 화력(우). 벽 + 차폐(coverZ)가 함께 있어야 배제가 성립한다
-      { z: 2300, x: 120, kind: 'soldier', durability: 6, n: 3, pairId: 'w1', coverZ: 1904,
+      { z: 2300, x: 120, kind: 'soldier', durability: 6, n: 3, pairId: 'w1', coverZ: 1953,
         hint: '분리벽 왼쪽 통로에는 병사 3명이 있습니다. 벽 앞 표지를 보고 미리 차선을 고르세요' },
-      { z: 2300, x: 326, kind: 'weapon', durability: 12, weapon: 'auto', pairId: 'w1', coverZ: 1904,
+      { z: 2300, x: 326, kind: 'weapon', durability: 12, weapon: 'auto', pairId: 'w1', coverZ: 1953,
         hint: '분리벽 오른쪽 기관총을 확보하면 다음 무리를 빨리 정리할 수 있어요' },
       { z: 5800, x: 150, kind: 'soldier', durability: 15, n: 5,
         hint: '두 번째 게이트에서 오른쪽을 골랐다면 이 통은 왼쪽으로 옮겨야 얻습니다' },
@@ -90,21 +95,21 @@ export const DEFS = {
       { z: 1500, x: 320, kind: 'soldier', durability: 5, n: 2, hint: '오른쪽 통으로 한 번 옮겨 보세요' },
       { z: 1900, x: 160, kind: 'soldier', durability: 6, n: 3, hint: '다시 왼쪽입니다. 통이 보이기 시작할 때 옮기면 늦지 않습니다' },
       //  선택 A: 연속증원(좌, 최대 15명이지만 좌측 차선에 묶인다) vs 즉시 병사 5(우, 자유롭다)
-      { z: 2800, x: 150, kind: 'chain', durability: 10, pads0: 5, maxPads: 15, pairId: 'p1', coverZ: 2475,
+      { z: 2800, x: 150, kind: 'chain', durability: 10, pads0: 5, maxPads: 15, pairId: 'p1', coverZ: 2524,
         hint: '왼쪽 증원 설비는 최대 15명까지 자라지만 발판이 왼쪽 차선에 깔립니다' },
-      { z: 2800, x: 330, kind: 'soldier', durability: 10, n: 5, pairId: 'p1', coverZ: 2475,
+      { z: 2800, x: 330, kind: 'soldier', durability: 10, n: 5, pairId: 'p1', coverZ: 2524,
         hint: '오른쪽 통은 병사 5명을 즉시 줍니다. 대신 성장 상한이 없습니다' },
       //  선택 B: 기관총(좌, 게이트 효율 2배) vs 중화기(우, 적 처리·정예전). 중화기를 고르면 발판 9개를 버린다
-      { z: 3500, x: 150, kind: 'weapon', durability: 12, weapon: 'auto', pairId: 'p2', coverZ: 3210,
+      { z: 3500, x: 150, kind: 'weapon', durability: 12, weapon: 'auto', pairId: 'p2', coverZ: 3259,
         hint: '기관총은 게이트에 넣는 탄이 소총의 두 배입니다' },
-      { z: 3500, x: 330, kind: 'weapon', durability: 24, weapon: 'heavy', pairId: 'p2', coverZ: 3210,
+      { z: 3500, x: 330, kind: 'weapon', durability: 24, weapon: 'heavy', pairId: 'p2', coverZ: 3259,
         hint: '중화기는 적 처리와 정예전에 강하지만 게이트 효율은 가장 낮습니다' },
       //  선택 C 의 다른 한쪽 — 게이트 사격창(z3660 개시)과 같은 창을 나눠 쓴다
       { z: 3900, x: 150, kind: 'soldier', durability: 24, n: 4, coverZ: 3660,
         hint: '이 통과 게이트 오른쪽 칸은 같은 사격 시간을 나눠 씁니다. 둘 다 노리면 둘 다 모자랍니다' },
-      //  선택 D: 좌 통로에 병사 10명 + 저격수 2기 / 우 통로는 안전하지만 보상 0
-      { z: 6300, x: 150, kind: 'soldier', durability: 20, n: 10, coverZ: 6046,
-        hint: '분리벽 왼쪽에는 병사 10명과 저격수 2기가 같이 있습니다. 오른쪽은 안전하지만 아무것도 없습니다' },
+      //  선택 D: 좌 통로에 병사 10명 + 저격수 2기 / 우 통로는 판마다 바뀌는 랜덤 길(3-9)
+      { z: 6300, x: 150, kind: 'soldier', durability: 20, n: 10, coverZ: 6094,
+        hint: '분리벽 왼쪽에는 병사 10명과 저격수 2기가 있습니다. 오른쪽은 판마다 달라지는 랜덤 길입니다' },
     ],
     walls: [
       { z0: 2400, z1: 2900, signs: { L: { kind: 'chain' }, R: { kind: 'soldier', n: 5 } } },
@@ -112,7 +117,7 @@ export const DEFS = {
       //  우측 = 랜덤 길('?'). 실제 내용은 buildStage 가 판마다 추첨한다(3-9)
       { z0: 6000, z1: 7200, signs: { L: { kind: 'soldier', n: 10 }, R: { kind: 'lottery' } } },
     ],
-    //  랜덤 길(3-9): w3(walls[2]) 우측 통로. 통·게이트는 z6300 x330(칸 [252,400)), 돌격 무리는 확정선에서 발동한다
+    //  랜덤 길(3-9): w3(walls[2]) 우측 통로. 통·게이트 모두 z6300 x330(칸 [252,400))에 놓인다
     lottery: { wallIdx: 2, z: 6300, x: 330, cell: [252, 400] },
     spawns: [
       { z: 5200, kind: 'grunt', n: 14, xs: [94, 136, 178, 220, 262, 304, 346, 115, 157, 199, 241, 283, 325, 367],
@@ -231,37 +236,37 @@ export function lotteryPick(seed = LOTTERY_DEFAULT_SEED) {
 }
 
 /** 뽑힌 항목을 stage 에 얹는다. 기존 물체 뒤에 **덧붙이기만** 하므로 c1~c9·g1 의 id 는 그대로다.
- *  통(soldier/weapon/chain) = z6300 x330 + coverZ(= 좌 통과 같은 비행시간 보정선) · 게이트 = 우 칸 한 칸(bypass, armZ 기본)
- *  돌격 무리 = 통로 확정선(revealZ)에서 발동해 우측 통로 안 xs 로 내려온다.
- *  stage.lottery = { pick, idx, seed, good, label, kind, z, x, revealZ, wallId, supplyId, rowId } — 셸이 결과 한 줄·'?' 연출에 쓴다. */
-function applyLottery(id, d, stage, mult, seed) {
+ *  통(soldier/weapon/chain) = z6300 x330 + coverZ(= 좌 통과 같은 비행시간 보정선)
+ *  게이트 = 우 칸 한 칸(bypass). 셔터 개방선을 통의 차폐 개방선과 같은 z(openZ)로 맞춘다 —
+ *   기본 armZ(340)면 확정 전에 쏜 탄이 셔터가 열린 뒤 도착해 값을 바꾼다(통 쪽 누출과 같은 계열).
+ *  stage.lottery = { pick, idx, seed, good, label, kind, z, x, revealZ, openZ, wallId, supplyId, rowId } — 셸이 결과 한 줄·'?' 연출에 쓴다. */
+function applyLottery(d, stage, seed) {
   const cfg = d.lottery;
   if (!cfg) { stage.lottery = null; return; }
   const useSeed = Number.isFinite(seed) ? (seed >>> 0) : LOTTERY_DEFAULT_SEED;
   const { idx, entry } = lotteryPick(useSeed);
   const wall = stage.walls[cfg.wallIdx];
   const revealZ = wall.z0 - WALL_LEAD;
+  const openZ = coverZFor(wall.z0, cfg.z);
   let supplyId = null, rowId = null;
   if (entry.kind === 'gate') {
     const row = makeRow(stage.gateRows.length + 1, {
-      z: cfg.z, maxValue: entry.maxValue, bypass: true, hint: entry.hint,
+      z: cfg.z, maxValue: entry.maxValue, bypass: true, hint: entry.hint, armZ: cfg.z - openZ,
       cells: [[cfg.cell[0], cfg.cell[1], entry.value, entry.maxValue]],
     });
     rowId = row.id;
     stage.gateRows.push(row);
-  } else if (entry.kind === 'enemy') {
-    stage.spawns.push(makeSpawn(id, { z: revealZ, kind: entry.enemy, n: entry.n, xs: entry.xs, corridorHw: null }, stage.walls, mult));
   } else {
     const sup = makeSupplyDef(stage.supplies.length + 1, {
       z: cfg.z, x: cfg.x, kind: entry.kind, durability: entry.durability,
       n: entry.n, weapon: entry.weapon, pads0: entry.pads0, maxPads: entry.maxPads,
-      coverZ: coverZFor(wall.z0, cfg.z), hint: entry.hint,
+      coverZ: openZ, hint: entry.hint,
     });
     supplyId = sup.id;
     stage.supplies.push(sup);
   }
   stage.lottery = { pick: entry.id, idx, seed: useSeed, good: !!entry.good, label: entry.label, kind: entry.kind,
-                    z: cfg.z, x: cfg.x, revealZ, wallId: wall.id, supplyId, rowId };
+                    z: cfg.z, x: cfg.x, revealZ, openZ, wallId: wall.id, supplyId, rowId };
 }
 
 // 스테이지 전체를 새 객체로 조립. 재도전 = 재호출(이전 판의 durability/value/passed/opened 가 남지 않는다)
@@ -282,7 +287,7 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     spawns: d.spawns.map(sp => makeSpawn(id, sp, walls, mult)),
     elite: d.elite ? { z: d.elite.z, hp: Math.round(d.elite.hp * mult.eliteHp), summon: !!d.elite.summon } : null,
   };
-  applyLottery(id, d, stage, mult, lotterySeed);
+  applyLottery(d, stage, lotterySeed);
   stage.spawns.sort((a, b) => a.z - b.z);
   return stage;
 }

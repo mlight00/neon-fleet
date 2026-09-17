@@ -331,15 +331,21 @@ test('V3-GATE-ARM ARM-4: armZ null 행은 생성 직후 armed·언제든 +1·gat
   assert.equal(ev.filter((e) => e.type === 'gateArm').length, 0);
 });
 
-test('V3-GATE-ARM ARM-5: 스테이지별 armZ 지정(S1 g1 = null 학습용, 나머지 전부 340)', () => {
+test('V3-GATE-ARM ARM-5: 스테이지별 armZ 지정(S1 g1 = null 학습용, 코스 행은 전부 340, 랜덤 길 행만 차폐선에 맞춘다)', () => {
   const s1 = buildStage(1);
   assert.equal(s1.gateRows[0].armZ, null);
   assert.equal(s1.gateRows[0].armed, true);
   assert.equal(s1.gateRows[1].armZ, 340);
   assert.equal(s1.gateRows[1].armed, false);
-  for (const id of [2, 3]) for (const row of buildStage(id).gateRows) {
-    assert.equal(row.armZ, 340, 'S' + id + ' ' + row.id);
-    assert.equal(row.armed, false);
+  for (const id of [2, 3]) {
+    const st = buildStage(id);
+    for (const row of st.gateRows) {
+      //  랜덤 길(3-9)이 뽑은 게이트 행은 셔터 개방선을 통의 차폐 개방선(openZ)과 같은 z 로 맞춘다 —
+      //  기본 340 이면 확정 전에 쏜 탄이 셔터가 열린 뒤 도착해 값을 바꾼다(LOT-3 가 실사격으로 잠근다)
+      const want = st.lottery && st.lottery.rowId === row.id ? st.lottery.z - st.lottery.openZ : 340;
+      assert.equal(row.armZ, want, 'S' + id + ' ' + row.id);
+      assert.equal(row.armed, false);
+    }
   }
 });
 

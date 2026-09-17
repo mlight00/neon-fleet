@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { makeSupply, hitSupply, passSupply, takePads, sweepHitsSupply, activateChain, applySupplyReward, supplyActive } from '../rush3/supply.js';
 import { makeUnit, layoutUnits, formation } from '../rush3/squad.js';
 import { createRun, stepRun, drainEvents } from '../rush3/combat.js';
-import { buildStage, STAGE_IDS, coverZFor, VZ_MIN } from '../rush3/stages.js';
+import { buildStage, STAGE_IDS, coverZFor, VZ_MIN, MAX_DY, lotteryPick } from '../rush3/stages.js';
 import { WEAPONS } from '../rush3/weapons.js';
 import { BAL3 } from '../rush3/balance.js';
 import { POLICIES, playPolicy } from './lib/rush3-policies.mjs';
@@ -355,7 +355,7 @@ function pairRun(side, opts = {}) {
   run.wallSide = side ? { w1: side } : {};
   const mk = (id, x, kind, extra) => makeSupply({
     id, z: 2300, x, kind, durability: 6, pairId: opts.noPair ? null : 'w1',
-    coverZ: opts.noCover ? null : 1904, payload: kind === 'chain' ? { pads0: 5, maxPads: 15 } : { n: 3 }, ...extra });
+    coverZ: opts.noCover ? null : 1953, payload: kind === 'chain' ? { pads0: 5, maxPads: 15 } : { n: 3 }, ...extra });
   run.supplies = [mk('L', 120, opts.chainLeft ? 'chain' : 'soldier'), mk('R', 326, 'soldier')];
   return run;
 }
@@ -448,7 +448,7 @@ test('V3-SUPPLY-PAIR PAIR-5b: 짝이 없는 통도 벽 반대편이면 skipped(S
   run.skippedSupplies = 0;
   run.walls = [{ id: 'w3', z0: 6000, z1: 7200, x0: 228, x1: 252 }];
   run.wallSide = { w3: 'R' };
-  const s = makeSupply({ id: 'c9', z: 6300, x: 150, kind: 'soldier', durability: 20, coverZ: 6046, payload: { n: 10 } });
+  const s = makeSupply({ id: 'c9', z: 6300, x: 150, kind: 'soldier', durability: 20, coverZ: 6094, payload: { n: 10 } });
   const ev = [];
   cross(run, 6300);
   assert.equal(passSupply(s, run, ev), true);
@@ -459,7 +459,7 @@ test('V3-SUPPLY-PAIR PAIR-5b: 짝이 없는 통도 벽 반대편이면 skipped(S
   run2.skippedSupplies = 0;
   run2.walls = run.walls;
   run2.wallSide = { w3: 'L' };
-  const s2 = makeSupply({ id: 'c9', z: 6300, x: 150, kind: 'soldier', durability: 20, coverZ: 6046, payload: { n: 10 } });
+  const s2 = makeSupply({ id: 'c9', z: 6300, x: 150, kind: 'soldier', durability: 20, coverZ: 6094, payload: { n: 10 } });
   cross(run2, 6300);
   passSupply(s2, run2, []);
   assert.deepEqual([s2.skipped, s2.missed], [false, true]);
@@ -468,7 +468,7 @@ test('V3-SUPPLY-PAIR PAIR-5b: 짝이 없는 통도 벽 반대편이면 skipped(S
 test('V3-SUPPLY-COVER COVER-1: coverZ 앞에서 탄 20발 → 내구 불변·탄 전부 흡수·supplyBlock 20 / supplyHit 0', () => {
   const run = makeRun(1, 120);
   run.z = 1800; run.prevZ = 1800;
-  const s = makeSupply({ id: 'c1', z: 2300, x: 120, kind: 'soldier', durability: 6, coverZ: 1904, payload: { n: 3 } });
+  const s = makeSupply({ id: 'c1', z: 2300, x: 120, kind: 'soldier', durability: 6, coverZ: 1953, payload: { n: 3 } });
   const ev = [];
   for (let i = 0; i < 20; i++) {
     const b = bullet(120, 2300, 2290);
@@ -486,8 +486,8 @@ test('V3-SUPPLY-COVER COVER-1: coverZ 앞에서 탄 20발 → 내구 불변·탄
 
 test('V3-SUPPLY-COVER COVER-2: run.z >= coverZ 뒤에는 정상 개봉(보상 정확히 1회)', () => {
   const run = makeRun(1, 120);
-  run.z = 1904; run.prevZ = 1903;
-  const s = makeSupply({ id: 'c1', z: 2300, x: 120, kind: 'soldier', durability: 6, coverZ: 1904, payload: { n: 3 } });
+  run.z = 1953; run.prevZ = 1952;
+  const s = makeSupply({ id: 'c1', z: 2300, x: 120, kind: 'soldier', durability: 6, coverZ: 1953, payload: { n: 3 } });
   const ev = [];
   for (let i = 0; i < 6; i++) hitSupply(s, bullet(120, 2300, 2290), ev, run);
   assert.equal(s.opened, true);
@@ -594,20 +594,58 @@ test('V3-SUPPLY-PAIR PAIR-4b: 확정 직전 대시 정책(양방향 T 스윕)에
   }
 });
 
-test('V3-SUPPLY-PAIR PAIR-4c: 배제 쌍의 coverZ 는 비행시간 보정선 공식과 정확히 같다(확정선이 아니다)', () => {
+//  랜덤 길(3-9) 통이 나오는 시드. 기본 시드의 랜덤 길은 **게이트**라 buildStage(3) 만 보면 랜덤 길 통을 한 번도 검사하지 못한다.
+//   정수 시드를 앞에서부터 훑어 풀의 통 종류마다 첫 시드를 고른다(결정적이고 파일 밖 의존이 없다).
+function lotterySupplySeeds() {
+  const want = new Set(BAL3.lottery.pool.filter((p) => p.kind !== 'gate').map((p) => p.id));
+  const out = new Map();
+  for (let seed = 1; seed <= 20000 && out.size < want.size; seed++) {
+    const { entry } = lotteryPick(seed);
+    if (want.has(entry.id) && !out.has(entry.id)) out.set(entry.id, seed);
+  }
+  assert.equal(out.size, want.size, '랜덤 길 통 시드를 못 찾았다: ' + JSON.stringify([...out.keys()]));
+  return [...out];
+}
+
+test('V3-SUPPLY-PAIR PAIR-4c: 차폐(coverZ)를 가진 모든 통 — 배제 쌍 4 + 짝 없는 c9 + 랜덤 길 통 — 의 coverZ 가 비행시간 보정선 공식과 정확히 같다', () => {
   const vzMin = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
   assert.equal(vzMin, VZ_MIN);
-  for (const id of STAGE_IDS) {
-    const st = buildStage(id);
+  //  ⚠ 옛 순회는 'pairId 있는 통만' 이라 S3 좌 통 c9(z6300, coverZ 6094)와 랜덤 길 통이 공식 검사에서 통째로 빠졌다
+  //   (c9 를 옛 값 6046 으로 되돌려도 검사 전건이 통과했다 — 2026-09-17 변이 검사). 이제 coverZ 가 있으면 전부 본다.
+  const stages = STAGE_IDS.map((id) => ({ id, st: buildStage(id), tag: 'S' + id }));
+  for (const [pick, seed] of lotterySupplySeeds()) stages.push({ id: 3, st: buildStage(3, { lotterySeed: seed }), tag: 'S3(랜덤 길=' + pick + ')' });
+
+  for (const { id, st, tag } of stages) {
+    let covered = 0;
     for (const s of st.supplies) {
-      if (!s.pairId) continue;
+      if (s.coverZ == null) continue;
       const wall = st.walls.find((w) => w.z0 - 60 <= s.z && s.z <= w.z1);
-      assert.ok(wall, 'S' + id + ' ' + s.id + ' 배제 쌍은 벽 안에 있어야 한다');
+      if (!wall) {
+        //  예외 1건 — 선택 C 의 z3900 통(S3 c8)은 벽이 아니라 **게이트(z4000)와 사격창을 나눠 쓰는 '저울'** 이다.
+        //   차폐선 = 그 게이트의 셔터 개시선(4000 − BAL3.gate.armZ = 3660). 다른 통이 벽 밖에서 coverZ 를 갖는 것은 허용하지 않는다.
+        assert.equal(id, 3, tag + ' ' + s.id + ': 벽 밖 coverZ 는 S3 에만 있다');
+        assert.equal(s.id, 'c8', tag + ' ' + s.id + ': 벽 밖 coverZ 예외는 S3 c8(저울) 하나뿐이다');
+        assert.equal(s.coverZ, 4000 - BAL3.gate.armZ, tag + ' c8 의 차폐선은 게이트 z4000 셔터 개시선');
+        covered++;
+        continue;
+      }
+      //  ①1 STEP 지연(통로 확정은 직전 STEP 의 run.z 로 판정된다) + ②대형 깊이(탄은 run.z - dy 에서 출발한다)를 함께 얹는다
       const commitZ = wall.z0 - 60;
-      const want = Math.ceil(commitZ + (s.z - commitZ) * BAL3.scroll / vzMin);
-      assert.equal(s.coverZ, want, 'S' + id + ' ' + s.id + ' coverZ');
-      assert.ok(s.coverZ > commitZ, 'coverZ 는 확정선보다 뒤여야 한다(확정 직전에 쏜 탄이 도착하는 지점)');
-      assert.ok(s.coverZ < s.z, 'coverZ 는 통보다 앞이어야 한다(개방 뒤 사격창이 남는다)');
+      const fireZ = commitZ + BAL3.scroll * BAL3.STEP;
+      const want = Math.ceil(fireZ + (s.z + MAX_DY - fireZ) * BAL3.scroll / vzMin);
+      assert.equal(s.coverZ, want, tag + ' ' + s.id + ' coverZ');
+      assert.equal(s.coverZ, coverZFor(wall.z0, s.z), tag + ' ' + s.id + ' coverZ 는 stages.coverZFor 과 같다');
+      assert.ok(s.coverZ > commitZ, tag + ' ' + s.id + ': coverZ 는 확정선보다 뒤여야 한다(확정 직전에 쏜 탄이 도착하는 지점)');
+      assert.ok(s.coverZ < s.z, tag + ' ' + s.id + ': coverZ 는 통보다 앞이어야 한다(개방 뒤 사격창이 남는다)');
+      covered++;
     }
+    //  배제 쌍은 차폐 + 벽을 함께 갖는다(둘 중 하나라도 빠지면 위 순회에서 조용히 빠져나간다)
+    for (const s of st.supplies) if (s.pairId) {
+      assert.ok(s.coverZ != null, tag + ' ' + s.id + ' 배제 쌍에 coverZ 가 없다');
+      assert.ok(st.walls.some((w) => w.z0 - 60 <= s.z && s.z <= w.z1), tag + ' ' + s.id + ' 배제 쌍은 벽 안에 있어야 한다');
+    }
+    //  검사 대상 개수를 못 박는다 — 통에서 coverZ 를 떼어 내 검사를 빠져나가는 변경을 여기서 잡는다
+    const wantCovered = id === 1 ? 0 : id === 2 ? 2 : (st.lottery && st.lottery.supplyId ? 7 : 6);
+    assert.equal(covered, wantCovered, tag + ': 차폐(coverZ) 통 개수');
   }
 });

@@ -78,10 +78,12 @@ export const BAL3 = deepFreeze({
     brutal: { id: 'brutal', label: '극한',   short: '극한',   enemyHp: 2.2, eshotDmg: 3, touchDmg: 3, eliteHp: 2.4, spawnCount: 1.8, eliteFireRate: 1.5 },
   },
   // 랜덤 길(계약서 3-9 · 2026-09-16 이사 지시 "빈 길이 아니라 랜덤 길"). S3 분리벽 w3 우측 통로에 걸리는 5종 풀.
-  //  좋음 3(병사 통·무기 통·연속 증원) : 꽝 2(음수 게이트·돌격체) 를 균등 1/5 로 뽑는다.
+  //  좋음 3(병사 통·무기 통·연속 증원) : 꽝 2(막을 수 있는 음수 게이트·확정 손실 게이트) 를 균등 1/5 로 뽑는다.
   //  추첨은 buildStage 시점에 한 번(mulberry32 한 번) — 규칙 진행 중 난수는 여전히 0 이다.
   //  good  = 좋음/꽝 구분(결과 문구·공개 효과음) · label = 표지·결과 문구에 쓰는 짧은 이름
-  //  kind  = 'soldier' | 'weapon' | 'chain'(통) · 'gate'(음수 게이트 한 칸) · 'enemy'(돌격 무리)
+  //  kind  = 'soldier' | 'weapon' | 'chain'(통) · 'gate'(음수 게이트 한 칸)
+  //  ⚠️꽝은 '병력이 실제로 줄어드는 것'이어야 한다. 적 무리는 이 지점(병력 68~69)에서 접촉 전에 전멸해
+  //   손실 0 + 공짜 처치로 끝난다(2026-09-17 실측: 세 난이도 모두 69→69). 그래서 꽝 2 는 둘 다 게이트다.
   lottery: {
     //  '?' 표지가 걷히는 선 = 통로 확정선(wall.z0 - squad.wallLead). 걷히는 연출 시간은 gate.openT(0.25s) 를 함께 쓴다
     openT: 0.25,
@@ -94,7 +96,9 @@ export const BAL3 = deepFreeze({
         hint: '랜덤 길의 증원 설비는 발판이 오른쪽 차선에 깔립니다' },
       { id: 'badGate', good: false, kind: 'gate', label: '−15 게이트', value: -15, maxValue: 0,
         hint: '랜덤 길의 −15 게이트는 상한이 0 이라 쏘는 만큼 무효로 만들 수 있습니다' },
-      { id: 'rusher4', good: false, kind: 'enemy', label: '돌격체 4', enemy: 'rusher', n: 4, xs: [282, 312, 342, 372] },
+      //  확정 손실: 상한이 자기 값(maxValue === value)이라 쏴도 오르지 않는다. 왼쪽에서 받았을 병사 10 과 같은 크기를 잃는다
+      { id: 'trapGate', good: false, kind: 'gate', label: '−10 확정 게이트', value: -10, maxValue: -10,
+        hint: '랜덤 길의 확정 게이트는 상한이 자기 값이라 쏜 만큼 줄어들지 않습니다' },
     ],
   },
   // 연출 상수(6장 + 기존 값 이식)
