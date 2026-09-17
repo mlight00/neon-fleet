@@ -97,6 +97,7 @@ function pickSide(run, wall) {
 export function clampCenter(run, walls, opts) {
   const o = cfg(opts);
   if (!run.wallSide) run.wallSide = {};
+  if (!run.wallSideLog) run.wallSideLog = {};
   const n = run.units ? run.units.length : 0;
   const fw = formationHalfWidth(n, opts);
   const prevZ = Number.isFinite(run.prevZ) ? run.prevZ : run.z;
@@ -107,7 +108,8 @@ export function clampCenter(run, walls, opts) {
     if (run.z < enterZ) continue;
     // 활성 구간: enterZ <= z <= z1
     let side = run.wallSide[w.id];
-    if (prevZ < enterZ || !side) { side = pickSide(run, w); run.wallSide[w.id] = side; }
+    //  wallSideLog 는 벽을 빠져나가도 남는다(결과 화면이 '어느 통로로 갔는가'를 읽는다)
+    if (prevZ < enterZ || !side) { side = pickSide(run, w); run.wallSide[w.id] = side; run.wallSideLog[w.id] = side; }
     const cLo = side === 'L' ? o.roadLo : w.x1;
     const cHi = side === 'L' ? w.x0 : o.roadHi;
     // 여러 벽이 겹치면 교집합

@@ -109,8 +109,11 @@ export const DEFS = {
     walls: [
       { z0: 2400, z1: 2900, signs: { L: { kind: 'chain' }, R: { kind: 'soldier', n: 5 } } },
       { z0: 3150, z1: 3550, signs: { L: { kind: 'weapon', weapon: 'auto' }, R: { kind: 'weapon', weapon: 'heavy' } } },
-      { z0: 6000, z1: 7200, signs: { L: { kind: 'soldier', n: 10 }, R: { kind: 'none' } } },
+      //  우측 = 랜덤 길('?'). 실제 내용은 buildStage 가 판마다 추첨한다(3-9)
+      { z0: 6000, z1: 7200, signs: { L: { kind: 'soldier', n: 10 }, R: { kind: 'lottery' } } },
     ],
+    //  랜덤 길(3-9): w3(walls[2]) 우측 통로. 통·게이트는 z6300 x330(칸 [252,400)), 돌격 무리는 확정선에서 발동한다
+    lottery: { wallIdx: 2, z: 6300, x: 330, cell: [252, 400] },
     spawns: [
       { z: 5200, kind: 'grunt', n: 14, xs: [94, 136, 178, 220, 262, 304, 346, 115, 157, 199, 241, 283, 325, 367],
         dz: [0, 0, 0, 0, 0, 0, 0, 40, 40, 40, 40, 40, 40, 40], corridorHw: null },
@@ -216,11 +219,57 @@ function makeSpawn(id, sp, walls, mult) {
   return ev;
 }
 
+/** 랜덤 길 추첨(계약서 3-9 · 2026-09-16 이사 지시). 시드 하나로 mulberry32 를 **한 번**만 돌려 균등 1/5.
+ *  시드를 안 주면 LOTTERY_DEFAULT_SEED — 검사·봇 시뮬의 기준선(같은 시드면 buildStage 두 번이 deepEqual). */
+export const LOTTERY_DEFAULT_SEED = hashSeed('rush3:lottery:default');
+
+export function lotteryPick(seed = LOTTERY_DEFAULT_SEED) {
+  const pool = BAL3.lottery.pool;
+  const r = mulberry32(seed >>> 0)();
+  const idx = Math.min(pool.length - 1, Math.floor(r * pool.length));
+  return { idx, entry: pool[idx] };
+}
+
+/** 뽑힌 항목을 stage 에 얹는다. 기존 물체 뒤에 **덧붙이기만** 하므로 c1~c9·g1 의 id 는 그대로다.
+ *  통(soldier/weapon/chain) = z6300 x330 + coverZ(= 좌 통과 같은 비행시간 보정선) · 게이트 = 우 칸 한 칸(bypass, armZ 기본)
+ *  돌격 무리 = 통로 확정선(revealZ)에서 발동해 우측 통로 안 xs 로 내려온다.
+ *  stage.lottery = { pick, idx, seed, good, label, kind, z, x, revealZ, wallId, supplyId, rowId } — 셸이 결과 한 줄·'?' 연출에 쓴다. */
+function applyLottery(id, d, stage, mult, seed) {
+  const cfg = d.lottery;
+  if (!cfg) { stage.lottery = null; return; }
+  const useSeed = Number.isFinite(seed) ? (seed >>> 0) : LOTTERY_DEFAULT_SEED;
+  const { idx, entry } = lotteryPick(useSeed);
+  const wall = stage.walls[cfg.wallIdx];
+  const revealZ = wall.z0 - WALL_LEAD;
+  let supplyId = null, rowId = null;
+  if (entry.kind === 'gate') {
+    const row = makeRow(stage.gateRows.length + 1, {
+      z: cfg.z, maxValue: entry.maxValue, bypass: true, hint: entry.hint,
+      cells: [[cfg.cell[0], cfg.cell[1], entry.value, entry.maxValue]],
+    });
+    rowId = row.id;
+    stage.gateRows.push(row);
+  } else if (entry.kind === 'enemy') {
+    stage.spawns.push(makeSpawn(id, { z: revealZ, kind: entry.enemy, n: entry.n, xs: entry.xs, corridorHw: null }, stage.walls, mult));
+  } else {
+    const sup = makeSupplyDef(stage.supplies.length + 1, {
+      z: cfg.z, x: cfg.x, kind: entry.kind, durability: entry.durability,
+      n: entry.n, weapon: entry.weapon, pads0: entry.pads0, maxPads: entry.maxPads,
+      coverZ: coverZFor(wall.z0, cfg.z), hint: entry.hint,
+    });
+    supplyId = sup.id;
+    stage.supplies.push(sup);
+  }
+  stage.lottery = { pick: entry.id, idx, seed: useSeed, good: !!entry.good, label: entry.label, kind: entry.kind,
+                    z: cfg.z, x: cfg.x, revealZ, wallId: wall.id, supplyId, rowId };
+}
+
 // 스테이지 전체를 새 객체로 조립. 재도전 = 재호출(이전 판의 durability/value/passed/opened 가 남지 않는다)
 //  난이도(3-8)는 여기서 한 번 박힌다: stage.difficulty · rows 스폰 n(spawnCount) · 정예 hp(eliteHp, 반올림).
 //  적 hp·적탄·접촉·정예 발사 빈도는 createRun 이 stage.difficulty 를 읽어 run.enemyDefs 로 만든다. 게이트·통·벽·시작 병력·무기는 난이도와 무관.
 //  difficulty 생략 = normal = 종전과 완전히 같은 객체(difficulty 필드만 추가).
-export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY } = {}) {
+//  랜덤 길(3-9)은 '재도전 동일 배치' 원칙의 명시적 예외 — lotterySeed 가 판마다 달라 우측 통로만 바뀐다(셸이 시계로 만든다).
+export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } = {}) {
   const d = def(id);
   const mult = difficultyMult(difficulty);
   const walls = d.walls.map((w, i) => makeWall(i + 1, w));
@@ -233,6 +282,7 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY } = {}) {
     spawns: d.spawns.map(sp => makeSpawn(id, sp, walls, mult)),
     elite: d.elite ? { z: d.elite.z, hp: Math.round(d.elite.hp * mult.eliteHp), summon: !!d.elite.summon } : null,
   };
+  applyLottery(id, d, stage, mult, lotterySeed);
   stage.spawns.sort((a, b) => a.z - b.z);
   return stage;
 }

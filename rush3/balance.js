@@ -77,6 +77,26 @@ export const BAL3 = deepFreeze({
     hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1.5, eshotDmg: 2, touchDmg: 2, eliteHp: 1.6, spawnCount: 1.4, eliteFireRate: 1.25 },
     brutal: { id: 'brutal', label: '극한',   short: '극한',   enemyHp: 2.2, eshotDmg: 3, touchDmg: 3, eliteHp: 2.4, spawnCount: 1.8, eliteFireRate: 1.5 },
   },
+  // 랜덤 길(계약서 3-9 · 2026-09-16 이사 지시 "빈 길이 아니라 랜덤 길"). S3 분리벽 w3 우측 통로에 걸리는 5종 풀.
+  //  좋음 3(병사 통·무기 통·연속 증원) : 꽝 2(음수 게이트·돌격체) 를 균등 1/5 로 뽑는다.
+  //  추첨은 buildStage 시점에 한 번(mulberry32 한 번) — 규칙 진행 중 난수는 여전히 0 이다.
+  //  good  = 좋음/꽝 구분(결과 문구·공개 효과음) · label = 표지·결과 문구에 쓰는 짧은 이름
+  //  kind  = 'soldier' | 'weapon' | 'chain'(통) · 'gate'(음수 게이트 한 칸) · 'enemy'(돌격 무리)
+  lottery: {
+    //  '?' 표지가 걷히는 선 = 통로 확정선(wall.z0 - squad.wallLead). 걷히는 연출 시간은 gate.openT(0.25s) 를 함께 쓴다
+    openT: 0.25,
+    pool: [
+      { id: 'soldier8', good: true, kind: 'soldier', label: '병사 8', durability: 14, n: 8,
+        hint: '오른쪽 랜덤 길은 판마다 달라집니다. 이번엔 병사 8 이었어요' },
+      { id: 'heavy', good: true, kind: 'weapon', label: '중화기', durability: 24, weapon: 'heavy',
+        hint: '랜덤 길에서 중화기가 나오면 내구 24 라 병력이 모여야 열립니다' },
+      { id: 'chain6', good: true, kind: 'chain', label: '연속 증원', durability: 8, pads0: 6, maxPads: 12,
+        hint: '랜덤 길의 증원 설비는 발판이 오른쪽 차선에 깔립니다' },
+      { id: 'badGate', good: false, kind: 'gate', label: '−15 게이트', value: -15, maxValue: 0,
+        hint: '랜덤 길의 −15 게이트는 상한이 0 이라 쏘는 만큼 무효로 만들 수 있습니다' },
+      { id: 'rusher4', good: false, kind: 'enemy', label: '돌격체 4', enemy: 'rusher', n: 4, xs: [282, 312, 342, 372] },
+    ],
+  },
   // 연출 상수(6장 + 기존 값 이식)
   fx: { shakeDur: 0.25, shakeAmp: 7, hurtFlashDur: 0.35, guideSec: 3, eliteBannerSec: 0.8, rewardPopSec: 0.5,
         fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3 },
@@ -99,6 +119,9 @@ export const BAL3 = deepFreeze({
 // 난이도 id 목록(타이틀 토글 순서 = 표 순서). 데이터 접근만 — 규칙 로직이 아니다.
 export const DIFFICULTY_IDS = Object.freeze(Object.keys(BAL3.difficulty));
 export const DEFAULT_DIFFICULTY = 'normal';
+// 타이틀 초기 선택(저장에 난이도가 없을 때). 2026-09-16 이사 결정: 극한으로 전 스테이지 격파 → 기본 선택을 극한으로.
+//  규칙 계층 기본(DEFAULT_DIFFICULTY, buildStage 인자 생략 시)은 normal 그대로 — 테스트·봇 기준선.
+export const DEFAULT_PICK_DIFFICULTY = 'brutal';
 
 // 난이도 배수 표 한 줄. 모르는 id 는 throw(규칙 모듈이 조용히 normal 로 떨어지지 않게 — 셸이 저장값을 미리 거른다)
 export function difficultyMult(id) {

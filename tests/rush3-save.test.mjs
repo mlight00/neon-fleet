@@ -421,7 +421,8 @@ test('V3-SAVE-VERSION DIFF: 옛 저장(난이도 없음)은 그대로 normal 칸
   assert.equal(st.getItem(BAK3), null);
   assert.deepEqual(s.getStage(1, 2), rec);
   assert.deepEqual(s.getStage(1, 2, 'hard'), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 });
-  assert.equal(s.get().difficulty, 'normal', '난이도 필드가 없던 저장은 normal');
+  //  옛 저장에는 난이도 필드가 없다 → 초기 선택은 극한(2026-09-16 이사 결정). 기록 칸은 위에서 본 대로 normal 그대로다
+  assert.equal(s.get().difficulty, 'brutal', '난이도 필드가 없던 저장의 초기 선택은 극한');
   s.patch({ lastStage: 1 });
   assert.deepEqual(JSON.parse(st.getItem(KEY3)).stages['1'], { versions: { 2: rec } }, '옛 칸 키 그대로');
 });
@@ -452,17 +453,19 @@ test("V3-SAVE-VERSION DIFF: 손상 케이스 — ':normal' 접미는 접미 없�
   assert.equal(s.get().lastStage, 1);
 });
 
-test('V3-SAVE-VERSION DIFF: 마지막 난이도(difficulty) — 기본 normal, patch 로 기억, 재로드 유지, 형식이 아니면 normal', () => {
+test('V3-SAVE-VERSION DIFF: 마지막 난이도(difficulty) — 기본은 타이틀 초기 선택 brutal, patch 로 기억, 재로드 유지, 형식이 아니면 brutal', () => {
   const st = memStorage();
   const s = createSave3(st);
-  assert.equal(s.get().difficulty, 'normal');
+  //  기록 접미 규칙의 기준(BASE_DIFFICULTY='normal')과 타이틀 초기 선택은 다른 값이다(계약서 3-8·7)
+  assert.equal(BASE_DIFFICULTY, 'normal');
+  assert.equal(s.get().difficulty, 'brutal');
   s.patch({ difficulty: 'hard' });
   assert.equal(s.get().difficulty, 'hard');
   assert.equal(JSON.parse(st.getItem(KEY3)).difficulty, 'hard');
   assert.equal(createSave3(st).get().difficulty, 'hard');
   for (const bad of [5, null, '', {}]) {
     const s2 = createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, difficulty: bad }) }));
-    assert.equal(s2.get().difficulty, 'normal', JSON.stringify(bad));
+    assert.equal(s2.get().difficulty, 'brutal', JSON.stringify(bad));
   }
   //  save 는 난이도 id 를 판정하지 않는다(그건 셸 normDifficulty 의 몫) — 문자열이면 그대로 둔다
   assert.equal(createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, difficulty: 'zzz' }) })).get().difficulty, 'zzz');

@@ -2,7 +2,7 @@
 //  ⚠️모듈 상단에서 DOM 을 만지지 않는다 — Node 테스트가 hitButton/makeLoop 를 그대로 import 한다.
 //  rush/main.js 는 import 하지 않는다(자동 부트가 같은 캔버스에 붙는다). 골격(hitButton/toLogical/spawnBurst/
 //  autoPause/오디오 unlock/ESC/음량 버튼/로드 후 루프 시작/#game3 가드)만 참고해 옮겨 적었다.
-import { BAL3, DIFFICULTY_IDS, DEFAULT_DIFFICULTY } from './balance.js';
+import { BAL3, DIFFICULTY_IDS, DEFAULT_PICK_DIFFICULTY } from './balance.js';
 import { STAGE_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
@@ -12,6 +12,7 @@ import { loadSprites3 } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
 import { adviceLine } from './advice.js';
+import { hashSeed } from '../rush/rng.js';
 
 const W = BAL3.view.w, H = BAL3.view.h, LINE_Y = BAL3.view.LINE_Y;
 const FX = BAL3.fx;
@@ -26,7 +27,7 @@ const DIFF_KEYS = Object.freeze({ Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, N
 
 //  저장값·외부 입력을 난이도 id 로 거른다(모르는 값 → normal). 규칙 모듈(buildStage/createRun)은 모르는 값에 throw 하므로 거르는 곳은 셸뿐이다
 export function normDifficulty(d) {
-  return DIFFICULTY_IDS.includes(d) ? d : DEFAULT_DIFFICULTY;
+  return DIFFICULTY_IDS.includes(d) ? d : DEFAULT_PICK_DIFFICULTY;
 }
 
 export function hitButton(buttons, x, y) {
@@ -80,7 +81,9 @@ const GATE_FLASH_SEC = BAL3.gate.flashT;
 
 function makeFx() {
   //  gateFlash: { 'rowId:idx': 남은 초 } · gateOpen: { rowId: 남은 초 }(셔터가 걷히는 연출) — 렌더가 이것만 읽는다
-  return { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null };
+  //  lotOpen = 랜덤 길 '?' 상자가 걷히는 연출 타이머 · lotSeen = 공개 효과음 1회 · lotSame = 랜덤 길 무기가 동급이라 교체 안 된 판
+  return { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null,
+           lotOpen: 0, lotSeen: false, lotSame: false };
 }
 
 function floater(fx, x, y, text, color, big = false) {
@@ -98,6 +101,23 @@ export function missedLine(run) {
   return parts.length ? parts.join(' · ') : '놓친 것 없음';
 }
 
+/** 결과 화면의 랜덤 길 한 줄(계약서 3-9·6장). 순수 함수 — run 상태와 stage.lottery 만 읽는다.
+ *  고른 판(우측 통로) = 무엇이 걸렸고 어떻게 됐는지 · 안 고른 판 = 이번 판에 무엇이었는지 공개(놓친 보상을 감추지 않는다). */
+export function lotteryLine(run, opts = {}) {
+  const lot = run && run.lottery;
+  if (!lot) return null;
+  const chosen = ((run.wallSideLog || {})[lot.wallId] || null) === 'R';
+  if (!chosen) {
+    return lot.good ? '오른쪽 랜덤 길은 이번 판엔 ' + lot.label + ' 이었습니다'
+                    : '오른쪽 랜덤 길은 이번 판엔 꽝(' + lot.label + ')이었습니다';
+  }
+  if (!lot.good) return '랜덤 길: 꽝 ' + lot.label;
+  const s = lot.supplyId ? (run.supplies || []).find((c) => c.id === lot.supplyId) : null;
+  if (s && !s.opened) return '랜덤 길: ' + lot.label + ' — 열지 못했습니다';
+  if (opts.weaponSame) return '랜덤 길: ' + lot.label + ' — 이미 같은 무기였습니다';
+  return '랜덤 길: ' + lot.label + ' 획득';
+}
+
 export function timeText(sec) {
   const m = Math.floor(sec / 60), s = sec - m * 60;
   return (m > 0 ? m + '분 ' : '') + s.toFixed(1) + '초';
@@ -107,6 +127,8 @@ export function boot(canvas, deps = {}) {
   const win = deps.win ?? (typeof window !== 'undefined' ? window : null);
   const doc = deps.doc ?? (typeof document !== 'undefined' ? document : null);
   const nowFn = deps.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
+  //  랜덤 길 시드용 벽시계(검사에서 고정할 수 있게 주입 가능). 게임 진행에는 쓰지 않는다
+  const dateNow = deps.dateNow ?? (() => Date.now());
   const raf = deps.raf ?? ((fn) => (win && win.requestAnimationFrame ? win.requestAnimationFrame(fn) : setTimeout(() => fn(nowFn()), 16)));
   const save = deps.save ?? createSave3(deps.storage);
   const au = deps.audio ?? createAudio3({});
@@ -147,7 +169,11 @@ export function boot(canvas, deps = {}) {
   }
 
   function startRun(id) {
-    const stage = buildStage(id, { difficulty });
+    //  랜덤 길 시드는 **판마다** 다르다(계약서 3-9 = '재도전 동일 배치' 원칙의 명시적 예외).
+    //   시계는 셸에만 둔다 — 규칙 계층(stages.buildStage)은 인자로 받은 시드로 mulberry32 를 한 번 돌릴 뿐이다.
+    const tries = save.getStage(id, stageVersion(id), difficulty).attempts || 0;
+    const lotterySeed = hashSeed('lot:' + id + ':' + tries + ':' + dateNow());
+    const stage = buildStage(id, { difficulty, lotterySeed });
     run = createRun(stage);
     //  기록은 stageId + 코스 버전 + 난이도로 묶는다(run.stageVersion = stage.version, run.difficulty = stage.difficulty)
     const ver = run.stageVersion, diff = run.difficulty;
@@ -207,7 +233,7 @@ export function boot(canvas, deps = {}) {
     save.updateStage(id, patch, ver, diff);
     result = {
       stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
-      missedLine: missedLine(run), advice: adviceLine(run, run), isBest, saveOk: save.ok,
+      missedLine: missedLine(run), advice: adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }), isBest, saveOk: save.ok,
       nextId: won && STAGE_IDS.includes(id + 1) ? id + 1 : null,
     };
     state = 'result';
@@ -254,7 +280,11 @@ export function boot(canvas, deps = {}) {
         case 'padTake': floater(fx, ev.x, LINE_Y - 70, '+1', C.chainPad); break;
         case 'chainOn': floater(fx, ev.x, sy(ev.z) - 40, '증원 설비 가동!', C.chainPad, true); break;
         case 'weaponSwap': fx.sfx.push(['weaponSwap']); floater(fx, run.x, LINE_Y - 110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' 장착!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
-        case 'weaponSame': floater(fx, run.x, LINE_Y - 90, '같은 무기', C.gateZero); break;
+        case 'weaponSame':
+          //  랜덤 길 무기 통이 동급이라 교체되지 않은 경우 — 결과 한 줄이 '획득'이라 거짓말하지 않게 표식을 남긴다
+          if (run.lottery && run.lottery.kind === 'weapon' && run.z >= run.lottery.revealZ) fx.lotSame = true;
+          floater(fx, run.x, LINE_Y - 90, '같은 무기', C.gateZero);
+          break;
         case 'hurt': fx.shakeT = FX.shakeDur; fx.hurtT = FX.hurtFlashDur; fx.sfx.push(['hurt']); floater(fx, ev.x, sy(ev.z) - 10, '−' + ev.n, C.heroHurt); break;
         case 'unitLost': spawnBurst(fx, ev.x, sy(ev.z), 9, false, C.heroHurt); break;
         case 'kill': spawnBurst(fx, ev.x, sy(ev.z), BAL3.enemies[ev.kind]?.r ?? 14, false); fx.sfx.push(['kill']); break;
@@ -281,6 +311,7 @@ export function boot(canvas, deps = {}) {
     fx.hurtT = Math.max(0, fx.hurtT - dt);
     fx.guideT = Math.max(0, fx.guideT - dt);
     fx.eliteT = Math.max(0, fx.eliteT - dt);
+    fx.lotOpen = Math.max(0, fx.lotOpen - dt);
     //  게이트 플래시: 감소 후 0 이하는 삭제(칸이 원래 색으로 돌아간다)
     for (const k of Object.keys(fx.gateFlash)) {
       fx.gateFlash[k] -= dt;
@@ -456,6 +487,12 @@ export function boot(canvas, deps = {}) {
     lastFx = now;
     if (state === 'run') {
       loop.frame(now);
+      //  랜덤 길 공개: 통로 확정선을 넘는 프레임에 '?' 상자를 걷고 효과음 1회(좋음 gateFlip / 꽝 hurt 재사용)
+      if (run.lottery && !fx.lotSeen && run.z >= run.lottery.revealZ) {
+        fx.lotSeen = true;
+        fx.lotOpen = BAL3.lottery.openT;
+        fx.sfx.push([run.lottery.good ? 'gateFlip' : 'hurt']);
+      }
       handleEvents(drainEvents(run));
       updateFx(dt);
       if (run.over) {

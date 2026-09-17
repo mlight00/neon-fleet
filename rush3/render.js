@@ -152,6 +152,10 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = C.chainPad;
       roundRect(x - 34, y - 10, 22, 18, 4); ctx.fill();
       outlinedText('증원', x + 10, y, 16, C.chainPad, 'bold', 4);
+    } else if (sg.kind === 'lottery') {
+      //  랜덤 길: 무엇이 걸릴지 모른다는 표시. 확정선을 지나야 실제 물체가 드러난다(계약서 3-9)
+      outlinedText('?', x - 22, y, 26, C.gold, 'bold', 5);
+      outlinedText('랜덤', x + 16, y, 17, C.gold, 'bold', 4);
     } else {
       outlinedText('빈 길', x, y, 17, C.gateZero, 'bold', 4);
     }
@@ -698,6 +702,12 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillText(rds, x0, 184);
       ctx.textAlign = 'center';
     }
+    //  랜덤 길 한 줄(계약서 3-9): 고른 판은 결과, 안 고른 판은 이번 판에 무엇이었는지 공개
+    if (r.lottery) {
+      ctx.font = '700 14px ' + FONT;
+      ctx.fillStyle = C.gold;
+      ctx.fillText(r.lottery, W / 2, 212);
+    }
     const lines = [
       ['생존 병력', r.survivors + '명'],
       ['최고 병력', r.peak + '명'],
@@ -744,13 +754,53 @@ export function createRenderer3(ctx, sprites) {
     }
   }
 
+  /** 랜덤 길 가림(계약서 3-9): 통로 확정선(lot.revealZ) 전에는 우측 통로 물체를 '?' 상자로 덮는다.
+   *  0 = 다 걷힘 · 1 = 완전히 덮임. 확정 직후 0.25초(fx.lotOpen)에 걸쳐 걷힌다. */
+  function lotteryMask(run, fx) {
+    const lot = run.lottery;
+    if (!lot) return 0;
+    if (run.z < lot.revealZ) return 1;
+    const left = fx && fx.lotOpen ? fx.lotOpen : 0;
+    const openT = BAL3.lottery.openT || 0.25;
+    return left > 0 ? Math.max(0, Math.min(1, left / openT)) : 0;
+  }
+
+  //  '?' 상자(가림 판). 회색 판 + 금색 물음표. 걷히는 동안 위로 줄어들며 사라진다
+  function drawLotteryBox(run, sy, mask) {
+    const lot = run.lottery;
+    if (!lot || mask <= 0) return;
+    const y = sy(lot.z);
+    if (y < -70 || y > H + 70) return;
+    const bw = 88, bh = 76;
+    ctx.save();
+    ctx.globalAlpha = mask;
+    shadow(lot.x, y + bh * 0.46, 34);
+    ctx.fillStyle = 'rgba(120,128,140,0.92)';
+    roundRect(lot.x - bw / 2, y - bh / 2, bw, bh, 12);
+    ctx.fill();
+    ctx.strokeStyle = C.gold;
+    ctx.lineWidth = 4;
+    roundRect(lot.x - bw / 2, y - bh / 2, bw, bh, 12);
+    ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    outlinedText('?', lot.x, y - 4, 44, C.gold, 'bold', 6);
+    outlinedText('랜덤 길', lot.x, y + 26, 14, C.supplyBody, 'bold', 4);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
   function drawScene(view) {
     const run = view.run, fx = view.fx, now = view.now;
     const sy = (z) => LINE_Y - (z - run.z);
+    const mask = lotteryMask(run, fx);
+    //  가려진 동안에는 실제 물체를 아예 그리지 않는다('?' 상자가 그 자리를 대신한다)
+    const hidden = (id) => mask >= 1 && id != null && run.lottery && (run.lottery.supplyId === id || run.lottery.rowId === id);
     drawBackground(run.z, Math.max(0, Math.min(2, run.stageId - 1)));
     drawWalls(run, sy);
-    for (const row of run.gateRows) drawGateRow(row, sy, fx, run.z);
-    for (const s of run.supplies) drawSupply(s, sy, run.z);
+    for (const row of run.gateRows) if (!hidden(row.id)) drawGateRow(row, sy, fx, run.z);
+    for (const s of run.supplies) if (!hidden(s.id)) drawSupply(s, sy, run.z);
+    drawLotteryBox(run, sy, mask);
     for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, sy);
     if (run.boss && !run.boss.dead) drawBoss(run.boss, sy, now);
     drawBullets(run, sy);

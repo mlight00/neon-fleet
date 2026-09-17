@@ -36,7 +36,10 @@ test('V3-STAGES: bypass 아닌 행의 칸 합집합이 [80,400) 완전 피복·�
       for (const c of cells) {
         assert.ok(c.x0 < c.x1 && c.x0 >= ROAD[0] && c.x1 <= ROAD[1], 'S' + id + ' ' + row.id + ' 칸이 도로 안');
         assert.ok(Number.isInteger(c.value) && Number.isInteger(c.maxValue) && c.flashT === 0);
-        assert.ok(Math.abs(c.value) <= c.maxValue);
+        //  maxValue = '쏴서 올릴 수 있는 천장'이다(시작값의 절대치 상한이 아니다).
+        //   랜덤 길 −15 칸은 상한 0 = 무효화까지만 가능 — 그래서 |value| <= maxValue 가 아니라 아래 둘이 참이어야 한다.
+        assert.ok(c.value <= c.maxValue, 'S' + id + ' ' + row.id + ' 칸 값이 상한을 넘었다');
+        assert.ok(c.maxValue >= 0, 'S' + id + ' ' + row.id + ' 상한은 0 이상(최소 무효화까지)');
       }
       for (let i = 1; i < cells.length; i++) assert.ok(cells[i].x0 >= cells[i - 1].x1, '겹침 없음');
       if (row.bypass) { assert.equal(cells.length, 1); continue; }
@@ -246,6 +249,21 @@ test('V3-STAGES STG-5: 통로 안내 표지가 그 벽 구간 안 좌/우 통의
         const inWall = st.supplies.filter((s) => w.z0 - LEAD <= s.z && s.z <= w.z1
           && (side === 'L' ? s.x - s.r <= w.x0 : s.x + s.r >= w.x1));
         if (sg.kind === 'none') { assert.equal(inWall.length, 0, 'S' + id + ' ' + w.id + ' ' + side + ' 은 빈 통로여야 한다'); continue; }
+        //  '?' 표지(랜덤 길, 계약서 3-9): 내용이 판마다 바뀌므로 표지는 '무엇인지 모른다'는 사실만 약속한다.
+        //   대신 그 통로의 실제 물체가 이번 판 추첨 결과(stage.lottery)와 일치하는지 검사한다.
+        if (sg.kind === 'lottery') {
+          const lot = st.lottery;
+          assert.ok(lot, 'S' + id + ' ' + w.id + ' 랜덤 길 표지인데 stage.lottery 가 없다');
+          assert.equal(lot.wallId, w.id, '랜덤 길은 그 벽의 통로다');
+          if (lot.supplyId) {
+            assert.equal(inWall.length, 1, 'S' + id + ' ' + w.id + ' ' + side + ' 통 1개(추첨이 통일 때)');
+            assert.equal(inWall[0].id, lot.supplyId);
+            assert.equal(inWall[0].kind, lot.kind);
+          } else {
+            assert.equal(inWall.length, 0, 'S' + id + ' ' + w.id + ' ' + side + ' 추첨이 통이 아니면 통은 없다');
+          }
+          continue;
+        }
         assert.equal(inWall.length, 1, 'S' + id + ' ' + w.id + ' ' + side + ' 통이 정확히 1개');
         const s = inWall[0];
         assert.equal(sg.kind, s.kind, 'S' + id + ' ' + w.id + ' ' + side + ' 표지 종류');

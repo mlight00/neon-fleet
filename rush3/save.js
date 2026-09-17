@@ -82,14 +82,16 @@ function mergeStage(cur, inc) {
   return { versions };
 }
 
-function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: BASE_DIFFICULTY, volume: 1, mute: false }; }
+//  저장에 난이도가 없을 때의 초기 선택 = 극한(2026-09-16 이사 결정). 기록 접미 규칙의 기준(BASE_DIFFICULTY=normal)과는 다른 값이다
+const PICK_DEFAULT = 'brutal';
+function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false }; }
 //  전체 정규화(형식이 맞는 원문에만 적용)
 function normalize(d) {
   const out = defaults();
   for (const [id, st] of Object.entries(d.stages)) out.stages[id] = normStage(st);
   out.lastStage = typeof d.lastStage === 'string' || Number.isFinite(d.lastStage) ? d.lastStage : null;
   //  마지막으로 고른 난이도(형식만 검사 — 실제 id 판정은 셸이 DIFFICULTY_IDS 로 한다)
-  out.difficulty = typeof d.difficulty === 'string' && d.difficulty ? d.difficulty : BASE_DIFFICULTY;
+  out.difficulty = typeof d.difficulty === 'string' && d.difficulty ? d.difficulty : PICK_DEFAULT;
   out.volume = Math.max(0, Math.min(1, num(d.volume, 1)));
   out.mute = d.mute === true;
   return out;

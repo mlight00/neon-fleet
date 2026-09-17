@@ -52,6 +52,10 @@ export function createRun(stage, { difficulty } = {}) {
     eshots: [],
     boss: null,
     wallSide: {},
+    //  지나온 벽의 통로 선택 기록(지워지지 않는다). wallSide 는 벽을 빠져나가면 삭제되므로 결과 화면이 읽을 수 없다
+    wallSideLog: {},
+    //  랜덤 길 추첨 결과(stages.buildStage 가 판마다 박는다). 규칙은 읽지 않고 셸의 결과 문구·'?' 연출만 쓴다
+    lottery: stage.lottery ?? null,
     pendingRewards: [],
     time: 0, peak: 0, kills: 0, lossByTouch: 0, lossByShot: 0, lossByGate: 0, missedSupplies: 0, skippedSupplies: 0, badGatesPassed: 0, lastBadGateId: null,
     over: false, won: false, wonAt: null,
