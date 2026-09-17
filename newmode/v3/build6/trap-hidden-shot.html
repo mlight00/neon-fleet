@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>공개 전 누출 검증 하네스</title>
+<style>html,body{margin:0;background:#05080E}canvas{display:block}</style>
+</head>
+<body>
+<!-- 공개 전 누출(수정 라운드 1 지적 1) 육안 검증용 하네스. 게임 파일 무수정.
+     ⚠️trap-shot.html 과 달리 **실제 셸(main.boot)** 을 태운다 — 막힘 스파크의 색과 소리를 고르는 것은 셸(handleEvents)이라
+     렌더만 직접 부르는 하네스로는 이 누출을 볼 수 없다. 프레임·시계·오디오만 주입해 한 프레임씩 세워 놓고 찍는다.
+     ⚠️캔버스 id 가 game3 가 아니라 main.js 자동 부트가 붙지 않는다. -->
+<canvas id="shot" width="480" height="800"></canvas>
+<script type="module">
+import { boot } from '../../../rush3/main.js';
+import { buildStage } from '../../../rush3/stages.js';
+import { createSave3 } from '../../../rush3/save.js';
+import { hashSeed } from '../../../rush/rng.js';
+
+//  랜덤 길 추첨이 pick 으로 걸리는 시각(셸의 시드 조립 규칙 그대로)
+window.__timeFor = (pick, base = 1700000000000) => {
+  for (let i = 0; i < 40; i++) {
+    const t = base + i * 86400000;
+    if (buildStage(3, { lotterySeed: hashSeed('lot:3:0:' + t) }).lottery.pick === pick) return t;
+  }
+  return null;
+};
+
+const queue = [];
+let nowMs = 1000, app = null;
+const played = [];
+const memStore = (() => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) }; })();
+const audio = { played, unlock() {}, sfx(n) { played.push(n); return true; }, bgmPlay() {}, bgmPause() {}, bgmResume() {},
+                setVolume() {}, getVolume() { return 1; }, setMuted() {}, isMuted() { return false; }, duck() {} };
+
+window.__boot = async (t) => {
+  app = boot(document.getElementById('shot'), { raf: (f) => queue.push(f), now: () => nowMs, dateNow: () => t,
+                                                save: createSave3(memStore), audio, spriteBase: '../../../assets/rush/' });
+  await app.ready;
+  window.__app = app;
+  return true;
+};
+//  프레임 n 개(60fps). 셸이 스스로 그리므로 캔버스는 언제나 마지막 프레임 상태다
+window.__frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; const f = queue.shift(); if (f) f(nowMs); } return Math.round(app.getRun() ? app.getRun().z : -1); };
+window.__start = (id) => { app.startRun(id); return app.getRun().lottery; };
+window.__aim = (x) => { app.input.state.pointerX = x; };
+window.__sfxFrom = (i) => played.slice(i);
+window.__sfxLen = () => played.length;
+//  화면의 파편 색 집계(색이 곧 누출이다) — 색은 BAL3.colors 문자열 그대로 들어온다
+window.__partColors = () => {
+  const m = {};
+  for (const p of app.getFx().parts) { const k = p.flash ? 'flash' : String(p.color); m[k] = (m[k] ?? 0) + 1; }
+  return m;
+};
+window.__state = () => { const r = app.getRun(); return { z: Math.round(r.z), revealZ: r.lottery.revealZ, pick: r.lottery.pick, parts: app.getFx().parts.length }; };
+window.__READY = true;
+</script>
+</body>
+</html>

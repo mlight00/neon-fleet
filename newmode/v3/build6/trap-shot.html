@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>함정 외형 렌더 검증 하네스</title>
+<style>html,body{margin:0;background:#05080E}canvas{display:block}</style>
+</head>
+<body>
+<!-- 함정(확정 −10) 외형·[다시 도전] 부연 육안 검증용 하네스(2026-09-17 이사 결정 ①③).
+     build4/lottery-shot.html 과 같은 틀이며, 달라진 것은 ① fx.gateTip 을 실을 수 있게 한 것
+     ② 결과 화면 버튼 자리를 셸(main.js)과 같이 랜덤 길 판에서 22px 내린 것뿐이다.
+     ⚠️캔버스 id 가 game3 가 아니라 main.js 자동 부트가 붙지 않는다(셸 상태기계 대신 여기서 직접 그린다). -->
+<canvas id="shot" width="480" height="800"></canvas>
+<script type="module">
+import { buildStage } from '../../../rush3/stages.js';
+import { createRun, stepRun, drainEvents, STEP } from '../../../rush3/combat.js';
+import { createRenderer3 } from '../../../rush3/render.js';
+import { loadSprites3 } from '../../../rush3/sprites.js';
+import { lotteryLine, missedLine, timeText, isFixedGateRow, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED,
+         emptyLotteryOutcome, collectLotteryOutcome } from '../../../rush3/main.js';
+import { adviceLine } from '../../../rush3/advice.js';
+import { BAL3 } from '../../../rush3/balance.js';
+import { hashSeed } from '../../../rush/rng.js';
+
+const canvas = document.getElementById('shot');
+const ctx = canvas.getContext('2d');
+let renderer = null, run = null, stage = null;
+//  main.makeFx() 와 같은 모양(렌더가 읽는 필드만)
+const fx = { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, gateTip: {}, gateTipSeen: {}, shakeT: 0, hurtT: 0, guideT: 0,
+             eliteT: 0, shutterT: 0, shutterText: null, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null, lotOpen: 0, lotSeen: false, lotSame: false };
+
+function view(now) {
+  return { state: 'run', now, saveOk: true, run, fx,
+           hud: { distM: Math.max(0, Math.round((run.length - run.z) / 10)) },
+           buttons: [{ id: 'pause', x: 422, y: 14, w: 44, h: 44, label: '❚❚' }] };
+}
+
+/** 시드를 주고 S3 를 시작한다. seedKey = 'lot:3:<i>' 형식(검사와 같은 조립 규칙) */
+window.__start = (seedKey, difficulty = 'normal') => {
+  stage = buildStage(3, { difficulty, lotterySeed: hashSeed(seedKey) });
+  run = createRun(stage);
+  fx.lotOpen = 0; fx.lotSeen = false; fx.lotSame = false;
+  fx.gateTip = {}; fx.gateOpen = {}; fx.gateFlash = {};
+  //  ⚠️결과 한 줄은 '추첨 이름'이 아니라 **실제 적용량**으로 나와야 한다(2차 검수 N4) — 셸처럼 집계 그릇을 달아 둔다
+  run.lotteryOutcome = run.lottery ? emptyLotteryOutcome() : null;
+  return stage.lottery;
+};
+
+/** zTarget 까지 진행. tx 를 매 STEP 고정해 통로를 고른다. 셸의 랜덤 길 공개 처리를 같은 조건으로 따라 한다. */
+window.__advance = (zTarget, tx = 240) => {
+  let n = 0;
+  while (run.z < zTarget && !run.over && n < 20000) {
+    run.tx = tx;
+    stepRun(run, { pointerX: null, dragDx: 0, keyDir: 0 }, STEP);
+    collectLotteryOutcome(run.lotteryOutcome, drainEvents(run), run);
+    if (run.lottery && !fx.lotSeen && run.z >= run.lottery.revealZ) { fx.lotSeen = true; fx.lotOpen = BAL3.lottery.openT; }
+    n++;
+  }
+  return { z: Math.round(run.z), x: Math.round(run.x), units: run.units.length, steps: n };
+};
+
+window.__setLotOpen = (v) => { fx.lotOpen = v; };
+//  사진용: 화면의 아군 탄만 지운다(숫자 위에 탄이 겹치면 '−10' 이 '+10' 처럼 보인다). 규칙에는 영향이 없다
+window.__clearShots = () => { run.bullets.length = 0; return true; };
+//  셸이 gateArm 에서 고르는 짧은 글을 그대로 얹는다(행 종류에 따라 '지금 쏘면 +1' / '쏴도 그대로예요')
+window.__tip = (rowId) => {
+  const row = run.gateRows.find((r) => r.id === rowId);
+  fx.gateTip[rowId] = { text: isFixedGateRow(row) ? GATE_TIP_OPEN_FIXED : GATE_TIP_OPEN, t: BAL3.fx.gateTipSec };
+  return fx.gateTip[rowId].text;
+};
+window.__draw = (now = 1) => { renderer.draw(view(now)); return true; };
+window.__lot = () => (run ? run.lottery : null);
+window.__row = (rowId) => {
+  const r = run.gateRows.find((x) => x.id === rowId);
+  return r ? { armed: r.armed, passed: r.passed, value: r.cells[0].value, maxValue: r.cells[0].maxValue } : null;
+};
+
+//  결과 화면(랜덤 길 한 줄 + [다시 도전] 아래 부연 확인용). 버튼 자리는 main.js 와 같다(랜덤 길 판은 22px 아래로)
+window.__drawResult = (won = true) => {
+  const r = { stageId: run.stageId, stageVersion: run.stageVersion, difficulty: run.difficulty, title: run.title,
+              won, survivors: run.units.length, peak: run.peak, time: run.time, timeText: timeText(run.time), kills: run.kills,
+              missedLine: missedLine(run), advice: adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }),
+              isBest: false, saveOk: true, nextId: null };
+  const gap = r.lottery ? 22 : 0;
+  renderer.draw({ state: 'result', now: 1, saveOk: true, result: r, run, fx,
+                  hud: { distM: 0 },
+                  buttons: [{ id: 'retry', x: 120, y: 480, w: 240, h: 56, label: '다시 도전', primary: true },
+                            { id: 'title', x: 120, y: 552 + gap, w: 240, h: 44, label: '스테이지 선택' }] });
+  return r.lottery;
+};
+
+const sprites = loadSprites3('../../../assets/rush/');
+Promise.resolve(sprites.ready ?? sprites).then(() => { renderer = createRenderer3(ctx, sprites); window.__READY = true; });
+</script>
+</body>
+</html>
