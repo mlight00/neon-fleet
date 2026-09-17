@@ -1,0 +1,17 @@
+{
+  "zipSha256": "1575ae26d55aed35ea94188ba6f1820e794ef7b0180a82408e0fb354e5c68393",
+  "submittedFilesChanged": [],
+  "submittedTestsPassed": 213,
+  "regressionRuns": 21,
+  "policyRuns": 72,
+  "bossRuns": 18,
+  "lotteryRuns": 30,
+  "browser": "title default brutal; normal S2 gate/lose/retry; no warnings or errors observed",
+  "notVerified": [
+    "mobile device",
+    "new-player test",
+    "legacy 32 tests",
+    "audio quality",
+    "git commit identity"
+  ]
+}
