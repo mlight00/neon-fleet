@@ -14,6 +14,10 @@ const SFX = {
   gateFlip:   ['nf_sfx_gate_good_1', 'nf_sfx_gate_good_2'],
   //  게이트 셔터 열림(사격 활성 구간 진입) — 행마다 1회
   gateOpen:   ['nf_sfx_gate_good_1'],
+  //  닫힌 셔터에 탄이 막힘 = 금속 튕김(피격음과 다른 계열이라 '지금은 안 먹힌다'가 소리로도 구분된다)
+  gateClang:  ['nf_sfx_shield_pop_1', 'nf_sfx_shield_pop_2'],
+  //  랜덤 길 위험 항목 공개 = 중립 경고음(피격음이 아니다 — 무력화 성공을 흐리지 않게, 2026-09-17 검수 N4)
+  lotWarn:    ['nf_sfx_telegraph_1'],
   //  3명 이상 합류·무기 교체
   joinMany:   ['nf_sfx_evolve_1'],
   weaponSwap: ['nf_sfx_buy_1'],
@@ -26,15 +30,18 @@ const SFX = {
   click:      ['nf_sfx_click_1'],
 };
 //  이름별 스로틀(초). 기본 0.045, 아래는 예외
-const THROTTLE = { crateHit: 0.03, kill: 0.08, hurt: 0.25, gateTick: 0.03 };
+const THROTTLE = { crateHit: 0.03, kill: 0.08, hurt: 0.25, gateTick: 0.03, gateClang: 0.09 };
 const THROTTLE_DEFAULT = 0.045;
 const VOL = { fire_rifle: 0.11, fire_auto: 0.11, fire_heavy: 0.14, crateHit: 0.35, crateBreak: 0.7, gateTick: 0.4, gateFlip: 0.6, gateOpen: 0.45,
+              gateClang: 0.3, lotWarn: 0.55,
               joinMany: 0.8, weaponSwap: 0.6, hurt: 0.55, kill: 0.4, elite: 0.8, win: 0.8, lose: 0.75, click: 0.5 };
 //  이름별 Audio 풀 크기(순환) · 전체 동시 재생 상한
 const POOL_SIZE = 4;
 const MAX_CONCURRENT = 12;
 
 export const SFX_NAMES3 = Object.freeze(Object.keys(SFX));
+//  이름 → 실존 파일 목록(검사에서 assets/sound 에 그 .ogg 가 있는지 대조한다 — 없는 파일을 매핑하면 소리가 조용히 사라진다)
+export const SFX_FILES3 = Object.freeze(Object.fromEntries(Object.entries(SFX).map(([k, v]) => [k, Object.freeze(v.slice())])));
 
 export function createAudio3({ dir = 'assets/sound/' } = {}) {
   const hasAudio = typeof Audio !== 'undefined';

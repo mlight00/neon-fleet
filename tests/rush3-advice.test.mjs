@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { adviceLine, ADVICE_DEFAULT } from '../rush3/advice.js';
 import { buildStage } from '../rush3/stages.js';
 import { createRun } from '../rush3/combat.js';
+import { playPolicy } from './lib/rush3-policies.mjs';
 
 //  최소 run: 손실 집계 + 행·통만 있으면 된다
 function mkRun(o = {}) {
@@ -80,4 +81,37 @@ test('V3-HINT: 실제 배치의 통·게이트에 hint 문구가 들어 있다(�
   assert.equal(typeof run.gateRows[0].hint, 'string');
   assert.equal(run.skippedSupplies, 0);
   assert.equal(run.lastBadGateId, null);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-HINT-N1(2026-09-17 2차 검수 N1) — 실패 안내는 **그 판에서 실제로 할 수 있는 행동**이어야 한다.
+//  S2 는 2명으로 시작하고 첫 게이트(z1140) 앞에는 보급이 없다. 옛 문구 '병력이 더 모인 뒤에 오른쪽'은
+//  같은 첫 게이트를 더 많은 병력으로 다시 만날 방법이 없어 실행 불가능한 권유였다.
+// ─────────────────────────────────────────────────────────────────────────────
+test('V3-HINT-N1: S2 첫 게이트 우측을 골라 전멸한 판의 제안 한 줄이 실행 가능한 다음 행동을 알려준다', () => {
+  //  우측 고정 봇 = 검수가 재현한 조건(오른쪽에 서서 쏘다 −20 칸을 통과)
+  const { run } = playPolicy(2, 'right', 14400);
+  assert.equal(run.over, true);
+  assert.equal(run.won, false);
+  assert.equal(run.lastBadGateId, 'g1', '마지막으로 통과한 음수 게이트 = S2 첫 게이트');
+  assert.equal(run.lossByGate, 2, '2명으로 시작해 −20 칸에서 둘 다 잃는다');
+  assert.ok(run.time < 10, '약 6초 만에 끝난다: ' + run.time.toFixed(2));
+  const line = adviceLine(run, run);
+  assert.equal(line, '첫 갈림길은 왼쪽 +칸으로 통과하세요. 뒤에서 병력을 모아 큰 게이트에 도전할 수 있어요.');
+  //  배치의 hint 가 1순위로 그대로 나온다(기본 문구로 떨어지지 않는다)
+  assert.equal(line, buildStage(2).gateRows[0].hint);
+  //  옛 문구(그 자리에서 실행할 수 없는 권유)는 배치에도 기본 문구에도 남아 있지 않다
+  for (const s of [line, ADVICE_DEFAULT.gate]) {
+    assert.ok(!/병력이 더 모인 뒤/.test(s), '실행 불가능한 옛 문구가 남아 있다: ' + s);
+  }
+});
+
+test('V3-HINT-N1: 기본 게이트 문구도 지금 할 수 있는 행동이다(배치에 hint 가 없을 때)', () => {
+  const r = mkRun({ lossByGate: 4, lastBadGateId: 'g1', gateRows: [row('g1', 1140, -20, null)] });
+  assert.equal(adviceLine(r, null), ADVICE_DEFAULT.gate);
+  //  '피할 수 있다 + 한 칸 옆으로' = 같은 판에서 바로 해 볼 수 있는 행동
+  assert.ok(/옆/.test(ADVICE_DEFAULT.gate) && /칸/.test(ADVICE_DEFAULT.gate), ADVICE_DEFAULT.gate);
+  //  행에 hint 가 있으면 언제나 그것이 이긴다(우선순위 1의 뜻)
+  const r2 = mkRun({ lossByGate: 4, lastBadGateId: 'g1', gateRows: [row('g1', 1140, -20, '배치 문구가 이긴다')] });
+  assert.equal(adviceLine(r2, null), '배치 문구가 이긴다');
 });

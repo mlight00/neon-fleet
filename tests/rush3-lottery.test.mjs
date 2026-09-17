@@ -10,7 +10,7 @@ import { makeSupply, hitSupply, activateChain, applySupplyReward, supplyActive }
 import { hitGateCell, passGateRow, updateGateArm, cellAt } from '../rush3/gates.js';
 import { makeUnit, layoutUnits, addUnits } from '../rush3/squad.js';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
-import { lotteryLine } from '../rush3/main.js';
+import { lotteryLine, emptyLotteryOutcome, collectLotteryOutcome } from '../rush3/main.js';
 import { adviceLine } from '../rush3/advice.js';
 import { BAL3 } from '../rush3/balance.js';
 import { WEAPONS } from '../rush3/weapons.js';
@@ -393,12 +393,24 @@ function rightAtW3(run) {
   if (run.z >= 5940 && run.z < 6600) return 330;
   return pickX('plan', run);
 }
-function playRight(seed, difficulty = 'normal') {
+//  ⚠️결과 한 줄은 이제 **실제 적용값**을 읽는다(2026-09-17 2차 검수 N4). 셸이 하는 일을 여기서도 그대로 한다 —
+//   규칙 계층 이벤트를 collectLotteryOutcome 에 흘려 run.lotteryOutcome 을 채운 뒤 lotteryLine 을 부른다.
+function playRight(seed, difficulty = 'normal', route = rightAtW3) {
   const stage = buildStage(3, { difficulty, lotterySeed: seed });
   const run = createRun(stage);
+  run.lotteryOutcome = emptyLotteryOutcome();
   let n = 0;
-  while (!run.over && n < 14400) { stepRun(run, { pointerX: rightAtW3(run), dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); n++; }
+  while (!run.over && n < 14400) {
+    stepRun(run, { pointerX: route(run), dragDx: 0, keyDir: 0 }, STEP);
+    collectLotteryOutcome(run.lotteryOutcome, drainEvents(run), run);
+    n++;
+  }
   return { stage, run };
+}
+//  중화기를 미리 든 채 랜덤 길 중화기를 만나는 노선(선택 B 우측 = z3500 중화기 통 → w3 우측)
+function heavyThenRight(run) {
+  if (run.z >= 2400 && run.z < 3600) return 330;
+  return rightAtW3(run);
 }
 //  분리벽 w3 를 빠져나온 직후(z 7200)의 병력. 랜덤 길이 실제로 얼마를 주고 얼마를 뺏었는지 그 자리에서 잰다
 function unitsAtWallEnd(seed, side, difficulty) {
@@ -488,7 +500,7 @@ test('V3-LOTTERY LOT-7: 좌측 통로를 고르면 랜덤 길 통은 skipped(놓
   }
 });
 
-test('V3-LOTTERY LOT-7b: 우측 통로를 고르면 결과 한 줄이 획득/꽝을 그대로 적는다', () => {
+test('V3-LOTTERY LOT-7b: 우측 통로를 고르면 결과 한 줄이 실제 결과를 적는다', () => {
   const good = playRight(SEED_OF.soldier8);
   assert.equal(good.run.wallSideLog.w3, 'R');
   const s = good.run.supplies.find((c) => c.id === good.run.lottery.supplyId);
@@ -498,15 +510,67 @@ test('V3-LOTTERY LOT-7b: 우측 통로를 고르면 결과 한 줄이 획득/꽝
   const leftCrate = good.run.supplies.find((c) => c.id === 'c9');
   assert.equal(leftCrate.skipped, true);
   assert.equal(leftCrate.missed, false);
-  //  꽝을 고르면 '꽝' 한 줄
+  //  ⚠️−15 게이트를 0 까지 올려 통과한 판은 **손실이 0** 이다. 추첨 이름만 적으면 막아낸 것을 '꽝'이라고 전한다
   const bad = playRight(SEED_OF.badGate);
   assert.equal(bad.run.wallSideLog.w3, 'R');
-  assert.equal(lotteryLine(bad.run), '랜덤 길: 꽝 −15 게이트');
-  //  무기 통이 이미 같은 등급이라 교체되지 않은 판은 '획득'이라 거짓말하지 않는다(셸 fx.lotSame)
-  const hv = playRight(SEED_OF.heavy);
-  assert.equal(lotteryLine(hv.run, { weaponSame: true }), '랜덤 길: 중화기 — 이미 같은 무기였습니다');
+  assert.equal(bad.run.lossByGate, 0, '쏴서 0 으로 만든 뒤 통과 = 실제 손실 0');
+  assert.equal(lotteryLine(bad.run), '랜덤 길: 위험 게이트 무력화 · 손실 0');
+  //  무기 통이 이미 같은 등급이라 교체되지 않은 판은 '획득'이라 거짓말하지 않는다(셸 opts.weaponSame 경로도 그대로)
+  const hv = playRight(SEED_OF.heavy, 'normal', heavyThenRight);
+  assert.equal(hv.run.weapon, 'heavy');
+  assert.equal(lotteryLine(hv.run), '랜덤 길: 중화기 중복 · 교체 없음');
+  assert.equal(lotteryLine(hv.run, { weaponSame: true }), '랜덤 길: 중화기 중복 · 교체 없음');
   //  랜덤 길이 없는 스테이지는 한 줄도 없다
   assert.equal(lotteryLine(createRun(buildStage(1))), null);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOT-11(2026-09-17 2차 검수 N4) — 결과 문구는 **추첨 종류의 이름이 아니라 실제 적용 결과**다.
+//  근거: 같은 '−15 게이트'가 손실 0(무력화)로도, 손실 15 로도 끝난다. 이름만 적으면 잘한 판과 못한 판이 같은 문구가 된다.
+// ─────────────────────────────────────────────────────────────────────────────
+test('V3-LOTTERY LOT-11: 풀 5종 각각 실제 결과 문구가 나온다(무력화·함정 피해·발판 수·중복·획득)', (t) => {
+  const rows = [];
+  const seen = {};
+  for (const id of POOL_IDS) {
+    assert.ok(SEED_OF[id], id);
+    const { run } = playRight(SEED_OF[id]);
+    assert.equal(run.lottery.pick, id, id + ': 이 판의 추첨 결과(기본 시드 폴백 금지)');
+    assert.equal(run.wallSideLog.w3, 'R', id + ': 우측 통로를 골랐다');
+    const out = run.lotteryOutcome, line = lotteryLine(run);
+    seen[id] = line;
+    rows.push([id, line, out.applied, out.soldiers, out.pads + '/' + out.padsTotal, out.swapped].join('\t'));
+  }
+  //  ① 막을 수 있는 −15 게이트를 0 으로 만든 뒤 통과 → '손실 0'(이름이 아니라 결과)
+  assert.equal(seen.badGate, '랜덤 길: 위험 게이트 무력화 · 손실 0');
+  //  ② 확정 −10 은 쏴도 안 오르므로 실제 피해가 그대로 적힌다
+  assert.equal(seen.trapGate, '랜덤 길: 함정 피해 −10명');
+  //  ③ 연속 증원은 '밟은 발판 / 깔린 발판'
+  assert.match(seen.chain6, /^랜덤 길: 증원 발판 \d+\/\d+개 확보$/);
+  //  ④⑤ 병사·무기
+  assert.equal(seen.soldier8, '랜덤 길: 병사 8 획득');
+  assert.equal(seen.heavy, '랜덤 길: 중화기 획득');
+  //  어느 문구도 '꽝'이라는 이름만 적고 끝내지 않는다
+  for (const [id, line] of Object.entries(seen)) assert.ok(!/^랜덤 길: 꽝/.test(line), id + ': 이름만 적혀 있다 — ' + line);
+  t.diagnostic('추첨\t결과 한 줄\t게이트 적용\t병사\t발판\t무기교체');
+  for (const r of rows) t.diagnostic(r);
+});
+
+test('V3-LOTTERY LOT-11b: 집계는 규칙 계층의 기존 이벤트만 읽는다(랜덤 길 것만 골라 센다)', () => {
+  const st = buildStage(3, { lotterySeed: SEED_OF.soldier8 });
+  const run = createRun(st);
+  const out = emptyLotteryOutcome();
+  //  같은 종류의 이벤트라도 id 가 랜덤 길 것이 아니면 세지 않는다(c9 = 좌 통, g1 = 코스 게이트)
+  collectLotteryOutcome(out, [
+    { type: 'joinMany', id: 'c9', n: 10 },
+    { type: 'gatePass', id: 'g1', value: -25, applied: -25 },
+    { type: 'padTake', id: 'c9', idx: 0 },
+  ], run);
+  assert.deepEqual(out, emptyLotteryOutcome(), '다른 물체의 이벤트는 랜덤 길 결과가 아니다');
+  collectLotteryOutcome(out, [{ type: 'joinMany', id: st.lottery.supplyId, n: 8 }], run);
+  assert.equal(out.soldiers, 8);
+  //  랜덤 길이 없는 판(S1·S2)은 집계 자체가 없다
+  const none = createRun(buildStage(1));
+  assert.equal(collectLotteryOutcome(null, [], none), null);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

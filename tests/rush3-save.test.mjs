@@ -1,11 +1,12 @@
 // rush3-save — 계약서 8장 V3-SAVE + 자산 모듈 Node 스모크
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { createSave3, KEY3, BAK3, recordKey, BASE_DIFFICULTY } from '../rush3/save.js';
 import { STAGE_IDS, buildStage, stageVersion } from '../rush3/stages.js';
 import { createRun } from '../rush3/combat.js';
 import { SPRITE_KEYS3, loadSprites3 } from '../rush3/sprites.js';
-import { createAudio3, SFX_NAMES3 } from '../rush3/audio.js';
+import { createAudio3, SFX_NAMES3, SFX_FILES3 } from '../rush3/audio.js';
 
 const memStorage = (init = {}) => { const m = new Map(Object.entries(init)); return {
   m, getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
@@ -234,7 +235,9 @@ test('V3-SPRITES: 키 목록 11개 고정·Node 에서 loadSprites3 는 전부 n
 });
 
 test('V3-AUDIO: Node 에서 createAudio3 는 예외 없이 no-op, 이름 목록 고정', () => {
-  const need = ['fire_rifle', 'fire_auto', 'fire_heavy', 'crateHit', 'crateBreak', 'gateTick', 'gateFlip', 'joinMany', 'weaponSwap', 'hurt', 'kill', 'elite', 'win', 'lose', 'click'];
+  const need = ['fire_rifle', 'fire_auto', 'fire_heavy', 'crateHit', 'crateBreak', 'gateTick', 'gateFlip', 'joinMany', 'weaponSwap', 'hurt', 'kill', 'elite', 'win', 'lose', 'click',
+    //  2026-09-17 2차 검수: 셔터에 막힌 탄(금속 튕김) · 랜덤 길 위험 공개(중립 경고음) — 색·이름만이 아니라 소리로도 구분한다
+    'gateOpen', 'gateClang', 'lotWarn'];
   for (const n of need) assert.ok(SFX_NAMES3.includes(n), n);
   const a = createAudio3({ dir: 'assets/sound/' });
   a.unlock();
@@ -469,4 +472,33 @@ test('V3-SAVE-VERSION DIFF: 마지막 난이도(difficulty) — 기본은 타이
   }
   //  save 는 난이도 id 를 판정하지 않는다(그건 셸 normDifficulty 의 몫) — 문자열이면 그대로 둔다
   assert.equal(createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, difficulty: 'zzz' }) })).get().difficulty, 'zzz');
+});
+
+test('V3-AUDIO: SFX 맵의 모든 이름이 실존 음원 파일로 간다(없는 파일을 적으면 소리가 조용히 사라진다)', () => {
+  const dir = new URL('../assets/sound/', import.meta.url);
+  for (const name of SFX_NAMES3) {
+    const files = SFX_FILES3[name];
+    assert.ok(Array.isArray(files) && files.length > 0, name + ': 파일 목록이 있어야 한다');
+    for (const f of files) {
+      assert.equal(existsSync(new URL(f + '.ogg', dir)), true, name + ' → ' + f + '.ogg 가 없다');
+    }
+  }
+});
+
+test('V3-SAVE: seenShutter — 새 저장은 false, true 로 저장되면 재로드 뒤에도 남는다(첫 셔터 안내는 사용자당 1회)', () => {
+  const st = memStorage();
+  const a = createSave3(st);
+  assert.equal(a.get().seenShutter, false, '새 사용자는 셔터 안내를 본 적이 없다');
+  a.patch({ seenShutter: true });
+  assert.equal(a.get().seenShutter, true);
+  assert.equal(createSave3(st).get().seenShutter, true, '재로드 뒤에도 남는다');
+  //  다른 필드를 고쳐도 지워지지 않고, 형식이 아니면(문자열·숫자) false 로 본다
+  a.patch({ volume: 0.5 });
+  assert.equal(a.get().seenShutter, true);
+  a.patch({ seenShutter: 'yes' });
+  assert.equal(a.get().seenShutter, false);
+  //  옛 저장(필드 없음)은 false — 그 사용자에게는 안내가 한 번 더 뜬다(없던 안내를 본 것으로 치지 않는다)
+  const old = memStorage();
+  old.setItem('starforgeRush.v3', JSON.stringify({ v: 3, stages: {}, volume: 1, mute: false }));
+  assert.equal(createSave3(old).get().seenShutter, false);
 });

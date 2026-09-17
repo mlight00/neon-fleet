@@ -1,12 +1,16 @@
 // rush3-loop — 셸 묶음(계약서 8장 V3-DETERMINISM·V3-INPUT + boot 스모크). DOM 없이 main.js 를 import 한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine, DIFF_TOGGLE, normDifficulty } from '../rush3/main.js';
+import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine, DIFF_TOGGLE, normDifficulty,
+         emptyLotteryOutcome, GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
+         isFixedGateRow } from '../rush3/main.js';
+import { makeGateRow } from '../rush3/gates.js';
 import { createInput } from '../rush3/input.js';
 import { createRun, stepRun, STEP } from '../rush3/combat.js';
 import { buildStage, stageVersion, DEFS, LOTTERY_DEFAULT_SEED } from '../rush3/stages.js';
 import { createSave3 } from '../rush3/save.js';
 import { BAL3 } from '../rush3/balance.js';
+import { hashSeed } from '../rush/rng.js';
 
 // STEP 인덱스별 입력열(결정적): 호버 x 는 사인파, 40~60 STEP 마다 드래그·키 조향이 섞인다
 function inputAt(i) {
@@ -296,7 +300,7 @@ function fakeWin() {
   };
 }
 
-async function bootFake() {
+async function bootFake(opts = {}) {
   const calls = [];
   const texts = [];
   const canvas = fakeCanvas(calls, texts);
@@ -306,12 +310,15 @@ async function bootFake() {
   const storage = fakeStorage();
   const save = createSave3(storage);
   const audio = fakeAudio();
-  const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() } });
+  const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio,
+    dateNow: opts.dateNow, sprites: { get: () => null, ready: new Set() } });
   await app.ready;
   //  프레임 n 개를 dt(ms) 간격으로 돌린다
   const frames = (n, dtMs = 1000 / 60) => { for (let i = 0; i < n; i++) { nowMs += dtMs; const f = queue.shift(); f(nowMs); } };
   return { app, canvas, win, calls, texts, frames, save, audio, storage, now: () => nowMs };
 }
+//  랜덤 길 시드를 고정한 boot 스모크(연출·효과음까지 보려면 bootLot 이 아니라 이쪽 — 프레임·오디오 기록이 필요하다)
+const bootFakeLot = (dateNow) => bootFake({ dateNow });
 
 test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → 일시정지 중 z 정지 → 재개 → 봇 완주 → 결과·저장', async () => {
   const { app, canvas, win, calls, frames, save, audio } = await bootFake();
@@ -696,4 +703,155 @@ test('V3-SHELL-LOTTERY: 셸이 시계·재도전 횟수로 시드를 만든다 �
   }
   assert.equal(seeds.size, 12, '시각 12개 → 시드 12개');
   assert.ok(picks.size >= 2, '시각이 달라도 같은 추첨만 나온다: ' + JSON.stringify([...picks]));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-SHELL-SHUTTER(2026-09-17 2차 검수 N2) — 셔터 안내·소리의 셸 결선.
+//  규칙 계층은 셔터가 열리고 막히는 것만 알린다(gateArm·gateBlock). '언제 무슨 글을 띄우고 무슨 소리를 내는가'는
+//  전부 셸이 정하므로, 이 결선이 빠지면 렌더 검사(V3-RENDER-SHUTTER)가 전부 통과해도 화면에는 아무 안내가 안 뜬다.
+// ─────────────────────────────────────────────────────────────────────────────
+test('V3-SHELL-SHUTTER: 첫 셔터 조우에 짧은 글 + 초보 배너 1회, 저장 seenShutter 에 기억된다', async () => {
+  const { app, frames, save, audio } = await bootFake();
+  assert.equal(save.get().seenShutter, false, '새 사용자는 셔터를 본 적이 없다');
+  app.startRun(2);                                   // S2 첫 게이트(z1140)에 셔터가 걸려 있다
+  const fx = () => app.getFx();
+  let guard = 0;
+  while (!fx().gateTip.g1 && guard++ < 900) frames(1);
+  assert.ok(guard < 900, '셔터 행이 화면에 들어오면 짧은 글이 뜬다');
+  assert.equal(fx().gateTip.g1.text, GATE_TIP_CLOSED);
+  assert.ok(fx().shutterT > 0, '첫 조우 배너가 떠 있다');
+  assert.deepEqual(fx().shutterText, SHUTTER_GUIDE_TEXT);
+  assert.equal(save.get().seenShutter, true, '배너는 사용자당 1회 — 저장에 남는다');
+  //  탄이 닫힌 셔터에 막히면 금속 튕김(색만으로 구분하지 않는다)
+  guard = 0;
+  while (audio.played.every((p) => p[0] !== 'gateClang') && guard++ < 900) { app.input.state.pointerX = 320; frames(1); }
+  assert.ok(guard < 900, '닫힌 셔터에 막힌 탄은 소리를 낸다');
+  //  열리는 순간: gateOpen 효과음 + '지금 쏘면 +1'
+  guard = 0;
+  while (!app.getRun().gateRows[0].armed && guard++ < 900) { app.input.state.pointerX = 320; frames(1); }
+  assert.ok(guard < 900, '셔터가 열렸다');
+  frames(1);
+  assert.equal(fx().gateTip.g1.text, GATE_TIP_OPEN);
+  assert.ok(audio.played.some((p) => p[0] === 'gateOpen'));
+  //  같은 사용자의 다음 판에는 배너가 다시 뜨지 않는다(짧은 글은 그대로 뜬다)
+  app.startRun(2);
+  guard = 0;
+  while (!app.getFx().gateTip.g1 && guard++ < 900) frames(1);
+  assert.ok(guard < 900);
+  assert.equal(app.getFx().shutterT, 0, '두 번째 판에는 초보 배너가 없다');
+});
+
+//  ⚠️'지금 쏘면 +1' 은 **쏘면 값이 오르는 행에만** 맞는 말이다. 랜덤 길 ⑤ 확정 −10 게이트(상한 = 자기 값)는
+//   몇 발을 맞아도 −10 그대로라, 같은 화면의 '확정' 꼬리표와 정면으로 어긋난다(2026-09-17 수정 라운드 1).
+//  시드를 골라 **실제 그 행이 열리는 판**까지 몰고 가서, 그 순간의 글이 무엇인지 본다.
+async function armLotteryGate(pick, guardMax = 6000) {
+  const T = 1_700_000_000_000;
+  let chosen = null;
+  for (let i = 0; i < 40 && chosen === null; i++) {
+    const t = T + i * 86_400_000;
+    if (buildStage(3, { lotterySeed: hashSeed('lot:3:0:' + t) }).lottery.pick === pick) chosen = t;
+  }
+  assert.ok(chosen !== null, pick + ' 이 걸리는 시각을 찾았다');
+  const { app, frames } = await bootFakeLot(() => chosen);
+  app.startRun(3);
+  const run = () => app.getRun();
+  assert.equal(run().lottery.pick, pick);
+  const rowId = run().lottery.rowId;
+  const row = () => run().gateRows.find((r) => r.id === rowId);
+  assert.ok(row(), pick + ': 랜덤 길 게이트 행이 있다');
+  let guard = 0;
+  while (!row().armed && guard++ < guardMax) { app.input.state.pointerX = run().z >= 4000 ? 330 : 240; frames(1); }
+  assert.ok(guard < guardMax, pick + ': 랜덤 길 게이트의 셔터가 열렸다');
+  return { rowId, tip: app.getFx().gateTip[rowId], row: row() };
+}
+
+test('V3-SHELL-SHUTTER: 쏴도 오르지 않는 확정 행이 열릴 때는 "지금 쏘면 +1" 이 뜨지 않는다', async () => {
+  //  ① 확정 −10(trapGate): 상한이 자기 값이라 값이 오르지 않는다 → 전용 문구
+  const trap = await armLotteryGate('trapGate');
+  assert.equal(trap.row.cells.every((c) => c.value < 0 && c.maxValue <= c.value), true, '이 행은 쏴도 오르지 않는다');
+  assert.ok(trap.tip, '열리는 순간 짧은 글이 뜬다');
+  assert.notEqual(trap.tip.text, GATE_TIP_OPEN, '확정 행에 "+1" 을 약속하면 칸 아래 "확정" 꼬리표와 어긋난다');
+  assert.equal(trap.tip.text, GATE_TIP_OPEN_FIXED);
+  //  ② 막을 수 있는 −15(badGate, 상한 0): 쏘면 실제로 오른다 → 종전 문구 그대로
+  const bad = await armLotteryGate('badGate');
+  assert.equal(bad.row.cells.some((c) => c.maxValue > c.value), true, '이 행은 쏘면 오른다');
+  assert.equal(bad.tip.text, GATE_TIP_OPEN);
+});
+
+test('V3-SHELL-SHUTTER: isFixedGateRow — 확정 손실 행만 참(빈 행·혼합 행·양수 행은 거짓)', () => {
+  assert.equal(isFixedGateRow(makeGateRow({ id: 'x', z: 100, cells: [{ x0: 0, x1: 100, value: -10, maxValue: -10 }] })), true);
+  assert.equal(isFixedGateRow(makeGateRow({ id: 'x', z: 100, cells: [{ x0: 0, x1: 100, value: -15, maxValue: 0 }] })), false, '상한 0 = 무력화할 수 있다');
+  assert.equal(isFixedGateRow(makeGateRow({ id: 'x', z: 100, cells: [{ x0: 0, x1: 80, value: -10, maxValue: -10 }, { x0: 80, x1: 160, value: 3 }] })), false, '한 칸이라도 오르면 확정 행이 아니다');
+  assert.equal(isFixedGateRow(makeGateRow({ id: 'x', z: 100, cells: [] })), false);
+  assert.equal(isFixedGateRow(null), false);
+});
+
+test('V3-SHELL-SHUTTER: 항상 열려 있는 S1 첫 게이트는 셔터가 아니다 — 그때는 배너가 뜨지 않는다', async () => {
+  const { app, frames, save } = await bootFake();
+  app.startRun(1);
+  //  S1 g1 은 armZ null(학습용). g2(z3040)가 화면에 들어오기 전(z 2280)까지는 셔터를 본 적이 없다
+  let guard = 0;
+  while (app.getRun().z < 1400 && guard++ < 900) frames(1);
+  assert.equal(app.getRun().gateRows[0].passed, true, '첫 게이트를 지났다');
+  assert.equal(app.getRun().gateRows[0].armZ, null, '이 행은 셔터가 없다');
+  assert.equal(save.get().seenShutter, false, '셔터를 본 적이 없는데 배웠다고 치지 않는다');
+  assert.equal(app.getFx().shutterT, 0);
+  assert.deepEqual(app.getFx().gateTip, {});
+  //  g2(셔터 있음)가 들어오면 그때 뜬다
+  guard = 0;
+  while (!app.getFx().gateTip.g2 && guard++ < 1400) frames(1);
+  assert.ok(guard < 1400, 'S1 둘째 게이트는 셔터가 걸려 있다');
+  assert.equal(save.get().seenShutter, true);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-SHELL-LOTTERY-OUT(2026-09-17 2차 검수 N4) — 결과 문구가 실제 결과를 읽는 결선.
+//  셸이 집계를 걸지 않으면 lotteryLine 은 추첨 이름으로 조용히 되돌아간다(막아낸 판도 '꽝'이라고 적힌다).
+// ─────────────────────────────────────────────────────────────────────────────
+test('V3-SHELL-LOTTERY-OUT: 출격이 집계 칸을 만들고, 랜덤 길이 없는 판은 만들지 않는다', async () => {
+  const { app } = await bootLot(() => 1_700_000_000_000);
+  app.startRun(3);
+  assert.deepEqual(app.getRun().lotteryOutcome, emptyLotteryOutcome(), 'S3 는 빈 집계로 시작한다');
+  app.startRun(1);
+  assert.equal(app.getRun().lotteryOutcome, null, 'S1 은 랜덤 길이 없다');
+});
+
+test('V3-SHELL-LOTTERY-OUT: 위험 항목 공개는 중립 경고음이고, 피격음은 실제 손실이 날 때만 난다', async () => {
+  //  확정 −10 게이트가 걸리는 시드로 우측 통로를 고른다(= 반드시 손실이 나는 판)
+  const T = 1_700_000_000_000;
+  let chosen = null;
+  for (let i = 0; i < 40 && !chosen; i++) {
+    const t = T + i * 86_400_000;
+    const seed = hashSeed('lot:3:0:' + t);
+    if (buildStage(3, { lotterySeed: seed }).lottery.pick === 'trapGate') chosen = t;
+  }
+  assert.ok(chosen, '확정 손실 게이트가 걸리는 시각을 찾았다');
+  const { app, audio, frames } = await bootFakeLot(() => chosen);
+  app.startRun(3);
+  const run = () => app.getRun();
+  let guard = 0, revealSfx = null;
+  //  공개선(revealZ)을 넘기는 **그 프레임에 난 소리**만 따로 본다(앞뒤 전투음에 휩쓸리지 않게)
+  while (revealSfx === null && guard++ < 4000) {
+    const before = audio.played.length;
+    app.input.state.pointerX = run().z >= 4000 ? 330 : 240;
+    frames(1);
+    if (app.getFx().lotSeen) revealSfx = audio.played.slice(before).map((p) => p[0]);
+  }
+  assert.ok(guard < 4000, '랜덤 길 공개선까지 왔다');
+  assert.equal(run().lottery.pick, 'trapGate');
+  assert.ok(revealSfx.includes('lotWarn'), '위험 항목 공개 = 중립 경고음: ' + JSON.stringify(revealSfx));
+  assert.ok(!revealSfx.includes('hurt'), '공개만으로 피격음을 내지 않는다: ' + JSON.stringify(revealSfx));
+  //  실제로 게이트를 통과해 병력을 잃는 순간에 피격음이 난다
+  guard = 0;
+  let lossSfx = null;
+  while (lossSfx === null && guard++ < 1200) {
+    const before = audio.played.length;
+    app.input.state.pointerX = 330;
+    frames(1);
+    if (run().lotteryOutcome.passed) lossSfx = audio.played.slice(before).map((p) => p[0]);
+  }
+  assert.ok(guard < 1200, '확정 손실 게이트를 통과했다');
+  assert.equal(run().lotteryOutcome.applied, -10);
+  assert.ok(lossSfx.includes('hurt'), '실제 손실이 나는 프레임에 피격음: ' + JSON.stringify(lossSfx));
+  assert.equal(lotteryLine(run()), '랜덤 길: 함정 피해 −10명');
 });

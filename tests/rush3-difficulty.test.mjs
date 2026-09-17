@@ -1,6 +1,7 @@
 // rush3-difficulty — 난이도 선택(계약서 3-8) V3-DIFF + V3-SIM-DIFF.
 //  V3-DIFF: 배수 표가 적 hp·적탄·접촉·정예·스폰 수에 정확히 반영되고, normal 은 종전과 완전히 같다(기존 검사 174건은 그대로 통과).
 //  V3-SIM-DIFF: 봇 정책 결과표(난이도 × 스테이지 × aim/center/plan). **봇 결과이지 사람의 성공률이 아니다.**
+//  SD-7: 위 결과표와 별개로 '성공 경로가 존재하는가'만 보는 검사(planBoss 봇 · 2차 검수 §4 Q3).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -244,4 +245,66 @@ test('V3-SIM-DIFF SD-5: 난이도 순서가 결과에 실린다 — 같은 스�
     const pk = DIFFS.map((d) => R(d, id, p).run.peak);
     assert.ok(pk[1] <= pk[0] && pk[2] <= pk[0], `S${id} ${p} peak ${pk.join('/')}`);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-SIM-DIFF SD-7 — 성공 경로 검사. 위 27판 결과표(SD-0~SD-6)와 **목적이 다르다**.
+//  SD-2·SD-3 는 '정예까지 코스가 이어지는가'(도달)를 보고, 여기서는 '이길 수 있는 조작이 하나라도 있는가'를 본다.
+//  봇 = planBoss: 보스 등장 전은 계획 봇 그대로, 보스가 나오면 보스 x 를 따라 조준한다(이동은 실제 STEP 속도 제한).
+//  ⚠️ 이것은 **봇 1판의 결정적 결과**이지 사람의 성공률이 아니다. 탄 회피를 최적화한 봇도 아니다.
+//  실측(2026-09-17): hard S1·S2·S3 와 brutal S1·S3 완주. brutal S2 만 실패(정예 hp 201 잔존) —
+//   2차 검수도 "극한 S2 는 단순 조준 변형으로 성공을 입증하지 못했다"고 적었다. 그래서 극한 S2·S3 는 기록만 하고 잠그지 않는다.
+// ─────────────────────────────────────────────────────────────────────────────
+const BOSS_RUNS = {};
+for (const d of ['hard', 'brutal']) for (const id of STAGE_IDS) BOSS_RUNS[d + ':' + id] = playPolicy(id, 'planBoss', 14400, d);
+const BR = (d, id) => BOSS_RUNS[d + ':' + id];
+const bossRow = (d, id) => {
+  const r = BR(d, id), run = r.run;
+  return { difficulty: d, stage: id, policy: 'planBoss', won: run.won, units: run.units.length, peak: run.peak, kills: run.kills,
+           lossByShot: run.lossByShot, lossByTouch: run.lossByTouch, weapon: run.weapon, eliteReached: r.events.elite === 1,
+           bossHpLeft: run.boss ? Math.ceil(run.boss.hp) : 0, time: +run.time.toFixed(1), steps: r.steps };
+};
+export const BOSS_TABLE = [];
+for (const d of ['hard', 'brutal']) for (const id of STAGE_IDS) BOSS_TABLE.push(bossRow(d, id));
+
+test('V3-SIM-DIFF SD-7 성공 경로: planBoss 가 hard S1·S2·S3 와 brutal S1 을 완주한다(봇 결과 — 사람 성공률 아님)', (t) => {
+  for (const r of BOSS_TABLE) t.diagnostic('SIM-BOSS ' + JSON.stringify(r));
+  //  잠그는 네 판 — 이 난이도·코스에 '이길 수 있는 조작'이 존재한다는 뜻이다
+  for (const id of STAGE_IDS) {
+    const r = BR('hard', id);
+    assert.equal(r.run.won, true, `hard S${id} planBoss 미완주(정예 잔여 hp ${r.run.boss ? Math.ceil(r.run.boss.hp) : 0})`);
+    assert.ok(r.run.units.length > 0, `hard S${id} planBoss 생존 병력 0`);
+  }
+  const b1 = BR('brutal', 1);
+  assert.equal(b1.run.won, true, `brutal S1 planBoss 미완주(정예 잔여 hp ${b1.run.boss ? Math.ceil(b1.run.boss.hp) : 0})`);
+  assert.ok(b1.run.units.length > 0, 'brutal S1 planBoss 생존 병력 0');
+  //  검수 표와 우리 실행값의 대조점(검수: 어려움 S2 5명 · 극한 S1 10명 생존)
+  assert.equal(BR('hard', 2).run.units.length, 5, 'hard S2 planBoss 생존 병력 = 검수 표와 같은 5명');
+  assert.equal(b1.run.units.length, 10, 'brutal S1 planBoss 생존 병력 = 검수 표와 같은 10명');
+});
+
+test('V3-SIM-DIFF SD-8 기록: brutal S2·S3 는 실패를 허용하고 결과만 남긴다 — 다만 지더라도 정예전에서만 진다', (t) => {
+  for (const id of [2, 3]) {
+    const r = BR('brutal', id), run = r.run;
+    assert.equal(run.over, true, `brutal S${id} planBoss 가 끝나지 않음`);
+    assert.ok(r.steps < 14400);
+    assert.equal(r.events.elite, 1, `brutal S${id} planBoss: 정예 등장까지 도달`);
+    if (!run.won) assert.ok(run.boss && run.units.length === 0, `brutal S${id} planBoss: 지더라도 정예전에서만 진다`);
+    t.diagnostic(`SIM-BOSS-RECORD brutal S${id} won=${run.won} units=${run.units.length} 정예잔여hp=${run.boss ? Math.ceil(run.boss.hp) : 0}`);
+  }
+  //  2026-09-17 실측: brutal S2 는 실패(정예 hp 201 잔존), brutal S3 는 완주. 완주 사실도 감추지 않고 기록한다.
+  const b2 = BR('brutal', 2), b3 = BR('brutal', 3);
+  t.diagnostic(`SIM-BOSS-RECORD 요약: brutal S2 ${b2.run.won ? '완주' : '실패'} · brutal S3 ${b3.run.won ? '완주' : '실패'}`);
+});
+
+test('V3-SIM-DIFF SD-9: planBoss 는 보스 등장 전까지 plan 과 완전히 같은 판이다(달라지는 지점은 정예전뿐)', () => {
+  //  S1 normal 은 정예전에서도 둘 다 무손실이라 판 전체가 같아야 한다
+  const pick = (r) => ({ z: r.z, peak: r.peak, weapon: r.weapon, won: r.won, units: r.units.length });
+  assert.deepEqual(pick(playPolicy(1, 'planBoss', 14400, 'normal').run), pick(playPolicy(1, 'plan', 14400, 'normal').run));
+  //  성장 축(최고 병력)은 정예전 조작으로 바뀌지 않는다 — 보스는 코스 끝에 나오기 때문
+  for (const d of ['hard', 'brutal']) for (const id of STAGE_IDS) {
+    assert.equal(BR(d, id).run.peak, playPolicy(id, 'plan', 14400, d).run.peak, `${d} S${id}: peak 는 plan 과 같다`);
+  }
+  //  같은 입력열이면 결정적
+  assert.equal(playPolicy(2, 'planBoss', 14400, 'hard').run.units.length, BR('hard', 2).run.units.length);
 });

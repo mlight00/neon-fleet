@@ -102,8 +102,10 @@ export const BAL3 = deepFreeze({
     ],
   },
   // 연출 상수(6장 + 기존 값 이식)
+  //  gateTipSec   = 셔터 칸 위 짧은 글('가까워지면 열림' · '지금 쏘면 +1') 표시 시간(계약서 6장 N2-③)
+  //  shutterGuideSec = 첫 셔터 조우 배너(저장 seenShutter 로 판당 아닌 사용자당 1회) 표시 시간
   fx: { shakeDur: 0.25, shakeAmp: 7, hurtFlashDur: 0.35, guideSec: 3, eliteBannerSec: 0.8, rewardPopSec: 0.5,
-        fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3 },
+        fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3, gateTipSec: 1.2, shutterGuideSec: 3 },
   // 색(기존 값 이식 + v3 게이트 색)
   colors: {
     outline: '#14233A', hero: '#F3F1E8', heroHurt: '#FF4A4A', soldier: '#DFE6F5', hud: '#FFFFFF', gold: '#F6C84A',

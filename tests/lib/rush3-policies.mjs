@@ -39,6 +39,15 @@ export function botPlan(run) {
   return 240;
 }
 
+/** 보스 조준 봇(planBoss): 정예(run.boss)가 나타나기 전은 계획 봇과 완전히 같고, 나타나면 보스의 현재 x 를 따라간다.
+ *  ⚠️조작은 pointerX 하나뿐이라 이동은 실제 STEP 의 이동 속도 제한을 그대로 받는다 — 탄 회피를 최적화한 봇이 아니다.
+ *  2차 검수(2026-09-17 §4 Q3)가 시험한 'bossFollow' 변형과 같은 조작이며, 정예전 성공 경로가 존재하는지만 본다. */
+export function botPlanBoss(run) {
+  return run.boss ? run.boss.x : botPlan(run);
+}
+
+//  ⚠️planBoss 는 아래 POLICIES 목록에 넣지 않는다. 24판 표(V3-SIM-POLICY)·27판 표(V3-SIM-DIFF)는 기존 판 수와 의미를 그대로 두고,
+//   성공 경로 검사(SD-7)만 이 정책을 따로 부른다.
 export const POLICIES = ['center', 'center-1', 'center+1', 'left', 'right', 'sway', 'aim', 'plan'];
 //  고정 정책 5종(POL-7 의 '조합 금지' 대상)
 export const FIXED_POLICIES = ['center', 'center-1', 'center+1', 'left', 'right'];
@@ -53,6 +62,7 @@ export function pickX(policy, run) {
     case 'sway': return Math.floor(run.time / 3) % 2 ? 160 : 320;
     case 'aim': return botAim(run);
     case 'plan': return botPlan(run);
+    case 'planBoss': return botPlanBoss(run);
     default: throw new Error('unknown policy ' + policy);
   }
 }

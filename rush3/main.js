@@ -24,6 +24,24 @@ const BGM = { title: 'nf_bgm_title', stage: ['nf_bgm_sector1a', 'nf_bgm_sector2a
 export const DIFF_TOGGLE = Object.freeze({ x0: 138, y: 382, w: 90, h: 34, gap: 6 });
 //  키 1/2/3 = 보통/어려움/극한(타이틀에서만). code 가 비어 오는 환경은 key 로 대신하므로 둘 다 받는다
 const DIFF_KEYS = Object.freeze({ Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2, 1: 0, 2: 1, 3: 2 });
+//  셔터 안내 문구(계약서 6장 N2-③⑥ · 2026-09-17 2차 검수). 닫힌 동안 → 처음 열릴 때 → 첫 조우 배너 순으로 이어진다
+export const GATE_TIP_CLOSED = '가까워지면 열림';
+export const GATE_TIP_OPEN = '지금 쏘면 +1';
+//  확정 손실 행은 열려도 값이 오르지 않는다 — 같은 화면의 '확정' 꼬리표와 어긋나지 않게 전용 문구를 쓴다(2026-09-17 수정 라운드 1)
+export const GATE_TIP_OPEN_FIXED = '쏴도 그대로예요';
+//  배너는 두 줄이다 — 한 줄로 쓰면 480px 화면을 넘어 양끝이 잘린다(2026-09-17 렌더 실측). 줄은 **어절 경계**에서만 나눈다
+export const SHUTTER_GUIDE_TEXT = Object.freeze(['회색 셔터는 잠긴 게이트예요', '가까워지면 열리고 그때부터 숫자가 오릅니다']);
+
+/** 쏴도 값이 오르지 않는 행인가 = 모든 칸이 음수이고 상한이 자기 값 이하(확정 손실).
+ *  랜덤 길 ⑤ `trapGate`(−10 · 상한 −10)가 여기에 해당한다 — 몇 발을 맞아도 −10 그대로다(gates.js 값 갱신 공식).
+ *  ⚠️이런 행에 '지금 쏘면 +1' 을 띄우면 같은 화면에 이미 붙어 있는 '확정' 꼬리표와 정면으로 어긋나,
+ *   N2 가 없애려던 '맞고 있는데 왜 숫자가 안 변하지?' 를 바로 그 행에서 새로 만든다(2026-09-17 수정 라운드 1).
+ *  판정 조건은 render.js 의 '확정' 꼬리표와 같은 식이다 — 글과 꼬리표가 언제나 같은 행에 함께 뜬다. */
+export function isFixedGateRow(row) {
+  const cells = row && Array.isArray(row.cells) ? row.cells : null;
+  if (!cells || cells.length === 0) return false;
+  return cells.every((c) => c.value < 0 && c.maxValue != null && c.maxValue <= c.value);
+}
 
 //  저장값·외부 입력을 난이도 id 로 거른다(모르는 값 → normal). 규칙 모듈(buildStage/createRun)은 모르는 값에 throw 하므로 거르는 곳은 셸뿐이다
 export function normDifficulty(d) {
@@ -81,8 +99,10 @@ const GATE_FLASH_SEC = BAL3.gate.flashT;
 
 function makeFx() {
   //  gateFlash: { 'rowId:idx': 남은 초 } · gateOpen: { rowId: 남은 초 }(셔터가 걷히는 연출) — 렌더가 이것만 읽는다
+  //  gateTip: { rowId: { text, t } } 짧은 안내 글 · gateTipSeen: 닫힘 안내를 이미 띄운 행 · shutterT/shutterText = 첫 조우 배너
   //  lotOpen = 랜덤 길 '?' 상자가 걷히는 연출 타이머 · lotSeen = 공개 효과음 1회 · lotSame = 랜덤 길 무기가 동급이라 교체 안 된 판
-  return { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null,
+  return { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, gateTip: {}, gateTipSeen: {},
+           shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, shutterT: 0, shutterText: null, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null,
            lotOpen: 0, lotSeen: false, lotSame: false };
 }
 
@@ -101,8 +121,69 @@ export function missedLine(run) {
   return parts.length ? parts.join(' · ') : '놓친 것 없음';
 }
 
+/** 랜덤 길 **실제 결과** 집계용 빈 그릇(계약서 3-9 · 2026-09-17 2차 검수 N4).
+ *  추첨 종류의 이름(label)만으로는 "−15 게이트를 0 으로 막아 손실 0" 인 판과 "10명을 잃은" 판이 같은 문구로 나온다.
+ *  그래서 규칙 계층이 이미 내는 이벤트(gatePass·joinMany·padTake·weaponSwap·weaponSame)를 셸이 모아 둔다. */
+export function emptyLotteryOutcome() {
+  return { passed: false, value: 0, applied: 0, soldiers: 0, pads: 0, padsTotal: 0, swapped: false, same: false };
+}
+
+/** 이벤트 한 묶음을 랜덤 길 결과에 누적한다(순수 — out 을 고쳐 돌려준다).
+ *  ⚠️규칙 모듈은 lottery 를 모른다(V3-LOTTERY LOT-8 정적 검사). 어느 이벤트가 랜덤 길의 것인지는 여기서 id 로 가린다.
+ *  무기 통은 이벤트에 id 가 없으므로 '랜덤 길이 무기 통이고 이미 공개된 뒤'라는 조건으로 가린다(fx.lotSame 과 같은 규칙). */
+export function collectLotteryOutcome(out, events, run) {
+  const lot = run && run.lottery;
+  if (!out || !lot) return out;
+  const weaponHere = () => lot.kind === 'weapon' && run.z >= lot.revealZ;
+  for (const ev of events) {
+    if (ev.type === 'gatePass' && ev.id === lot.rowId) {
+      out.passed = true;
+      out.value = ev.value;
+      out.applied = ev.applied;
+    } else if (ev.type === 'joinMany' && ev.id === lot.supplyId) {
+      out.soldiers += ev.n;
+    } else if (ev.type === 'chainOn' && ev.id === lot.supplyId) {
+      //  깔린 발판 수는 활성화(pads0) 뒤에도 유효탄 1발마다 늘어난다(padAdd, maxPads 까지) — 둘을 함께 세야 '몇 개 중 몇 개'가 맞는다
+      out.padsTotal = ev.pads;
+    } else if (ev.type === 'padAdd' && ev.id === lot.supplyId) {
+      out.padsTotal += 1;
+    } else if (ev.type === 'padTake' && ev.id === lot.supplyId) {
+      out.pads += 1;
+    } else if (ev.type === 'weaponSwap' && weaponHere()) {
+      out.swapped = true;
+    } else if (ev.type === 'weaponSame' && weaponHere()) {
+      out.same = true;
+    }
+  }
+  return out;
+}
+
+//  우측(랜덤 길)을 고른 판의 결과 문구. 집계가 없으면(옛 경로·규칙 계층 검사) 추첨 이름으로 되돌아간다
+function chosenLine(run, lot, out, weaponSame) {
+  const s = lot.supplyId ? (run.supplies || []).find((c) => c.id === lot.supplyId) : null;
+  if (lot.kind === 'gate') {
+    if (!out || !out.passed) return '랜덤 길: 꽝 ' + lot.label;
+    //  쏴서 0 까지 올린 판 = 위험을 막아낸 판이다. '꽝'으로 적으면 잘한 것을 잘못 전한다
+    return out.applied === 0 ? '랜덤 길: 위험 게이트 무력화 · 손실 0'
+                             : '랜덤 길: 함정 피해 −' + (-out.applied) + '명';
+  }
+  if (s && !s.opened) return '랜덤 길: ' + lot.label + ' — 열지 못했습니다';
+  if (lot.kind === 'chain') {
+    //  최대치는 발판이 실제로 깔린 수(chainOn). 연속 증원은 밟아야 이득이라 '몇/몇 개'로 적는다
+    const total = out && out.padsTotal ? out.padsTotal : (s ? s.pads.length : 0);
+    const got = out ? out.pads : (s ? s.pads.filter((p) => p.taken).length : 0);
+    return '랜덤 길: 증원 발판 ' + got + '/' + total + '개 확보';
+  }
+  if (lot.kind === 'weapon') {
+    if (weaponSame || (out && out.same && !out.swapped)) return '랜덤 길: ' + lot.label + ' 중복 · 교체 없음';
+    return '랜덤 길: ' + lot.label + ' 획득';
+  }
+  const n = out && out.soldiers ? out.soldiers : null;
+  return '랜덤 길: 병사 ' + (n ?? (s ? s.payload.n ?? 0 : 0)) + ' 획득';
+}
+
 /** 결과 화면의 랜덤 길 한 줄(계약서 3-9·6장). 순수 함수 — run 상태와 stage.lottery 만 읽는다.
- *  고른 판(우측 통로) = 무엇이 걸렸고 어떻게 됐는지 · 안 고른 판 = 이번 판에 무엇이었는지 공개(놓친 보상을 감추지 않는다). */
+ *  고른 판(우측 통로) = **실제로 일어난 일**(막아낸 손실·실제 피해·밟은 발판·교체 여부) · 안 고른 판 = 이번 판에 무엇이었는지 공개. */
 export function lotteryLine(run, opts = {}) {
   const lot = run && run.lottery;
   if (!lot) return null;
@@ -111,11 +192,7 @@ export function lotteryLine(run, opts = {}) {
     return lot.good ? '오른쪽 랜덤 길은 이번 판엔 ' + lot.label + ' 이었습니다'
                     : '오른쪽 랜덤 길은 이번 판엔 꽝(' + lot.label + ')이었습니다';
   }
-  if (!lot.good) return '랜덤 길: 꽝 ' + lot.label;
-  const s = lot.supplyId ? (run.supplies || []).find((c) => c.id === lot.supplyId) : null;
-  if (s && !s.opened) return '랜덤 길: ' + lot.label + ' — 열지 못했습니다';
-  if (opts.weaponSame) return '랜덤 길: ' + lot.label + ' — 이미 같은 무기였습니다';
-  return '랜덤 길: ' + lot.label + ' 획득';
+  return chosenLine(run, lot, opts.outcome ?? run.lotteryOutcome ?? null, opts.weaponSame);
 }
 
 export function timeText(sec) {
@@ -175,6 +252,8 @@ export function boot(canvas, deps = {}) {
     const lotterySeed = hashSeed('lot:' + id + ':' + tries + ':' + dateNow());
     const stage = buildStage(id, { difficulty, lotterySeed });
     run = createRun(stage);
+    //  랜덤 길 실제 결과 집계(계약서 3-9 결과 문구). 규칙이 아니라 셸이 갖는 칸이다 — 규칙 모듈은 lottery 를 모른다
+    run.lotteryOutcome = run.lottery ? emptyLotteryOutcome() : null;
     //  기록은 stageId + 코스 버전 + 난이도로 묶는다(run.stageVersion = stage.version, run.difficulty = stage.difficulty)
     const ver = run.stageVersion, diff = run.difficulty;
     fx = makeFx();
@@ -243,6 +322,7 @@ export function boot(canvas, deps = {}) {
 
   //  연출 이벤트 소비(프레임 1회, drainEvents). 규칙 상태는 읽기만 한다
   function handleEvents(events) {
+    collectLotteryOutcome(run.lotteryOutcome, events, run);
     for (const ev of events) {
       switch (ev.type) {
         case 'fire': fx.fireCount += ev.count; fx.fireWeapon = ev.weapon; break;
@@ -260,9 +340,17 @@ export function boot(canvas, deps = {}) {
         //  구조적으로 얻을 수 없던 대안 — '놓침'이 아니라 '다른 길'로 알린다(흐려지며 뒤로 빠진다)
         case 'supplySkipped': floater(fx, ev.x, sy(ev.z) - 20, '다른 길', C.wall); break;
         case 'supplyBlock': break;
-        //  셔터 열림: 0.25초 걷히는 연출 + 효과음 1회. 막힌 탄은 회색 튐(소리 없음)
-        case 'gateArm': fx.gateOpen[ev.id] = BAL3.gate.openT; fx.sfx.push(['gateOpen']); break;
-        case 'gateBlock': spawnBurst(fx, ev.x, sy(ev.z), 6, false, C.wall); break;
+        //  셔터 열림: 0.25초 걷히는 연출(판이 위로) + 효과음 1회 + 짧은 글(행 종류에 따라 '지금 쏘면 +1' / '쏴도 그대로예요')
+        case 'gateArm': {
+          fx.gateOpen[ev.id] = BAL3.gate.openT;
+          //  확정 손실 행에는 '지금 쏘면 +1' 대신 '쏴도 그대로예요' — 칸 아래 '확정' 꼬리표와 같은 말을 한다
+          const armed = run.gateRows.find((r) => r.id === ev.id);
+          fx.gateTip[ev.id] = { text: isFixedGateRow(armed) ? GATE_TIP_OPEN_FIXED : GATE_TIP_OPEN, t: FX.gateTipSec };
+          fx.sfx.push(['gateOpen']);
+          break;
+        }
+        //  막힌 탄: 작은 회색 스파크 + 금속 튕김(색만으로 구분하지 않는다 — 2026-09-17 2차 검수 N2-④)
+        case 'gateBlock': spawnBurst(fx, ev.x, sy(ev.z), 6, false, C.wall); fx.sfx.push(['gateClang']); break;
         case 'gateHit': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateTick']); break;
         case 'gateFlip': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateFlip']); floater(fx, ev.x, sy(run.gateRows.find((r) => r.id === ev.id)?.z ?? run.z) - 40, '반전!', C.gatePos, true); break;
         case 'gatePass': {
@@ -311,7 +399,13 @@ export function boot(canvas, deps = {}) {
     fx.hurtT = Math.max(0, fx.hurtT - dt);
     fx.guideT = Math.max(0, fx.guideT - dt);
     fx.eliteT = Math.max(0, fx.eliteT - dt);
+    fx.shutterT = Math.max(0, fx.shutterT - dt);
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
+    //  셔터 짧은 안내 글(행 단위): 다 지나면 칸 위에서 사라진다
+    for (const k of Object.keys(fx.gateTip)) {
+      fx.gateTip[k].t -= dt;
+      if (fx.gateTip[k].t <= 0) delete fx.gateTip[k];
+    }
     //  게이트 플래시: 감소 후 0 이하는 삭제(칸이 원래 색으로 돌아간다)
     for (const k of Object.keys(fx.gateFlash)) {
       fx.gateFlash[k] -= dt;
@@ -480,6 +574,27 @@ export function boot(canvas, deps = {}) {
   });
   if (win) win.__rush3Dbg = dbg;
 
+  /** 셔터 안내(계약서 6장 N2-③⑥ · 2026-09-17 2차 검수). 셔터가 걸린 행이 **처음 화면에 들어온 시점**에
+   *  칸 위 짧은 글 '가까워지면 열림'을 1회, 그리고 이 사용자의 첫 셔터라면 초보 배너를 1회 띄운다.
+   *  ⚠️S1 첫 게이트는 `armZ === null`(항상 열림)이라 여기에 걸리지 않는다 — 셔터를 본 적이 없는데 셔터를 배웠다고 치지 않는다.
+   *  ⚠️랜덤 길 게이트는 통로 확정선 전에는 '?' 상자 뒤에 있으므로 공개된 뒤에만 센다. */
+  function updateShutterGuide() {
+    const lot = run.lottery;
+    for (const row of run.gateRows) {
+      if (row.armZ == null || row.armed || row.passed) continue;
+      if (fx.gateTipSeen[row.id]) continue;
+      if (row.z - run.z > BAL3.enterZ) continue;
+      if (lot && lot.rowId === row.id && run.z < lot.revealZ) continue;
+      fx.gateTipSeen[row.id] = true;
+      fx.gateTip[row.id] = { text: GATE_TIP_CLOSED, t: FX.gateTipSec };
+      if (!save.get().seenShutter) {
+        save.patch({ seenShutter: true });
+        fx.shutterText = SHUTTER_GUIDE_TEXT;
+        fx.shutterT = FX.shutterGuideSec;
+      }
+    }
+  }
+
   let lastFx = null;
   function frame(nowMs) {
     const now = nowMs / 1000;
@@ -488,11 +603,14 @@ export function boot(canvas, deps = {}) {
     if (state === 'run') {
       loop.frame(now);
       //  랜덤 길 공개: 통로 확정선을 넘는 프레임에 '?' 상자를 걷고 효과음 1회(좋음 gateFlip / 꽝 hurt 재사용)
+      //  ⚠️위험 항목 공개는 **중립 경고음**(lotWarn)이다. 여기서 피격음을 내면 −15 를 0 으로 막아낸 판까지
+      //   '맞았다'로 들려 무력화 성공을 흐린다(2026-09-17 2차 검수 N4). 피격음은 실제 손실이 날 때(gatePass)만 난다.
       if (run.lottery && !fx.lotSeen && run.z >= run.lottery.revealZ) {
         fx.lotSeen = true;
         fx.lotOpen = BAL3.lottery.openT;
-        fx.sfx.push([run.lottery.good ? 'gateFlip' : 'hurt']);
+        fx.sfx.push([run.lottery.good ? 'gateFlip' : 'lotWarn']);
       }
+      updateShutterGuide();
       handleEvents(drainEvents(run));
       updateFx(dt);
       if (run.over) {

@@ -14,6 +14,11 @@ const FONT = 'system-ui, sans-serif';
 const ENEMY_FALLBACK = C.enemy;
 const ENEMY_SPRITE = { grunt: 'e_grunt', rusher: 'e_rusher', shooter: 'e_shooter' };
 const ENEMY_LABEL = { grunt: '잡졸', rusher: '돌격체', shooter: '저격수' };
+//  사격 개시선 옆 안내(계약서 6장 N2-⑤). ⚠️선을 넘는 주체는 **게이트**다 — 플레이어가 넘는다는 뜻으로 읽히면
+//   벽의 통로 확정선과 헷갈린다(2026-09-17 2차 검수 N2-④).
+export const ARM_LINE_TEXT = '이 선 안으로 온 게이트를 쏠 수 있어요';
+//  칸 위 짧은 글의 화면 상단 한계(HUD 아래). 행이 화면 밖에서 들어오는 동안에도 글이 보이게 여기에 붙인다
+const TIP_MIN_Y = 96;
 //  난이도 짧은 표기 색(HUD 태그·결과 제목). normal 은 표기 없음(BAL3.difficulty[id].short 가 빈 문자열)
 const DIFF_COLOR = { hard: C.bulletHeavy, brutal: C.gateNeg };
 const diffShort = (id) => BAL3.difficulty[id]?.short ?? '';
@@ -163,8 +168,32 @@ export function createRenderer3(ctx, sprites) {
     ctx.restore();
   }
 
+  //  잠김 표시(계약서 6장 N2-②): 숫자를 가리지 않는 칸 모서리의 작은 자물쇠. 색만으로 구분하지 않기 위한 형태 신호다
+  function drawLockBadge(x, y) {
+    ctx.save();
+    //  고리(열린 반원) → 몸통 순서. 회색 판 위에서도 보이게 어두운 테두리를 먼저 깐다
+    ctx.strokeStyle = C.outline;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(x, y - 4, 5, Math.PI, 0);
+    ctx.stroke();
+    ctx.strokeStyle = C.wallTop;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(x, y - 4, 5, Math.PI, 0);
+    ctx.stroke();
+    ctx.fillStyle = C.outline;
+    roundRect(x - 8, y - 2, 16, 13, 3);
+    ctx.fill();
+    ctx.fillStyle = C.wallTop;
+    roundRect(x - 6.5, y - 0.5, 13, 10, 2.5);
+    ctx.fill();
+    ctx.restore();
+  }
+
   //  게이트 행: 칸 사각형 + 부호 숫자 + 색. 피격 흰 플래시·숫자 튐(셸 fx.gateFlash 타이머, 규칙의 cell.flashT 는 읽지 않는다). 통과 뒤 흐리게
-  //  셔터(armZ): 아직 안 열린 행은 회색 빗금 판을 덮고 숫자를 흐리게 그린다. 열리는 순간(fx.gateOpen)에는 판이 위로 걷힌다
+  //  셔터(armZ): 아직 안 열린 행은 회색 빗금 판을 덮되 **숫자·부호는 판 위에 선명하게** 그리고(2026-09-17 검수 N2-①),
+  //   잠김은 칸 모서리의 작은 자물쇠로 따로 알린다(N2-②). 열리는 순간(fx.gateOpen)에는 판이 위로 걷힌다.
   function drawGateRow(row, sy, fx, runZ) {
     const y = sy(row.z);
     if (y < -60 || y > H + 60) return;
@@ -186,9 +215,17 @@ export function createRenderer3(ctx, sprites) {
         ctx.beginPath(); ctx.moveTo(ROAD0, ay); ctx.lineTo(ROAD1, ay); ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
+        //  선 옆 작은 글(N2-⑤). ⚠️주체는 게이트다 — "플레이어가 선을 넘는다"로 읽히면 통로 확정선과 헷갈린다
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.globalAlpha = 0.92;
+        outlinedText(ARM_LINE_TEXT, ROAD0 + 6, ay - 7, 12, C.hud, '600', 3);
+        ctx.restore();
       }
     }
-    ctx.globalAlpha = row.passed ? 0.32 : 0.92;
+    const base = row.passed ? 0.32 : 0.92;
+    ctx.globalAlpha = base;
     for (const c of row.cells) {
       const col = gateColor(c.value);
       const left = flashMap ? (flashMap[row.id + ':' + c.idx] ?? 0) : 0;
@@ -200,29 +237,13 @@ export function createRenderer3(ctx, sprites) {
       ctx.lineWidth = 4;
       roundRect(c.x0 + 3, y - vis / 2, c.x1 - c.x0 - 6, vis, 10);
       ctx.stroke();
-      //  숫자: 피격 직후 살짝 튄다
       const cx = (c.x0 + c.x1) / 2;
-      const px = 38 + Math.round(flash * 8);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      //  닫힌 셔터 뒤에서는 숫자를 흐리게(무엇이 걸린 판인지 미리 읽게 한다)
-      const numAlpha = 1 - shut * 0.55;
-      ctx.globalAlpha = (row.passed ? 0.32 : 0.92) * numAlpha;
-      outlinedText(gateLabel(c.value), cx, y, px, flash > 0.5 ? C.gateFlash : col, 'bold', 6);
-      //  확정 손실 칸(상한이 자기 값 = 쏴도 오르지 않는다, 랜덤 길 ⑤): 칸 아래에 '확정' 꼬리표를 붙여 '안 먹히는 이유'를 화면에 남긴다
-      //  ⚠️숫자와 겹치지 않게 칸 **바깥**(아래)에 그린다 — 숫자가 38px 라 칸 안에서는 밑줄이 물린다
-      if (c.value < 0 && c.maxValue != null && c.maxValue <= c.value) {
-        ctx.globalAlpha = (row.passed ? 0.32 : 0.92) * numAlpha;
-        outlinedText('확정', cx, y + vis / 2 + 13, 16, col, 'bold', 4);
-      }
-      ctx.globalAlpha = row.passed ? 0.32 : 0.92;
-      ctx.textBaseline = 'alphabetic';
-      //  셔터 판(회색 빗금). 열리는 동안 위로 걷힌다
+      //  셔터 판(회색 빗금) — 숫자보다 **먼저** 그린다. 열리는 동안 남은 판이 위쪽으로 줄어든다(문이 위로 걷히는 동작)
       if (shut > 0) {
         const hh = vis * shut;
         ctx.save();
         ctx.beginPath();
-        ctx.rect(c.x0 + 3, y + vis / 2 - hh, c.x1 - c.x0 - 6, hh);
+        ctx.rect(c.x0 + 3, y - vis / 2, c.x1 - c.x0 - 6, hh);
         ctx.clip();
         ctx.fillStyle = 'rgba(120,128,140,0.82)';
         ctx.fillRect(c.x0 + 3, y - vis / 2, c.x1 - c.x0 - 6, vis);
@@ -236,6 +257,42 @@ export function createRenderer3(ctx, sprites) {
         ctx.stroke();
         ctx.restore();
       }
+      //  숫자: 피격 직후 살짝 튄다. **셔터 위에 같은 불투명도로** 그린다(닫혀 있어도 무엇이 걸린 판인지 그대로 읽힌다)
+      const px = 38 + Math.round(flash * 8);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha = base;
+      outlinedText(gateLabel(c.value), cx, y, px, flash > 0.5 ? C.gateFlash : col, 'bold', 6);
+      //  확정 손실 칸(상한이 자기 값 = 쏴도 오르지 않는다, 랜덤 길 ⑤): 칸 아래에 '확정' 꼬리표를 붙여 '안 먹히는 이유'를 화면에 남긴다
+      //  ⚠️숫자와 겹치지 않게 칸 **바깥**(아래)에 그린다 — 숫자가 38px 라 칸 안에서는 밑줄이 물린다
+      if (c.value < 0 && c.maxValue != null && c.maxValue <= c.value) {
+        outlinedText('확정', cx, y + vis / 2 + 13, 16, col, 'bold', 4);
+      }
+      ctx.textBaseline = 'alphabetic';
+      //  잠김 아이콘: 칸 왼쪽 위 모서리(숫자 자리를 비켜 간다). 색이 아니라 형태로 '아직 안 열렸다'를 알린다.
+      //  ⚠️판이 걷히는 중(armed 직후)에는 이미 잠김이 풀렸으므로 그리지 않는다 — 셔터 판만 남아 걷힌다
+      if (!row.armed && !row.passed) drawLockBadge(c.x0 + 20, y - vis / 2 + 15);
+      ctx.globalAlpha = base;
+    }
+    //  짧은 안내 글(N2-③): 닫힌 동안 '가까워지면 열림' · 처음 열릴 때 '지금 쏘면 +1'. 각 BAL3.fx.gateTipSec 초, 칸 위
+    const tip = fx && fx.gateTip ? fx.gateTip[row.id] : null;
+    if (tip && tip.t > 0) {
+      const tipSec = BAL3.fx.gateTipSec || 1.2;
+      const rx = (row.cells[0].x0 + row.cells[row.cells.length - 1].x1) / 2;
+      //  ⚠️행이 화면 위쪽 끝에서 들어올 때는 칸 위가 화면 밖이다 — 그 동안에는 HUD 아래(y 96)에 붙여 두고,
+      //   행이 내려오면 자연스럽게 칸 위로 따라 붙는다. 안 그러면 1.2초 내내 화면 밖에 그려진다(2026-09-17 렌더 실측).
+      const top = Math.max(TIP_MIN_Y, y - vis / 2 - 34);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, tip.t / (tipSec * 0.4));
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(20,35,58,0.82)';
+      const tw = Math.max(96, tip.text.length * 15 + 20);
+      roundRect(rx - tw / 2, top, tw, 26, 8);
+      ctx.fill();
+      outlinedText(tip.text, rx, top + 13, 15, C.hud, 'bold', 4);
+      ctx.textBaseline = 'alphabetic';
+      ctx.restore();
     }
     ctx.globalAlpha = 1;
   }
@@ -576,6 +633,20 @@ export function createRenderer3(ctx, sprites) {
       ctx.font = 'bold 18px ' + FONT;
       ctx.fillStyle = C.hud;
       ctx.fillText('좌우로 드래그 · 쏴서 숫자를 키우세요', W / 2, 294);
+      ctx.globalAlpha = 1;
+    }
+    //  첫 셔터 조우 배너(N2-⑥): 셔터가 걸린 행이 처음 화면에 들어온 그 시점에 1회. 문구는 셸이 넘긴다
+    if (fx.shutterT > 0 && fx.shutterText) {
+      //  문구는 줄 배열로 받는다(한 줄로 쓰면 480px 화면에서 양끝이 잘린다 — 줄은 어절 경계에서만 나눈다)
+      const lines = Array.isArray(fx.shutterText) ? fx.shutterText : [fx.shutterText];
+      ctx.globalAlpha = Math.min(1, fx.shutterT / 0.5);
+      ctx.fillStyle = 'rgba(20,35,58,0.86)';
+      //  첫 플레이 안내(y 268)·정예 경고(y 196)와 겹치지 않는 자리
+      const bh = 22 + lines.length * 24;
+      roundRect(28, 332, W - 56, bh, 14); ctx.fill();
+      ctx.font = 'bold 16px ' + FONT;
+      ctx.fillStyle = C.hud;
+      for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], W / 2, 332 + 23 + i * 24);
       ctx.globalAlpha = 1;
     }
     if (fx.eliteT > 0) {
