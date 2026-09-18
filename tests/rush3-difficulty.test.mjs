@@ -36,8 +36,8 @@ test('V3-DIFF DIFF-1: 배수 표 = 계약서 3-8 표 그대로(출발값) · id 
   assert.deepEqual(pick(BAL3.difficulty.normal), [1, 1, 1, 1, 1, 1]);
   assert.deepEqual(pick(BAL3.difficulty.hard), [1.5, 2, 2, 1.6, 1.4, 1.25]);
   assert.deepEqual(pick(BAL3.difficulty.brutal), [2.2, 3, 3, 2.4, 1.8, 1.5]);
-  assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].label), ['보통', '어려움', '극한']);
-  assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].short), ['', '어려움', '극한'], 'HUD 짧은 표기는 어려움·극한만');
+  assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].label), ['보통', '어려움', '지옥']);
+  assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].short), ['', '어려움', '지옥'], 'HUD 짧은 표기는 어려움·지옥만');
   assert.ok(Object.isFrozen(BAL3.difficulty) && Object.isFrozen(BAL3.difficulty.hard));
   assert.equal(difficultyMult('hard'), BAL3.difficulty.hard);
   assert.throws(() => difficultyMult('nope'), /unknown difficulty/);
@@ -253,7 +253,7 @@ test('V3-SIM-DIFF SD-5: 난이도 순서가 결과에 실린다 — 같은 스�
 //  봇 = planBoss: 보스 등장 전은 계획 봇 그대로, 보스가 나오면 보스 x 를 따라 조준한다(이동은 실제 STEP 속도 제한).
 //  ⚠️ 이것은 **봇 1판의 결정적 결과**이지 사람의 성공률이 아니다. 탄 회피를 최적화한 봇도 아니다.
 //  실측(2026-09-17): hard S1·S2·S3 와 brutal S1·S3 완주. brutal S2 만 실패(정예 hp 201 잔존) —
-//   2차 검수도 "극한 S2 는 단순 조준 변형으로 성공을 입증하지 못했다"고 적었다. 그래서 극한 S2·S3 는 기록만 하고 잠그지 않는다.
+//   2차 검수도 "지옥 S2 는 단순 조준 변형으로 성공을 입증하지 못했다"고 적었다. 그래서 지옥 S2·S3 는 기록만 하고 잠그지 않는다.
 // ─────────────────────────────────────────────────────────────────────────────
 const BOSS_RUNS = {};
 for (const d of ['hard', 'brutal']) for (const id of STAGE_IDS) BOSS_RUNS[d + ':' + id] = playPolicy(id, 'planBoss', 14400, d);
@@ -278,7 +278,7 @@ test('V3-SIM-DIFF SD-7 성공 경로: planBoss 가 hard S1·S2·S3 와 brutal S1
   const b1 = BR('brutal', 1);
   assert.equal(b1.run.won, true, `brutal S1 planBoss 미완주(정예 잔여 hp ${b1.run.boss ? Math.ceil(b1.run.boss.hp) : 0})`);
   assert.ok(b1.run.units.length > 0, 'brutal S1 planBoss 생존 병력 0');
-  //  검수 표와 우리 실행값의 대조점(검수: 어려움 S2 5명 · 극한 S1 10명 생존)
+  //  검수 표와 우리 실행값의 대조점(검수: 어려움 S2 5명 · 지옥 S1 10명 생존)
   assert.equal(BR('hard', 2).run.units.length, 5, 'hard S2 planBoss 생존 병력 = 검수 표와 같은 5명');
   assert.equal(b1.run.units.length, 10, 'brutal S1 planBoss 생존 병력 = 검수 표와 같은 10명');
 });

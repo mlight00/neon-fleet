@@ -72,10 +72,12 @@ export const BAL3 = deepFreeze({
   //   enemyHp      잡졸·돌격체·저격수 hp(반올림)      eshotDmg     저격수·정예 적탄 dmg(어려움부터 1발 = 병사 1명)
   //   touchDmg     잡졸·돌격체·정예 접촉 피해          eliteHp      정예 hp(반올림)
   //   spawnCount   xs 없이 rows 로 뿌리는 스폰의 n(반올림, xs 명시 스폰은 그대로)   eliteFireRate 정예 부채꼴 발사 빈도(shootEvery ÷ 배수)
+  //  ⚠️표시 이름(label·short)과 id 는 다른 것이다 — 2026-09-18 이사 결정으로 세 칸의 화면 이름은 **보통 / 어려움 / 지옥**이지만
+  //   id('normal'·'hard'·'brutal')·배수·저장 칸 키 접미는 종전 그대로다(기록 칸 `2:brutal` 은 옛 저장과 그대로 이어진다).
   difficulty: {
     normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,   spawnCount: 1,   eliteFireRate: 1 },
     hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1.5, eshotDmg: 2, touchDmg: 2, eliteHp: 1.6, spawnCount: 1.4, eliteFireRate: 1.25 },
-    brutal: { id: 'brutal', label: '극한',   short: '극한',   enemyHp: 2.2, eshotDmg: 3, touchDmg: 3, eliteHp: 2.4, spawnCount: 1.8, eliteFireRate: 1.5 },
+    brutal: { id: 'brutal', label: '지옥',   short: '지옥',   enemyHp: 2.2, eshotDmg: 3, touchDmg: 3, eliteHp: 2.4, spawnCount: 1.8, eliteFireRate: 1.5 },
   },
   // 랜덤 길(계약서 3-9 · 2026-09-16 이사 지시 "빈 길이 아니라 랜덤 길"). S3 분리벽 w3 우측 통로에 걸리는 5종 풀.
   //  좋음 3(병사 통·무기 통·연속 증원) : 꽝 2(막을 수 있는 음수 게이트·확정 손실 게이트) 를 균등 1/5 로 뽑는다.
@@ -125,7 +127,7 @@ export const BAL3 = deepFreeze({
 // 난이도 id 목록(타이틀 토글 순서 = 표 순서). 데이터 접근만 — 규칙 로직이 아니다.
 export const DIFFICULTY_IDS = Object.freeze(Object.keys(BAL3.difficulty));
 export const DEFAULT_DIFFICULTY = 'normal';
-// 타이틀 초기 선택(저장에 난이도가 없을 때). 2026-09-16 이사 결정: 극한으로 전 스테이지 격파 → 기본 선택을 극한으로.
+// 타이틀 초기 선택(저장에 난이도가 없을 때). 2026-09-16 이사 결정: 가장 높은 난이도로 전 스테이지 격파 → 기본 선택을 그 칸으로.
 //  규칙 계층 기본(DEFAULT_DIFFICULTY, buildStage 인자 생략 시)은 normal 그대로 — 테스트·봇 기준선.
 export const DEFAULT_PICK_DIFFICULTY = 'brutal';
 

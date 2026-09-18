@@ -7,7 +7,7 @@ import { STAGE_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW } from './render.js';
 import { loadSprites3 } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
@@ -22,7 +22,11 @@ const OVER_DELAY = { won: 1.3, lost: 1.0 };
 const BGM = { title: 'nf_bgm_title', stage: ['nf_bgm_sector1a', 'nf_bgm_sector2a', 'nf_bgm_sector3a'], boss: ['nf_bgm_boss_sector1', 'nf_bgm_boss_sector2', 'nf_bgm_boss_sector3'] };
 //  타이틀 난이도 토글(계약서 3-8·6장): 스테이지 버튼(y 436~) 바로 위 한 줄. 버튼 id = 'diff_' + 난이도 id
 export const DIFF_TOGGLE = Object.freeze({ x0: 138, y: 382, w: 90, h: 34, gap: 6 });
-//  키 1/2/3 = 보통/어려움/극한(타이틀에서만). code 가 비어 오는 환경은 key 로 대신하므로 둘 다 받는다
+//  ⏸(일시정지) 버튼 = HUD 상단 줄의 셋째 칸. 상자는 render 의 자리표(HUD_ROW.box.pause) 하나에서만 온다 —
+//  이 객체가 **히트 영역이자 그려지는 상자**다(`hud: true` 라 drawButtons 는 건너뛰고 drawHud 가 같은 상자로 그린다).
+//  ⚠️여기에 좌표를 직접 적지 말 것. 적는 순간 화면의 칩과 누르는 자리가 조용히 어긋난다(2026-09-18 HUD 정돈).
+export const HUD_BTN = Object.freeze({ id: 'pause', ...HUD_ROW.box.pause, label: '❚❚', hud: true });
+//  키 1/2/3 = 보통/어려움/지옥(타이틀에서만). code 가 비어 오는 환경은 key 로 대신하므로 둘 다 받는다
 const DIFF_KEYS = Object.freeze({ Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2, 1: 0, 2: 1, 3: 2 });
 //  셔터 안내 문구(계약서 6장 N2-③⑥ · 2026-09-17 2차 검수). 닫힌 동안 → 처음 열릴 때 → 첫 조우 배너 순으로 이어진다
 export const GATE_TIP_CLOSED = '가까워지면 열림';
@@ -478,7 +482,7 @@ export function boot(canvas, deps = {}) {
       v.fx = paused ? { ...fx, gateFlash: { ...fx.gateFlash }, gateOpen: { ...fx.gateOpen }, shakeT: 0, hurtT: 0 } : fx;
       v.hud = { distM: Math.max(0, Math.round((run.length - run.z) / 10)) };
       if (state === 'run') {
-        v.buttons = [{ id: 'pause', x: 422, y: 14, w: 44, h: 44, label: '❚❚' }];
+        v.buttons = [{ ...HUD_BTN }];
       } else if (state === 'paused') {
         v.buttons = [
           { id: 'resume', x: 120, y: 400, w: 240, h: 56, label: '계속하기', primary: true },

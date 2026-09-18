@@ -35,6 +35,24 @@ const TIP_MIN_Y = 96;
 const DIFF_COLOR = { hard: C.bulletHeavy, brutal: C.gateNeg };
 const diffShort = (id) => BAL3.difficulty[id]?.short ?? '';
 
+//  HUD 상단 줄의 **자리표 단일 출처**(2026-09-18 이사 소견: "난이도 칩·무기 칩·⏸ 버튼 크기가 제각각이고 높이가 안 맞는다").
+//   세 조각(난이도 칩·무기 칩·⏸)은 같은 높이 h·같은 세로 중심선 cy·같은 모서리 반경 r·같은 글자 크기 fs 를 쓰고,
+//   화면 오른쪽 끝에서 right 만큼 띄운 자리부터 gap 간격으로 왼쪽으로 줄을 선다. 왼쪽 STAGE 제목도 같은 cy 에 중심을 맞춘다.
+//  ⚠️⏸ 의 **히트 영역**(main.js HUD_BTN)도 이 표에서 나온 상자를 그대로 받는다 — 그린 자리와 누르는 자리가 갈라지지 않게
+//   좌표를 두 곳에 적지 않는다. main.js 는 render.js 를 이미 import 하므로 방향은 render → main 하나뿐이다(역방향은 순환).
+const HUD_TOP = 16, HUD_H = 36, HUD_R = 18, HUD_FS = 15, HUD_GAP = 8, HUD_RIGHT = 14;
+const hudBoxOf = (w, right) => Object.freeze({ x: right - w, y: HUD_TOP, w, h: HUD_H });
+const HUD_PAUSE = hudBoxOf(44, W - HUD_RIGHT);
+const HUD_WEAPON = hudBoxOf(122, HUD_PAUSE.x - HUD_GAP);
+const HUD_DIFF = hudBoxOf(64, HUD_WEAPON.x - HUD_GAP);
+export const HUD_ROW = Object.freeze({
+  top: HUD_TOP, h: HUD_H, r: HUD_R, fs: HUD_FS, gap: HUD_GAP, right: HUD_RIGHT,
+  cy: HUD_TOP + HUD_H / 2,
+  //  왼쪽 두 줄: 제목은 세 칩과 같은 중심선, 남은 거리는 그 아래 한 줄
+  left: 16, titleFs: 20, distFs: 15, distCy: HUD_TOP + HUD_H / 2 + 28,
+  box: Object.freeze({ diff: HUD_DIFF, weapon: HUD_WEAPON, pause: HUD_PAUSE }),
+});
+
 export function createRenderer3(ctx, sprites) {
   const get = (k) => (sprites && typeof sprites.get === 'function' ? sprites.get(k) : null);
 
@@ -653,38 +671,58 @@ export function createRenderer3(ctx, sprites) {
     ctx.globalAlpha = 1;
   }
 
-  //  HUD: 좌상 STAGE n 제목 + 남은 거리 m / 우상 무기 / 정예 HP 막대+숫자
+  //  HUD 칩 바탕(난이도·무기·⏸ 공통) — 같은 높이·같은 모서리 반경·같은 바탕색을 한 함수에서만 그린다
+  function hudChip(b) {
+    ctx.fillStyle = 'rgba(20,35,58,0.82)';
+    roundRect(b.x, b.y, b.w, b.h, HUD_ROW.r);
+    ctx.fill();
+  }
+
+  //  HUD: 좌상 STAGE n 제목 + 남은 거리 m / 우상 한 줄(난이도 칩 · 무기 칩 · ⏸) / 정예 HP 막대+숫자
+  //  ⚠️우상 세 조각의 자리는 HUD_ROW 한 곳에서 온다. ⏸ 만은 **셸이 넘긴 버튼 상자 그대로** 그린다 —
+  //   그 상자가 곧 히트 영역이라, 그리는 자리와 누르는 자리가 구조적으로 같아진다(drawButtons 는 이 버튼을 건너뛴다).
   function drawHud(view) {
     const run = view.run, hud = view.hud;
+    const cy = HUD_ROW.cy;
     ctx.textAlign = 'left';
-    outlinedText('STAGE ' + run.stageId + '  ' + run.title, 16, 34, 20, C.hud, '900', 6);
+    ctx.textBaseline = 'middle';
+    outlinedText('STAGE ' + run.stageId + '  ' + run.title, HUD_ROW.left, cy, HUD_ROW.titleFs, C.hud, '900', 6);
     const goal = run.boss ? '정예 전투!' : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
-    outlinedText(goal, 16, 60, 16, run.boss ? C.gateNeg : C.hero, 'bold', 5);
+    outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
     //  무기 칩
+    const wb = HUD_ROW.box.weapon;
     const w = WEAPONS[run.weapon] ?? WEAPONS.rifle;
-    ctx.fillStyle = 'rgba(20,35,58,0.82)';
-    roundRect(292, 14, 122, 44, 22);
-    ctx.fill();
+    hudChip(wb);
     ctx.fillStyle = w.color;
-    roundRect(304, 30, 26, 10, 3);
+    roundRect(wb.x + 12, cy - 5, 26, 10, 3);
     ctx.fill();
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(308, 32, 7, 6);
-    ctx.font = 'bold 16px ' + FONT;
+    ctx.fillRect(wb.x + 16, cy - 3, 7, 6);
+    ctx.font = 'bold ' + HUD_ROW.fs + 'px ' + FONT;
     ctx.fillStyle = w.color;
-    ctx.fillText(w.name, 340, 42);
-    //  난이도 태그(어려움·극한만): 무기 칩 왼쪽 옆
+    ctx.fillText(w.name, wb.x + 48, cy);
+    //  난이도 태그(어려움·지옥만): 무기 칩 왼쪽 옆. 보통은 short 가 빈 문자열이라 칩 자체를 그리지 않는다
     const ds = diffShort(run.difficulty);
     if (ds) {
-      ctx.fillStyle = 'rgba(20,35,58,0.82)';
-      roundRect(222, 21, 64, 30, 15);
-      ctx.fill();
+      const db = HUD_ROW.box.diff;
+      hudChip(db);
       ctx.textAlign = 'center';
-      ctx.font = 'bold 14px ' + FONT;
+      ctx.font = 'bold ' + HUD_ROW.fs + 'px ' + FONT;
       ctx.fillStyle = DIFF_COLOR[run.difficulty] ?? C.hud;
-      ctx.fillText(ds, 254, 41);
+      ctx.fillText(ds, db.x + db.w / 2, cy);
       ctx.textAlign = 'left';
     }
+    //  ⏸(일시정지) — 셸이 hud:true 로 넘긴 버튼만. 없는 상태(일시정지 중·결과)에서는 그리지 않는다
+    const pb = (view.buttons ?? []).find((b) => b.hud);
+    if (pb) {
+      hudChip(pb);
+      ctx.textAlign = 'center';
+      ctx.font = '700 ' + HUD_ROW.fs + 'px ' + FONT;
+      ctx.fillStyle = C.hero;
+      ctx.fillText(pb.label, pb.x + pb.w / 2, pb.y + pb.h / 2);
+      ctx.textAlign = 'left';
+    }
+    ctx.textBaseline = 'alphabetic';
     //  정예 HP 막대
     if (run.boss) {
       ctx.fillStyle = 'rgba(20,35,58,0.85)';
@@ -739,6 +777,8 @@ export function createRenderer3(ctx, sprites) {
   //  버튼 공통(기존 복제): 주 버튼 = 딥 네이비 + 시안 라인, 보조 = 반투명 네이비 패널
   function drawButtons(buttons) {
     for (const b of buttons) {
+      //  HUD 줄에 얹히는 버튼(⏸)은 drawHud 가 같은 칩으로 그린다 — 여기서 또 그리면 두 겹이 되고 모양이 갈라진다
+      if (b.hud) continue;
       ctx.globalAlpha = b.disabled ? 0.45 : 1;
       const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
       if (b.primary) {

@@ -2,7 +2,7 @@
 //  starforgeRush.v1 은 읽지도 쓰지도 않는다. 손상 원문은 .bak 에 보존 후 기본값.
 //  최상위 필드: lastStage · difficulty(타이틀에서 마지막으로 고른 난이도) · volume · mute · seenShutter(첫 셔터 안내를 봤는가).
 //  스테이지 기록은 stageId + stageVersion + 난이도로 묶는다: stages[id].versions[key] = { cleared, attempts, bestSurvivors, bestTime }.
-//   key = `${version}`(보통 normal — 접미 없음, 옛 기록 그대로) | `${version}:${difficulty}`(어려움·극한). 계약서 7장·3-8.
+//   key = `${version}`(보통 normal — 접미 없음, 옛 기록 그대로) | `${version}:${difficulty}`(어려움·지옥). 계약서 7장·3-8.
 //  코스 배치를 고치면(stages.js 의 version 상향) 새 버전 칸에 따로 쌓이므로 옛 기록과 섞이지 않는다. 난이도도 같은 원리로 칸이 갈린다.
 //  구 저장(stages[id] 에 기록이 바로 있던 형식)은 지우지 않고 버전 1 로 귀속시킨다(마이그레이션).
 export const KEY3 = 'starforgeRush.v3';
@@ -83,7 +83,7 @@ function mergeStage(cur, inc) {
   return { versions };
 }
 
-//  저장에 난이도가 없을 때의 초기 선택 = 극한(2026-09-16 이사 결정). 기록 접미 규칙의 기준(BASE_DIFFICULTY=normal)과는 다른 값이다
+//  저장에 난이도가 없을 때의 초기 선택 = 지옥(id brutal, 2026-09-16 이사 결정). 기록 접미 규칙의 기준(BASE_DIFFICULTY=normal)과는 다른 값이다
 const PICK_DEFAULT = 'brutal';
 //  seenShutter = 첫 셔터 조우 배너를 이미 본 적이 있는가(계약서 6장 N2-⑥). 판이 아니라 **사용자당 1회**라 저장에 남는다
 function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false }; }

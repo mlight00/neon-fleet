@@ -426,8 +426,8 @@ test('V3-SAVE-VERSION DIFF: 옛 저장(난이도 없음)은 그대로 normal 칸
   assert.equal(st.getItem(BAK3), null);
   assert.deepEqual(s.getStage(1, 2), rec);
   assert.deepEqual(s.getStage(1, 2, 'hard'), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 });
-  //  옛 저장에는 난이도 필드가 없다 → 초기 선택은 극한(2026-09-16 이사 결정). 기록 칸은 위에서 본 대로 normal 그대로다
-  assert.equal(s.get().difficulty, 'brutal', '난이도 필드가 없던 저장의 초기 선택은 극한');
+  //  옛 저장에는 난이도 필드가 없다 → 초기 선택은 지옥(2026-09-16 이사 결정). 기록 칸은 위에서 본 대로 normal 그대로다
+  assert.equal(s.get().difficulty, 'brutal', '난이도 필드가 없던 저장의 초기 선택은 지옥');
   s.patch({ lastStage: 1 });
   assert.deepEqual(JSON.parse(st.getItem(KEY3)).stages['1'], { versions: { 2: rec } }, '옛 칸 키 그대로');
 });

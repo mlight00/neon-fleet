@@ -3,13 +3,13 @@
 //  ⚠️정적 검사(소스에 무슨 문자열이 있나)로는 '무엇이 무엇 위에 그려지는가'를 못 잡는다 — 그리기 순서가 곧 가림이다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRenderer3, ARM_LINE_TEXT, TRAP_BADGE_TEXT, RETRY_LOTTERY_NOTE, isTrapGateRow } from '../rush3/render.js';
+import { createRenderer3, ARM_LINE_TEXT, TRAP_BADGE_TEXT, RETRY_LOTTERY_NOTE, isTrapGateRow, HUD_ROW } from '../rush3/render.js';
 import { buildStage } from '../rush3/stages.js';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 import { BAL3 } from '../rush3/balance.js';
 import { gateLabel } from '../rush3/gates.js';
 import { GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
-         isFixedGateRow } from '../rush3/main.js';
+         isFixedGateRow, HUD_BTN } from '../rush3/main.js';
 import { hashSeed } from '../rush/rng.js';
 
 //  호출 기록 ctx: 호출마다 { op, args, alpha, fill } 을 순서대로 남긴다(save/restore 로 상태도 되돌린다)
@@ -25,7 +25,7 @@ function recCtx() {
       return (...args) => {
         if (k === 'save') stack.push({ ...t });
         if (k === 'restore') { const s = stack.pop(); if (s) Object.assign(t, s); }
-        ops.push({ op: k, args, alpha: t.globalAlpha, fill: t.fillStyle, stroke: t.strokeStyle });
+        ops.push({ op: k, args, alpha: t.globalAlpha, fill: t.fillStyle, stroke: t.strokeStyle, font: t.font, baseline: t.textBaseline });
         if (k.startsWith('create')) return grad;
         if (k === 'measureText') return { width: 10 };
         return undefined;
@@ -264,4 +264,105 @@ test('V3-RENDER-TRAP: 결과 화면 [다시 도전] 아래에 "랜덤 길은 새
   assert.equal(note.args[1], retry.x + retry.w / 2, '버튼 가운데 정렬');
   //  랜덤 길이 없는 스테이지(결과 한 줄 없음)에는 뜨지 않는다
   assert.ok(!textsOf(drawWith(null)).includes(RETRY_LOTTERY_NOTE), '랜덤 길이 없으면 부연도 없다');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3-RENDER-HUD(2026-09-18 이사 소견) — "상단의 난이도 칩·무기 칩·⏸ 버튼 크기가 제각각이고 높이가 안 맞는다".
+//  ⚠️정적 검사(상수 표를 읽어 비교)로는 못 잡는다 — 자리표를 그대로 두고 drawHud 안에서 y 를 하나만 손대도 통과한다.
+//  그래서 실제 그리기 경로로 한 프레임을 그린 뒤, 캔버스에 찍힌 **둥근 상자 네 모서리**에서 세 칩을 되살려 잰다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+//  칩 바탕색(hudChip 에서만 쓰는 값). 같은 색을 쓰는 칸 위 짧은 글은 drawHud 보다 먼저 그려지므로 제목 뒤부터 모은다
+const CHIP_FILL = 'rgba(20,35,58,0.82)';
+
+//  roundRect = moveTo + arcTo×4. 첫 arcTo(x+w, y, x+w, y+h, r) 와 셋째 arcTo(x, y+h, x, y, r) 로 상자를 되살린다
+function chipBoxes(ops, fromIdx) {
+  const arcs = [];
+  for (let i = fromIdx; i < ops.length; i++) if (ops[i].op === 'arcTo' && ops[i].fill === CHIP_FILL) arcs.push(ops[i].args);
+  const boxes = [];
+  for (let i = 0; i + 3 < arcs.length; i += 4) {
+    const a0 = arcs[i], a2 = arcs[i + 2];
+    boxes.push({ left: a2[0], top: a0[1], right: a0[0], bottom: a0[3], r: a0[4] });
+  }
+  return boxes.sort((p, q) => p.left - q.left);
+}
+
+const fontPx = (o) => Number(String(o.font).match(/(\d+)px/)[1]);
+
+//  지옥(brutal) 판 한 프레임 — 난이도 칩은 보통에서는 아예 안 그려지므로 표기가 있는 난이도로 그린다.
+//  버튼은 셸이 실제로 넘기는 것과 같은 객체(main.HUD_BTN)를 그대로 넘긴다
+function hudFrame() {
+  const run = createRun(buildStage(2, { difficulty: 'brutal' }));
+  for (let i = 0; i < 120; i++) { stepRun(run, { pointerX: 240, dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); }
+  const { ctx, ops } = recCtx();
+  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: makeFxLike(), hud: { distM: 120 },
+    buttons: [{ ...HUD_BTN }], saveOk: true });
+  return { run, ops };
+}
+
+test('V3-RENDER-HUD: 난이도 칩·무기 칩·⏸ 가 같은 높이·같은 세로 중심선·같은 모서리 반경·같은 글자 크기로 한 줄에 선다', () => {
+  const { run, ops } = hudFrame();
+  assert.equal(run.difficulty, 'brutal', '난이도 표기가 있는 판을 그렸다');
+  const title = ops.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
+  assert.ok(title >= 0, 'HUD 제목을 그린다: ' + JSON.stringify(textsOf(ops).slice(0, 8)));
+  const [diff, weapon, pause] = chipBoxes(ops, title);
+  assert.equal(chipBoxes(ops, title).length, 3, 'HUD 칩은 정확히 세 개(난이도·무기·⏸)');
+
+  //  ① 같은 높이 · 같은 세로 중심선 — 위·아래 경계가 픽셀까지 같다(이사 소견의 '높이가 안 맞는다')
+  for (const [name, b] of [['난이도', diff], ['무기', weapon], ['⏸', pause]]) {
+    assert.equal(b.top, HUD_ROW.top, name + ' 칩 위 경계 = ' + HUD_ROW.top);
+    assert.equal(b.bottom - b.top, HUD_ROW.h, name + ' 칩 높이 = ' + HUD_ROW.h);
+    assert.equal((b.top + b.bottom) / 2, HUD_ROW.cy, name + ' 칩 세로 중심 = ' + HUD_ROW.cy);
+    assert.equal(b.r, HUD_ROW.r, name + ' 칩 모서리 반경 = ' + HUD_ROW.r);
+  }
+  assert.equal(diff.top, weapon.top, '난이도·무기 위 경계가 같다');
+  assert.equal(weapon.top, pause.top, '무기·⏸ 위 경계가 같다');
+  assert.equal(diff.bottom, pause.bottom, '난이도·⏸ 아래 경계가 같다');
+
+  //  ② 오른쪽 정렬 간격이 일정하다
+  assert.equal(weapon.left - diff.right, HUD_ROW.gap, '난이도 ↔ 무기 사이 = ' + HUD_ROW.gap + 'px');
+  assert.equal(pause.left - weapon.right, HUD_ROW.gap, '무기 ↔ ⏸ 사이 = ' + HUD_ROW.gap + 'px');
+  assert.equal(480 - pause.right, HUD_ROW.right, '⏸ 오른쪽 여백 = ' + HUD_ROW.right + 'px');
+
+  //  ③ 세 칸의 글자 크기가 같다(제각각이던 14 / 16 / 19px → 하나로)
+  const labelOf = (t) => ops.find((o) => o.op === 'fillText' && o.args[0] === t);
+  const wname = run.weapon === 'auto' ? '기관총' : run.weapon === 'heavy' ? '중화기' : '소총';
+  for (const [name, t] of [['난이도', '지옥'], ['무기', wname], ['⏸', HUD_BTN.label]]) {
+    const op = labelOf(t);
+    assert.ok(op, name + ' 칸 글자를 그린다: ' + JSON.stringify(textsOf(ops).slice(0, 12)));
+    assert.equal(fontPx(op), HUD_ROW.fs, name + ' 칸 글자 크기 = ' + HUD_ROW.fs + 'px');
+    assert.equal(op.baseline, 'middle', name + ' 칸 글자는 칩 중심에 맞춘다');
+    assert.equal(op.args[2], HUD_ROW.cy, name + ' 칸 글자 중심 y = ' + HUD_ROW.cy);
+  }
+
+  //  ④ 왼쪽 STAGE 제목도 같은 중심선, 남은 거리는 그 아래 한 줄
+  const titleOp = ops[title];
+  assert.equal(titleOp.baseline, 'middle', 'STAGE 제목도 중심 기준으로 찍는다');
+  assert.equal(titleOp.args[2], HUD_ROW.cy, 'STAGE 제목 중심 y 가 칩들과 같은 선(' + HUD_ROW.cy + ')');
+  const dist = ops.find((o) => o.op === 'fillText' && String(o.args[0]).startsWith('남은 거리'));
+  assert.ok(dist, '남은 거리를 그린다');
+  assert.equal(dist.args[1], titleOp.args[1], '제목과 같은 왼쪽 선');
+  assert.ok(dist.args[2] > HUD_ROW.cy, '남은 거리는 제목 아래 줄: y=' + dist.args[2]);
+});
+
+test('V3-RENDER-HUD: ⏸ 는 셸이 넘긴 버튼 상자 그대로 그려진다 — 그린 자리와 누르는 자리가 같다', () => {
+  const { ops } = hudFrame();
+  const title = ops.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
+  const pause = chipBoxes(ops, title)[2];
+  //  ① 히트 영역(main.HUD_BTN = hitButton 이 쓰는 상자)과 그려진 상자가 네 변 모두 같다
+  assert.equal(pause.left, HUD_BTN.x, '왼쪽');
+  assert.equal(pause.top, HUD_BTN.y, '위');
+  assert.equal(pause.right, HUD_BTN.x + HUD_BTN.w, '오른쪽');
+  assert.equal(pause.bottom, HUD_BTN.y + HUD_BTN.h, '아래');
+  //  ② 좌표의 출처가 한 곳이다 — 셸의 버튼은 render 의 자리표를 그대로 받는다
+  assert.deepEqual({ x: HUD_BTN.x, y: HUD_BTN.y, w: HUD_BTN.w, h: HUD_BTN.h }, { ...HUD_ROW.box.pause });
+  //  ③ 두 겹으로 그려지지 않는다 — drawButtons 가 같은 버튼을 한 번 더 그리면 상자가 네 개가 된다
+  assert.equal(chipBoxes(ops, title).length, 3, 'HUD 칩 상자는 셋뿐(⏸ 이 drawButtons 에서 또 그려지지 않는다)');
+  //  ④ 셸이 ⏸ 를 안 넘기는 상태(일시정지·결과)에서는 칩도 없다
+  const run = createRun(buildStage(2, { difficulty: 'brutal' }));
+  const { ctx, ops: noBtn } = recCtx();
+  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: makeFxLike(), hud: { distM: 120 }, buttons: [], saveOk: true });
+  const t2 = noBtn.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
+  assert.equal(chipBoxes(noBtn, t2).length, 2, '⏸ 버튼이 없으면 칩은 난이도·무기 둘뿐');
+  assert.ok(!textsOf(noBtn).includes(HUD_BTN.label), '⏸ 글자도 없다');
 });

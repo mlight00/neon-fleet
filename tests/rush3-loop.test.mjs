@@ -332,8 +332,8 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   //  타이틀 버튼 클릭(스테이지 1): 논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율
   canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
   assert.equal(app.getState(), 'run');
-  //  기록은 코스 버전 + 난이도 칸에 쌓인다 — 저장이 없는 새 사용자의 초기 선택은 극한(brutal)이므로 `${ver}:brutal` 칸이다(계약서 3-8·6)
-  assert.equal(app.getDifficulty(), 'brutal', '저장 없는 첫 부팅의 초기 선택 = 극한');
+  //  기록은 코스 버전 + 난이도 칸에 쌓인다 — 저장이 없는 새 사용자의 초기 선택은 지옥(brutal)이므로 `${ver}:brutal` 칸이다(계약서 3-8·6)
+  assert.equal(app.getDifficulty(), 'brutal', '저장 없는 첫 부팅의 초기 선택 = 지옥');
   assert.equal(save.getStage(1, stageVersion(1), 'brutal').attempts, 1, '출격 때 attempts +1');
   assert.equal(save.getStage(1, stageVersion(1)).attempts, 0, 'normal 칸은 건드리지 않는다');
   assert.equal(save.get().lastStage, 1);
@@ -521,7 +521,7 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
     DEFS[1].version = 2;
     assert.equal(stageVersion(1), 2);
     const { app, canvas, frames, save, texts } = await bootFake();
-    //  개정 전(버전 1)의 기록. 화면에서 빠지는 이유가 '버전'뿐이도록 초기 선택 난이도(극한) 칸에 둔다
+    //  개정 전(버전 1)의 기록. 화면에서 빠지는 이유가 '버전'뿐이도록 초기 선택 난이도(지옥) 칸에 둔다
     save.updateStage(1, { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 1, 'brutal');
     frames(2);
     //  스테이지 선택 화면은 현재 코스 버전(2)의 기록만 보여 준다
@@ -553,8 +553,8 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
 test('V3-SAVE-VERSION DIFF 셸 결선: 토글 클릭·키 1/2/3 → 난이도 저장, 출격·결과 기록이 `${ver}:hard` 칸에만 쌓이고 normal 칸은 그대로, HUD·결과에 표기', async () => {
   const ver = stageVersion(1);
   const { app, canvas, win, frames, save, texts, storage } = await bootFake();
-  //  저장이 없으면 초기 선택은 극한(계약서 3-8·6) — normal 화면을 보려면 토글로 '보통'을 고른다
-  assert.equal(app.getDifficulty(), 'brutal', '저장 없는 첫 부팅의 초기 선택 = 극한');
+  //  저장이 없으면 초기 선택은 지옥(계약서 3-8·6) — normal 화면을 보려면 토글로 '보통'을 고른다
+  assert.equal(app.getDifficulty(), 'brutal', '저장 없는 첫 부팅의 초기 선택 = 지옥');
   assert.equal(normDifficulty('zzz'), 'brutal', '모르는 값의 폴백도 초기 선택과 같다');
   win.fire('keydown', { code: 'Digit1' });
   //  normal 칸의 기존 기록
@@ -562,7 +562,7 @@ test('V3-SAVE-VERSION DIFF 셸 결선: 토글 클릭·키 1/2/3 → 난이도 �
   frames(2);
   assert.equal(app.getDifficulty(), 'normal');
   assert.ok(texts.some((t) => t.includes('99명')), 'normal 에서는 normal 기록이 보인다');
-  assert.ok(texts.includes('보통') && texts.includes('어려움') && texts.includes('극한'), '토글 3칸이 그려진다: ' + JSON.stringify(texts.slice(-12)));
+  assert.ok(texts.includes('보통') && texts.includes('어려움') && texts.includes('지옥'), '토글 3칸이 그려진다: ' + JSON.stringify(texts.slice(-12)));
   //  '어려움' 칸 클릭(둘째 칸). 논리 좌표 → CSS 절반 배율
   const T = DIFF_TOGGLE;
   canvas.fire('pointerdown', { clientX: (T.x0 + (T.w + T.gap) + T.w / 2) / 2, clientY: (T.y + T.h / 2) / 2, pointerType: 'mouse' });
@@ -628,13 +628,13 @@ test('V3-SAVE-VERSION DIFF 셸 결선: 토글 클릭·키 1/2/3 → 난이도 �
   app.startRun(1);
   texts.length = 0;
   frames(1);
-  assert.ok(!texts.includes('어려움') && !texts.includes('극한'), 'normal HUD 에는 난이도 표기가 없다');
+  assert.ok(!texts.includes('어려움') && !texts.includes('지옥'), 'normal HUD 에는 난이도 표기가 없다');
 });
 
-test('V3-SAVE-VERSION DIFF 새 사용자: 저장이 없으면 타이틀 초기 선택은 극한 — 토글로 보통을 고르면 접미 없는 칸에 기록된다', async () => {
+test('V3-SAVE-VERSION DIFF 새 사용자: 저장이 없으면 타이틀 초기 선택은 지옥 — 토글로 보통을 고르면 접미 없는 칸에 기록된다', async () => {
   const ver = stageVersion(1);
   const { app, canvas, frames, save, storage, texts } = await bootFake();
-  //  저장 원문 자체가 없는 상태(첫 방문). 초기 선택 = 극한(2026-09-16 이사 결정, 계약서 3-8)
+  //  저장 원문 자체가 없는 상태(첫 방문). 초기 선택 = 지옥(2026-09-16 이사 결정, 계약서 3-8)
   assert.equal(storage.getItem('starforgeRush.v3'), null, '아직 저장 원문이 없다');
   assert.equal(app.getDifficulty(), 'brutal');
   frames(2);
@@ -645,17 +645,17 @@ test('V3-SAVE-VERSION DIFF 새 사용자: 저장이 없으면 타이틀 초기 �
   assert.equal(app.getState(), 'title', '토글은 출격이 아니다');
   assert.equal(app.getDifficulty(), 'normal');
   assert.equal(save.get().difficulty, 'normal', '선택은 저장에 기억');
-  //  출격 — 기록은 접미 없는 칸(`${ver}`)에만 쌓이고 극한 칸은 비어 있다
+  //  출격 — 기록은 접미 없는 칸(`${ver}`)에만 쌓이고 지옥 칸은 비어 있다
   canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
   assert.equal(app.getState(), 'run');
   assert.equal(app.getRun().difficulty, 'normal');
   assert.equal(save.getStage(1, ver).attempts, 1);
-  assert.equal(save.getStage(1, ver, 'brutal').attempts, 0, '극한 칸은 비어 있다');
+  assert.equal(save.getStage(1, ver, 'brutal').attempts, 0, '지옥 칸은 비어 있다');
   assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions), [String(ver)], '저장 원문 키에 난이도 접미가 없다');
   //  보통은 HUD 에 난이도를 표기하지 않는다
   texts.length = 0;
   frames(1);
-  assert.ok(!texts.includes('어려움') && !texts.includes('극한'), 'normal HUD 에는 난이도 표기가 없다: ' + JSON.stringify(texts));
+  assert.ok(!texts.includes('어려움') && !texts.includes('지옥'), 'normal HUD 에는 난이도 표기가 없다: ' + JSON.stringify(texts));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
