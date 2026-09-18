@@ -18,6 +18,8 @@ export const SPRITE_KEYS3 = {
 export const SHEETS3 = Object.freeze({
   m1_walk:       Object.freeze({ file: 'M01_walk',  cols: 6, frames: 12, fw: 206, fh: 241, fps: 12, loop: true,  refH: 225 }),
   m1_fire:       Object.freeze({ file: 'M01_fire',  cols: 8, frames: 8,  fw: 325, fh: 283, fps: 12, loop: true,  refH: 225 }),
+  soldier_walk:  Object.freeze({ file: 'SOLDIER_walk', cols: 6, frames: 12, fw: 202, fh: 231, fps: 12, loop: true, refH: 207 }),
+  soldier_fire:  Object.freeze({ file: 'SOLDIER_fire', cols: 8, frames: 8,  fw: 328, fh: 222, fps: 12, loop: true, refH: 207 }),
   e_grunt_hit:   Object.freeze({ file: 'E1_hit',    cols: 6, frames: 12, fw: 244, fh: 255, fps: 24, loop: false, refH: 200 }),
   e_grunt_death: Object.freeze({ file: 'E1_death',  cols: 6, frames: 12, fw: 365, fh: 294, fps: 12, loop: false, refH: 200 }),
 });

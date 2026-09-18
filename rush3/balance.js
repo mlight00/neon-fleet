@@ -110,7 +110,7 @@ export const BAL3 = deepFreeze({
         fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3, gateTipSec: 1.2, shutterGuideSec: 3,
         //  동작 시트(6장, 2026-09-18 파일럿): 히어로는 걷기 heroWalkMinSec 뒤 발사 이벤트에 사격 시트 1회,
         //  쓰러진 잡졸은 사망 시트 뒤 corpseLingerSec 머물다 corpseFadeSec 동안 흐려진다(최대 corpseCap 구)
-        heroWalkMinSec: 0.9, corpseLingerSec: 0.6, corpseFadeSec: 0.3, corpseCap: 40 },
+        heroWalkMinSec: 0.2, corpseLingerSec: 0.6, corpseFadeSec: 0.3, corpseCap: 40 },
   // 색(기존 값 이식 + v3 게이트 색)
   colors: {
     outline: '#14233A', hero: '#F3F1E8', heroHurt: '#FF4A4A', soldier: '#DFE6F5', hud: '#FFFFFF', gold: '#F6C84A',

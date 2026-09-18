@@ -608,9 +608,12 @@ export function createRenderer3(ctx, sprites) {
       const hurt = u.hp < S.unitHp;
       //  히어로 동작 시트: 사격 중(fx.heroFire 남은 초)이면 사격 시트, 아니면 걷기 루프(now 기준). 시트가 없으면 정지 그림
       const firing = !!(fx && fx.heroFire > 0);
-      const heroSh = hero ? (firing ? sheet('m1_fire') : sheet('m1_walk')) : null;
-      if (heroSh) drawSheetFrame(heroSh, sheetFrameAt(heroSh, firing ? heroSh.frames / heroSh.fps - fx.heroFire : now), px, py, size);
-      else drawImgCentered(hero ? 'm1' : 'soldier', px, py, size, () => {
+      const unitSh = hero ? (firing ? sheet('m1_fire') : sheet('m1_walk')) : (firing ? sheet('soldier_fire') : sheet('soldier_walk'));
+      if (unitSh) {
+        //  병사는 i 마다 위상을 0.13초씩 어긋나게 — 부대가 한 몸처럼 딱딱 맞지 않게(사격 시트는 루프라 위상만 돈다)
+        const animT = (firing ? unitSh.frames / unitSh.fps - fx.heroFire : now) + (hero ? 0 : i * 0.13);
+        drawSheetFrame(unitSh, sheetFrameAt(unitSh, animT), px, py, size);
+      } else drawImgCentered(hero ? 'm1' : 'soldier', px, py, size, () => {
         ctx.fillStyle = hero ? C.hero : C.soldier;
         ctx.beginPath();
         ctx.moveTo(px, py - size / 2);
