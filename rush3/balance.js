@@ -75,9 +75,14 @@ export const BAL3 = deepFreeze({
   //  ⚠️표시 이름(label·short)과 id 는 다른 것이다 — 2026-09-18 이사 결정으로 세 칸의 화면 이름은 **보통 / 어려움 / 지옥**이지만
   //   id('normal'·'hard'·'brutal')·배수·저장 칸 키 접미는 종전 그대로다(기록 칸 `2:brutal` 은 옛 저장과 그대로 이어진다).
   difficulty: {
-    normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,   spawnCount: 1,   eliteFireRate: 1 },
-    hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1.5, eshotDmg: 2, touchDmg: 2, eliteHp: 1.6, spawnCount: 1.4, eliteFireRate: 1.25 },
-    brutal: { id: 'brutal', label: '지옥',   short: '지옥',   enemyHp: 2.2, eshotDmg: 3, touchDmg: 3, eliteHp: 2.4, spawnCount: 1.8, eliteFireRate: 1.5 },
+    //  r3.9(2026-09-18 이사 결정 2): 위협은 **적 체력이 아니라 출현 빈도**로 올린다 — enemyHp·eliteHp 배수 1 고정,
+    //   xs 명시 무리는 waves 배(같은 xs 로 waveGap px 뒤에 한 번 더 들어온다 → 회피 통로 규격 불변), rows 무리는 spawnCount 배,
+    //   정예 소환 주기는 eliteSummonRate 로 나눈다. 적탄·접촉 피해 배수는 종전 유지(체력이 아니다).
+    normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1, eshotDmg: 1, touchDmg: 1, eliteHp: 1, spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    eliteSummonRate: 1 },
+    //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다: hard 2/360·brutal 2/360 만 성공 경로 잠금(SD-7)·정예전 도달(SD-8)·단조성(SD-5)을 전부 지킨다.
+    //   brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반). 지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
+    hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1, eshotDmg: 2, touchDmg: 2, eliteHp: 1, spawnCount: 1.4, waves: 2, waveGap: 360, eliteFireRate: 1.25, eliteSummonRate: 1.5 },
+    brutal: { id: 'brutal', label: '지옥',   short: '지옥',   enemyHp: 1, eshotDmg: 3, touchDmg: 3, eliteHp: 1, spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  eliteSummonRate: 2 },
   },
   // 랜덤 길(계약서 3-9 · 2026-09-16 이사 지시 "빈 길이 아니라 랜덤 길"). S3 분리벽 w3 우측 통로에 걸리는 5종 풀.
   //  좋음 3(병사 통·무기 통·연속 증원) : 꽝 2(막을 수 있는 음수 게이트·확정 손실 게이트) 를 균등 1/5 로 뽑는다.

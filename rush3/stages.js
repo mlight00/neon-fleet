@@ -196,7 +196,9 @@ function keepOutOfWalls(x, z, r, walls) {
 //   시드는 i 만 쓰므로 늘어난 뒤에도 앞 n 개의 지터는 종전과 같다(cols 가 바뀌면 대역 폭은 달라진다).
 function makeSpawn(id, sp, walls, mult) {
   const r = BAL3.enemies[sp.kind].r;
-  const n = sp.xs ? sp.n : Math.max(1, Math.round(sp.n * mult.spawnCount));
+  //  r3.9: xs 명시 무리는 waves 번 반복 — 같은 xs·같은 통로 규격으로 waveGap px 뒤에 다시 들어온다(출현 빈도 = 난이도)
+  const waves = sp.xs ? Math.max(1, Math.round(mult.waves ?? 1)) : 1;
+  const n = sp.xs ? sp.n * waves : Math.max(1, Math.round(sp.n * mult.spawnCount));
   const evZ = sp.z;
   const xs = [], zs = [];
   const rows = sp.rows ?? 1;
@@ -209,8 +211,9 @@ function makeSpawn(id, sp, walls, mult) {
     const jz = rng() * 12;
     let x, z;
     if (sp.xs) {
-      x = sp.xs[i];
-      z = evZ + ENTER + (sp.dz ? sp.dz[i] : 0);
+      const k = i % sp.n, w = Math.floor(i / sp.n);
+      x = sp.xs[k];
+      z = evZ + ENTER + (sp.dz ? sp.dz[k] : 0) + w * (mult.waveGap ?? 0);
     } else {
       const row = Math.floor(i / cols), col = i % cols;
       x = lo + bandW * (col + 0.5) + jx;

@@ -23,7 +23,7 @@ export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY) {
     if (d.hp != null) e.hp = Math.round(d.hp * m.enemyHp);
     if (d.touchDmg) e.touchDmg = Math.round(d.touchDmg * m.touchDmg);
     if (d.shot) e.shot = Object.freeze({ ...d.shot, dmg: Math.round(d.shot.dmg * m.eshotDmg) });
-    if (kind === 'elite') e.shootEvery = d.shootEvery / m.eliteFireRate;
+    if (kind === 'elite') { e.shootEvery = d.shootEvery / m.eliteFireRate; e.summonEvery = d.summonEvery / (m.eliteSummonRate ?? 1); }
     out[kind] = Object.freeze(e);
   }
   return Object.freeze(out);

@@ -29,13 +29,15 @@ function play(run, sec, x = 240) {
 // ─────────────────────────────────────────────────────────────────────────────
 // V3-DIFF
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-DIFF DIFF-1: 배수 표 = 계약서 3-8 표 그대로(출발값) · id 목록 순서 · 모르는 id 는 throw', () => {
+test('V3-DIFF DIFF-1: 배수 표 = 계약서 3-8 표 그대로(r3.9: 체력 배수 1 고정, 출현 빈도 = waves·waveGap·spawnCount·eliteSummonRate) · id 목록 순서 · 모르는 id 는 throw', () => {
   assert.deepEqual(DIFFICULTY_IDS, DIFFS);
   assert.equal(DEFAULT_DIFFICULTY, 'normal');
-  const pick = (m) => [m.enemyHp, m.eshotDmg, m.touchDmg, m.eliteHp, m.spawnCount, m.eliteFireRate];
-  assert.deepEqual(pick(BAL3.difficulty.normal), [1, 1, 1, 1, 1, 1]);
-  assert.deepEqual(pick(BAL3.difficulty.hard), [1.5, 2, 2, 1.6, 1.4, 1.25]);
-  assert.deepEqual(pick(BAL3.difficulty.brutal), [2.2, 3, 3, 2.4, 1.8, 1.5]);
+  const pick = (m) => [m.enemyHp, m.eshotDmg, m.touchDmg, m.eliteHp, m.spawnCount, m.eliteFireRate, m.waves, m.waveGap, m.eliteSummonRate];
+  assert.deepEqual(pick(BAL3.difficulty.normal), [1, 1, 1, 1, 1, 1, 1, 0, 1]);
+  assert.deepEqual(pick(BAL3.difficulty.hard), [1, 2, 2, 1, 1.4, 1.25, 2, 360, 1.5]);
+  assert.deepEqual(pick(BAL3.difficulty.brutal), [1, 3, 3, 1, 1.8, 1.5, 2, 360, 2]);
+  //  r3.9 원칙(이사 결정 2, 2026-09-18): 적 체력은 난이도로 올리지 않는다
+  for (const d of DIFFS) assert.deepEqual([BAL3.difficulty[d].enemyHp, BAL3.difficulty[d].eliteHp], [1, 1], d + ' 체력 배수 1');
   assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].label), ['보통', '어려움', '지옥']);
   assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].short), ['', '어려움', '지옥'], 'HUD 짧은 표기는 어려움·지옥만');
   assert.ok(Object.isFrozen(BAL3.difficulty) && Object.isFrozen(BAL3.difficulty.hard));
@@ -72,9 +74,11 @@ test('V3-DIFF DIFF-3: enemyDefsFor — hp(반올림)·접촉·적탄 dmg·정예
   const rows = { normal: enemyDefsFor('normal'), hard: enemyDefsFor('hard'), brutal: enemyDefsFor('brutal') };
   const hp = (k) => DIFFS.map((d) => rows[d][k].hp);
   const touch = (k) => DIFFS.map((d) => rows[d][k].touchDmg);
-  assert.deepEqual(hp('grunt'), [2, 3, 4]);     // 2×2.2 = 4.4 → 4
-  assert.deepEqual(hp('rusher'), [4, 6, 9]);    // 4×2.2 = 8.8 → 9
-  assert.deepEqual(hp('shooter'), [6, 9, 13]);  // 6×2.2 = 13.2 → 13
+  //  r3.9: 체력은 세 난이도에서 같다(출현 빈도로만 벌어진다)
+  assert.deepEqual(hp('grunt'), [2, 2, 2]);
+  assert.deepEqual(hp('rusher'), [4, 4, 4]);
+  assert.deepEqual(hp('shooter'), [6, 6, 6]);
+  assert.deepEqual(DIFFS.map((d) => +rows[d].elite.summonEvery.toFixed(4)), [4, 2.6667, 2], '정예 소환 주기 ÷ eliteSummonRate');
   assert.deepEqual(touch('grunt'), [1, 2, 3]);
   assert.deepEqual(touch('rusher'), [2, 4, 6]);
   assert.deepEqual(touch('elite'), [3, 6, 9]);
@@ -91,9 +95,9 @@ test('V3-DIFF DIFF-3: enemyDefsFor — hp(반올림)·접촉·적탄 dmg·정예
   assert.equal(rows.hard.elite.hp, undefined, '정예 hp 는 스테이지 값(buildStage)이라 표에 없다');
 });
 
-test('V3-DIFF DIFF-4: buildStage — 정예 hp(eliteHp 반올림)·rows 스폰 n(spawnCount 반올림)만 바뀌고 xs 명시 스폰은 좌표까지 그대로', () => {
+test('V3-DIFF DIFF-4: buildStage — 정예 hp 는 난이도와 무관(r3.9)·rows 스폰 n(spawnCount 반올림)·xs 명시 스폰은 같은 xs 로 waves 번(waveGap 뒤) 반복', () => {
   assert.deepEqual(DIFFS.map((d) => STAGE_IDS.map((id) => buildStage(id, { difficulty: d }).elite.hp)),
-                   [[120, 220, 500], [192, 352, 800], [288, 528, 1200]]);
+                   [[120, 220, 500], [120, 220, 500], [120, 220, 500]]);
   //  rows 스폰은 S3 z8800 잡졸(n 18, rows 2) 하나뿐
   const rowsN = DIFFS.map((d) => buildStage(3, { difficulty: d }).spawns.find((s) => s.z === 8800 && s.kind === 'grunt').n);
   assert.deepEqual(rowsN, [18, 25, 32]);   // 18×1.4 = 25.2 → 25 · 18×1.8 = 32.4 → 32
@@ -109,12 +113,32 @@ test('V3-DIFF DIFF-4: buildStage — 정예 hp(eliteHp 반올림)·rows 스폰 n
     assert.deepEqual([...rowsZ].sort(), [0, 1], d + ' 두 열');
     assert.equal(sp.zs.filter((z) => z < 8800 + 760 + 40).length, Math.ceil(sp.n / 2), d + ' 앞 열 수');
   }
-  //  xs 명시 스폰(회피 통로 규격의 대상)은 n·xs·zs·corridorHw 전부 normal 과 같다
+  //  xs 명시 스폰(회피 통로 규격의 대상): r3.9 — 첫 물결은 normal 과 좌표까지 같고, 그 뒤 waveGap 씩 뒤에 같은 xs 로 waves−1 번 더 들어온다.
+  //  corridorHw·z(이벤트)·kind·hp 는 그대로(통로 규격 불변)
   for (const id of STAGE_IDS) {
-    const n = buildStage(id).spawns.filter((s) => !(id === 3 && s.z === 8800 && s.kind === 'grunt'));
+    const base = buildStage(id).spawns.filter((s) => !(id === 3 && s.z === 8800 && s.kind === 'grunt'));
     for (const d of ['hard', 'brutal']) {
+      const m = BAL3.difficulty[d];
       const s = buildStage(id, { difficulty: d }).spawns.filter((x) => !(id === 3 && x.z === 8800 && x.kind === 'grunt'));
-      assert.deepEqual(s, n, `S${id} ${d}: xs 명시 스폰 불변`);
+      assert.equal(s.length, base.length, `S${id} ${d}: 무리 수 같음`);
+      for (let k = 0; k < base.length; k++) {
+        const a = base[k], b = s[k];
+        assert.deepEqual([b.z, b.kind, b.corridorHw, b.hp], [a.z, a.kind, a.corridorHw, a.hp], `S${id} ${d} 무리 ${k}: 이벤트 z·종류·통로·hp 불변`);
+        assert.equal(b.n, a.n * m.waves, `S${id} ${d} 무리 ${k}: n = 원래 n × waves`);
+        const walls = buildStage(id, { difficulty: d }).walls;
+        for (let w = 0; w < m.waves; w++) for (let i = 0; i < a.n; i++) {
+          const z = b.zs[w * a.n + i];
+          assert.equal(+(z - a.zs[i]).toFixed(2), w * m.waveGap, `S${id} ${d} 무리 ${k} 물결 ${w}: zs = 원래 + w×waveGap`);
+          //  뒤 물결이 분리벽 z 구간에 걸리면 keepOutOfWalls 가 x 를 벽 밖으로 민다(규칙 그대로) — 그 경우만 등호 대신 '벽 밖·도로 안'을 본다
+          const wall = walls.find((wl) => z >= wl.z0 && z <= wl.z1);
+          if (!wall) assert.equal(b.xs[w * a.n + i], a.xs[i], `S${id} ${d} 무리 ${k} 물결 ${w}: xs 동일`);
+          else {
+            const x = b.xs[w * a.n + i], r = BAL3.enemies[a.kind].r;
+            assert.ok(x <= wall.x0 - r + 0.01 || x >= wall.x1 + r - 0.01, `S${id} ${d} 무리 ${k} 물결 ${w}: 벽 밖`);
+            assert.ok(x >= 80 + r && x <= 400 - r, `S${id} ${d} 무리 ${k} 물결 ${w}: 도로 안`);
+          }
+        }
+      }
     }
   }
   //  buildStage 는 난이도별로도 호출마다 새 객체·결정적
@@ -278,9 +302,9 @@ test('V3-SIM-DIFF SD-7 성공 경로: planBoss 가 hard S1·S2·S3 와 brutal S1
   const b1 = BR('brutal', 1);
   assert.equal(b1.run.won, true, `brutal S1 planBoss 미완주(정예 잔여 hp ${b1.run.boss ? Math.ceil(b1.run.boss.hp) : 0})`);
   assert.ok(b1.run.units.length > 0, 'brutal S1 planBoss 생존 병력 0');
-  //  검수 표와 우리 실행값의 대조점(검수: 어려움 S2 5명 · 지옥 S1 10명 생존)
-  assert.equal(BR('hard', 2).run.units.length, 5, 'hard S2 planBoss 생존 병력 = 검수 표와 같은 5명');
-  assert.equal(b1.run.units.length, 10, 'brutal S1 planBoss 생존 병력 = 검수 표와 같은 10명');
+  //  대조점(r3.9 재기준 2026-09-19 실측: 어려움 S2 4명 · 지옥 S1 14명 생존. 검수 표의 5명·10명은 체력 배수 시절 값)
+  assert.equal(BR('hard', 2).run.units.length, 4, 'hard S2 planBoss 생존 병력 = r3.9 실측 4명');
+  assert.equal(b1.run.units.length, 14, 'brutal S1 planBoss 생존 병력 = r3.9 실측 14명');
 });
 
 test('V3-SIM-DIFF SD-8 기록: brutal S2·S3 는 실패를 허용하고 결과만 남긴다 — 다만 지더라도 정예전에서만 진다', (t) => {
