@@ -381,15 +381,17 @@ test('V3-RENDER-SHEET: 동작 시트 유무에 따라 시트 칸 / 폴백이 갈
   let r = recCtx();
   createRenderer3(r.ctx, sprites).draw(view(makeFxLike({ heroFire: 0, enemyHit: {}, corpses: [] }), 1));
   let d = sheetDraws(r.ops);
-  assert.equal(d.length, 1, '시트는 히어로 걷기 한 칸만');
-  assert.equal(d[0].args[0].key, 'm1_walk');
+  assert.equal(d.length, 1, '시트는 히어로 한 칸만(병사 시트는 이 모의에 없다)');
+  //  heroFireAlways 면 사격 시트가 now 기준으로 계속 돈다(이사 결정 9/18), 아니면 걷기
+  const always = !!BAL3.fx.heroFireAlways;
+  assert.equal(d[0].args[0].key, always ? 'm1_fire' : 'm1_walk');
   //  2) 사격 남은 0.3초 → 사격 시트, 칸 = floor((8/12 − 0.3)·12) = 4
   r = recCtx();
   createRenderer3(r.ctx, sprites).draw(view(makeFxLike({ heroFire: 0.3, enemyHit: { 900: 0.25 }, corpses: [{ x: 200, z: run.z + 150, t: 0.5, h: 33 }] }), 1));
   d = sheetDraws(r.ops);
   const byKey = Object.fromEntries(d.map((o) => [o.args[0].key, o]));
   assert.ok(byKey.m1_fire && byKey.e_grunt_hit && byKey.e_grunt_death, '사격·피격·사망 세 시트가 모두 그려진다: ' + Object.keys(byKey));
-  assert.equal(byKey.m1_fire.args[1] / 10, 4, '사격 칸 번호 = 경과 시간 × fps');
+  assert.equal(byKey.m1_fire.args[1] / 10, always ? Math.floor(1 * 12) % 8 : 4, '사격 칸 번호 = (항상 모드) now × fps 순환 / (교대 모드) 경과 시간 × fps');
   assert.equal(byKey.e_grunt_hit.args[1] / 10, ((0.5 - 0.25) * 24) % 6, '피격 칸 번호(24fps, 열 6)');
   assert.equal(byKey.e_grunt_death.args[1] / 10, 0, '사망 0.5초 = 6번째 칸 → 2행 첫 열');
   assert.equal(byKey.e_grunt_death.args[2] / 20, 1, '사망 6번째 칸은 2행');
