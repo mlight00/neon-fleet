@@ -8,7 +8,7 @@ import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
 import { createRenderer3, isTrapGateRow, HUD_ROW } from './render.js';
-import { loadSprites3 } from './sprites.js';
+import { loadSprites3, sheetSec } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
 import { adviceLine } from './advice.js';
@@ -104,7 +104,17 @@ function makeFx() {
   //  lotOpen = 랜덤 길 '?' 상자가 걷히는 연출 타이머 · lotSeen = 공개 효과음 1회 · lotSame = 랜덤 길 무기가 동급이라 교체 안 된 판
   return { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, gateTip: {}, gateTipSeen: {},
            shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, shutterT: 0, shutterText: null, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null,
-           lotOpen: 0, lotSeen: false, lotSame: false };
+           lotOpen: 0, lotSeen: false, lotSame: false,
+           //  동작 시트 타이머(6장): heroFire = 사격 시트 남은 초 · heroWalk = 마지막 사격 뒤 걸은 초 · enemyHit = { id: 피격 시트 남은 초 } · corpses = 쓰러진 잡졸
+           heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [] };
+}
+
+//  쓰러진 잡졸 등록(kill·touch 공통). 규칙은 이미 enemies 에서 뺐으므로 위치만 셸이 기억한다
+function addCorpse(fx, ev) {
+  if (ev.kind !== 'grunt') return;
+  delete fx.enemyHit[ev.id];
+  fx.corpses.push({ x: ev.x, z: ev.z, t: 0, h: BAL3.enemies.grunt.r * 2.4 });
+  if (fx.corpses.length > FX.corpseCap) fx.corpses.shift();
 }
 
 function floater(fx, x, y, text, color, big = false) {
@@ -333,7 +343,13 @@ export function boot(canvas, deps = {}) {
     collectLotteryOutcome(run.lotteryOutcome, events, run);
     for (const ev of events) {
       switch (ev.type) {
-        case 'fire': fx.fireCount += ev.count; fx.fireWeapon = ev.weapon; break;
+        case 'fire':
+          fx.fireCount += ev.count; fx.fireWeapon = ev.weapon;
+          //  히어로 사격 시트: 걷기가 heroWalkMinSec 이상 이어진 뒤 오는 발사에 1회(연속 사격이라 매번 재생하면 걷기가 안 보인다)
+          if (fx.heroFire <= 0 && fx.heroWalk >= FX.heroWalkMinSec) fx.heroFire = sheetSec('m1_fire');
+          break;
+        //  잡졸 피격(살아남은 경우만 — 죽으면 사망 시트가 대신한다)
+        case 'enemyHit': if (ev.kind === 'grunt' && ev.hp > 0) fx.enemyHit[ev.id] = sheetSec('e_grunt_hit'); break;
         case 'supplyHit': fx.sfx.push(['crateHit']); break;
         case 'supplyOpen': {
           const y = sy(ev.z);
@@ -401,8 +417,8 @@ export function boot(canvas, deps = {}) {
           break;
         case 'hurt': fx.shakeT = FX.shakeDur; fx.hurtT = FX.hurtFlashDur; fx.sfx.push(['hurt']); floater(fx, ev.x, sy(ev.z) - 10, '−' + ev.n, C.heroHurt); break;
         case 'unitLost': spawnBurst(fx, ev.x, sy(ev.z), 9, false, C.heroHurt); break;
-        case 'kill': spawnBurst(fx, ev.x, sy(ev.z), BAL3.enemies[ev.kind]?.r ?? 14, false); fx.sfx.push(['kill']); break;
-        case 'touch': fx.shakeT = FX.shakeDur; spawnBurst(fx, ev.x, sy(ev.z), 12, false); break;
+        case 'kill': spawnBurst(fx, ev.x, sy(ev.z), BAL3.enemies[ev.kind]?.r ?? 14, false); fx.sfx.push(['kill']); addCorpse(fx, ev); break;
+        case 'touch': fx.shakeT = FX.shakeDur; spawnBurst(fx, ev.x, sy(ev.z), 12, false); addCorpse(fx, ev); break;
         case 'blast': spawnBurst(fx, ev.x, sy(ev.z), ev.r, false, C.bulletHeavy); break;
         case 'elite': fx.eliteT = FX.eliteBannerSec; fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]); break;
         case 'bossKill': spawnBurst(fx, ev.x, sy(ev.z), ev.r, true); fx.shakeT = FX.shakeDur; fx.sfx.push(['win']); break;
@@ -427,6 +443,16 @@ export function boot(canvas, deps = {}) {
     fx.eliteT = Math.max(0, fx.eliteT - dt);
     fx.shutterT = Math.max(0, fx.shutterT - dt);
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
+    //  동작 시트 타이머: 사격이 끝나면 걷기 시간을 다시 센다 · 피격은 0 이하 삭제 · 쓰러진 잡졸은 재생+머묾이 끝나면 지운다
+    fx.heroFire = Math.max(0, fx.heroFire - dt);
+    fx.heroWalk = fx.heroFire > 0 ? 0 : fx.heroWalk + dt;
+    for (const k of Object.keys(fx.enemyHit)) {
+      fx.enemyHit[k] -= dt;
+      if (fx.enemyHit[k] <= 0) delete fx.enemyHit[k];
+    }
+    const corpseSec = sheetSec('e_grunt_death') + FX.corpseLingerSec;
+    for (const c of fx.corpses) c.t += dt;
+    fx.corpses = fx.corpses.filter((c) => c.t < corpseSec);
     //  셔터 짧은 안내 글(행 단위): 다 지나면 칸 위에서 사라진다
     for (const k of Object.keys(fx.gateTip)) {
       fx.gateTip[k].t -= dt;

@@ -107,7 +107,10 @@ export const BAL3 = deepFreeze({
   //  gateTipSec   = 셔터 칸 위 짧은 글('가까워지면 열림' · '지금 쏘면 +1') 표시 시간(계약서 6장 N2-③)
   //  shutterGuideSec = 첫 셔터 조우 배너(저장 seenShutter 로 판당 아닌 사용자당 1회) 표시 시간
   fx: { shakeDur: 0.25, shakeAmp: 7, hurtFlashDur: 0.35, guideSec: 3, eliteBannerSec: 0.8, rewardPopSec: 0.5,
-        fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3, gateTipSec: 1.2, shutterGuideSec: 3 },
+        fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3, gateTipSec: 1.2, shutterGuideSec: 3,
+        //  동작 시트(6장, 2026-09-18 파일럿): 히어로는 걷기 heroWalkMinSec 뒤 발사 이벤트에 사격 시트 1회,
+        //  쓰러진 잡졸은 사망 시트 뒤 corpseLingerSec 머물다 corpseFadeSec 동안 흐려진다(최대 corpseCap 구)
+        heroWalkMinSec: 0.9, corpseLingerSec: 0.6, corpseFadeSec: 0.3, corpseCap: 40 },
   // 색(기존 값 이식 + v3 게이트 색)
   colors: {
     outline: '#14233A', hero: '#F3F1E8', heroHurt: '#FF4A4A', soldier: '#DFE6F5', hud: '#FFFFFF', gold: '#F6C84A',

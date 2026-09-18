@@ -55,6 +55,21 @@ export const HUD_ROW = Object.freeze({
 
 export function createRenderer3(ctx, sprites) {
   const get = (k) => (sprites && typeof sprites.get === 'function' ? sprites.get(k) : null);
+  //  동작 시트(sprites.sheet(key) → { img, cols, frames, fw, fh, fps, loop, refH } 또는 null → 정지 그림/폴백)
+  const sheet = (k) => (sprites && typeof sprites.sheet === 'function' ? sprites.sheet(k) : null);
+  //  시트의 한 칸을 (x, y) 중심에 그린다. bodyH = 몸통 높이(px). 배율은 칸 높이가 아니라 refH 기준 —
+  //  칸이 큰 시트(사격 섬광·사망 파편)와 작은 시트 사이에서 몸 크기가 같게 보인다
+  function drawSheetFrame(sh, frame, x, y, bodyH) {
+    const f = Math.max(0, Math.min(sh.frames - 1, Math.floor(frame)));
+    const sx = (f % sh.cols) * sh.fw, sy0 = Math.floor(f / sh.cols) * sh.fh;
+    const k = bodyH / sh.refH, dw = sh.fw * k, dh = sh.fh * k;
+    ctx.drawImage(sh.img, sx, sy0, sh.fw, sh.fh, x - dw / 2, y - dh / 2, dw, dh);
+  }
+  //  경과 시간 t(초) → 칸 번호. loop 면 순환, 아니면 마지막 칸에 머문다
+  function sheetFrameAt(sh, t) {
+    const f = Math.floor(Math.max(0, t) * sh.fps);
+    return sh.loop ? f % sh.frames : Math.min(sh.frames - 1, f);
+  }
 
   function drawImgCentered(key, x, y, h, fallbackFn) {
     const im = get(key);
@@ -484,7 +499,7 @@ export function createRenderer3(ctx, sprites) {
   }
 
   //  적: 스프라이트 폴백(상자/원/마름모) + HP 태그. 저격 예고선은 부대 쪽으로
-  function drawEnemy(e, run, sy) {
+  function drawEnemy(e, run, sy, fx) {
     const y = sy(e.z);
     if (y < -80 || y > H + 80) return;
     if (e.kind === 'shooter' && e.aimT > 0) {
@@ -497,7 +512,11 @@ export function createRenderer3(ctx, sprites) {
     }
     const h = e.r * 2.4;
     shadow(e.x, y + h * 0.4, e.r * 0.95);
-    drawImgCentered(ENEMY_SPRITE[e.kind], e.x, y, h, () => {
+    //  피격 중인 잡졸(셸 fx.enemyHit[id] 남은 초)은 피격 시트를 한 번 재생한다
+    const hitLeft = fx && fx.enemyHit ? (fx.enemyHit[e.id] ?? 0) : 0;
+    const hitSh = e.kind === 'grunt' && hitLeft > 0 ? sheet('e_grunt_hit') : null;
+    if (hitSh) drawSheetFrame(hitSh, sheetFrameAt(hitSh, hitSh.frames / hitSh.fps - hitLeft), e.x, y, h);
+    else drawImgCentered(ENEMY_SPRITE[e.kind], e.x, y, h, () => {
       ctx.fillStyle = ENEMY_FALLBACK[e.kind] ?? '#B3402F';
       if (e.kind === 'shooter') {
         ctx.fillRect(e.x - e.r * 1.1, y - e.r, e.r * 2.2, e.r * 2);
@@ -522,6 +541,22 @@ export function createRenderer3(ctx, sprites) {
     //  HP 태그: 잡졸은 다쳤을 때만, 나머지는 항상. 기준 hp 는 그 판의 난이도 표(run.enemyDefs)
     const base = run.enemyDefs?.[e.kind]?.hp ?? BAL3.enemies[e.kind]?.hp ?? 0;
     if (e.kind !== 'grunt' || e.hp < base) drawHpTag(e.x, y + e.r + 16, e.hp);
+  }
+
+  //  쓰러진 잡졸(셸 fx.corpses — 규칙의 enemies 에는 이미 없다): 사망 시트를 한 번 재생하고 corpseLingerSec 머문 뒤 흐려진다
+  function drawCorpses(fx, sy) {
+    const list = fx && fx.corpses;
+    if (!list || !list.length) return;
+    const sh = sheet('e_grunt_death');
+    if (!sh) return;
+    const total = sh.frames / sh.fps + FX.corpseLingerSec;
+    for (const c of list) {
+      const y = sy(c.z);
+      if (y < -80 || y > H + 80) continue;
+      ctx.globalAlpha = Math.max(0, Math.min(1, (total - c.t) / FX.corpseFadeSec));
+      drawSheetFrame(sh, sheetFrameAt(sh, c.t), c.x, y, c.h);
+    }
+    ctx.globalAlpha = 1;
   }
 
   function drawHpTag(x, y, hp) {
@@ -571,7 +606,11 @@ export function createRenderer3(ctx, sprites) {
       const sway = hero ? Math.sin(now * 4.5) * 0.8 : Math.sin(phase * 0.5 + i) * 1.1;
       const px = run.x + u.dx + sway, py = LINE_Y + u.dy + bob;
       const hurt = u.hp < S.unitHp;
-      drawImgCentered(hero ? 'm1' : 'soldier', px, py, size, () => {
+      //  히어로 동작 시트: 사격 중(fx.heroFire 남은 초)이면 사격 시트, 아니면 걷기 루프(now 기준). 시트가 없으면 정지 그림
+      const firing = !!(fx && fx.heroFire > 0);
+      const heroSh = hero ? (firing ? sheet('m1_fire') : sheet('m1_walk')) : null;
+      if (heroSh) drawSheetFrame(heroSh, sheetFrameAt(heroSh, firing ? heroSh.frames / heroSh.fps - fx.heroFire : now), px, py, size);
+      else drawImgCentered(hero ? 'm1' : 'soldier', px, py, size, () => {
         ctx.fillStyle = hero ? C.hero : C.soldier;
         ctx.beginPath();
         ctx.moveTo(px, py - size / 2);
@@ -1004,7 +1043,8 @@ export function createRenderer3(ctx, sprites) {
     for (const row of run.gateRows) if (!hidden(row.id)) drawGateRow(row, sy, fx, run.z);
     for (const s of run.supplies) if (!hidden(s.id)) drawSupply(s, sy, run.z);
     drawLotteryBox(run, sy, mask);
-    for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, sy);
+    drawCorpses(fx, sy);
+    for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, sy, fx);
     if (run.boss && !run.boss.dead) drawBoss(run.boss, sy, now);
     drawBullets(run, sy);
     drawEshots(run, sy);

@@ -366,3 +366,37 @@ test('V3-RENDER-HUD: ⏸ 는 셸이 넘긴 버튼 상자 그대로 그려진다 
   assert.equal(chipBoxes(noBtn, t2).length, 2, '⏸ 버튼이 없으면 칩은 난이도·무기 둘뿐');
   assert.ok(!textsOf(noBtn).includes(HUD_BTN.label), '⏸ 글자도 없다');
 });
+
+//  동작 시트(2026-09-18 파일럿): 시트가 있으면 히어로(걷기/사격)·피격 잡졸·쓰러진 잡졸이 시트 칸(drawImage 9인자)으로 그려지고,
+//  시트가 없으면(sprites null) 그리기 경로가 이전과 같이 drawImage 없이 폴백으로만 돈다. 규칙(run)은 건드리지 않는다
+test('V3-RENDER-SHEET: 동작 시트 유무에 따라 시트 칸 / 폴백이 갈리고, 사격·피격·사망 칸은 시간에 따라 진행된다', () => {
+  const run = createRun(buildStage(1));
+  run.enemies.push({ id: 900, kind: 'grunt', x: 240, z: run.z + 200, px: 240, pz: run.z + 200, vz: 60, hp: 1, r: 14, dead: false, touched: false });
+  const meta = { cols: 6, frames: 12, fw: 10, fh: 20, fps: 12, loop: false, refH: 20 };
+  const sheets = { m1_walk: { ...meta, loop: true }, m1_fire: { ...meta, cols: 8, frames: 8, loop: true }, e_grunt_hit: { ...meta, fps: 24 }, e_grunt_death: { ...meta } };
+  const sprites = { get: () => null, ready: new Set(), sheet: (k) => (sheets[k] ? { img: { key: k }, ...sheets[k] } : null) };
+  const view = (fx, now = 1) => ({ state: 'run', now, run, fx, hud: { distM: 10 }, buttons: [], saveOk: true });
+  const sheetDraws = (ops) => ops.filter((o) => o.op === 'drawImage' && o.args.length === 9);
+  //  1) 걷기만: 히어로 1칸(now 에 따라 순환)
+  let r = recCtx();
+  createRenderer3(r.ctx, sprites).draw(view(makeFxLike({ heroFire: 0, enemyHit: {}, corpses: [] }), 1));
+  let d = sheetDraws(r.ops);
+  assert.equal(d.length, 1, '시트는 히어로 걷기 한 칸만');
+  assert.equal(d[0].args[0].key, 'm1_walk');
+  //  2) 사격 남은 0.3초 → 사격 시트, 칸 = floor((8/12 − 0.3)·12) = 4
+  r = recCtx();
+  createRenderer3(r.ctx, sprites).draw(view(makeFxLike({ heroFire: 0.3, enemyHit: { 900: 0.25 }, corpses: [{ x: 200, z: run.z + 150, t: 0.5, h: 33 }] }), 1));
+  d = sheetDraws(r.ops);
+  const byKey = Object.fromEntries(d.map((o) => [o.args[0].key, o]));
+  assert.ok(byKey.m1_fire && byKey.e_grunt_hit && byKey.e_grunt_death, '사격·피격·사망 세 시트가 모두 그려진다: ' + Object.keys(byKey));
+  assert.equal(byKey.m1_fire.args[1] / 10, 4, '사격 칸 번호 = 경과 시간 × fps');
+  assert.equal(byKey.e_grunt_hit.args[1] / 10, ((0.5 - 0.25) * 24) % 6, '피격 칸 번호(24fps, 열 6)');
+  assert.equal(byKey.e_grunt_death.args[1] / 10, 0, '사망 0.5초 = 6번째 칸 → 2행 첫 열');
+  assert.equal(byKey.e_grunt_death.args[2] / 20, 1, '사망 6번째 칸은 2행');
+  //  사망 칸의 그리기 높이 = h × (fh/refH)
+  assert.equal(byKey.e_grunt_death.args[8], 33 * (20 / 20));
+  //  3) 시트 없음: drawImage 자체가 없다(폴백 도형)
+  r = recCtx();
+  createRenderer3(r.ctx, null).draw(view(makeFxLike({ heroFire: 0.3, enemyHit: { 900: 0.25 }, corpses: [{ x: 200, z: run.z + 150, t: 0.5, h: 33 }] }), 1));
+  assert.equal(r.ops.filter((o) => o.op === 'drawImage').length, 0, '시트·그림이 없으면 폴백만');
+});
