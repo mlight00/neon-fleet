@@ -24,13 +24,17 @@ export const SHEETS3 = Object.freeze({
   e_grunt_death: Object.freeze({ file: 'E1_death',  cols: 6, frames: 12, fw: 365, fh: 294, fps: 12, loop: false, refH: 200 }),
 });
 export const SHEET_BASE3 = 'assets/rush3/';
+//  무기 아이콘(2026-09-19 Gemini 생성, 이미지프롬프트_v5): 6종 × Mk I~III, 옆모습·투명. HUD 칩·보급 통 내용물이 쓴다.
+//  규칙에는 아직 강화 단계(Mk)가 없으므로 렌더는 mk 1 을 기본으로 읽는다. 없으면 종전 도형 폴백.
+export const WEAPON_ICON_IDS3 = Object.freeze(['rifle', 'auto', 'heavy', 'scatter', 'sniper', 'arc']);
+export const WEAPON_ICON_BASE3 = 'assets/rush3/weapons/';
 //  시트 재생 길이(초)
 export function sheetSec(key) { const m = SHEETS3[key]; return m ? m.frames / m.fps : 0; }
 
 export function loadSprites3(base = 'assets/rush/', sheetBase = SHEET_BASE3) {
-  const imgs = new Map(), sheets = new Map(), ready = new Set();
+  const imgs = new Map(), sheets = new Map(), icons = new Map(), ready = new Set();
   //  Image 가 없는 환경(Node)에서는 즉시 빈 결과 — 게임은 폴백으로 돈다
-  if (typeof Image === 'undefined') return Promise.resolve({ get: () => null, sheet: () => null, ready });
+  if (typeof Image === 'undefined') return Promise.resolve({ get: () => null, sheet: () => null, icon: () => null, ready });
   const load = (src, onOk) => new Promise((res) => {
     let im;
     try { im = new Image(); } catch { res(); return; }
@@ -43,5 +47,9 @@ export function loadSprites3(base = 'assets/rush/', sheetBase = SHEET_BASE3) {
   for (const [key, meta] of Object.entries(SHEETS3)) {
     jobs.push(load(sheetBase + meta.file + '.png', (im) => { sheets.set(key, { img: im, ...meta }); ready.add(key); }));
   }
-  return Promise.all(jobs).then(() => ({ get: (k) => imgs.get(k) ?? null, sheet: (k) => sheets.get(k) ?? null, ready }));
+  for (const id of WEAPON_ICON_IDS3) for (const mk of [1, 2, 3]) {
+    jobs.push(load(WEAPON_ICON_BASE3 + 'W_' + id + '_' + mk + '.png', (im) => { icons.set(id + ':' + mk, im); }));
+  }
+  return Promise.all(jobs).then(() => ({ get: (k) => imgs.get(k) ?? null, sheet: (k) => sheets.get(k) ?? null,
+                                        icon: (id, mk = 1) => icons.get(id + ':' + mk) ?? null, ready }));
 }

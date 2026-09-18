@@ -57,6 +57,14 @@ export function createRenderer3(ctx, sprites) {
   const get = (k) => (sprites && typeof sprites.get === 'function' ? sprites.get(k) : null);
   //  동작 시트(sprites.sheet(key) → { img, cols, frames, fw, fh, fps, loop, refH } 또는 null → 정지 그림/폴백)
   const sheet = (k) => (sprites && typeof sprites.sheet === 'function' ? sprites.sheet(k) : null);
+  //  무기 아이콘(옆모습, 총구 오른쪽). 없으면 null → 호출부가 종전 도형을 그린다
+  const icon = (id, mk = 1) => (sprites && typeof sprites.icon === 'function' ? sprites.icon(id, mk) : null);
+  //  아이콘을 (x, y) 중심·높이 h 로. 폭은 그림 비율(가로로 긴 옆모습) — 칩·통 안에서 maxW 를 넘지 않게 줄인다
+  function drawIconCentered(im, x, y, h, maxW) {
+    let w = h * (im.width / im.height);
+    if (maxW && w > maxW) { h *= maxW / w; w = maxW; }
+    ctx.drawImage(im, x - w / 2, y - h / 2, w, h);
+  }
   //  시트의 한 칸을 (x, y) 중심에 그린다. bodyH = 몸통 높이(px). 배율은 칸 높이가 아니라 refH 기준 —
   //  칸이 큰 시트(사격 섬광·사망 파편)와 작은 시트 사이에서 몸 크기가 같게 보인다
   function drawSheetFrame(sh, frame, x, y, bodyH) {
@@ -422,11 +430,15 @@ export function createRenderer3(ctx, sprites) {
       outlinedText('+' + n, x, y + 16, 18, C.supplyBody, 'bold', 4);
     } else if (s.kind === 'weapon') {
       const w = WEAPONS[s.payload.weapon] ?? WEAPONS.rifle;
-      ctx.fillStyle = w.color;
-      roundRect(x - 16, y - 12, 32, 10, 3);
-      ctx.fill();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(x - 12, y - 10, 8, 6);
+      const im = icon(w.id);
+      if (im) drawIconCentered(im, x, y - 7, 22, 40);
+      else {
+        ctx.fillStyle = w.color;
+        roundRect(x - 16, y - 12, 32, 10, 3);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(x - 12, y - 10, 8, 6);
+      }
       outlinedText(w.name, x, y + 14, 15, w.color, 'bold', 4);
     } else {
       ctx.fillStyle = C.chainPad;
@@ -737,11 +749,15 @@ export function createRenderer3(ctx, sprites) {
     const wb = HUD_ROW.box.weapon;
     const w = WEAPONS[run.weapon] ?? WEAPONS.rifle;
     hudChip(wb);
-    ctx.fillStyle = w.color;
-    roundRect(wb.x + 12, cy - 5, 26, 10, 3);
-    ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(wb.x + 16, cy - 3, 7, 6);
+    const wim = icon(w.id);
+    if (wim) drawIconCentered(wim, wb.x + 26, cy, 24, 34);
+    else {
+      ctx.fillStyle = w.color;
+      roundRect(wb.x + 12, cy - 5, 26, 10, 3);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(wb.x + 16, cy - 3, 7, 6);
+    }
     ctx.font = 'bold ' + HUD_ROW.fs + 'px ' + FONT;
     ctx.fillStyle = w.color;
     ctx.fillText(w.name, wb.x + 48, cy);
