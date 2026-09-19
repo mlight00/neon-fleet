@@ -1,11 +1,14 @@
 // rush3/stages.js — 기준 전투 3개 고정 배치(계약서 5장). buildStage 는 호출마다 새 객체(구조 공유 금지).
 // 난수는 빌드 시점 좌표 확정용 hashSeed/mulberry32 만(규칙 진행 중 난수 없음).
 import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
+import { makeCourses, COURSE_IDS } from './courses.js';
 import { WEAPONS } from './weapons.js';
 import { formation } from './squad.js';
 import { hashSeed, mulberry32 } from '../rush/rng.js';
 
+//  STAGE_IDS = 검사·봇 실측·계약서 기준 코스(1~3, 코스 버전 2). ALL_STAGE_IDS = 셸(타이틀·다음 작전)이 보는 공개 목록 1~24(4~24 는 courses.js).
 export const STAGE_IDS = [1, 2, 3];
+export const ALL_STAGE_IDS = Object.freeze([...STAGE_IDS, ...COURSE_IDS]);
 
 const ROAD = BAL3.road;
 const WALL_X = BAL3.wall;
@@ -164,8 +167,10 @@ export const PROTO_DEFS = {
   },
 };
 
+let COURSES = null;
+function courses() { return COURSES ?? (COURSES = makeCourses({ coverZFor })); }
 function def(id) {
-  const d = DEFS[id] ?? PROTO_DEFS[id];
+  const d = DEFS[id] ?? courses()[id] ?? PROTO_DEFS[id];
   if (!d) throw new Error('unknown stage ' + id);
   return d;
 }
@@ -260,6 +265,8 @@ function makeSpawn(id, sp, walls, mult) {
   //  corridorHw = 그 구간 예상 부대 반폭(회피 통로 규격 검사 기준). null = 통로 없음(탄막 무리)
   const ev = { z: evZ, kind: sp.kind, n, xs, zs, corridorHw: sp.corridorHw ?? null };
   if (sp.hp != null) ev.hp = sp.hp;
+  //  역할 근사용 그림 교체(B-3): 규칙은 읽지 않고 렌더만 본다
+  if (sp.skin) ev.skin = sp.skin;
   return ev;
 }
 
@@ -328,7 +335,9 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
     spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, mult)),
-    elite: d.elite ? { z: d.elite.z, hp: Math.round(d.elite.hp * mult.eliteHp), summon: !!d.elite.summon } : null,
+    elite: d.elite ? { z: d.elite.z, hp: Math.round(d.elite.hp * mult.eliteHp), summon: !!d.elite.summon, ...(d.elite.skin ? { skin: d.elite.skin } : {}) } : null,
+    //  배경 번호(C-3 표). 1~3 은 스테이지 번호와 같다
+    bg: d.bg ?? (typeof id === 'number' ? Math.min(3, id) : 1),
   };
   applyLottery(d, stage, lotterySeed);
   stage.spawns.sort((a, b) => a.z - b.z);

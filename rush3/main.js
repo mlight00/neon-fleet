@@ -3,7 +3,7 @@
 //  rush/main.js 는 import 하지 않는다(자동 부트가 같은 캔버스에 붙는다). 골격(hitButton/toLogical/spawnBurst/
 //  autoPause/오디오 unlock/ESC/음량 버튼/로드 후 루프 시작/#game3 가드)만 참고해 옮겨 적었다.
 import { BAL3, DIFFICULTY_IDS, DEFAULT_PICK_DIFFICULTY } from './balance.js';
-import { STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
+import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
@@ -22,6 +22,8 @@ const OVER_DELAY = { won: 1.3, lost: 1.0 };
 const BGM = { title: 'nf_bgm_title', stage: ['nf_bgm_sector1a', 'nf_bgm_sector2a', 'nf_bgm_sector3a'], boss: ['nf_bgm_boss_sector1', 'nf_bgm_boss_sector2', 'nf_bgm_boss_sector3'] };
 //  타이틀 난이도 토글(계약서 3-8·6장): 스테이지 버튼(y 436~) 바로 위 한 줄. 버튼 id = 'diff_' + 난이도 id
 export const DIFF_TOGGLE = Object.freeze({ x0: 138, y: 382, w: 90, h: 34, gap: 6 });
+//  타이틀 스테이지 목록(24스테이지·B-2): 2열×4행 = 8칸/페이지, 첫 칸 x 60~236·y 446~500. 페이지 줄은 그 아래(694)
+export const TITLE_GRID = Object.freeze({ y: 446, dy: 60, h: 54, pageY: 694, perPage: 8 });
 //  ⏸(일시정지) 버튼 = HUD 상단 줄의 셋째 칸. 상자는 render 의 자리표(HUD_ROW.box.pause) 하나에서만 온다 —
 //  이 객체가 **히트 영역이자 그려지는 상자**다(`hud: true` 라 drawButtons 는 건너뛰고 drawHud 가 같은 상자로 그린다).
 //  ⚠️여기에 좌표를 직접 적지 말 것. 적는 순간 화면의 칩과 누르는 자리가 조용히 어긋난다(2026-09-18 HUD 정돈).
@@ -262,14 +264,26 @@ export function boot(canvas, deps = {}) {
     try {
       const q = win && win.location && typeof URLSearchParams === 'function' ? new URLSearchParams(win.location.search) : null;
       const s = q && q.get('stage');
-      return s && PROTO_IDS.includes(s) ? s : null;
+      if (!s) return null;
+      //  시제품 id(문자) 또는 공개 스테이지 번호(4~24 포함) — 개발 확인용. 번호는 진짜 스테이지라 기록도 정상 저장된다
+      if (PROTO_IDS.includes(s)) return s;
+      const n = Number(s);
+      return ALL_STAGE_IDS.includes(n) ? n : null;
     } catch { return null; }
   }
   function lastStageId() {
     const dev = devStageId();
     if (dev) return dev;
     const id = save.get().lastStage;
-    return STAGE_IDS.includes(id) ? id : STAGE_IDS[0];
+    return ALL_STAGE_IDS.includes(id) ? id : ALL_STAGE_IDS[0];
+  }
+  //  타이틀 스테이지 목록 페이지(8칸 = 2열×4행). -1 = 마지막으로 한 스테이지가 있는 쪽
+  const TITLE_PAGE = TITLE_GRID.perPage;
+  let titlePage = -1;
+  const titlePages = () => Math.ceil(ALL_STAGE_IDS.length / TITLE_PAGE);
+  function curTitlePage() {
+    if (titlePage < 0) titlePage = Math.max(0, Math.floor(ALL_STAGE_IDS.indexOf(lastStageId()) / TITLE_PAGE));
+    return Math.max(0, Math.min(titlePages() - 1, titlePage));
   }
 
   function startRun(id) {
@@ -352,7 +366,7 @@ export function boot(canvas, deps = {}) {
     result = {
       stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
       missedLine: missedLine(run), advice: adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }), isBest, saveOk: save.ok,
-      nextId: won && STAGE_IDS.includes(id + 1) ? id + 1 : null,
+      nextId: won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null,
     };
     state = 'result';
     loop.stop(nowSec());
@@ -531,12 +545,19 @@ export function boot(canvas, deps = {}) {
       //  난이도 토글 3칸(고른 칸 = primary). 스테이지 버튼의 기록(sub)도 그 난이도 칸의 기록이다
       const T = DIFF_TOGGLE;
       v.buttons = DIFFICULTY_IDS.map((d, i) => ({ id: 'diff_' + d, x: T.x0 + i * (T.w + T.gap), y: T.y, w: T.w, h: T.h, label: BAL3.difficulty[d].label, primary: d === difficulty, small: true }));
-      for (let i = 0; i < STAGE_IDS.length; i++) {
-        const id = STAGE_IDS[i];
+      //  24스테이지(B-2): 한 페이지 8칸(2열×4행) + 페이지 넘김
+      const pg = curTitlePage(), pages = titlePages();
+      for (let i = 0; i < TITLE_PAGE; i++) {
+        const id = ALL_STAGE_IDS[pg * TITLE_PAGE + i];
+        if (id === undefined) break;
         const m = stageMeta(id), st = save.getStage(id, stageVersion(id), difficulty);
-        const sub = st.cleared ? '완료 · 최고 ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전';
-        v.buttons.push({ id: 'stage' + id, x: 60, y: 436 + i * 76, w: 360, h: 62, label: 'STAGE ' + id + '  ' + m.title, sub, primary: last === id });
+        const sub = st.cleared ? '완료 · ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전';
+        const col = i % 2, row = Math.floor(i / 2);
+        v.buttons.push({ id: 'stage' + id, x: 60 + col * 184, y: TITLE_GRID.y + row * TITLE_GRID.dy, w: 176, h: TITLE_GRID.h, label: id + ' ' + m.title, sub, primary: last === id, small: true });
       }
+      v.buttons.push({ id: 'pageL', x: 60, y: TITLE_GRID.pageY, w: 100, h: 40, label: '◀ 이전', small: true, primary: false, disabled: pg === 0 });
+      v.buttons.push({ id: 'pageInfo', x: 168, y: TITLE_GRID.pageY, w: 144, h: 40, label: (pg + 1) + ' / ' + pages, small: true, primary: false });
+      v.buttons.push({ id: 'pageR', x: 320, y: TITLE_GRID.pageY, w: 100, h: 40, label: '다음 ▶', small: true, primary: false, disabled: pg >= pages - 1 });
       v.buttons.push({ id: 'mute', x: 422, y: 14, w: 44, h: 44, label: au.isMuted() ? '🔇' : '🔊' });
     } else if (run) {
       v.run = run;
@@ -588,6 +609,9 @@ export function boot(canvas, deps = {}) {
     au.sfx('click');
     if (state === 'title') {
       if (id.startsWith('diff_')) setDifficulty(id.slice(5));
+      else if (id === 'pageL') { titlePage = Math.max(0, curTitlePage() - 1); }
+      else if (id === 'pageR') { titlePage = Math.min(titlePages() - 1, curTitlePage() + 1); }
+      else if (id === 'pageInfo') { /* 표시 전용 */ }
       else if (id.startsWith('stage')) startRun(Number(id.slice(5)));
     } else if (state === 'run') {
       if (id === 'pause') pause();

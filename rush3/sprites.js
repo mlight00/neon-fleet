@@ -5,7 +5,11 @@ export const SPRITE_KEYS3 = {
   //  보급 통·게이트
   supply: 'SUPPLY', gate: 'GATE',
   //  배경 3구간(스테이지 1~3)
-  bg1: 'BG1', bg2: 'BG2', bg3: 'BG3',
+  bg1: 'BG1', bg2: 'BG2', bg3: 'BG3', bg4: 'BG4', bg5: 'BG5',
+  //  역할 근사 그림(B-3·C-1·C-2): 스폰·정예의 skin 값이 이 키('skin:'+파일명)로 그림을 고른다
+  'skin:E2_ramhound': 'E2_ramhound', 'skin:E3_wallguard': 'E3_wallguard', 'skin:E4_needleeye': 'E4_needleeye',
+  'skin:E7_cartyard': 'E7_cartyard', 'skin:E8_manholejumper': 'E8_manholejumper', 'skin:E9_spawnpod': 'E9_spawnpod', 'skin:E10_magnethead': 'E10_magnethead',
+  'skin:B2_gantrywidow': 'B2_gantrywidow', 'skin:B3_railleviathan': 'B3_railleviathan', 'skin:B4_smelter': 'B4_smelter', 'skin:B5_crownbreaker': 'B5_crownbreaker',
   //  적 3종(계약서 e_shooter='E4_signaler'는 파일이 없어 실존 E6_signaler로 매핑)
   e_grunt: 'E1_scrapbit', e_rusher: 'E5_wheeler', e_shooter: 'E6_signaler',
   //  정예

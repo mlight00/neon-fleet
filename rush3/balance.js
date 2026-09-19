@@ -141,6 +141,9 @@ export const BAL3 = deepFreeze({
       { road: '#B7B1A2', side: '#857F6F', line: 'rgba(255,255,255,0.55)' },
       { road: '#A8A296', side: '#7A746A', line: 'rgba(255,255,255,0.5)' },
       { road: '#948F86', side: '#6A655D', line: 'rgba(255,255,255,0.42)' },
+      //  4·5 = 13~24 스테이지 배경(BG4 공장 내부·BG5 최종 구역). 그림이 없을 때의 대체 팔레트
+      { road: '#8C8A8C', side: '#5E5B62', line: 'rgba(255,255,255,0.38)' },
+      { road: '#7E7C86', side: '#4F4C58', line: 'rgba(255,255,255,0.34)' },
     ],
   },
 });

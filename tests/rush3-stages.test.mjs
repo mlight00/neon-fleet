@@ -23,7 +23,7 @@ test('V3-STAGES: STAGE_IDS 는 1·2·3 이고 stageMeta 가 계약서 표와 일
   assert.deepEqual(stageMeta(1), { id: 1, title: '첫 진격', startUnits: 1, startWeapon: 'rifle', length: 7600, eliteZ: 7200 });
   assert.deepEqual(stageMeta(2), { id: 2, title: '갈림길', startUnits: 2, startWeapon: 'rifle', length: 8600, eliteZ: 8200 });
   assert.deepEqual(stageMeta(3), { id: 3, title: '군단', startUnits: 3, startWeapon: 'rifle', length: 11000, eliteZ: 10600 });
-  assert.throws(() => buildStage(9));
+  assert.throws(() => buildStage(99));
 });
 
 test('V3-STAGES: bypass 아닌 행의 칸 합집합이 [80,400) 완전 피복·반열림·겹침 없음', () => {

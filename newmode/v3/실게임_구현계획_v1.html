@@ -564,6 +564,56 @@ blockquote{background:#fff7e0;border-left:4px solid #e0a800;margin:12px 0;paddin
 <li>안전한 길만 정답이 되지 않게 하되 <strong>초반에는 명확한 성공 경로를 보장</strong>한다(01 §10).</li>
 <li>스테이지마다 봇 8정책 완주표를 남긴다(§3-2 2층).</li>
 </ul>
+<p><strong>1차 배치 상태(2026-09-19, 계약서 r3.12).</strong> 4~12번을 <code>rush3/courses.js</code>에 배치했고 검사 <code>V3-COURSE C-1~C-6</code>(형식·길이·게이트 피복·통/벽/스폰·보통 난이도 <code>planBoss</code> 봇 완주·그림 전달)이 잠근다. 다만 <strong>장치가 아직 없는 자리는 기존 장치로 그 자리의 '배우는 것'을 근사</strong>했다(표의 '새 장치' 열은 목표이고, 아래가 지금 들어간 것이다).</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">#</th>
+<th>표의 새 장치</th>
+<th>1차 배치가 넣은 것(근사)</th>
+<th>장치가 들어오면</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">6</td>
+<td>움직이는 보급(차량)</td>
+<td>차선을 번갈아 놓은 통 3개(움직이지 않는다)</td>
+<td>같은 번호를 차량 통으로 교체</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td>구출 캡슐</td>
+<td>갓길 끝의 큰 병사 통(놓쳐도 실패 아님 — 보상만 없다)</td>
+<td>캡슐 장치로 교체</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td>보너스전</td>
+<td>짧은 본전투 + 소환형 정예(살려 온 병력이 곧 보상)</td>
+<td>본전투 뒤 보너스 구간 추가</td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td>복수 정예 2체</td>
+<td>정예 1체(B2 그림) + 좌우 소환 물결</td>
+<td>2체 동시 등장</td>
+</tr>
+<tr>
+<td style="text-align: right;">10·11</td>
+<td>아레나 보스</td>
+<td>도로 전투(B3·B4 그림, 병력 상한 큰 3칸 행)</td>
+<td>광장 전환</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td>관문(조합)</td>
+<td>3칸 + 차폐 + 배제 쌍 + 랜덤 길 조합(차량·복수 정예는 빠짐)</td>
+<td>위 장치들이 들어오면 보강</td>
+</tr>
+</tbody>
+</table>
+<p>새 장치 5종(움직이는 보급·구출 캡슐·보너스전·복수 정예·아레나)은 <strong>다음 회차</strong>에 장치를 넣고 같은 번호를 교체한다(기록은 코스 버전을 올려 보존).</p>
 <h4 id="b-3-1324">B-3. 13~24번 — 새 장치 없이 채운다</h4>
 <p>13~24는 <strong>새 장치를 하나도 추가하지 않는다.</strong> 대신 ① 아직 안 쓴 기존 적 그림 6종을 한 스테이지에 하나씩 도입하고 ② 배경 BG4·BG5를 본격적으로 쓰고 ③ 12번까지의 재료를 다른 공간에 재배치한다.</p>
 <table>
@@ -620,6 +670,7 @@ blockquote{background:#fff7e0;border-left:4px solid #e0a800;margin:12px 0;paddin
 </tr>
 </tbody>
 </table>
+<p><strong>1차 배치 상태(2026-09-19).</strong> 13~24번도 <code>courses.js</code>에 배치·검사 완료. 새 역할 5종은 <strong>행동 없이 그림(<code>skin</code>)·체력만 바꿔 근사</strong>했다 — 장갑체 = 체력 10 잡졸에 E3 그림 · 복병 = 돌격체에 E8 · 생성기 = 체력 14 고정 저격수에 E9(소환 없음) · 방해형 = 체력 9 저격수에 E10(빗나감 없음) · 카트 = 체력 20 잡졸에 E7. 23은 정예 1체(B2 그림)+소환, 24는 도로 정예(B5). 규칙은 <code>skin</code>을 읽지 않으므로(렌더 전용) 행동이 들어와도 배치 데이터는 그대로 쓴다. <strong>행동 구현(장갑 피격 감쇠·차선 점프·소환·탄 빗나감·파편)은 다음 회차.</strong></p>
 <p><strong>완료 기준(묶음 B).</strong> 01 §13 2단계 원문 그대로: <strong>"02 문서의 전투 요소가 모두 실제 플레이에 등장하고, 모바일에서 벽·포인터 취소·아레나 전환까지 동작한다."</strong></p>
 <h3 id="c">묶음 C — 기존 자산 편성</h3>
 <p>새로 그리기 전에 <strong>이미 가진 것부터 배치한다.</strong> 현재 <code>assets/rush/</code>에 적 10종(E1~E10)·보스 5종(B1~B5)·배경 5종(BG1~5)·아군/보급/게이트(M01~M05·SOLDIER·SUPPLY·GATE·POW)가 있고, 이 중 rush3가 실제로 쓰는 것은 <strong>11장뿐</strong>이다(<code>rush3/sprites.js</code> <code>SPRITE_KEYS3</code>: M01·SOLDIER·SUPPLY·GATE·BG1·BG2·BG3·E1·E5·E6·B1). <strong>적 7종·보스 4종·배경 2종이 그려져 있는데 놀고 있다.</strong></p>

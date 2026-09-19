@@ -51,7 +51,7 @@ export const HUD_ROW = Object.freeze({
   top: HUD_TOP, h: HUD_H, r: HUD_R, fs: HUD_FS, gap: HUD_GAP, right: HUD_RIGHT,
   cy: HUD_TOP + HUD_H / 2,
   //  왼쪽 두 줄: 제목은 세 칩과 같은 중심선, 남은 거리는 그 아래 한 줄
-  left: 16, titleFs: 20, distFs: 15, distCy: HUD_TOP + HUD_H / 2 + 28,
+  left: 16, titleFs: 20, titleFsSmall: 17, distFs: 15, distCy: HUD_TOP + HUD_H / 2 + 28,
   box: Object.freeze({ diff: HUD_DIFF, weapon: HUD_WEAPON, pause: HUD_PAUSE }),
 });
 
@@ -108,10 +108,11 @@ export function createRenderer3(ctx, sprites) {
   }
 
   //  외곽선 글자(밝은 배경 위에서도 읽히게)
-  function outlinedText(text, x, y, px, color, weight = 'bold', lw = 5) {
+  function outlinedText(text, x, y, px, color, weight = 'bold', lw = 5, maxWidth) {
     ctx.font = weight + ' ' + px + 'px ' + FONT;
     ctx.lineWidth = lw;
     ctx.strokeStyle = C.outline;
+    if (maxWidth > 0) { ctx.strokeText(text, x, y, maxWidth); ctx.fillStyle = color; ctx.fillText(text, x, y, maxWidth); return; }
     ctx.strokeText(text, x, y);
     ctx.fillStyle = color;
     ctx.fillText(text, x, y);
@@ -119,7 +120,7 @@ export function createRenderer3(ctx, sprites) {
 
   //  배경: BG 타일(있으면) + 도로 80~400 + 차선. 도로와 물체는 같은 속도로 흐른다(세계 고정)
   function drawBackground(scroll, stageIdx) {
-    const pal = C.bg[stageIdx] ?? C.bg[0];
+    const pal = C.bg[Math.min(stageIdx, C.bg.length - 1)] ?? C.bg[0];
     const im = get('bg' + (stageIdx + 1));
     if (im) {
       const h = Math.round(im.height * (W / im.width));
@@ -548,7 +549,7 @@ export function createRenderer3(ctx, sprites) {
     const hitLeft = fx && fx.enemyHit ? (fx.enemyHit[e.id] ?? 0) : 0;
     const hitSh = e.kind === 'grunt' && hitLeft > 0 ? sheet('e_grunt_hit') : null;
     if (hitSh) drawSheetFrame(hitSh, sheetFrameAt(hitSh, hitSh.frames / hitSh.fps - hitLeft), e.x, y, h);
-    else drawImgCentered(ENEMY_SPRITE[e.kind], e.x, y, h, () => {
+    else drawImgCentered(e.skin ? 'skin:' + e.skin : ENEMY_SPRITE[e.kind], e.x, y, h, () => {
       ctx.fillStyle = ENEMY_FALLBACK[e.kind] ?? '#B3402F';
       if (e.kind === 'shooter') {
         ctx.fillRect(e.x - e.r * 1.1, y - e.r, e.r * 2.2, e.r * 2);
@@ -600,7 +601,7 @@ export function createRenderer3(ctx, sprites) {
   function drawBoss(b, sy, now) {
     const y = sy(b.z);
     shadow(b.x, y + b.r * 1.05, b.r * 1.15);
-    drawImgCentered('elite', b.x, y, b.r * 2.6, () => {
+    drawImgCentered(b.skin ? 'skin:' + b.skin : 'elite', b.x, y, b.r * 2.6, () => {
       ctx.fillStyle = ENEMY_FALLBACK.elite;
       ctx.beginPath(); ctx.arc(b.x, y, b.r, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = C.warn; ctx.lineWidth = 6;
@@ -767,7 +768,14 @@ export function createRenderer3(ctx, sprites) {
     const cy = HUD_ROW.cy;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    outlinedText('STAGE ' + run.stageId + '  ' + run.title, HUD_ROW.left, cy, HUD_ROW.titleFs, C.hud, '900', 6);
+    //  제목은 난이도 칩 앞에서 끝나야 한다(24스테이지 제목 중 '크라운 브레이커' 같은 긴 것).
+    //  순서: 기본 크기 → 한 단계 작게(17px) → 그래도 넘치면 'STAGE ' 접두 제거 → 마지막 안전망 maxWidth
+    const titleMaxW = HUD_ROW.box.diff.x - HUD_ROW.left - 6;
+    const fits = (t, fs) => { ctx.font = '900 ' + fs + 'px ' + FONT; return ctx.measureText(t).width <= titleMaxW; };
+    const full = 'STAGE ' + run.stageId + '  ' + run.title, short = run.stageId + '  ' + run.title;
+    let titleText = full, titleFs = HUD_ROW.titleFs;
+    if (!fits(full, titleFs)) { titleFs = HUD_ROW.titleFsSmall; if (!fits(full, titleFs)) titleText = short; }
+    outlinedText(titleText, HUD_ROW.left, cy, titleFs, C.hud, '900', 6, titleMaxW);
     const goal = run.boss ? '정예 전투!' : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
     outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
     //  무기 칩
@@ -1085,7 +1093,7 @@ export function createRenderer3(ctx, sprites) {
     const mask = lotteryMask(run, fx);
     //  가려진 동안에는 실제 물체를 아예 그리지 않는다('?' 상자가 그 자리를 대신한다)
     const hidden = (id) => mask >= 1 && id != null && run.lottery && (run.lottery.supplyId === id || run.lottery.rowId === id);
-    drawBackground(run.z, Math.max(0, Math.min(2, run.stageId - 1)));
+    drawBackground(run.z, Math.max(0, (run.bg || 1) - 1));
     drawWalls(run, sy);
     drawCovers(run, sy);
     for (const row of run.gateRows) if (!hidden(row.id)) drawGateRow(row, sy, fx, run.z);

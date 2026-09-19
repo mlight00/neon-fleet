@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine, DIFF_TOGGLE, normDifficulty,
          emptyLotteryOutcome, GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
-         isFixedGateRow } from '../rush3/main.js';
+         isFixedGateRow, TITLE_GRID } from '../rush3/main.js';
 import { makeGateRow } from '../rush3/gates.js';
 import { createInput } from '../rush3/input.js';
 import { createRun, stepRun, STEP } from '../rush3/combat.js';
@@ -323,6 +323,8 @@ async function bootFake(opts = {}) {
 }
 //  랜덤 길 시드를 고정한 boot 스모크(연출·효과음까지 보려면 bootLot 이 아니라 이쪽 — 프레임·오디오 기록이 필요하다)
 const bootFakeLot = (dateNow) => bootFake({ dateNow });
+//  타이틀의 스테이지 1 칸을 누른다(24스테이지 목록 2열×4행의 첫 칸 = main.TITLE_GRID). 논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율
+const tapStage1 = (canvas) => canvas.fire('pointerdown', { clientX: (60 + 88) / 2, clientY: (TITLE_GRID.y + TITLE_GRID.h / 2) / 2, pointerType: 'mouse' });
 
 test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → 일시정지 중 z 정지 → 재개 → 봇 완주 → 결과·저장', async () => {
   const { app, canvas, win, calls, frames, save, audio } = await bootFake();
@@ -330,7 +332,7 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   assert.equal(app.getState(), 'title');
   assert.ok(calls.includes('fillText') && calls.includes('drawImage') === false, '타이틀은 그림 없이 폴백으로 그려진다');
   //  타이틀 버튼 클릭(스테이지 1): 논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율
-  canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
+  tapStage1(canvas);
   assert.equal(app.getState(), 'run');
   //  기록은 코스 버전 + 난이도 칸에 쌓인다 — 저장이 없는 새 사용자의 초기 선택은 지옥(brutal)이므로 `${ver}:brutal` 칸이다(계약서 3-8·6)
   assert.equal(app.getDifficulty(), 'brutal', '저장 없는 첫 부팅의 초기 선택 = 지옥');
@@ -528,7 +530,7 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
     assert.ok(texts.includes('미도전'), '표시된 글: ' + JSON.stringify(texts));
     assert.ok(!texts.some((t) => t.includes('99명')), 'v1 기록이 화면에 나오면 안 된다: ' + JSON.stringify(texts));
     //  출격 — attempts 는 버전 2 칸에서 1, v1 은 그대로
-    canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
+    tapStage1(canvas);
     assert.equal(app.getState(), 'run');
     assert.equal(app.getRun().stageVersion, 2);
     assert.equal(save.getStage(1, 2, 'brutal').attempts, 1);
@@ -581,7 +583,7 @@ test('V3-SAVE-VERSION DIFF 셸 결선: 토글 클릭·키 1/2/3 → 난이도 �
   win.fire('keydown', { code: 'Digit2' });
   assert.equal(app.getDifficulty(), 'hard');
   //  출격: run.difficulty = hard, 적 표가 hard, attempts 는 `${ver}:hard` 칸
-  canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
+  tapStage1(canvas);
   assert.equal(app.getState(), 'run');
   assert.equal(app.getRun().difficulty, 'hard');
   assert.equal(app.getRun().enemyDefs.shooter.shot.dmg, 2);
@@ -646,7 +648,7 @@ test('V3-SAVE-VERSION DIFF 새 사용자: 저장이 없으면 타이틀 초기 �
   assert.equal(app.getDifficulty(), 'normal');
   assert.equal(save.get().difficulty, 'normal', '선택은 저장에 기억');
   //  출격 — 기록은 접미 없는 칸(`${ver}`)에만 쌓이고 지옥 칸은 비어 있다
-  canvas.fire('pointerdown', { clientX: 120, clientY: (436 + 31) / 2, pointerType: 'mouse' });
+  tapStage1(canvas);
   assert.equal(app.getState(), 'run');
   assert.equal(app.getRun().difficulty, 'normal');
   assert.equal(save.getStage(1, ver).attempts, 1);
@@ -997,14 +999,14 @@ test('V3-SHELL-RESULT-LAYOUT: 랜덤 길이 있는 판은 셸이 아래 버튼�
   assert.equal(retry.top, 480, '[다시 도전] 은 제자리');
   assert.equal(note.args[1], (retry.left + retry.right) / 2, '부연은 [다시 도전] 가운데 정렬');
   assert.ok(note.args[2] > retry.bottom, '부연은 [다시 도전] 아래: 글 y=' + note.args[2] + ' 버튼 아래끝=' + retry.bottom);
-  //  ② 그 아래 버튼([스테이지 선택] — S3 는 마지막 판이라 [다음 작전] 이 없다)이 부연과 겹치지 않는다
+  //  ② 그 아래 버튼(S3 는 4 로 이어지므로 [다음 작전], 마지막 판이면 [스테이지 선택])이 부연과 겹치지 않는다
   const hasNext = ops.some((o) => o.op === 'fillText' && o.args[0] === '다음 작전');
   const below = buttonBoxOf(ops, hasNext ? '다음 작전' : '스테이지 선택');
   assert.equal(below.bottom - below.top, hasNext ? 56 : 44, '아래 버튼 상자를 제대로 집었다');
   assert.ok(note.args[2] + 4 <= below.top,
     '부연 아래로 버튼이 내려와야 한다 — 글 y=' + note.args[2] + ' 아래 버튼 top=' + below.top + '(셸의 noteGap 이 0 이면 여기서 깔린다)');
-  //  ③ 내려온 양 = 부연 한 줄 자리(22px). 기본 자리는 552(아래 대조군과 같은 수)
-  assert.equal(below.top, 552 + 22, '[스테이지 선택] 이 기본 자리 552 에서 22px 내려와 있다');
+  //  ③ 내려온 양 = 부연 한 줄 자리(22px). 기본 자리는 [다음 작전] 548 / [스테이지 선택] 552(아래 대조군과 같은 수)
+  assert.equal(below.top, (hasNext ? 548 : 552) + 22, '아래 버튼이 기본 자리에서 22px 내려와 있다');
 });
 
 test('V3-SHELL-RESULT-LAYOUT: 랜덤 길이 없는 판(대조군)은 부연이 없고 버튼이 기본 자리 그대로다', async () => {

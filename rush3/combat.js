@@ -38,7 +38,7 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
   const weaponMk = clampMk(startMk ?? 1);
   const diff = difficulty ?? stage.difficulty ?? DEFAULT_DIFFICULTY;
   const run = {
-    stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null,
+    stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null, bg: stage.bg ?? 1,
     difficulty: diff, enemyDefs: enemyDefsFor(diff),
     z: 0, prevZ: 0, x: ROAD.startX, tx: ROAD.startX,
     units: [], nextUnitId: 1,
@@ -120,7 +120,7 @@ function spawnDue(run, ev) {
   const sp = run.spawns;
   while (run.spawnCursor < sp.length && sp[run.spawnCursor].z <= run.z) {
     const e = sp[run.spawnCursor++];
-    for (let i = 0; i < e.n; i++) spawnEnemy(run, e.kind, e.xs[i], e.zs[i], e.hp);
+    for (let i = 0; i < e.n; i++) spawnEnemy(run, e.kind, e.xs[i], e.zs[i], e.hp, e.skin);
     ev.push({ type: 'spawn', kind: e.kind, n: e.n, x: e.xs[0], z: e.z });
   }
   if (run.elite && !run.eliteSpawned && run.elite.z <= run.z) {
@@ -129,6 +129,7 @@ function spawnDue(run, ev) {
     const z = run.z + E.spawnAhead;
     run.boss = { kind: 'elite', x: ROAD.center, z, px: ROAD.center, pz: z, hp: run.elite.hp, max: run.elite.hp, r: E.r,
                  state: 'descend', dir: 1, shootT: E.shootEvery, touchT: 0, spawnT: E.summonEvery, summon: !!run.elite.summon, dead: false };
+    if (run.elite.skin) run.boss.skin = run.elite.skin;
     ev.push({ type: 'elite', x: run.boss.x, z: run.boss.z, hp: run.boss.hp });
   }
 }
@@ -139,9 +140,10 @@ function armGates(run, ev) {
 }
 
 // 적 1기 생성. hp 는 스테이지 정의 고정값(병력 무관) — 난이도 배수는 run.enemyDefs 에 이미 들어 있다
-function spawnEnemy(run, kind, x, z, hp) {
+function spawnEnemy(run, kind, x, z, hp, skin) {
   const d = run.enemyDefs[kind];
   const e = { id: run.nextEnemyId++, kind, x, z, px: x, pz: z, vz: d.vz, hp: hp ?? d.hp, r: d.r, dead: false, touched: false };
+  if (skin) e.skin = skin;
   if (kind === 'shooter') { e.shootT = d.shootEvery; e.aimT = 0; }
   run.enemies.push(e);
   return e;
