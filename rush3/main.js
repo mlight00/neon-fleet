@@ -3,7 +3,7 @@
 //  rush/main.js 는 import 하지 않는다(자동 부트가 같은 캔버스에 붙는다). 골격(hitButton/toLogical/spawnBurst/
 //  autoPause/오디오 unlock/ESC/음량 버튼/로드 후 루프 시작/#game3 가드)만 참고해 옮겨 적었다.
 import { BAL3, DIFFICULTY_IDS, DEFAULT_PICK_DIFFICULTY } from './balance.js';
-import { STAGE_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
+import { STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
@@ -257,7 +257,17 @@ export function boot(canvas, deps = {}) {
   function nowSec() { return nowFn() / 1000; }
   function sy(z) { return LINE_Y - (z - run.z); }
   //  저장의 lastStage 는 형식만 검사되므로(문자열·범위 밖 숫자 가능) 실제 스테이지 id 로만 쓴다
+  //  격리 시제품(r3.11): rush3.html?stage=proto3 — 타이틀 기본 선택이 그 시제품이 되고, 그 판은 기록에 남기지 않는다
+  function devStageId() {
+    try {
+      const q = win && win.location && typeof URLSearchParams === 'function' ? new URLSearchParams(win.location.search) : null;
+      const s = q && q.get('stage');
+      return s && PROTO_IDS.includes(s) ? s : null;
+    } catch { return null; }
+  }
   function lastStageId() {
+    const dev = devStageId();
+    if (dev) return dev;
     const id = save.get().lastStage;
     return STAGE_IDS.includes(id) ? id : STAGE_IDS[0];
   }
@@ -271,7 +281,7 @@ export function boot(canvas, deps = {}) {
     //  개발 확인용 시작 무기(r3.10): rush3.html?weapon=scatter&mk=2 — 규칙엔 startWeapon/startMk 로만 들어가고, 이 판은 기록에 남기지 않는다
     const devStart = devStartWeapon();
     run = createRun(stage, devStart);
-    run.devWeapon = !!devStart.startWeapon;
+    run.devWeapon = !!devStart.startWeapon || PROTO_IDS.includes(id);
     //  랜덤 길 실제 결과 집계(계약서 3-9 결과 문구). 규칙이 아니라 셸이 갖는 칸이다 — 규칙 모듈은 lottery 를 모른다
     run.lotteryOutcome = run.lottery ? emptyLotteryOutcome() : null;
     //  기록은 stageId + 코스 버전 + 난이도로 묶는다(run.stageVersion = stage.version, run.difficulty = stage.difficulty)
@@ -394,6 +404,8 @@ export function boot(canvas, deps = {}) {
         //  막힌 탄: 작은 회색 스파크 + 금속 튕김(색만으로 구분하지 않는다 — 2026-09-17 2차 검수 N2-④).
         //  ⚠️함정 행(붉은 봉쇄 장치)은 셔터가 아니다 — 둔탁한 차단음 + 붉은 스파크로 '이 장치에는 사격이 안 먹힌다'를 알린다(이사 결정 ③).
         //   단 **'?' 상자가 걷힌 뒤부터**다(trapShown) — 공개 전에는 함정도 꽝 게이트도 똑같이 gateClang + 회색이어야 내용이 새지 않는다
+        //  차폐물 흡수(r3.11): 셔터와 같은 회색 스파크 + 금속 튕김 — '여기서는 안 뚫린다'
+        case 'coverHit': spawnBurst(fx, ev.x, sy(ev.z), 5, false, C.wall); fx.sfx.push(['gateClang']); break;
         case 'gateBlock': {
           const trap = trapShown(ev.id);
           spawnBurst(fx, ev.x, sy(ev.z), 6, false, trap ? C.warn : C.wall);

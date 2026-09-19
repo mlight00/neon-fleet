@@ -46,7 +46,9 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
     bullets: [],
     gateRows: (stage.gateRows || []).map(makeGateRow),
     supplies: (stage.supplies || []).map(makeSupply),
-    walls: stage.walls || [],
+    //  r3.11: 차폐물(kind 'cover')은 이동·통로 판정에서 빼고(walls) 탄·적탄·폭발/연쇄 사선만 막는다(covers)
+    walls: (stage.walls || []).filter((w) => w.kind !== 'cover'),
+    covers: (stage.walls || []).filter((w) => w.kind === 'cover'),
     spawns: stage.spawns || [], spawnCursor: 0,
     elite: stage.elite || null, eliteSpawned: false, bossDefeated: false,
     events: [],
@@ -203,6 +205,7 @@ function moveBullets(run, ev, dt) {
       if (cz < bestZ || (cz === bestZ && p < bestP)) { bestZ = cz; bestP = p; kind = k; obj = o; cell = c; }
     };
     for (const w of run.walls) consider(wallContactZ(b, w), 0, 0, w, null);
+    for (const w of run.covers) consider(wallContactZ(b, w), 0, 0, w, null);
     for (const s of run.supplies) consider(sweepContactSupply(s, b), 1, 1, s, null);
     for (const row of run.gateRows) {
       if (row.passed) continue;
@@ -214,7 +217,7 @@ function moveBullets(run, ev, dt) {
     for (const e of run.enemies) if (!e.dead && !hitAlready(e.id)) consider(circleContactZ(b, e.x, e.z, e.r + halfW), 3, 3, e, null);
     const bo = run.boss;
     if (bo && !bo.dead && !hitAlready('boss')) consider(circleContactZ(b, bo.x, bo.z, bo.r + halfW), 3, 3, bo, null);
-    if (kind === 0) { b.dead = true; ev.push({ type: 'wallHit', x: b.x, z: bestZ }); }
+    if (kind === 0) { b.dead = true; ev.push({ type: obj.kind === 'cover' ? 'coverHit' : 'wallHit', x: b.x, z: bestZ }); }
     else if (kind === 1) hitSupply(obj, b, ev, run);
     else if (kind === 2) hitGateCell(obj, cell, b, ev);
     else if (kind === 3) hitEnemy(run, obj, b, ev);
@@ -243,7 +246,7 @@ function chainArc(run, from, n, r, dmg, ev) {
     if (t === from || t.dead) continue;
     const d = Math.hypot(t.x - from.x, t.z - from.z);
     if (d > r + t.r) continue;
-    if (wallBetween(run.walls, from.x, from.z, t.x, t.z)) continue;
+    if (wallBetween(run.walls.concat(run.covers), from.x, from.z, t.x, t.z)) continue;
     cand.push({ t, d, id: t.id ?? Number.MAX_SAFE_INTEGER });
   }
   cand.sort((a, b) => a.d - b.d || a.id - b.id);
@@ -272,7 +275,7 @@ function blast(run, center, r, dmg, ev) {
     if (t === center || t.dead) continue;
     const d = Math.hypot(t.x - center.x, t.z - center.z);
     if (d > r + t.r) continue;
-    if (wallBetween(run.walls, center.x, center.z, t.x, t.z)) continue;
+    if (wallBetween(run.walls.concat(run.covers), center.x, center.z, t.x, t.z)) continue;
     t.hp -= dmg;
     ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, blast: true });
     if (t.hp <= 0) t.dead = true;
@@ -388,6 +391,7 @@ function moveEshots(run, ev, dt) {
     s.x += s.vx * dt;
     let wall = false;
     for (const w of run.walls) if (segHitsRect(s.px, s.pz, s.x, s.z, w)) { wall = true; break; }
+    if (!wall) for (const w of run.covers) if (segHitsRect(s.px, s.pz, s.x, s.z, w)) { wall = true; break; }
     if (wall) { s.dead = true; continue; }
     const u = hitUnit(run.units, s.x, s.z, s.r, { x: s.px, z: s.pz }, run);
     if (u) { s.dead = true; damageUnit(run, u, s.dmg, 'shot', ev, s.x, s.z); }

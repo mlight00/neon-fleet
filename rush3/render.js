@@ -152,6 +152,24 @@ export function createRenderer3(ctx, sprites) {
     }
   }
 
+  //  차폐물(r3.11): 낮은 모래주머니 둔덕 — 탄만 막고 통로는 막지 않는다. 벽과 달리 도로 폭 일부만 차지하고 색이 어둡다
+  function drawCovers(run, sy) {
+    for (const w of run.covers || []) {
+      const yTop = sy(w.z1), yBot = sy(w.z0);
+      if (yBot < -10 || yTop > H + 10) continue;
+      const wd = w.x1 - w.x0, hh = Math.max(8, yBot - yTop);
+      ctx.fillStyle = 'rgba(20,25,35,0.28)';
+      ctx.fillRect(w.x0 - 2, yTop + 5, wd + 4, hh);
+      ctx.fillStyle = '#5B5347';
+      roundRect(w.x0, yTop, wd, hh, 6); ctx.fill();
+      ctx.fillStyle = '#8A7B62';
+      roundRect(w.x0 + 3, yTop + 2, wd - 6, hh * 0.45, 5); ctx.fill();
+      //  사선 줄무늬 = '탄 막힘' 표시
+      ctx.fillStyle = 'rgba(255,214,90,0.55)';
+      for (let x = w.x0 + 6; x < w.x1 - 10; x += 22) ctx.fillRect(x, yTop + hh - 7, 12, 4);
+    }
+  }
+
   //  벽: 도로 위 회색 분리대(상단 하이라이트)
   function drawWalls(run, sy) {
     for (const w of run.walls) {
@@ -1069,6 +1087,7 @@ export function createRenderer3(ctx, sprites) {
     const hidden = (id) => mask >= 1 && id != null && run.lottery && (run.lottery.supplyId === id || run.lottery.rowId === id);
     drawBackground(run.z, Math.max(0, Math.min(2, run.stageId - 1)));
     drawWalls(run, sy);
+    drawCovers(run, sy);
     for (const row of run.gateRows) if (!hidden(row.id)) drawGateRow(row, sy, fx, run.z);
     for (const s of run.supplies) if (!hidden(s.id)) drawSupply(s, sy, run.z);
     drawLotteryBox(run, sy, mask);

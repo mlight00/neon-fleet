@@ -135,8 +135,37 @@ export const DEFS = {
   },
 };
 
+//  격리 시제품(r3.11, 2026-09-19 · 실게임 구현계획 §7 착수 2): STAGE_IDS 에 넣지 않는다 — 타이틀·봇 실측·기록과 분리.
+//  셸은 rush3.html?stage=proto3 로만 연다(기록 저장 없음). 도로 80~400 을 3등분한 세 칸 행 + 사선만 막는 차폐물(kind 'cover').
+const T3 = [80, 80 + 320 / 3, 80 + 640 / 3, 400];
+export const PROTO_IDS = ['proto3'];
+export const PROTO_DEFS = {
+  proto3: {
+    version: 1, title: '시험 · 세 갈래', startUnits: 6, startWeapon: 'rifle', length: 5200, eliteZ: 4800,
+    gates: [
+      //  가운데(+3)가 정답이지만 그 앞에 차폐물이 있어 정면에서는 못 쏜다 — 옆 칸에서 비스듬히 쏘거나 차폐 뒤에서 미리 쏴야 한다
+      { z: 1500, maxValue: 15, cells: [[T3[0], T3[1], -4], [T3[1], T3[2], 3], [T3[2], T3[3], -6]], hint: '세 칸: 가운데가 늘 정답은 아니다' },
+      //  왼쪽(+2) 앞 차폐, 오른쪽(+5)이 열려 있다
+      { z: 3000, maxValue: 15, cells: [[T3[0], T3[1], 2], [T3[1], T3[2], -8], [T3[2], T3[3], 5]], hint: '가려진 칸은 쏠 수 없다' },
+    ],
+    supplies: [
+      { z: 2200, x: 150, kind: 'soldier', durability: 8, n: 4 },
+      { z: 3800, x: 330, kind: 'weapon', durability: 12, weapon: 'auto' },
+    ],
+    walls: [
+      { kind: 'cover', x0: 190, x1: 290, z0: 1120, z1: 1160 },
+      { kind: 'cover', x0: 80, x1: 186, z0: 2620, z1: 2660 },
+    ],
+    spawns: [
+      { z: 2400, kind: 'grunt', n: 4, xs: [120, 200, 280, 360], corridorHw: null },
+      { z: 3400, kind: 'rusher', n: 2, xs: [160, 320], corridorHw: null },
+    ],
+    elite: { z: 4800, hp: 100, summon: false },
+  },
+};
+
 function def(id) {
-  const d = DEFS[id];
+  const d = DEFS[id] ?? PROTO_DEFS[id];
   if (!d) throw new Error('unknown stage ' + id);
   return d;
 }
@@ -174,8 +203,11 @@ function makeSupplyDef(idx, s) {
 }
 
 //  signs = 벽 앞머리에 그리는 통로 안내 표지(연출이 아니라 계약 데이터 — V3-STAGES 가 실제 통 내용과 대조한다)
+//  kind 'cover'(r3.11) = 사선만 막는 짧은 차폐물: x0·x1 을 직접 적고, 통로(이동)는 막지 않는다(combat.createRun 이 walls/covers 로 나눈다)
 function makeWall(idx, w) {
-  const wall = { id: 'w' + idx, z0: w.z0, z1: w.z1, x0: WALL_X.x0, x1: WALL_X.x1 };
+  const cover = w.kind === 'cover';
+  const wall = { id: (cover ? 'v' : 'w') + idx, z0: w.z0, z1: w.z1, x0: cover ? w.x0 : WALL_X.x0, x1: cover ? w.x1 : WALL_X.x1 };
+  if (cover) wall.kind = 'cover';
   if (w.signs) wall.signs = { L: { ...w.signs.L }, R: { ...w.signs.R } };
   return wall;
 }
@@ -287,13 +319,15 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   const d = def(id);
   const mult = difficultyMult(difficulty);
   const walls = d.walls.map((w, i) => makeWall(i + 1, w));
+  //  스폰 좌표 보정·랜덤 길은 진짜 벽만 본다(차폐물은 이동을 막지 않는다)
+  const solid = walls.filter((w) => w.kind !== 'cover');
   const stage = {
     id, version: d.version ?? 1, difficulty,
     title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ,
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
-    spawns: d.spawns.map(sp => makeSpawn(id, sp, walls, mult)),
+    spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, mult)),
     elite: d.elite ? { z: d.elite.z, hp: Math.round(d.elite.hp * mult.eliteHp), summon: !!d.elite.summon } : null,
   };
   applyLottery(d, stage, lotterySeed);
