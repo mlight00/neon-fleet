@@ -147,7 +147,14 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = pal.road;
       ctx.fillRect(x0, 0, x1 - x0, H);
     }
-    if (k > 0) {
+    //  광장 그림(2026-09-19 Gemini ARENA1=산업지대·ARENA2=적 공장): 있으면 열림 정도 k 만큼 겹쳐 그린다(도로가 광장으로 열리는 구도). 없으면 종전 어두운 타원
+    const arenaIm = k > 0 ? get(stageIdx >= 4 ? 'arena2' : 'arena1') : null;
+    if (arenaIm) {
+      ctx.globalAlpha = k;
+      ctx.drawImage(arenaIm, 0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+    if (k > 0 && !arenaIm) {
       //  광장 바닥: 보스 등장 자리(y 140)부터 화면 아래까지 덮는 어두운 타원 + 옅은 테두리
       const yTop = 130;
       ctx.fillStyle = 'rgba(18,22,30,' + (0.6 * k).toFixed(3) + ')';
@@ -169,7 +176,7 @@ export function createRenderer3(ctx, sprites) {
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
-    ctx.strokeStyle = 'rgba(20,35,58,0.35)';
+    ctx.strokeStyle = 'rgba(20,35,58,' + (arenaIm ? (0.35 * (1 - k)).toFixed(3) : '0.35') + ')';
     ctx.lineWidth = 4;
     for (const x of [x0, x1]) {
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
@@ -756,15 +763,18 @@ export function createRenderer3(ctx, sprites) {
       if (y < -60 || y > H + 60) continue;
       const r = t.r;
       shadow(t.x, y + r * 0.95, r * 0.9);
-      ctx.fillStyle = C.bonusBox;
-      roundRect(t.x - r, y - r * 0.8, r * 2, r * 1.6, 6); ctx.fill();
-      ctx.strokeStyle = C.outline; ctx.lineWidth = 3;
-      roundRect(t.x - r, y - r * 0.8, r * 2, r * 1.6, 6); ctx.stroke();
-      ctx.fillStyle = C.bonusRibbon;
-      ctx.fillRect(t.x - r * 0.18, y - r * 0.8, r * 0.36, r * 1.6);
-      ctx.fillRect(t.x - r, y - r * 0.16, r * 2, r * 0.32);
-      ctx.beginPath(); ctx.arc(t.x - r * 0.32, y - r * 0.92, r * 0.24, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(t.x + r * 0.32, y - r * 0.92, r * 0.24, 0, Math.PI * 2); ctx.fill();
+      //  표적 그림(2026-09-19 Gemini): 짝수 id = 선물 상자, 홀수 id = 별 코인. 없으면 종전 도형(노란 상자 + 리본)
+      drawImgCentered((t.id ?? 0) % 2 === 1 ? 'bonus_coin' : 'bonus_gift', t.x, y, r * 2.2, () => {
+        ctx.fillStyle = C.bonusBox;
+        roundRect(t.x - r, y - r * 0.8, r * 2, r * 1.6, 6); ctx.fill();
+        ctx.strokeStyle = C.outline; ctx.lineWidth = 3;
+        roundRect(t.x - r, y - r * 0.8, r * 2, r * 1.6, 6); ctx.stroke();
+        ctx.fillStyle = C.bonusRibbon;
+        ctx.fillRect(t.x - r * 0.18, y - r * 0.8, r * 0.36, r * 1.6);
+        ctx.fillRect(t.x - r, y - r * 0.16, r * 2, r * 0.32);
+        ctx.beginPath(); ctx.arc(t.x - r * 0.32, y - r * 0.92, r * 0.24, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(t.x + r * 0.32, y - r * 0.92, r * 0.24, 0, Math.PI * 2); ctx.fill();
+      });
       ctx.textAlign = 'center';
       outlinedText('+' + t.value, t.x, y - r * 1.15, 13, C.gold, 'bold', 4);
       outlinedText(String(Math.max(0, Math.ceil(t.hp))), t.x, y + r + 18, 16, C.bulletHeavy, 'bold', 4);
