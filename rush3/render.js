@@ -55,6 +55,14 @@ export const MK_LABEL = Object.freeze(['', '', ' II', ' III']);
 //  chip = HUD 왼쪽 셋째 줄의 토글 상자(셸이 버튼으로 넘기고 drawButtons 가 그린다). 저장 필드 zoom(save.js)은 그대로 재사용(뜻만 바뀜).
 export const ZOOM = Object.freeze({ chip: Object.freeze({ x: 16, y: 84, w: 70, h: 26 }), label: Object.freeze({ off: '가까이 ○', on: '가까이 ●' }) });
 
+//  탄 그림의 화면 길이(px, Mk I 기준). 무기마다 실루엣이 달라 길이도 다르게: 저격 바늘이 가장 길고 산탄 펠릿 뭉치는 짧고 넓다
+export const BULLET_LEN = Object.freeze({ rifle: 24, auto: 26, heavy: 34, scatter: 22, sniper: 48, arc: 34 });
+//  탄의 진행 방향(라디안, 0 = 화면 위). vx 가 있는 탄(산탄 부채꼴·아레나 자동 조준)은 그 방향으로 그림을 돌린다
+export function bulletAngle(b) {
+  const vx = b.vx || 0, vz = b.vz || 1;
+  return vx === 0 ? 0 : Math.atan2(vx, vz);
+}
+
 export const HUD_ROW = Object.freeze({
   top: HUD_TOP, h: HUD_H, r: HUD_R, fs: HUD_FS, gap: HUD_GAP, right: HUD_RIGHT,
   cy: HUD_TOP + HUD_H / 2,
@@ -1027,16 +1035,39 @@ export function createRenderer3(ctx, sprites) {
     ctx.globalAlpha = 1;
   }
 
-  //  아군 탄: 무기별 색·폭(× 그 자리 배율)
+  //  아군 탄: 무기별 **그림**(bullet_<weapon>, 위를 향한 자세)을 진행 방향(bulletAngle)으로 돌려 그리고
+  //   뒤에 무기색 꼬리(알파 그라디언트)를 깐다. 위치·크기는 그 자리 배율(q.s)을 곱해 원근을 따른다.
+  //   Mk 강화의 탄 폭(b.w)이 그림 크기에도 반영된다. 그림이 없으면 종전 막대 폴백(같은 색·같은 자리).
   function drawBullets(run) {
     for (const b of run.bullets) {
       if (b.dead) continue;
       const d = b.z - run.z;
-      if (offscreen(d, 20)) continue;
+      if (offscreen(d, 40)) continue;
       const q = pj(b.x, d), k = q.s;
       const w = WEAPONS[b.kind] ?? WEAPONS.rifle;
-      const bw = (b.w ?? w.w) * k;   // Mk 강화로 탄 폭이 커진다
-      const len = (10 + (b.w ?? w.w) * 1.5) * k;
+      const bw0 = b.w ?? w.w;        // Mk 강화로 탄 폭이 커진다(트랙 기준)
+      const bw = bw0 * k;
+      const len = (10 + bw0 * 1.5) * k;
+      const im = get('bullet_' + w.id);
+      if (im) {
+        const hh = (BULLET_LEN[w.id] ?? 26) * (1 + (bw0 - w.w) * 0.12) * k;
+        const iw = hh * (im.width / im.height);
+        const ang = bulletAngle(b);
+        ctx.save();
+        ctx.translate(q.x, q.y);
+        if (ang !== 0) ctx.rotate(ang);
+        //  꼬리: 탄 뒤쪽(아래)으로 무기색이 옅어지는 띠
+        const tail = hh * 0.9;
+        const gr = ctx.createLinearGradient(0, 0, 0, tail);
+        gr.addColorStop(0, w.color); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = gr;
+        ctx.fillRect(-Math.max(2, bw * 0.4), 0, Math.max(4, bw * 0.8), tail);
+        ctx.globalAlpha = 1;
+        ctx.drawImage(im, -iw / 2, -hh * 0.75, iw, hh);
+        ctx.restore();
+        continue;
+      }
       ctx.fillStyle = w.color;
       ctx.fillRect(q.x - bw / 2, q.y - len, bw, len);
       ctx.fillStyle = 'rgba(255,255,255,0.8)';

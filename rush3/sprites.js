@@ -18,6 +18,9 @@ export const SPRITE_KEYS3 = {
   vehicle: 'D_vehicle', capsule: 'D_capsule', bonus_gift: 'D_bonus_gift', bonus_coin: 'D_bonus_coin',
   soldiers_1: 'ICON_soldiers_1', soldiers_2: 'ICON_soldiers_2', soldiers_3: 'ICON_soldiers_3',
   arena1: 'ARENA1', arena2: 'ARENA2',
+  //  발사체 6종(2026-09-20 Gemini v6 P-6, 이사 소감 "탄환은 색만 바뀌어 차이가 안 느껴진다"): 위를 향한 자세·꼬리 아래. 없으면 종전 막대 폴백
+  bullet_rifle: 'BULLET_rifle', bullet_auto: 'BULLET_auto', bullet_heavy: 'BULLET_heavy',
+  bullet_scatter: 'BULLET_scatter', bullet_sniper: 'BULLET_sniper', bullet_arc: 'BULLET_arc',
 };
 
 //  동작 시트(2026-09-18 에테르AI 파일럿, newmode/v3/research/sprite-pilot-20260918): 칸은 열 우선, 같은 크기.

@@ -225,12 +225,13 @@ test('V3-SAVE: storage 미주입(Node) → 메모리 저장으로 진행', () =>
   runsFine(s);
 });
 
-test('V3-SPRITES: 키 목록 33개 고정(기본 11 + 배경 4·5 + 역할 근사 그림 11 + 장치 그림 9)·Node 에서 loadSprites3 는 전부 null 폴백', async () => {
+test('V3-SPRITES: 키 목록 39개 고정(기본 11 + 배경 4·5 + 역할 근사 그림 11 + 장치 그림 9 + 발사체 6)·Node 에서 loadSprites3 는 전부 null 폴백', async () => {
   assert.deepEqual(Object.keys(SPRITE_KEYS3), ['m1', 'soldier', 'supply', 'gate', 'bg1', 'bg2', 'bg3', 'bg4', 'bg5',
     'skin:E2_ramhound', 'skin:E3_wallguard', 'skin:E4_needleeye', 'skin:E7_cartyard', 'skin:E8_manholejumper', 'skin:E9_spawnpod', 'skin:E10_magnethead',
     'skin:B2_gantrywidow', 'skin:B3_railleviathan', 'skin:B4_smelter', 'skin:B5_crownbreaker',
     'e_grunt', 'e_rusher', 'e_shooter', 'elite',
-    'vehicle', 'capsule', 'bonus_gift', 'bonus_coin', 'soldiers_1', 'soldiers_2', 'soldiers_3', 'arena1', 'arena2']);
+    'vehicle', 'capsule', 'bonus_gift', 'bonus_coin', 'soldiers_1', 'soldiers_2', 'soldiers_3', 'arena1', 'arena2',
+    'bullet_rifle', 'bullet_auto', 'bullet_heavy', 'bullet_scatter', 'bullet_sniper', 'bullet_arc']);
   assert.equal(SPRITE_KEYS3.m1, 'M01');
   assert.equal(SPRITE_KEYS3.elite, 'B1_grader');
   const sp = await loadSprites3('assets/rush/');
