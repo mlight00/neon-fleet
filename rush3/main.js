@@ -394,6 +394,8 @@ export function boot(canvas, deps = {}) {
         case 'supplyBlock': break;
         //  셔터 열림: 0.25초 걷히는 연출(판이 위로) + 효과음 1회 + 짧은 글(행 종류에 따라 '지금 쏘면 +1' / '쏴도 그대로예요')
         case 'gateArm': {
+          //  첫 조우 배너('회색 셔터는 잠긴 게이트예요')가 아직 떠 있으면 내린다 — 열림 안내와 겹쳐 두 줄이 포개진다(시제품 캡처에서 실측)
+          fx.shutterT = 0;
           fx.gateOpen[ev.id] = BAL3.gate.openT;
           //  확정 손실 행에는 '지금 쏘면 +1' 대신 '쏴도 그대로예요' — 칸 아래 '확정' 꼬리표와 같은 말을 한다
           const armed = run.gateRows.find((r) => r.id === ev.id);

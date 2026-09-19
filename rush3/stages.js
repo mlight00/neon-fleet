@@ -141,7 +141,7 @@ const T3 = [80, 80 + 320 / 3, 80 + 640 / 3, 400];
 export const PROTO_IDS = ['proto3'];
 export const PROTO_DEFS = {
   proto3: {
-    version: 1, title: '시험 · 세 갈래', startUnits: 6, startWeapon: 'rifle', length: 5200, eliteZ: 4800,
+    version: 1, title: '세 갈래', startUnits: 6, startWeapon: 'rifle', length: 5200, eliteZ: 4800,
     gates: [
       //  가운데(+3)가 정답이지만 그 앞에 차폐물이 있어 정면에서는 못 쏜다 — 옆 칸에서 비스듬히 쏘거나 차폐 뒤에서 미리 쏴야 한다
       { z: 1500, maxValue: 15, cells: [[T3[0], T3[1], -4], [T3[1], T3[2], 3], [T3[2], T3[3], -6]], hint: '세 칸: 가운데가 늘 정답은 아니다' },
