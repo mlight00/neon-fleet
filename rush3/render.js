@@ -47,6 +47,11 @@ const HUD_WEAPON = hudBoxOf(122, HUD_PAUSE.x - HUD_GAP);
 const HUD_DIFF = hudBoxOf(64, HUD_WEAPON.x - HUD_GAP);
 //  무기 강화 단계 표기(r3.10). Mk I 은 표기 없음
 export const MK_LABEL = Object.freeze(['', '', ' II', ' III']);
+//  확대 보기(2026-09-19 이사 지시 "스프라이트 적용해서 귀여운 캐릭터 움직임을 볼 수 있으니 화면 확대 모드"): 화면 전용 카메라.
+//  규칙은 모르는 값이다 — drawScene 이 세계 그리기(배경~연출)만 부대 중심(run.x, LINE_Y) 기준 k 배로 키우고, HUD·배너·버튼은 그대로.
+//  chip = HUD 왼쪽 셋째 줄의 토글 상자(셸이 버튼으로 넘기고 drawButtons 가 그린다). 저장 필드 zoom(save.js).
+export const ZOOM = Object.freeze({ k: 1.8, chip: Object.freeze({ x: 16, y: 84, w: 70, h: 26 }) });
+
 export const HUD_ROW = Object.freeze({
   top: HUD_TOP, h: HUD_H, r: HUD_R, fs: HUD_FS, gap: HUD_GAP, right: HUD_RIGHT,
   cy: HUD_TOP + HUD_H / 2,
@@ -1400,6 +1405,10 @@ export function createRenderer3(ctx, sprites) {
     const arena = run.phase === 'arena' && run.arena
       ? { w: run.arena.w, depth: run.arena.depth, k: 1 - Math.max(0, Math.min(1, (fx.arenaOpen ?? 0) / (FX.arenaOpenSec || 0.6))) }
       : null;
+    //  확대 보기: 세계 그리기만 부대 중심 기준으로 k 배. 부대는 제자리(같은 화면점)에 남고 주변이 커진다(아레나에서는 세로 오프셋 ay 포함)
+    const zk = view.zoom ? ZOOM.k : 1;
+    const zay = LINE_Y + (run.ay || 0);
+    if (zk !== 1) { ctx.save(); ctx.translate(run.x, zay); ctx.scale(zk, zk); ctx.translate(-run.x, -zay); }
     drawBackground(run.z, Math.max(0, (run.bg || 1) - 1), arena);
     drawWalls(run, sy);
     drawCovers(run, sy);
@@ -1419,6 +1428,7 @@ export function createRenderer3(ctx, sprites) {
     drawParts(fx.parts);
     drawFloaters(fx.floaters);
     drawPops(fx.pops);
+    if (zk !== 1) ctx.restore();
     if (fx.hurtT > 0) {
       const a = Math.min(0.45, fx.hurtT / FX.hurtFlashDur * 0.45);
       const gr = ctx.createRadialGradient(W / 2, H / 2, 160, W / 2, H / 2, 470);

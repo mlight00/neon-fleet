@@ -102,7 +102,7 @@ function mergeStage(cur, inc) {
 const PICK_DEFAULT = 'brutal';
 //  seenShutter = 첫 셔터 조우 배너를 이미 본 적이 있는가(계약서 6장 N2-⑥). 판이 아니라 **사용자당 1회**라 저장에 남는다
 //  seenVehicle(r3.13) = 첫 차량 통 조우 배너를 본 적이 있는가 — seenShutter 와 같은 꼴(사용자당 1회). 스키마 v 는 3 그대로(빠진 키는 기본값)
-function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false }; }
+function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false, zoom: false }; }
 //  전체 정규화(형식이 맞는 원문에만 적용)
 function normalize(d) {
   const out = defaults();
@@ -114,6 +114,8 @@ function normalize(d) {
   out.mute = d.mute === true;
   out.seenShutter = d.seenShutter === true;
   out.seenVehicle = d.seenVehicle === true;
+  //  확대 보기 토글(화면 전용 취향, 2026-09-19). 없던 저장은 false
+  out.zoom = d.zoom === true;
   return out;
 }
 

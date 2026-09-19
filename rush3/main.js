@@ -7,7 +7,7 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, ZOOM } from './render.js';
 import { loadSprites3, sheetSec } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
@@ -260,6 +260,10 @@ export function boot(canvas, deps = {}) {
   const dateNow = deps.dateNow ?? (() => Date.now());
   const raf = deps.raf ?? ((fn) => (win && win.requestAnimationFrame ? win.requestAnimationFrame(fn) : setTimeout(() => fn(nowFn()), 16)));
   const save = deps.save ?? createSave3(deps.storage);
+  //  확대 보기(화면 전용). 저장에 기억하고, 출격 중·일시정지·결과 화면에서 Z 키 또는 HUD '확대' 칩으로 토글
+  let zoom = save.get().zoom === true;
+  function setZoom(on) { zoom = !!on; save.patch({ zoom }); return zoom; }
+  const zoomButton = () => ({ id: 'zoom', ...ZOOM.chip, label: zoom ? '확대 ●' : '확대 ○', small: true, primary: zoom });
   const au = deps.audio ?? createAudio3({});
   const input = deps.input ?? createInput();
   au.setMuted(!!save.get().mute);
@@ -685,10 +689,12 @@ export function boot(canvas, deps = {}) {
       const paused = state === 'paused';
       v.fx = paused ? { ...fx, gateFlash: { ...fx.gateFlash }, gateOpen: { ...fx.gateOpen }, shakeT: 0, hurtT: 0 } : fx;
       v.hud = { distM: Math.max(0, Math.round((run.length - run.z) / 10)) };
+      v.zoom = zoom;
       if (state === 'run') {
-        v.buttons = [{ ...HUD_BTN }];
+        v.buttons = [{ ...HUD_BTN }, zoomButton()];
       } else if (state === 'paused') {
         v.buttons = [
+          zoomButton(),
           { id: 'resume', x: 120, y: 400, w: 240, h: 56, label: '계속하기', primary: true },
           { id: 'giveup', x: 120, y: 480, w: 240, h: 44, label: '스테이지 선택' },
           { id: 'vol_down', x: 120, y: 548, w: 64, h: 44, label: '−' },
@@ -719,6 +725,7 @@ export function boot(canvas, deps = {}) {
       save.patch({ mute: au.isMuted() });
       return true;
     }
+    if (id === 'zoom') { setZoom(!zoom); au.sfx('click'); return true; }
     if (id === 'vol_down' || id === 'vol_up') {
       const v = Math.max(0, Math.min(1, au.getVolume() + (id === 'vol_up' ? 0.2 : -0.2)));
       au.setVolume(v);
@@ -790,6 +797,8 @@ export function boot(canvas, deps = {}) {
         else if (state === 'paused') resume();
         return;
       }
+      //  Z = 확대 보기 토글(출격 중·일시정지·결과). 조향 키보다 먼저 보되 타이틀에서는 무시
+      if (code === 'KeyZ' && (state === 'run' || state === 'paused' || state === 'result')) { setZoom(!zoom); return; }
       if (input.onKey(code, true)) { if (e.preventDefault) e.preventDefault(); return; }
       //  타이틀에서 1/2/3 = 난이도 선택(클릭과 같은 경로)
       if (state === 'title' && DIFF_KEYS[code] !== undefined) {
@@ -833,6 +842,7 @@ export function boot(canvas, deps = {}) {
     //  r3.18: bossGuard(보호막 남아 있는가) · supplyArmed(피격 활성 구간에 든 통 id 목록 — armZ 가 있는 통만)
     bossGuard: !!(run && run.boss && run.boss.guard),
     supplyArmed: run ? run.supplies.filter((s) => s.armZ != null && !s.opened && s.z - run.z <= s.armZ).map((s) => s.id) : [],
+    zoom,
   });
   if (win) win.__rush3Dbg = dbg;
 
@@ -912,7 +922,7 @@ export function boot(canvas, deps = {}) {
   });
 
   return { dbg, ready, startRun, pause, resume, toTitle, getState: () => state, getRun: () => run, getFx: () => fx, loop, input,
-           getDifficulty: () => difficulty, setDifficulty };
+           getDifficulty: () => difficulty, setDifficulty, getZoom: () => zoom, setZoom };
 }
 
 if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'));

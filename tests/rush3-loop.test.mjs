@@ -1,6 +1,7 @@
 // rush3-loop — 셸 묶음(계약서 8장 V3-DETERMINISM·V3-INPUT + boot 스모크). DOM 없이 main.js 를 import 한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { ZOOM } from '../rush3/render.js';
 import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine, DIFF_TOGGLE, normDifficulty,
          emptyLotteryOutcome, GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
          isFixedGateRow, TITLE_GRID } from '../rush3/main.js';
@@ -1020,4 +1021,29 @@ test('V3-SHELL-RESULT-LAYOUT: 랜덤 길이 없는 판(대조군)은 부연이 �
   assert.equal(buttonBoxOf(ops, '다시 도전').top, 480);
   assert.equal(buttonBoxOf(ops, '다음 작전').top, 548, '기본 자리');
   assert.equal(buttonBoxOf(ops, '스테이지 선택').top, 620, '기본 자리');
+});
+
+test('V3-ZOOM 셸: 확대 보기는 출격 중 Z 키·HUD 칩으로 켜고 끄며 저장에 기억되고, 타이틀에서는 Z 가 무시된다', async () => {
+  const { app, canvas, win, frames, save, texts } = await bootFake();
+  frames(2);
+  assert.equal(app.getZoom(), false, '저장 없는 첫 부팅 = 꺼짐');
+  win.fire('keydown', { code: 'KeyZ' });
+  assert.equal(app.getZoom(), false, '타이틀에서는 Z 무시');
+  tapStage1(canvas);
+  assert.equal(app.getState(), 'run');
+  win.fire('keydown', { code: 'KeyZ' });
+  assert.equal(app.getZoom(), true, 'Z 로 켜짐');
+  assert.equal(save.get().zoom, true, '저장에 기억');
+  frames(1);
+  assert.ok(texts.includes('확대 ●'), 'HUD 칩이 켜짐 표시: ' + JSON.stringify(texts.filter((t) => t.startsWith('확대'))));
+  //  HUD 칩 클릭(논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율) → 꺼짐
+  canvas.fire('pointerdown', { clientX: (ZOOM.chip.x + ZOOM.chip.w / 2) / 2, clientY: (ZOOM.chip.y + ZOOM.chip.h / 2) / 2, pointerType: 'mouse' });
+  assert.equal(app.getZoom(), false, '칩 클릭으로 꺼짐');
+  assert.equal(save.get().zoom, false);
+  assert.equal(app.getState(), 'run', '칩 클릭은 조향·일시정지가 아니다');
+  //  다시 켜고 일시정지해도 켜진 채 — 재부팅 시 저장값으로 시작
+  win.fire('keydown', { code: 'KeyZ' });
+  win.fire('keydown', { code: 'Escape' });
+  assert.equal(app.getState(), 'paused');
+  assert.equal(app.getZoom(), true);
 });
