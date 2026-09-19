@@ -11,6 +11,9 @@ import { playPolicy } from './lib/rush3-policies.mjs';
 import { createRun, stepRun } from '../rush3/combat.js';
 
 const NEW = COURSE_IDS;
+//  장치 교체로 코스 버전을 올린 번호(기록은 버전별로 보존된다 — 계약서 7장). 새 장치 담당은 여기에 자기 키만 추가한다.
+//   6·12 = 움직이는 보급(차량, r3.13)
+const REPLACED = { 6: 2, 12: 2 };
 
 test('V3-COURSE C-1: 목록 — STAGE_IDS 는 1~3 그대로, ALL_STAGE_IDS 는 1~24, 4~24 는 전부 buildStage 가능·결정적', () => {
   assert.deepEqual(STAGE_IDS, [1, 2, 3]);
@@ -18,7 +21,7 @@ test('V3-COURSE C-1: 목록 — STAGE_IDS 는 1~3 그대로, ALL_STAGE_IDS 는 1
   for (const id of NEW) {
     const a = buildStage(id), b = buildStage(id);
     assert.deepEqual(a, b, 'S' + id + ' 결정성');
-    assert.equal(stageVersion(id), 1);
+    assert.equal(stageVersion(id), REPLACED[id] ?? 1, 'S' + id + ' 코스 버전');
     assert.ok(stageMeta(id).title.length > 0);
   }
 });
@@ -59,12 +62,24 @@ test('V3-COURSE C-3: 게이트 행 — 칸이 도로 80~400 을 빈틈없이 덮
   }
 });
 
-test('V3-COURSE C-4: 통·벽·스폰 — 통은 도로 안·무기 id 유효, 배제 쌍 coverZ 는 공식과 같음, 차폐물은 kind cover·도로 안, 스폰 xs 도로 안', () => {
+test('V3-COURSE C-4: 통·벽·스폰 — 통은 도로 안·무기 id 유효, 배제 쌍 coverZ 는 공식과 같음, 차폐물은 kind cover·도로 안, 스폰 xs 도로 안, 차량 move 범위', () => {
   for (const id of NEW) {
     const st = buildStage(id);
     const solid = st.walls.filter((w) => w.kind !== 'cover');
     for (const s of st.supplies) {
       assert.ok(s.x - s.r >= 80 && s.x + s.r <= 400, `S${id} ${s.id} 통 x`);
+      //  차량(r3.13): 왕복 범위도 도로 안, 양 끝에서 출발, STEP 당 이동이 반지름 이하(판독 여유), 진짜 벽 활성 구간에서 벽 x 를 건너지 않는다
+      if (s.move) {
+        const m = s.move;
+        assert.ok(m.x0 < m.x1 && Number.isFinite(m.period) && m.period > 0, `S${id} ${s.id} move 형식`);
+        assert.ok(m.x0 - s.r >= 80 && m.x1 + s.r <= 400, `S${id} ${s.id} move 범위 도로 안`);
+        assert.ok(s.x === m.x0 || s.x === m.x1, `S${id} ${s.id} 출발 x 는 양 끝 중 하나`);
+        assert.ok(2 * (m.x1 - m.x0) / m.period * BAL3.STEP <= s.r, `S${id} ${s.id} 속도`);
+        for (const w of solid) {
+          if (!(w.z0 - BAL3.squad.wallLead <= s.z && s.z <= w.z1)) continue;
+          assert.ok(m.x1 + s.r < w.x0 || m.x0 - s.r > w.x1, `S${id} ${s.id} 차량이 벽 ${w.id} 를 건넌다`);
+        }
+      }
       if (s.kind === 'weapon') assert.ok(WEAPONS[s.payload.weapon], `S${id} ${s.id} 무기 id`);
       if (s.pairId) {
         const w = solid.find((wl) => wl.z0 <= s.z && s.z <= wl.z1);

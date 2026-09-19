@@ -1,8 +1,11 @@
 // rush3/supply.js — 보급 통(병사/무기/연속 증원). 순수 규칙만(난수·화면·balance 없음). 계약서 3-3.
-// s = { id, z, x, r, kind, durability, maxDurability, payload, opened, missed, locked, skipped, coverZ, pairId, hint, activated, queuedPads, pads }
+// s = { id, z, x, r, kind, durability, maxDurability, payload, opened, missed, locked, skipped, coverZ, pairId, hint, activated, queuedPads, pads,
+//       move, homeX, moveT, prevX }
 // payload: soldier { n } / weapon { weapon } / chain { pads0, maxPads }   pads = [{ z, x, taken }]
 // coverZ = 차폐 개방선(비행시간 보정선). run.z < coverZ 이면 탄을 흡수하고 내구는 줄지 않는다(계약서 3-3 · 개정 r3 §3-3).
 // pairId = 벽으로 배제되는 쌍의 이름. 한 판에서 같은 pairId 는 최대 1개만 열린다.
+// move(r3.13 차량) = { x0, x1, period } | null. 통의 z 는 고정이고 x 만 삼각파(왕복)로 움직인다. homeX = 출발 x(위상 원점),
+//   moveT = 화면 진입(obj.z - run.z <= ENTER_Z)부터 센 자기 시계(초, null = 아직 진입 전), prevX = 직전 STEP 의 x(탄 캡슐 스윕용).
 // 유닛 증감은 squad.js 의 addUnits/removeUnits 를 직접 호출한다(콜백 주입 없음).
 import { addUnits } from './squad.js';
 
@@ -12,18 +15,52 @@ export const PAD_GAP = 40;
 export const PAD_REACH = 70;
 // 벽 활성(통로 확정) 선행 여유. squad.SQUAD_DEFAULTS.wallLead 와 같은 값(순수 모듈이라 import 하지 않고 상수로 둔다)
 export const WALL_LEAD = 60;
+// 화면 진입선(px). BAL3.enterZ 와 같은 값 — 차량 통의 자기 시계는 여기서부터 센다(WALL_LEAD 처럼 상수로 복제, 검사가 일치를 잠근다)
+export const ENTER_Z = 760;
 
-// def = { id, z, x, kind, durability, maxDurability?, r?, payload, padStart?, padGap?, coverZ?, pairId?, hint? }
+// def = { id, z, x, kind, durability, maxDurability?, r?, payload, padStart?, padGap?, coverZ?, pairId?, hint?, move? }
 export function makeSupply(def) {
   const payload = def.payload ? { ...def.payload } : {};
+  const move = def.move ? { x0: def.move.x0, x1: def.move.x1, period: def.move.period } : null;
   const s = {
     id: def.id, z: def.z, x: def.x, r: def.r ?? SUPPLY_R, kind: def.kind,
     durability: def.durability, maxDurability: def.maxDurability ?? def.durability,
     payload, opened: false, missed: false, locked: false, skipped: false, activated: false, queuedPads: 0, pads: [],
     coverZ: def.coverZ ?? null, pairId: def.pairId ?? null, hint: def.hint ?? null,
     padStart: def.padStart ?? PAD_START, padGap: def.padGap ?? PAD_GAP,
+    //  r3.13 차량: move 는 복사본(구조 공유 금지). 정지 통은 move null 이고 prevX 는 항상 x 와 같다
+    move, homeX: def.x, moveT: null, prevX: def.x,
   };
   return s;
+}
+
+/** 차량 통의 x(r3.13). 삼각파 왕복: x0 → x1 → x0 가 period 초. homeX 가 x0 이면 오른쪽으로, x1 이면 왼쪽으로 먼저 간다.
+ *  (x0·x1 사이의 homeX 는 그 자리에서 오른쪽으로 출발 — 점프 없음.) 난수·시계 없음, t 만의 함수. */
+export function vehicleX(move, homeX, t) {
+  const span = move.x1 - move.x0;
+  if (!(span > 0) || !(move.period > 0)) return homeX;
+  const u0 = homeX >= move.x1 ? 0.5 : Math.max(0, (homeX - move.x0) / span) / 2;
+  let u = (u0 + t / move.period) % 1;
+  if (u < 0) u += 1;
+  return move.x0 + span * (u < 0.5 ? 2 * u : 2 - 2 * u);
+}
+
+/** 차량 통 한 STEP(r3.13, combat 3-c 단계). 반환 = 이번 STEP 에 x 가 갱신됐는가.
+ *   · 매 STEP prevX = x(정지 통도 — 탄 스윕이 [prevX, x] 캡슐을 본다)
+ *   · 열리거나(opened) 지나치면(missed/skipped) 그 자리에 선다 — chain 은 열린 x 에 발판이 한 줄로 깔린다
+ *   · 진입 STEP(s.z - run.z <= ENTER_Z 가 처음 성립): 시계만 0, x 는 아직 homeX. 다음 STEP 부터 moveT += dt
+ *   · run.z 만 읽으므로(입력·난수 무관) 진입 시점·위상이 판마다 같다. 차폐(coverZ) 중에도 움직인다 */
+export function moveSupply(s, run, dt) {
+  s.prevX = s.x;
+  if (!s.move) return false;
+  if (s.opened || s.missed || s.skipped) return false;
+  if (s.moveT === null) {
+    if (s.z - run.z <= ENTER_Z) s.moveT = 0;
+    return false;
+  }
+  s.moveT += dt;
+  s.x = vehicleX(s.move, s.homeX, s.moveT);
+  return true;
 }
 
 // 충돌 후보 여부: (opened && chain 아님) || missed || locked || skipped 면 제외.
@@ -67,9 +104,14 @@ export function supplyReward(s) {
 
 // 탄 스윕 [pz, z](수직 선분, 중심 x 기준 = 탄 폭 미반영) vs 통 원(중심 (x, z), 반지름 r) 의 최초 교차 z.
 // 겹치지 않으면 null. 교차 z = 스윕이 원에 처음 들어가는 z = max(s.z - 반현, 스윕 시작).
+//  r3.13 차량: 통의 x 를 점이 아니라 이번 STEP 의 이동 구간 [min(prevX, x), max(prevX, x)] 로 본다(캡슐 = 스타디움 판정).
+//   dx = 탄 x 에서 그 구간까지의 거리. 정지 통은 prevX === x 라 종전 판정과 완전히 같고(회귀 0), 빠른 왕복에서도
+//   통이 탄 x 를 한 STEP 에 건너뛰어 놓치는 일(터널링)이 없다. prevX 가 없는 옛 리터럴 객체는 점으로 본다.
 export function sweepContactSupply(s, bullet) {
   if (!supplyActive(s)) return null;
-  const dx = Math.abs(bullet.x - s.x);
+  const px = s.prevX ?? s.x;
+  const lo = Math.min(px, s.x), hi = Math.max(px, s.x);
+  const dx = Math.max(0, lo - bullet.x, bullet.x - hi);
   if (dx > s.r) return null;
   const half = Math.sqrt(s.r * s.r - dx * dx);
   const zlo = Math.min(bullet.pz, bullet.z), zhi = Math.max(bullet.pz, bullet.z);

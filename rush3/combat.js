@@ -3,7 +3,7 @@
 import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
 import { WEAPONS, weaponRank, makeBullet, weaponStats, fanAngles, clampMk, MK_MAX } from './weapons.js';
 import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm } from './gates.js';
-import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward } from './supply.js';
+import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward, moveSupply } from './supply.js';
 import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit } from './squad.js';
 
 export const STEP = BAL3.STEP;
@@ -89,6 +89,7 @@ export function stepRun(run, input, dt = STEP) {
   run.time += dt;
   spawnDue(run, ev);
   armGates(run, ev);
+  moveSupplies(run, dt);
   fireUnits(run, ev, dt);
   moveBullets(run, ev, dt);
   moveEnemies(run, ev, dt);
@@ -137,6 +138,12 @@ function spawnDue(run, ev) {
 // 3-b 단계 게이트 셔터 갱신: run.z 갱신(2단계) 뒤·사격(4단계) 앞. 그 STEP 의 탄 충돌(5단계)이 올바른 셔터 상태를 보게 한다
 function armGates(run, ev) {
   for (const row of run.gateRows) updateGateArm(row, run, ev);
+}
+
+// 3-c 단계 차량 통 이동(r3.13): 셔터와 같은 자리 — 갱신된 run.z 로 진입을 판단하고, 그 STEP 의 탄 충돌(5단계)이 갱신된 x·prevX 를 본다.
+//  규칙은 supply.moveSupply 가 갖고 여기서는 순서만 정한다(정지 통도 매 STEP prevX = x 갱신)
+function moveSupplies(run, dt) {
+  for (const s of run.supplies) moveSupply(s, run, dt);
 }
 
 // 적 1기 생성. hp 는 스테이지 정의 고정값(병력 무관) — 난이도 배수는 run.enemyDefs 에 이미 들어 있다

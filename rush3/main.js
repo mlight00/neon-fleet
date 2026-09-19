@@ -37,6 +37,8 @@ export const GATE_TIP_OPEN = '지금 쏘면 +1';
 export const GATE_TIP_OPEN_FIXED = '쏴도 그대로예요';
 //  배너는 두 줄이다 — 한 줄로 쓰면 480px 화면을 넘어 양끝이 잘린다(2026-09-17 렌더 실측). 줄은 **어절 경계**에서만 나눈다
 export const SHUTTER_GUIDE_TEXT = Object.freeze(['회색 셔터는 잠긴 게이트예요', '가까워지면 열리고 그때부터 숫자가 오릅니다']);
+//  첫 차량 통 조우 배너(r3.13). 셔터 배너와 같은 슬롯(fx.shutterText/shutterT)을 쓰고 사용자당 1회(저장 seenVehicle). 줄은 어절 경계에서만 나눈다
+export const VEHICLE_GUIDE_TEXT = Object.freeze(['움직이는 통은 앞을 보고 쏘세요', '통이 갈 자리에 미리 서면 탄이 거기서 만납니다']);
 
 /** 쏴도 값이 오르지 않는 행인가 = 모든 칸이 음수이고 상한이 자기 값 이하(확정 손실).
  *  랜덤 길 ⑤ `trapGate`(−10 · 상한 −10)가 여기에 해당한다 — 몇 발을 맞아도 −10 그대로다(gates.js 값 갱신 공식).
@@ -109,6 +111,8 @@ function makeFx() {
   return { parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, gateTip: {}, gateTipSeen: {},
            shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, shutterT: 0, shutterText: null, burstSeed: 0, sfx: [], fireCount: 0, fireWeapon: null,
            lotOpen: 0, lotSeen: false, lotSame: false,
+           //  vehicleTipSeen(r3.13) = 이 판에서 차량 통이 처음 화면에 들어온 것을 이미 처리했는가(배너는 저장 seenVehicle 로 사용자당 1회)
+           vehicleTipSeen: false,
            //  동작 시트 타이머(6장): heroFire = 사격 시트 남은 초 · heroWalk = 마지막 사격 뒤 걸은 초 · enemyHit = { id: 피격 시트 남은 초 } · corpses = 쓰러진 잡졸
            heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [] };
 }
@@ -686,6 +690,8 @@ export function boot(canvas, deps = {}) {
     z: run ? Math.round(run.z) : 0, x: run ? Math.round(run.x) : 0,
     units: run ? run.units.length : 0, weapon: run ? run.weapon : null, weaponMk: run ? run.weaponMk : null, boss: run ? !!run.boss : false,
     enemies: run ? run.enemies.length : 0, bullets: run ? run.bullets.length : 0,
+    //  차량 통(r3.13) 관찰: Playwright 가 이동을 읽는다
+    vehicles: run ? run.supplies.filter((s) => s.move).map((s) => ({ id: s.id, x: Math.round(s.x), moveT: s.moveT, opened: s.opened, missed: s.missed })) : [],
   });
   if (win) win.__rush3Dbg = dbg;
 
@@ -714,6 +720,20 @@ export function boot(canvas, deps = {}) {
     }
   }
 
+  /** 차량 통 안내(r3.13). 규칙이 '화면 진입'을 이미 판정(s.moveT !== null)했으므로 셸은 enterZ 를 다시 계산하지 않는다.
+   *  이 판에서 차량 통이 처음 들어온 프레임에 fx.vehicleTipSeen 을 세우고, 이 사용자의 첫 차량이면 배너 1회
+   *  (저장 seenVehicle — seenShutter 와 같은 꼴, 셔터 배너와 같은 슬롯·같은 시간 FX.shutterGuideSec). 캠페인 순서상 6번 첫 통이다. */
+  function updateVehicleGuide() {
+    if (fx.vehicleTipSeen) return;
+    if (!run.supplies.some((s) => s.move && s.moveT !== null)) return;
+    fx.vehicleTipSeen = true;
+    if (!save.get().seenVehicle) {
+      save.patch({ seenVehicle: true });
+      fx.shutterText = VEHICLE_GUIDE_TEXT;
+      fx.shutterT = FX.shutterGuideSec;
+    }
+  }
+
   let lastFx = null;
   function frame(nowMs) {
     const now = nowMs / 1000;
@@ -730,6 +750,7 @@ export function boot(canvas, deps = {}) {
         fx.sfx.push([run.lottery.good ? 'gateFlip' : 'lotWarn']);
       }
       updateShutterGuide();
+      updateVehicleGuide();
       handleEvents(drainEvents(run));
       updateFx(dt);
       if (run.over) {

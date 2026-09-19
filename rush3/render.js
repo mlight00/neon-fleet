@@ -473,6 +473,50 @@ export function createRenderer3(ctx, sprites) {
     ctx.textBaseline = 'alphabetic';
   }
 
+  //  차량 통 몸체(r3.13): 궤도 점선 + 그림자 + 둥근 상자 + 바퀴 4 + 앞유리 + 진행 방향 화살표. 새 그림 없음(캔버스 도형만).
+  //   나머지(내용물·내구 숫자·차폐 막·missed/skipped 알파)는 정지 통과 같은 경로를 그대로 공유한다.
+  //   방향은 렌더 안에서만 셈한다(규칙 필드 추가 없음): 이번 STEP 에 움직인 쪽, 진입 전이면 '갈 방향', 멈춘 뒤(opened/missed)엔 화살표 없음
+  function drawVehicleBody(s, y, r) {
+    const m = s.move;
+    const px = s.prevX ?? s.x;
+    const dir = s.x !== px ? Math.sign(s.x - px) : (s.moveT === null ? (s.homeX === m.x0 ? 1 : -1) : 0);
+    //  궤도선: 이 통이 왕복하는 구간(x0~x1)을 미리 알린다 — '앞을 보고 쏘라'는 장치의 핵심 정보. 양 끝에 짧은 눈금
+    ctx.save();
+    ctx.strokeStyle = C.supplyDark;
+    ctx.globalAlpha = ctx.globalAlpha * 0.35;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.moveTo(m.x0, y); ctx.lineTo(m.x1, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(m.x0, y - 6); ctx.lineTo(m.x0, y + 6);
+    ctx.moveTo(m.x1, y - 6); ctx.lineTo(m.x1, y + 6);
+    ctx.stroke();
+    ctx.restore();
+    shadow(s.x, y + r * 0.95, r * 1.05);
+    //  바퀴 4개(반지름 6, 외곽선 색)는 몸체보다 먼저 — 위아래 가장자리에서 반쯤 내다보여 위에서 본 차로 읽힌다
+    ctx.fillStyle = C.outline;
+    for (const kx of [-1, 1]) for (const ky of [-1, 1]) {
+      ctx.beginPath(); ctx.arc(s.x + kx * (r - 8), y + ky * (r * 0.7 + 2), 6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = C.supplyDark;
+    roundRect(s.x - r - 4, y - r * 0.7, r * 2 + 8, r * 1.4, 8); ctx.fill();
+    ctx.strokeStyle = C.gold; ctx.lineWidth = 4;
+    roundRect(s.x - r - 4, y - r * 0.7, r * 2 + 8, r * 1.4, 8); ctx.stroke();
+    //  앞유리: 진행 방향 쪽 가장자리 안쪽(방향이 없으면 오른쪽)
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillRect(dir < 0 ? s.x - r - 4 + 5 : s.x + r + 4 - 11, y - r * 0.45, 6, r * 0.9);
+    //  방향 화살표: 몸체 밖 진행 방향 쪽 작은 삼각형(꼭짓점 x = s.x + dir·(r + 22))
+    if (dir !== 0) {
+      ctx.save();
+      ctx.fillStyle = C.gold;
+      ctx.globalAlpha = ctx.globalAlpha * 0.9;
+      const ax = s.x + dir * (r + 12);
+      ctx.beginPath(); ctx.moveTo(ax + dir * 10, y); ctx.lineTo(ax, y - 6); ctx.lineTo(ax, y + 6); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+
   //  보급 통: 그림 + 내용물 + 남은 내구 숫자(병력 수가 아니다). chain 발판 열은 '+1'
   function drawSupply(s, sy, runZ) {
     //  발판(통보다 앞 z = 화면 위쪽)
@@ -499,13 +543,17 @@ export function createRenderer3(ctx, sprites) {
     const covered = s.coverZ != null && runZ != null && runZ < s.coverZ;
     //  skipped = 구조적으로 얻을 수 없던 대안. '밀려나며 사라지는' missed 연출과 달리 흐려지며 뒤로 빠진다
     ctx.globalAlpha = s.skipped ? 0.22 : s.missed ? 0.35 : 1;
-    shadow(s.x, y + r * 0.95, r * 0.9);
-    drawImgCentered('supply', s.x, y, r * 2.1, () => {
-      ctx.fillStyle = C.supplyDark;
-      roundRect(s.x - r, y - r * 0.8, r * 2, r * 1.6, 8); ctx.fill();
-      ctx.strokeStyle = C.gold; ctx.lineWidth = 4;
-      roundRect(s.x - r, y - r * 0.8, r * 2, r * 1.6, 8); ctx.stroke();
-    });
+    //  차량(r3.13)은 몸체 그리기만 갈아 끼운다 — 정지 통 경로는 한 줄도 바뀌지 않는다
+    if (s.move) drawVehicleBody(s, y, r);
+    else {
+      shadow(s.x, y + r * 0.95, r * 0.9);
+      drawImgCentered('supply', s.x, y, r * 2.1, () => {
+        ctx.fillStyle = C.supplyDark;
+        roundRect(s.x - r, y - r * 0.8, r * 2, r * 1.6, 8); ctx.fill();
+        ctx.strokeStyle = C.gold; ctx.lineWidth = 4;
+        roundRect(s.x - r, y - r * 0.8, r * 2, r * 1.6, 8); ctx.stroke();
+      });
+    }
     if (!s.opened) drawSupplyContents(s, s.x, y);
     //  남은 내구 숫자(주황) — 내용물과 구분되는 위치(통 아래)
     ctx.textAlign = 'center';

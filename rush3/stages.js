@@ -196,6 +196,7 @@ function makeRow(idx, g) {
 }
 
 // 보급 통: 계약서 3-3 필드 전부 초기값 포함
+//  move(r3.13 차량) = { x0, x1, period } 복사본(구조 공유 금지 — buildStage 두 번이 deepEqual 이되 참조는 다르다). 정지 통은 null
 function makeSupplyDef(idx, s) {
   let payload;
   if (s.kind === 'soldier') payload = { n: s.n };
@@ -204,7 +205,8 @@ function makeSupplyDef(idx, s) {
   return { id: 'c' + idx, z: s.z, x: s.x, r: BAL3.supply.r, kind: s.kind,
            durability: s.durability, maxDurability: s.durability,
            payload, opened: false, missed: false, locked: false, skipped: false, pads: [],
-           coverZ: s.coverZ ?? null, pairId: s.pairId ?? null, hint: s.hint ?? null };
+           coverZ: s.coverZ ?? null, pairId: s.pairId ?? null, hint: s.hint ?? null,
+           move: s.move ? { x0: s.move.x0, x1: s.move.x1, period: s.move.period } : null };
 }
 
 //  signs = 벽 앞머리에 그리는 통로 안내 표지(연출이 아니라 계약 데이터 — V3-STAGES 가 실제 통 내용과 대조한다)

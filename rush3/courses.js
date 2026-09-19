@@ -1,6 +1,6 @@
 // rush3/courses.js — 4~24 스테이지 정의(묶음 B-2·B-3, 2026-09-19 1차 배치). 순수 데이터 + 작은 조립 헬퍼, 난수 없음.
 //  1~3 은 stages.DEFS 그대로(코스 버전 2, 기록 보존). 여기 21개는 실게임 구현계획 B-2 설계표·B-3 역할표·C-1~C-3 자산표를 따른다.
-//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 움직이는 보급(6)·구출 캡슐(7)·보너스전(8)·복수 정예(9·23)·아레나(10·11·24)는
+//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 구출 캡슐(7)·보너스전(8)·복수 정예(9·23)·아레나(10·11·24)는
 //   장치가 아직 없어 **기존 장치로 그 자리의 '배우는 것'을 근사**한다. 13~22 의 새 역할(장갑체·복병·생성기·방해형·카트)은
 //   기존 행동(잡졸·돌격체·저격수)에 **체력·그림(skin)만 바꿔** 근사한다 — 행동 자체는 다음 회차.
 //  공통 규칙: 길이 30~60초(z = 초 × 190) · 게이트 행은 도로 80~400 완전 피복 · 배제 쌍은 coverZ = coverZFor(벽 z0, 통 z) · 초반엔 명확한 성공 경로.
@@ -15,6 +15,9 @@ const g3 = (z, a, b, c, o = {}) => ({ z, maxValue: o.max ?? 15, bypass: !!o.bypa
 const soldier = (z, x, n, durability, o = {}) => ({ z, x, kind: 'soldier', n, durability, ...o });
 const weapon = (z, x, w, durability, o = {}) => ({ z, x, kind: 'weapon', weapon: w, durability, ...o });
 const chain = (z, x, pads0, maxPads, durability, o = {}) => ({ z, x, kind: 'chain', pads0, maxPads, durability, ...o });
+//  차량 통(r3.13): 통 정의의 마지막 인자 o 에 펼친다 — soldier(2000, 120, 3, 6, { ...mv(120, 360, 4), hint }). x0 < x1(px)·period = 왕복 1회 초.
+//   통의 x 는 x0 또는 x1 이어야 한다(양 끝에서 출발). 속도 2·(x1−x0)/period 가 STEP 당 반지름(30px) 이하(C-4·VEH-10 이 잠근다)
+const mv = (x0, x1, period) => ({ move: { x0, x1, period } });
 const wall = (z0, z1, L, R) => ({ z0, z1, signs: { L, R } });
 const cover = (x0, x1, z0) => ({ kind: 'cover', x0, x1, z0, z1: z0 + 40 });
 const wave = (z, kind, xs, o = {}) => ({ z, kind, n: xs.length, xs, corridorHw: null, ...o });
@@ -49,10 +52,12 @@ export function makeCourses({ coverZFor }) {
     walls: [cover(190, 290, 1220), cover(80, 186, 3620), cover(240, 400, 6020)],
     spawns: [wave(2100, 'grunt', [140, 240, 340]), wave(3300, 'shooter', [200, 280]), mass(5300, 'grunt', 12, 2), wave(6900, 'rusher', [120, 360], HOUND)],
     elite: { z: 8000, hp: 200, summon: false } };
-  //  6 달리는 보급(근사: 차선을 옮겨 가며 놓인 통 4개 — 어느 차선에 설지 매번 고른다)(BG4)
-  C[6] = { version: 1, title: '차선 바꾸기', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
+  //  6 달리는 보급(r3.13 차량 3대 — 왕복하는 통은 '지금 자리'가 아니라 '갈 자리'에 서야 열린다. version 2, 정지 통 시절 기록은 1 칸에 보존)(BG4)
+  const VH = '움직이는 통은 지금 자리가 아니라 갈 자리에 미리 서야 열립니다';
+  C[6] = { version: 2, title: '차선 바꾸기', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
     gates: [g2(1400, 2, -6), g2(4600, -8, 3, { max: 20 }), g3(7000, 4, -12, 3, { max: 24 })],
-    supplies: [soldier(2000, 120, 3, 6), soldier(2700, 360, 3, 6), weapon(3400, 120, 'scatter', 10), soldier(4000, 360, 4, 8), soldier(5800, 240, 6, 16)],
+    supplies: [soldier(2000, 120, 3, 6, { ...mv(120, 360, 4), hint: VH }), soldier(2700, 360, 3, 6, { ...mv(120, 360, 4), hint: '오른쪽에서 출발한 통은 왼쪽으로 먼저 갑니다. 탄이 날아가는 동안 통이 어디까지 가는지 보세요' }),
+               weapon(3400, 120, 'scatter', 10), soldier(4000, 330, 4, 8, { ...mv(150, 330, 3), hint: '빠른 통은 앞을 더 많이 봐야 합니다. 통이 되돌아오는 끝점에서 기다리면 쉽습니다' }), soldier(5800, 240, 6, 16)],
     walls: [],
     spawns: [wave(2400, 'rusher', [240], HOUND), wave(3100, 'grunt', [100, 180, 300, 380]), wave(5200, 'shooter', [130, 350]), mass(6300, 'grunt', 12, 2), wave(7600, 'rusher', [140, 240, 340], HOUND)],
     elite: { z: 8400, hp: 240, summon: false } };
@@ -92,9 +97,11 @@ export function makeCourses({ coverZFor }) {
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(5200, 'shooter', [130, 240, 350]), mass(6800, 'grunt', 16, 2), wave(8000, 'rusher', [110, 200, 280, 370], HOUND), mass(8600, 'grunt', 10, 2)],
     elite: { z: 9400, hp: 480, summon: true, skin: 'B4_smelter' } };
   //  12 관문 — 지금까지 배운 것을 한 판에(BG5): 3칸+차폐+분리벽+랜덤 길+정예
-  C[12] = { version: 1, title: '관문', bg: 5, startUnits: 5, startWeapon: 'rifle', length: 10400, eliteZ: 10000,
+  //   r3.13: 정예 직전 병사 8 통(z7200)이 차량 — 벽 활성 구간(w1 3940~5200·w3 7740~8600)·차폐물 사선 밖. version 2
+  C[12] = { version: 2, title: '관문', bg: 5, startUnits: 5, startWeapon: 'rifle', length: 10400, eliteZ: 10000,
     gates: [g3(1500, -4, 3, -6), g2(3300, 4, -10, { max: 20 }), g3(6200, -8, 6, -8, { max: 24 }), g2(8600, 8, -20, { max: 30 })],
-    supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 4000, 4600, soldier(0, 120, 5, 12), weapon(0, 326, 'heavy', 18), 'w1'), soldier(7200, 240, 8, 20),
+    supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 4000, 4600, soldier(0, 120, 5, 12), weapon(0, 326, 'heavy', 18), 'w1'),
+               soldier(7200, 150, 8, 20, { ...mv(150, 330, 3), hint: '정예 앞의 큰 통은 좌우로 달립니다. 통이 되돌아오는 자리에 미리 서세요' }),
                //  랜덤 길 왼쪽의 확정 통(S3 c9 와 같은 꼴: 짝 없는 차폐)
                soldier(8200, 150, 5, 10, { coverZ: coverZFor(7800, 8200) })],
     walls: [wall(4000, 5200, { kind: 'soldier', n: 5 }, { kind: 'weapon', weapon: 'heavy' }), cover(190, 290, 1220), cover(80, 186, 5820), wall(7800, 8600, { kind: 'soldier', n: 5 }, { kind: 'lottery' })],
