@@ -119,10 +119,10 @@ test('V3-CAPSULE CAP-3: 놓침 — 미개봉 캡슐의 z 를 지나면 supplyMis
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule, c2 }·c2 payload { n: 2 }·내구 24(r3.21: gain 0.575·재산정)·armZ 440(r3.18)·x120·hint, createRun 이 objective 를 초기화, 다른 스테이지는 null, 잘못된 supplyId 는 throw', () => {
+test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 3(r3.21 검수 반영: 코스 버전 +1)·objective { capsule, c2 }·c2 payload { n: 2 }·내구 24(r3.21: gain 0.575·재산정)·armZ 440(r3.18)·x120·hint, createRun 이 objective 를 초기화, 다른 스테이지는 null, 잘못된 supplyId 는 throw', () => {
   const a = buildStage(7), b = buildStage(7);
   assert.deepEqual(a, b, '결정성');
-  assert.equal(a.version, 2); assert.equal(stageVersion(7), 2);
+  assert.equal(a.version, 3); assert.equal(stageVersion(7), 3);
   assert.deepEqual(a.objective, { kind: 'capsule', supplyId: 'c2' });
   const c2 = a.supplies[1];
   assert.equal(c2.id, 'c2'); assert.equal(c2.kind, 'capsule');
@@ -140,7 +140,7 @@ test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule
   const run = createRun(a);
   assert.deepEqual(run.objective, { kind: 'capsule', supplyId: 'c2', done: false, missed: false, n: 0 });
   assert.deepEqual(run.supplies[1].payload, { n: 2 });
-  assert.equal(run.stageVersion, 2);
+  assert.equal(run.stageVersion, 3);
   //  다른 스테이지: objective null(1~3·나머지 코스). 버전은 자기 것만 단정한다(순차 적용에서 다른 장치가 올릴 수 있다)
   assert.equal(buildStage(1).objective, null);
   assert.equal(createRun(buildStage(1)).objective, null);
@@ -239,41 +239,41 @@ const KEY = 'starforgeRush.v3';
 test('V3-CAPSULE CAP-7: 저장 rescued — 희소 필드(true 일 때만 존재), 칸별(버전·난이도), 재로드 유지, 단조(false·비불리언 패치 무시), 로드 정규화', () => {
   const st = memStorage();
   const s = createSave3(st);
-  const before = s.getStage(7, 2);
+  const before = s.getStage(7, 3);
   assert.equal('rescued' in before, false, '구출 전엔 키 자체가 없다');
   assert.deepEqual(before, { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 });
-  s.updateStage(7, { rescued: true }, 2);
-  assert.equal(s.getStage(7, 2).rescued, true);
-  assert.equal('rescued' in s.getStage(7, 2, 'hard'), false, '다른 난이도 칸엔 없다');
+  s.updateStage(7, { rescued: true }, 3);
+  assert.equal(s.getStage(7, 3).rescued, true);
+  assert.equal('rescued' in s.getStage(7, 3, 'hard'), false, '다른 난이도 칸엔 없다');
   assert.equal('rescued' in s.getStage(7, 1), false, '다른 버전 칸엔 없다');
   const raw = JSON.parse(st.getItem(KEY));
-  assert.equal(raw.stages['7'].versions['2'].rescued, true);
-  assert.deepEqual(Object.keys(raw.stages['7'].versions), ['2']);
+  assert.equal(raw.stages['7'].versions['3'].rescued, true);
+  assert.deepEqual(Object.keys(raw.stages['7'].versions), ['3']);
   //  다른 필드 갱신이 rescued 를 지우지 않는다
-  s.updateStage(7, { attempts: 3, cleared: true }, 2);
-  assert.deepEqual(s.getStage(7, 2), { cleared: true, attempts: 3, bestSurvivors: 0, bestTime: 0, rescued: true });
+  s.updateStage(7, { attempts: 3, cleared: true }, 3);
+  assert.deepEqual(s.getStage(7, 3), { cleared: true, attempts: 3, bestSurvivors: 0, bestTime: 0, rescued: true });
   //  재로드 유지
-  assert.equal(createSave3(st).getStage(7, 2).rescued, true);
+  assert.equal(createSave3(st).getStage(7, 3).rescued, true);
   //  단조: false·'yes' 패치 뒤에도 true
-  s.updateStage(7, { rescued: false }, 2);
-  assert.equal(s.getStage(7, 2).rescued, true);
-  s.updateStage(7, { rescued: 'yes' }, 2);
-  assert.equal(s.getStage(7, 2).rescued, true);
-  assert.equal(JSON.parse(st.getItem(KEY)).stages['7'].versions['2'].rescued, true);
+  s.updateStage(7, { rescued: false }, 3);
+  assert.equal(s.getStage(7, 3).rescued, true);
+  s.updateStage(7, { rescued: 'yes' }, 3);
+  assert.equal(s.getStage(7, 3).rescued, true);
+  assert.equal(JSON.parse(st.getItem(KEY)).stages['7'].versions['3'].rescued, true);
   //  구출한 적 없는 칸에 false 를 보내도 키가 생기지 않는다
-  s.updateStage(7, { rescued: false, attempts: 1 }, 2, 'hard');
-  assert.deepEqual(s.getStage(7, 2, 'hard'), { cleared: false, attempts: 1, bestSurvivors: 0, bestTime: 0 });
-  assert.equal('rescued' in JSON.parse(st.getItem(KEY)).stages['7'].versions['2:hard'], false);
+  s.updateStage(7, { rescued: false, attempts: 1 }, 3, 'hard');
+  assert.deepEqual(s.getStage(7, 3, 'hard'), { cleared: false, attempts: 1, bestSurvivors: 0, bestTime: 0 });
+  assert.equal('rescued' in JSON.parse(st.getItem(KEY)).stages['7'].versions['3:hard'], false);
   //  로드 정규화: 비불리언 rescued 는 버린다, attempts 는 남는다
-  const s2 = createSave3(memStorage({ [KEY]: JSON.stringify({ v: 3, stages: { 7: { versions: { 2: { rescued: 'yes', attempts: 1 } } } } }) }));
-  assert.deepEqual(s2.getStage(7, 2), { cleared: false, attempts: 1, bestSurvivors: 0, bestTime: 0 });
+  const s2 = createSave3(memStorage({ [KEY]: JSON.stringify({ v: 3, stages: { 7: { versions: { 3: { rescued: 'yes', attempts: 1 } } } } }) }));
+  assert.deepEqual(s2.getStage(7, 3), { cleared: false, attempts: 1, bestSurvivors: 0, bestTime: 0 });
   //  로드: true 는 유지(getStageVersions 사본에도)
-  const s3 = createSave3(memStorage({ [KEY]: JSON.stringify({ v: 3, stages: { 7: { versions: { 2: { rescued: true } } } } }) }));
-  assert.equal(s3.getStage(7, 2).rescued, true);
-  assert.deepEqual(s3.getStageVersions(7), { 2: { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0, rescued: true } });
+  const s3 = createSave3(memStorage({ [KEY]: JSON.stringify({ v: 3, stages: { 7: { versions: { 3: { rescued: true } } } } }) }));
+  assert.equal(s3.getStage(7, 3).rescued, true);
+  assert.deepEqual(s3.getStageVersions(7), { 3: { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0, rescued: true } });
   //  patch({ stages }) 경로도 같은 규칙
-  s3.patch({ stages: { 7: { versions: { 2: { rescued: false, attempts: 2 } } } } });
-  assert.deepEqual(s3.getStage(7, 2), { cleared: false, attempts: 2, bestSurvivors: 0, bestTime: 0, rescued: true });
+  s3.patch({ stages: { 7: { versions: { 3: { rescued: false, attempts: 2 } } } } });
+  assert.deepEqual(s3.getStage(7, 3), { cleared: false, attempts: 2, bestSurvivors: 0, bestTime: 0, rescued: true });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -455,7 +455,7 @@ test('V3-CAPSULE-SHELL SHELL-1: 배너 1회 — S7 출격 직후 objT 3·두 줄
   assert.equal(h.app.dbg().objective, null);
 });
 
-test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — aim 정책으로 S7 캡슐을 열면 joinMany 효과음 없음(n 2 < joinManyAt 3)·"구출 성공!"·"+2명 합류", 결과에 "구출 성공 · +2명"(r3.21 n 2)과 "작전 성공!", rescued 저장, 타이틀 sub 에 "구출✓"', async () => {
+test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — aim 정책으로 S7 캡슐을 열면 joinMany 효과음은 기록만(n 2 < joinManyAt 3 — 검수 반영, 규칙으로 잠그지 않음)·"구출 성공!"·"+2명 합류", 결과에 "구출 성공 · +2명"(r3.21 n 2)과 "작전 성공!", rescued 저장, 타이틀 sub 에 "구출✓"', async (t) => {
   const h = await bootFake();
   h.app.setDifficulty('normal');
   h.app.startRun(7);
@@ -465,8 +465,9 @@ test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — a
   driveUntil(h, 'aim', () => run().objective.done, 6000);
   assert.equal(run().objective.done, true, '캡슐 구출');
   h.frames(2);
-  //  r3.21: 캡슐 n 3 → 2 라 셸 규칙(main.js joinMany 효과음은 ev.n >= FX.joinManyAt 3)에 걸리지 않는다 — 효과음 없음이 현행 규칙(플로터·'구출!' 은 그대로). 보고서 difficulty-b-20260920 §6
-  assert.equal(h.audio.played.includes('joinMany'), false, 'n 2 < joinManyAt 3: 합류 효과음 없음');
+  //  r3.21: 캡슐 n 3 → 2 라 셸 규칙(main.js joinMany 효과음은 ev.n >= FX.joinManyAt 3)에 걸리지 않는다 — 구출 성공에 소리가 없는 것은 사용자 체감 퇴행이라
+  //   규칙으로 잠그지 않고 기록만 남긴다(검수 반영). 다음 회차 main.js joinManyAt 3 → 2 또는 캡슐 전용 효과음을 넣은 뒤 '효과음 있음' 단언으로 되돌린다. 보고서 difficulty-b-20260920 §6
+  t.diagnostic(`CAPSULE SHELL-2 joinMany 효과음 ${h.audio.played.includes('joinMany') ? '있음' : '없음(n 2 < joinManyAt 3 — main.js 미수정)'}`);
   assert.ok(h.texts.includes('구출 성공!'), '구출 플로터');
   assert.ok(h.texts.includes('+2명 합류'), '합류 플로터');
   assert.ok(h.texts.includes('구출!'), '개봉 팝 문구');
@@ -478,9 +479,9 @@ test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — a
   h.frames(1);
   assert.ok(h.texts.includes('구출 성공 · +2명'), '결과 목표 줄');
   assert.ok(h.texts.includes('작전 성공!'));
-  assert.equal(h.save.getStage(7, 2).rescued, true, '구출 기록');
-  assert.equal('rescued' in h.save.getStage(7, 2, 'brutal'), false, '다른 난이도 칸엔 없다');
-  assert.equal(h.save.getStage(7, 2).cleared, true);
+  assert.equal(h.save.getStage(7, 3).rescued, true, '구출 기록');
+  assert.equal('rescued' in h.save.getStage(7, 3, 'brutal'), false, '다른 난이도 칸엔 없다');
+  assert.equal(h.save.getStage(7, 3).cleared, true);
   //  타이틀: 7번 칸 sub 가 '완료 · … · 구출✓'
   h.app.toTitle();
   h.texts.length = 0;
@@ -508,8 +509,8 @@ test('V3-CAPSULE-SHELL SHELL-3: 놓침은 실패 아님 — x240 고정으로 S7
   h.frames(1);
   assert.ok(h.texts.includes('구출 실패 — 캡슐을 열지 못했습니다'));
   assert.ok(h.texts.includes('작전 성공!'), '놓쳐도 작전은 성공');
-  assert.equal('rescued' in h.save.getStage(7, 2), false);
-  assert.equal(h.save.getStage(7, 2).cleared, true);
+  assert.equal('rescued' in h.save.getStage(7, 3), false);
+  assert.equal(h.save.getStage(7, 3).cleared, true);
   assert.equal(h.app.dbg().objective.missed, true);
   assert.equal(h.app.dbg().objective.done, false);
   h.app.toTitle();

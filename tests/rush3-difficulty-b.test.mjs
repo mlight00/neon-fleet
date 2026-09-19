@@ -1,6 +1,6 @@
 // rush3-difficulty-b — 난이도 B안(r3.21, 이사 결정 2026-09-20) V3-DIFFB.
 //  ① 적 체력 스테이지 구간 배율(BAL3.enemyHpByStage) 단조 증가 · makeSpawn 이 ev.hp 를 항상 명시 · 소환 잡졸도 같은 배율 · spawnEnemy 가 hpMax 기록
-//  ② 획득 숫자 후처리(gain 0.5 → 1.0) 정수·단조 · 3칸 행 값 서로 다름 · 음수 칸 max > 양수 칸 max · 부대 상한 100(BAL3 = SQUAD_DEFAULTS)
+//  ② 획득 숫자 후처리(gain 0.5 → 1.0) 정수·단조(벽 표지 soldier n 도 — 검수 반영, 대조는 STG-5 가 1~24 전부) · 3칸 행 값 서로 다름 · 음수 칸 max > 양수 칸 max · 부대 상한 100(BAL3 = SQUAD_DEFAULTS)
 //  ③ 봇 실측: planBoss 보통 1~24 완주 · 지옥 무입력 S13 이상 실패 ≥ 70% · 머리 위 체력 숫자 렌더(12px, hpMax > 2 만)
 //  ⚠️봇 결과는 사람의 성공률이 아니다(결정적 1판). 표 전체는 보고서 newmode/v3/research/difficulty-b-20260920/report.md
 import { test } from 'node:test';

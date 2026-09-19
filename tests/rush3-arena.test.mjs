@@ -83,7 +83,7 @@ test('V3-ARENA A-1: 형식·파생·불변식 — 10·11·24 정의에 arena 만
     const a = buildStage(id), b = buildStage(id);
     assert.deepEqual(a, b, 'S' + id + ' 결정성');
     assert.notEqual(a.arena, b.arena, '호출마다 새 객체');
-    assert.equal(stageVersion(id), 2); assert.equal(a.version, 2);
+    assert.equal(stageVersion(id), 3); assert.equal(a.version, 3);
     //  기본값 병합: w/depth/bossZ 는 BAL3.arena, 정의가 적지 않은 boss 칸(r·spawnAhead·touchEvery·touchDmg·dash.recover)은 BAL3.arena.boss
     assert.deepEqual(a.arena.w, AR.w); assert.deepEqual(a.arena.depth, AR.depth);
     assert.equal(a.arena.boss.r, AR.boss.r); assert.equal(a.arena.boss.spawnAhead, AR.boss.spawnAhead);
@@ -594,7 +594,7 @@ test('V3-ARENA A-13: 셸 — 진입 프레임에 배너·열림 연출·lotWarn/
   n = 0;
   while (app.getState() !== 'result' && n < 6000) { const c = botArena(run()) ?? { x: 240, ay: 0 }; app.input.state.pointerX = c.x; if (run().boss) app.input.state.dragDy += c.ay - run().tay; frames(1); n++; }
   assert.equal(app.getState(), 'result');
-  assert.equal(save.getStage(10, 2).cleared, true); assert.equal(save.getStage(10, 1).cleared, false, '근사 시절 기록 칸은 따로');
+  assert.equal(save.getStage(10, 3).cleared, true); assert.equal(save.getStage(10, 2).cleared, false, 'r3.21 이전 판 기록 칸은 따로'); assert.equal(save.getStage(10, 1).cleared, false, '근사 시절 기록 칸은 따로');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

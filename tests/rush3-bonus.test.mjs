@@ -77,7 +77,7 @@ test('V3-BONUS B-1: 형식 — buildStage(8).bonus { sec 20, tiers = BAL3, 표�
   for (const w of obtainable) for (const t of a.bonus.targets) assert.ok(w.range * (w.vz - BAL3.scroll) / w.vz - MAX_DY >= t.dz + t.r, w.id + ' 가 ' + t.id + ' 에 닿지 않는다');
   assert.deepEqual(a, b, '결정성');
   assert.notEqual(a.bonus, b.bonus); assert.notEqual(a.bonus.targets, b.bonus.targets); assert.notEqual(a.bonus.targets[0], b.bonus.targets[0]); assert.notEqual(a.bonus.tiers, b.bonus.tiers);
-  assert.equal(stageVersion(8), 2);
+  assert.equal(stageVersion(8), 3);
   for (const id of STAGE_IDS) assert.equal(buildStage(id).bonus, null, 'S' + id);
   //  보너스 구간 불변식: 게이트·통·스폰 z 가 전부 eliteZ 이하(stepBonus 는 셔터·보상·스폰을 부르지 않는다).
   //   검수 반영으로 buildStage 가 같은 조건을 빌드 시점 guard 로 잠갔다(아래 DEFS[999]) — 이 S8 루프는 실측 대조군으로 그대로 둔다
@@ -290,39 +290,39 @@ function memStorage(init = {}) { const m = new Map(Object.entries(init)); return
 test('V3-BONUS B-7: 저장 — bestBonus 는 희소 필드(유한수만·max 병합), STAGE_DEFAULTS 4필드 불변, 재로드 유지, cleared 갱신에 보존, 난이도 접미 칸도 같은 규칙', () => {
   const st = memStorage();
   const s = createSave3(st);
-  s.updateStage(8, { bestBonus: 12 }, 2);
-  assert.deepEqual(s.getStage(8, 2), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0, bestBonus: 12 });
+  s.updateStage(8, { bestBonus: 12 }, 3);
+  assert.deepEqual(s.getStage(8, 3), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0, bestBonus: 12 });
   assert.deepEqual(s.getStage(1), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 }, '다른 스테이지엔 키 없음');
   assert.deepEqual(s.getStage(8, 1), { cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 }, '다른 버전 칸엔 키 없음');
   //  max 병합: 낮은 점수 조각은 무시, 높은 점수는 갱신
-  s.updateStage(8, { bestBonus: 5 }, 2);
-  assert.equal(s.getStage(8, 2).bestBonus, 12);
-  s.updateStage(8, { bestBonus: 40 }, 2);
-  assert.equal(s.getStage(8, 2).bestBonus, 40);
+  s.updateStage(8, { bestBonus: 5 }, 3);
+  assert.equal(s.getStage(8, 3).bestBonus, 12);
+  s.updateStage(8, { bestBonus: 40 }, 3);
+  assert.equal(s.getStage(8, 3).bestBonus, 40);
   //  cleared 만 갱신해도 보존
-  s.updateStage(8, { cleared: true, attempts: 3 }, 2);
-  assert.deepEqual(s.getStage(8, 2), { cleared: true, attempts: 3, bestSurvivors: 0, bestTime: 0, bestBonus: 40 });
+  s.updateStage(8, { cleared: true, attempts: 3 }, 3);
+  assert.deepEqual(s.getStage(8, 3), { cleared: true, attempts: 3, bestSurvivors: 0, bestTime: 0, bestBonus: 40 });
   //  재로드 뒤 유지 + 원문에 키가 있다
   const s2 = createSave3(st);
-  assert.equal(s2.getStage(8, 2).bestBonus, 40);
-  assert.equal(JSON.parse(st.raw.get(KEY3)).stages['8'].versions['2'].bestBonus, 40);
+  assert.equal(s2.getStage(8, 3).bestBonus, 40);
+  assert.equal(JSON.parse(st.raw.get(KEY3)).stages['8'].versions['3'].bestBonus, 40);
   //  비수·NaN 은 키가 생기지 않는다
   const s3 = createSave3(memStorage());
-  s3.updateStage(8, { bestBonus: 'x' }, 2);
-  assert.equal('bestBonus' in s3.getStage(8, 2), false);
-  s3.updateStage(8, { bestBonus: NaN }, 2);
-  assert.equal('bestBonus' in s3.getStage(8, 2), false);
+  s3.updateStage(8, { bestBonus: 'x' }, 3);
+  assert.equal('bestBonus' in s3.getStage(8, 3), false);
+  s3.updateStage(8, { bestBonus: NaN }, 3);
+  assert.equal('bestBonus' in s3.getStage(8, 3), false);
   //  난이도 접미 칸
-  s3.updateStage(8, { bestBonus: 9 }, 2, 'hard');
-  assert.equal(s3.getStage(8, 2, 'hard').bestBonus, 9);
-  assert.equal('bestBonus' in s3.getStage(8, 2), false);
-  assert.equal('bestBonus' in s3.getStage(8, 2, 'brutal'), false);
+  s3.updateStage(8, { bestBonus: 9 }, 3, 'hard');
+  assert.equal(s3.getStage(8, 3, 'hard').bestBonus, 9);
+  assert.equal('bestBonus' in s3.getStage(8, 3), false);
+  assert.equal('bestBonus' in s3.getStage(8, 3, 'brutal'), false);
   //  로드 원문 + patch({ stages }) 경로도 max
-  const s4 = createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: { 8: { versions: { 2: { bestBonus: 30, cleared: true } } } } }) }));
-  assert.equal(s4.getStage(8, 2).bestBonus, 30);
-  s4.patch({ stages: { 8: { versions: { 2: { bestBonus: 10, attempts: 2 } } } } });
-  assert.deepEqual(s4.getStage(8, 2), { cleared: true, attempts: 2, bestSurvivors: 0, bestTime: 0, bestBonus: 30 });
-  assert.deepEqual(s4.getStageVersions(8), { 2: { cleared: true, attempts: 2, bestSurvivors: 0, bestTime: 0, bestBonus: 30 } });
+  const s4 = createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: { 8: { versions: { 3: { bestBonus: 30, cleared: true } } } } }) }));
+  assert.equal(s4.getStage(8, 3).bestBonus, 30);
+  s4.patch({ stages: { 8: { versions: { 3: { bestBonus: 10, attempts: 2 } } } } });
+  assert.deepEqual(s4.getStage(8, 3), { cleared: true, attempts: 2, bestSurvivors: 0, bestTime: 0, bestBonus: 30 });
+  assert.deepEqual(s4.getStageVersions(8), { 3: { cleared: true, attempts: 2, bestSurvivors: 0, bestTime: 0, bestBonus: 30 } });
   //  bonusLine 순수 함수
   assert.equal(bonusLine({ score: 12, tier: 1, hits: 4, isBestBonus: false }), '보너스 12점 · 단계 1');
   assert.equal(bonusLine({ score: 207, tier: 3, hits: 69, isBestBonus: true }), '보너스 207점 · 단계 3 · 신기록');
@@ -412,9 +412,9 @@ test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결�
   assert.ok(h.texts.includes(line), '결과 한 줄: ' + h.texts.filter((t) => t.startsWith('보너스')).join(' | '));
   assert.ok(h.texts.includes('작전 성공!'));
   assert.ok(h.texts.includes(r.mainResult.survivors + '명'), '생존 = 본전투 확정값');
-  const rec = h.save.getStage(8, 2);
+  const rec = h.save.getStage(8, 3);
   assert.deepEqual(rec, { cleared: true, attempts: 1, bestSurvivors: r.mainResult.survivors, bestTime: r.wonAt, bestBonus: r.bonus.score });
-  assert.equal('bestBonus' in h.save.getStage(8, 2, 'brutal'), false);
+  assert.equal('bestBonus' in h.save.getStage(8, 3, 'brutal'), false);
   //  두 번째 판: bestBonus 는 max 로만 오르고, '신기록' 은 앞 판보다 높을 때만 붙는다(프레임 경계가 달라 점수는 조금 다를 수 있다 — STEP 결정성은 B-3)
   h.app.startRun(8);
   h.frames(1);
@@ -423,18 +423,18 @@ test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결�
   h.texts.length = 0; h.frames(1);
   const better = r2.bonus.score > r.bonus.score;
   assert.ok(h.texts.includes('보너스 ' + r2.bonus.score + '점 · 단계 ' + r2.bonus.tier + (better ? ' · 신기록' : '')), '신기록 표기는 앞 판보다 높을 때만: ' + r.bonus.score + ' → ' + r2.bonus.score);
-  assert.equal(h.save.getStage(8, 2).bestBonus, Math.max(r.bonus.score, r2.bonus.score));
-  assert.equal(h.save.getStage(8, 2).attempts, 2);
+  assert.equal(h.save.getStage(8, 3).bestBonus, Math.max(r.bonus.score, r2.bonus.score));
+  assert.equal(h.save.getStage(8, 3).attempts, 2);
   //  검수 반영(Important): 세 번째 판 — 보너스 20초 창에서 ⏸→[스테이지 선택](= toTitle, finishRun 을 거치지 않는 경로)으로 나가도
   //   승리 확정 프레임에 commitMain 이 쓴 cleared·bestSurvivors·bestTime 은 남는다. bestBonus 는 보너스가 끝나야(over) 쓰므로 앞 판 값 그대로
-  const before = h.save.getStage(8, 2);
+  const before = h.save.getStage(8, 3);
   h.app.startRun(8);
   h.frames(1);
   driveUntil(h, 'planBoss', () => run().phase === 'bonus', 9000);
   const r3 = run();
   assert.equal(r3.won, true); assert.equal(r3.over, false); assert.equal(h.app.getState(), 'run');
   const expSurv = Math.max(before.bestSurvivors, r3.mainResult.survivors), expTime = Math.min(before.bestTime, r3.wonAt);
-  const atWin = h.save.getStage(8, 2);
+  const atWin = h.save.getStage(8, 3);
   assert.deepEqual(atWin, { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus }, '승리 확정 프레임에 본전투 기록이 이미 저장돼 있다(bestBonus 는 아직)');
   assert.deepEqual(r3.mainRecord, { isBest: r3.mainResult.survivors > before.bestSurvivors, survivors: r3.mainResult.survivors, time: r3.wonAt }, '판당 1회 표식');
   driveUntil(h, 'planBoss', () => run().bonus.t >= 3, 600);
@@ -443,7 +443,7 @@ test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결�
   assert.equal(h.app.getState(), 'paused');
   h.app.toTitle();
   assert.equal(h.app.getState(), 'title'); assert.equal(h.app.getRun(), null);
-  assert.deepEqual(h.save.getStage(8, 2), { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus }, '나가도 확정된 승리·기록은 그대로, 미완 보너스 점수는 기록에 들어가지 않는다');
+  assert.deepEqual(h.save.getStage(8, 3), { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus }, '나가도 확정된 승리·기록은 그대로, 미완 보너스 점수는 기록에 들어가지 않는다');
   assert.equal(h.app.dbg().state, 'title');
   //  보너스가 없는 판(1)은 dbg 가 종전 꼴
   h.app.startRun(1);

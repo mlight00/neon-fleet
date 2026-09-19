@@ -266,7 +266,7 @@ test('V3-MULTIELITE ME-6: C[9]·C[23] planBoss 보통 완주 — won·상한 안
     assert.equal(r.events.bossKill, buildStage(id).elites.length);
     const sum = hpSum(buildStage(id));
     assert.equal(sum, expectSum, `S${id} 체력 합`);
-    assert.equal(stageVersion(id), 2);
+    assert.equal(stageVersion(id), 3);
     //  처치 순서·잔여 병력·생존 초 기록(등장 STEP 의 run.time → 마지막 bossKill STEP 의 run.time)
     const run = createRun(buildStage(id));
     let spawnT = null, lastKillT = null;
@@ -479,7 +479,8 @@ test('V3-MULTIELITE ME-9: 셸 — 2체 등장 프레임에 elite 효과음·보�
   assert.equal(run().won, true);
   shellDrive(h, () => h.app.getState() === 'result', 600);
   assert.equal(h.app.getState(), 'result');
-  const rec = h.save.getStage(9, 2);
+  const rec = h.save.getStage(9, 3);
   assert.equal(rec.cleared, true);
+  assert.equal(h.save.getStage(9, 2).cleared, false, 'r3.21 이전 판 기록 칸은 따로');
   assert.equal(h.save.getStage(9, 1).cleared, false, '단수 정예 시절 기록 칸은 따로');
 });

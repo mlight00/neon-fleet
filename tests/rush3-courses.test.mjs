@@ -11,9 +11,10 @@ import { playPolicy, pickInput } from './lib/rush3-policies.mjs';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 
 const NEW = COURSE_IDS;
-//  장치 교체로 코스 버전을 올린 번호(기록은 버전별로 보존된다 — 계약서 7장). 새 장치 담당은 여기에 자기 키만 추가한다.
-//   6·12 = 움직이는 보급(차량, r3.13) · 7 = 구출 캡슐(r3.14) · 8 = 보너스전(r3.15) · 9·23 = 복수 정예(r3.16) · 10·11·24 = 아레나 보스(r3.17)
-const REPLACED = { 6: 2, 7: 2, 8: 2, 9: 2, 10: 2, 11: 2, 12: 2, 23: 2, 24: 2 };
+//  코스 버전(기록은 버전별로 보존된다 — 계약서 7장). r3.21 검수 반영(2026-09-20)으로 4~24 전부 +1: 장치 교체가 없던 번호는 1 → 2, 장치 교체로 2 였던 번호는 2 → 3.
+//   장치 교체 회차: 6·12 = 움직이는 보급(차량, r3.13) · 7 = 구출 캡슐(r3.14) · 8 = 보너스전(r3.15) · 9·23 = 복수 정예(r3.16) · 10·11·24 = 아레나 보스(r3.17)
+//   새 장치 담당은 자기 키의 값만 +1 한다(기본은 2).
+const REPLACED = { 6: 3, 7: 3, 8: 3, 9: 3, 10: 3, 11: 3, 12: 3, 23: 3, 24: 3 };
 
 test('V3-COURSE C-1: 목록 — STAGE_IDS 는 1~3 그대로, ALL_STAGE_IDS 는 1~24, 4~24 는 전부 buildStage 가능·결정적', () => {
   assert.deepEqual(STAGE_IDS, [1, 2, 3]);
@@ -21,7 +22,7 @@ test('V3-COURSE C-1: 목록 — STAGE_IDS 는 1~3 그대로, ALL_STAGE_IDS 는 1
   for (const id of NEW) {
     const a = buildStage(id), b = buildStage(id);
     assert.deepEqual(a, b, 'S' + id + ' 결정성');
-    assert.equal(stageVersion(id), REPLACED[id] ?? 1, 'S' + id + ' 코스 버전');
+    assert.equal(stageVersion(id), REPLACED[id] ?? 2, 'S' + id + ' 코스 버전');
     assert.ok(stageMeta(id).title.length > 0);
   }
 });

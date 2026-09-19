@@ -284,8 +284,8 @@ test('V3-VEHICLE VEH-9: chain 차량 — 열리면 정지하고 발판 x 가 전
   for (let i = 0; i < 60; i++) { stepRun(run, IN, STEP); drainEvents(run); assert.equal(s.x, openX); }
 });
 
-test('V3-VEHICLE VEH-10: 배치 불변식 — S6·S12 차량은 범위·출발점·속도·벽·hint 를 지키고 코스 버전 2', () => {
-  assert.equal(stageVersion(6), 2); assert.equal(stageVersion(12), 2);
+test('V3-VEHICLE VEH-10: 배치 불변식 — S6·S12 차량은 범위·출발점·속도·벽·hint 를 지키고 코스 버전 3(r3.21 검수 반영 +1)', () => {
+  assert.equal(stageVersion(6), 3); assert.equal(stageVersion(12), 3);
   for (const id of [6, 12]) {
     const st = buildStage(id);
     const solid = st.walls.filter((w) => w.kind !== 'cover');

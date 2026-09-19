@@ -48,7 +48,7 @@ const wall = (z0, z1, L, R) => ({ z0, z1, signs: { L, R } });
 const cover = (x0, x1, z0) => ({ kind: 'cover', x0, x1, z0, z1: z0 + 40 });
 const wave = (z, kind, xs, o = {}) => ({ z, kind, n: xs.length, xs, corridorHw: null, ...o });
 const mass = (z, kind, n, rows = 2, o = {}) => ({ z, kind, n, rows, corridorHw: null, ...o });
-//  역할 근사(B-3): 그림만 바꾸고 체력을 올린다. hp 는 스폰 고정값(난이도 배수 무관 — 계약서 3-8 '명시 hp 는 그대로')
+//  역할 근사(B-3): 그림만 바꾸고 체력을 올린다. hp 는 정의 출발값 — stages.makeSpawn 이 구간 배율(BAL3.enemyHpByStage) × 난이도 enemyHp 를 곱한다(r3.21: 장갑체 10 → 4~8 ×2·13~18 ×7 = 20~70, 지옥 카트 20 × 12 × 2 = 480)
 const ARMOR = { skin: 'E3_wallguard', hp: 10 };      // 장갑체 = 오래 쏴야 하는 잡졸
 const JUMPER = { skin: 'E8_manholejumper' };         // 복병 = 돌격체 그림
 const POD = { skin: 'E9_spawnpod', hp: 14 };         // 생성기 = 고정 저격수(소환은 다음 회차)
@@ -62,17 +62,20 @@ function pair(coverZFor, wallZ0, z, left, right, id) {
   return [{ ...left, z, pairId: id, coverZ: cz }, { ...right, z, pairId: id, coverZ: cz }];
 }
 
+//  코스 버전(r3.21 검수 반영, 2026-09-20): 4~24 전부 +1 — 4·5·13~22 는 1 → 2, 장치 교체로 이미 2 였던 6~12·23·24 는 2 → 3.
+//   r3.21 로 게이트 값·칸 상한·통 n·캡슐/차량 내구·적 체력이 전부 바뀌어 계약서 §7 '배치를 고치면 올린다'를 따른다 — 이사 실기의 옛 판 기록(지옥 24 클리어 등)은
+//   옛 칸에 그대로 남고 새 판 기록은 새 칸에 쌓인다(되돌리려면 이 숫자만 내리면 된다). 각 정의의 'version N, … 기록은 1 칸에 보존' 주석은 장치 교체 회차 기준.
 export function makeCourses({ coverZFor }) {
   const C = {};
   //  4 세 갈래 — 한 행에 세 칸(BG1). 시제품 proto3 를 정식 길이로
-  C[4] = { version: 1, title: '세 갈래', bg: 1, startUnits: 4, startWeapon: 'rifle', length: 8000, eliteZ: 7600,
+  C[4] = { version: 2, title: '세 갈래', bg: 1, startUnits: 4, startWeapon: 'rifle', length: 8000, eliteZ: 7600,
     gates: [g3(1500, -4, 3, -6, { hint: '세 칸: 가운데가 늘 정답은 아닙니다' }), g3(4200, 2, -8, 5), g3(6200, -3, -10, 4, { max: 20 })],
     supplies: [soldier(2500, 150, 4, 8), weapon(3300, 330, 'auto', 12), soldier(5200, 240, 5, 14)],
     walls: [],
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(3600, 'rusher', [160, 320], HOUND), mass(5000, 'grunt', 10, 2), wave(6800, 'shooter', [150, 330])],
     elite: { z: 7600, hp: 160, summon: false } };
   //  5 가림막 — 가려진 것은 쏠 수 없다(BG2)
-  C[5] = { version: 1, title: '가림막', bg: 2, startUnits: 4, startWeapon: 'rifle', length: 8400, eliteZ: 8000,
+  C[5] = { version: 2, title: '가림막', bg: 2, startUnits: 4, startWeapon: 'rifle', length: 8400, eliteZ: 8000,
     gates: [g3(1600, -4, 4, -5, { hint: '가운데 앞 둔덕이 탄을 막습니다. 비스듬히 쏘거나 지나서 쏘세요' }), g3(4000, 3, -9, 2), g2(6400, -12, 6, { max: 20 })],
     supplies: [soldier(2600, 120, 4, 8), soldier(2600, 360, 3, 6), weapon(4900, 240, 'auto', 12)],
     walls: [cover(190, 290, 1220), cover(80, 186, 3620), cover(240, 400, 6020)],
@@ -82,7 +85,7 @@ export function makeCourses({ coverZFor }) {
   //   r3.18 대항 검수 반영: 차량 3대에 armZ(440, 화면 y 200 아래에서만 피격)·내구 6/6/8 → 40/40/48. 봇 실측(2026-09-19, review-fix/sweep.mjs):
   //   무입력(x240 고정)·현재 위치 추종(track)은 셋 다 못 열고, 비행시간만큼 앞을 보는 lead 봇만 dz 217/179/194 에서 연다(보통·지옥 동일) — '갈 자리에 미리 서라'가 실제로 필요해졌다
   const VH = '움직이는 통은 지금 자리가 아니라 갈 자리에 미리 서야 열립니다';
-  C[6] = { version: 2, title: '차선 바꾸기', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
+  C[6] = { version: 3, title: '차선 바꾸기', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
     gates: [g2(1400, 2, -6), g2(4600, -8, 3, { max: 20 }), g3(7000, 5, -12, 3, { max: 24 })],
     supplies: [soldier(2000, 120, 3, 40, { ...mv(120, 360, 4), armZ: true, hint: VH }), soldier(2700, 360, 3, 40, { ...mv(120, 360, 4), armZ: true, hint: '오른쪽에서 출발한 통은 왼쪽으로 먼저 갑니다. 탄이 날아가는 동안 통이 어디까지 가는지 보세요' }),
                weapon(3400, 120, 'scatter', 10), soldier(4000, 330, 4, 48, { ...mv(150, 330, 3), armZ: true, hint: '빠른 통은 앞을 더 많이 봐야 합니다. 통이 되돌아오는 끝점에서 기다리면 쉽습니다' }), soldier(5800, 240, 6, 16)],
@@ -95,7 +98,7 @@ export function makeCourses({ coverZFor }) {
   //   봇 실측(sweep.mjs): x120 고정 봇이 dz 291(y 349, 화면 한가운데)에서 열고, x160 봇은 dz 262, x240 무입력은 못 연다(보통·지옥 동일)
   //   r3.21 B안 재산정: 내구 80 → 24. 양수 칸 상한(value+2)으로 g2 좌 칸이 +24 까지 오르던 성장이 사라져 캡슐 도착 병력이 44명 기관총 → 18명 소총(활성 구간 명중 79 → 38)이 됐다.
   //   봇 실측(probe_arm, 보고서 difficulty-b-20260920): 내구 24 면 x160 이 dz 170·x120 dz 262·aim dz 265 에서 열고(전부 화면 안, armZ 가 '보인 뒤'를 잠근다), x240 무입력은 여전히 못 연다
-  C[7] = { version: 2, title: '갓길의 보상', bg: 3, startUnits: 5, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
+  C[7] = { version: 3, title: '갓길의 보상', bg: 3, startUnits: 5, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
     gates: [g3(1500, -5, 3, -7), g2(3800, 5, -14, { max: 24 }), g3(6600, -6, 6, -8, { max: 20 })],
     supplies: [weapon(2400, 240, 'auto', 12), capsule(4800, 120, 3, 24, { armZ: true, hint: '갓길 끝의 캡슐은 왼쪽 끝까지 붙어야 열립니다. 놓쳐도 실패는 아닙니다' }), soldier(5600, 360, 3, 6)],
     objective: { kind: 'capsule', supplyId: 'c2' },
@@ -107,7 +110,7 @@ export function makeCourses({ coverZFor }) {
   //   본전투(길이 7800·정예 7400·게이트·통·스폰)는 근사 시절 그대로. 표적 4개(y400·y320·y240·y160, 위상 0/.75/.5/.25): 가까운 것은 느리고 값이 작고, 먼 것은 단단하고 값이 크다.
   //   내구 12/16/20/32·재등장 0.5/0.5/0.5/0.8 은 봇 실측(2026-09-19)으로 점수가 병력·무기에 비례하게 잡은 값(내구 6/10/16·재등장 1.5 는 30 처치에서 포화했다).
   //   넷째 표적(dz 320, 140~340)은 검수 반영 — 표적 3개일 때 기관총 50명 이상이면 셋이 동시에 죽어 '맞힐 게 없는' 프레임이 실제로 보였다(캡처 shot-4)
-  C[8] = { version: 2, title: '남은 군단', bg: 1, startUnits: 3, startWeapon: 'rifle', length: 7800, eliteZ: 7400,
+  C[8] = { version: 3, title: '남은 군단', bg: 1, startUnits: 3, startWeapon: 'rifle', length: 7800, eliteZ: 7400,
     gates: [g2(1300, 3, -5), g3(3600, 4, 6, -12, { max: 24 }), g2(5600, -10, -10, { max: 20, hint: '양쪽 다 음수: 쏴서 0 까지 올리거나 병력을 아끼세요' })],
     supplies: [soldier(2200, 150, 5, 10), soldier(2200, 330, 5, 10), weapon(4500, 240, 'auto', 12), soldier(6500, 240, 8, 20)],
     walls: [],
@@ -118,7 +121,7 @@ export function makeCourses({ coverZFor }) {
   //   소환형을 먼저 잡으면 그가 낳은 잡졸은 남는다 = 순서를 고른 결과가 화면에 남는다. version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG2)
   //   r3.18 대항 검수 반영: 체력 합 440 → 1320(200/240 → 600/720, ×3). 근사 시절 값은 무입력 도착 병력(78명 소총 ≈ 156 dps)에 3.5초 만에 전멸해 순서가 보이지 않았다.
   //   봇 실측(sweep.mjs, hp×3): 보통 무입력 11.4초·planBoss 15.6초(포격 7.8 → 소환 15.6), 지옥 planBoss 21.9초·생존 47/65. ×4 부터는 지옥 무입력이 8명까지 준다
-  C[9] = { version: 2, title: '갠트리', bg: 2, startUnits: 5, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
+  C[9] = { version: 3, title: '갠트리', bg: 2, startUnits: 5, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
     gates: [g3(1600, -4, 3, -6), g2(4200, -14, 4, { max: 24 }), g3(7000, 5, -12, -3, { max: 24 })],
     supplies: [...pair(coverZFor, 2400, 2900, soldier(0, 120, 4, 8), weapon(0, 326, 'sniper', 14), 'w1'), soldier(5400, 240, 6, 16), chain(6200, 340, 6, 12, 8)],
     walls: [wall(2400, 3600, { kind: 'soldier', n: 4 }, { kind: 'weapon', weapon: 'sniper' })],
@@ -129,7 +132,7 @@ export function makeCourses({ coverZFor }) {
   //   r3.18 대항 검수 반영: hp 1400 → 2400 + 보호막(BAL3.arena.boss.guard — 첫 착지 충격까지 피격 무효). 1400 은 무입력 도착 병력(76명 중화기 ≈ 380 dps)에
   //   첫 돌진 전(3.1초)에 죽었다. 봇 실측(sweep.mjs, 2400): 보통 무입력 11.5초·충격 2회 뒤 승리(생존 37/76), planBoss 9.6~9.8초·충격 2회(세 난이도 승리).
   //   3200 부터는 보통 무입력도 전멸(충격 4회)
-  C[10] = { version: 2, title: '광장', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
+  C[10] = { version: 3, title: '광장', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
     gates: [g2(1400, 4, -8), g3(4400, -6, 5, -8, { max: 20 }), g2(7200, 6, -16, { max: 30 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3300, 120, 5, 10), soldier(3300, 360, 5, 10), weapon(5600, 240, 'heavy', 18), soldier(8000, 240, 8, 20)],
     walls: [],
@@ -139,7 +142,7 @@ export function makeCourses({ coverZFor }) {
   //  11 사냥터(r3.17 아레나 실제 장치 — 보스 B4 가 5초마다 잡졸 2 를 소환(부대를 양축으로 추격)하고 2.6초마다 돌진·충격(r80, hp −2).
   //   배우는 것 = "피할 수 없는 자리가 생긴다"(범위 + 소환). version 2, 근사 시절 기록은 1 칸에 보존)(BG4)
   //   r3.18 대항 검수 반영: hp 1800 → 2600 + 보호막. 봇 실측(sweep.mjs, 2600): planBoss 보통 10.6초(생존 77/88)·지옥 14.1초·충격 4회(생존 50/65). 무입력은 세 난이도 모두 전멸(충격 dmg 2)
-  C[11] = { version: 2, title: '사냥터', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
+  C[11] = { version: 3, title: '사냥터', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
     gates: [g3(1500, -5, 4, -7), g3(4600, 3, -10, 6, { max: 24 }), g2(7400, -18, 8, { max: 30 })],
     supplies: [soldier(2300, 240, 5, 10), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 5, 10), weapon(0, 326, 'arc', 14), 'w1'), soldier(6000, 150, 6, 16), weapon(6000, 330, 'auto', 12)],
     walls: [wall(3000, 4200, { kind: 'soldier', n: 5 }, { kind: 'weapon', weapon: 'arc' })],
@@ -153,7 +156,7 @@ export function makeCourses({ coverZFor }) {
   //   ⚠️여기서는 무입력도 연다 — 도착 병력(77명 기관총 ≈ 308 dps)이 크고 왕복 폭(150~330)이 좁아 탄 기둥을 못 벗어난다. 240 이상이면 lead 봇도 못 열어(dz 18~✗) '보인 뒤에 열린다'만 잠근다
   //   r3.21 B안 재산정: 내구 128 → 80. 도착 병력 77명 기관총 → 24명(gain 0.7·양수 칸 상한). 봇 실측(probe_arm, 보고서 difficulty-b-20260920): 128 이면 보통 무입력이 dz 37 에서 겨우 열고 지옥 무입력은 못 연다(명중 104).
   //   80 이면 보통 무입력·지옥 무입력·lead 전부 화면 안에서 연다 — '무입력도 연다'(AG-3 S12 center 보통·지옥)를 유지
-  C[12] = { version: 2, title: '관문', bg: 5, startUnits: 5, startWeapon: 'rifle', length: 10400, eliteZ: 10000,
+  C[12] = { version: 3, title: '관문', bg: 5, startUnits: 5, startWeapon: 'rifle', length: 10400, eliteZ: 10000,
     gates: [g3(1500, -4, 3, -6), g2(3300, 4, -10, { max: 20 }), g3(6200, -8, 6, -10, { max: 24 }), g2(8600, 8, -20, { max: 30 })],
     supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 4000, 4600, soldier(0, 120, 5, 12), weapon(0, 326, 'heavy', 18), 'w1'),
                soldier(7200, 150, 8, 80, { ...mv(150, 330, 3), armZ: true, hint: '정예 앞의 큰 통은 좌우로 달립니다. 통이 되돌아오는 자리에 미리 서세요' }),
@@ -164,65 +167,65 @@ export function makeCourses({ coverZFor }) {
     spawns: [wave(2000, 'grunt', [120, 240, 360]), wave(3900, 'rusher', [200, 280], HOUND), wave(5300, 'grunt', [95, 137, 179, 221], { corridorHw: 61 }), wave(5300, 'shooter', [300, 370]), mass(6800, 'grunt', 14, 2), wave(9200, 'shooter', [120, 240, 360]), mass(9500, 'grunt', 10, 2)],
     elite: { z: 10000, hp: 560, summon: true } };
   //  13~14 장갑체(E3): 오래 쏴야 하는 적(BG4)
-  C[13] = { version: 1, title: '장갑체', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
+  C[13] = { version: 2, title: '장갑체', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
     gates: [g2(1400, 3, -6), g3(4300, -6, 5, -8, { max: 20 }), g2(6800, -12, 6, { max: 24 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 150, 5, 10), soldier(5400, 330, 6, 16)],
     walls: [],
     spawns: [wave(1900, 'grunt', [200, 280], ARMOR), wave(3000, 'grunt', [120, 240, 360]), wave(4900, 'grunt', [160, 320], ARMOR), mass(6000, 'grunt', 10, 2), wave(7400, 'grunt', [120, 240, 360], ARMOR)],
     elite: { z: 8200, hp: 400, summon: false } };
-  C[14] = { version: 1, title: '철벽', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 9200, eliteZ: 8800,
+  C[14] = { version: 2, title: '철벽', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 9200, eliteZ: 8800,
     gates: [g3(1500, -5, 3, -7), g2(4400, 5, -14, { max: 24 }), g3(7000, -8, 7, -10, { max: 24 })],
     supplies: [weapon(2300, 240, 'heavy', 18), soldier(3500, 120, 5, 10), soldier(3500, 360, 5, 10), soldier(5800, 240, 7, 18)],
     walls: [cover(190, 290, 1220)],
     spawns: [wave(2000, 'grunt', [140, 340], ARMOR), wave(3100, 'rusher', [200, 280], HOUND), wave(5000, 'grunt', [120, 240, 360], ARMOR), mass(6400, 'grunt', 12, 2), wave(7800, 'grunt', [100, 180, 300, 380], ARMOR)],
     elite: { z: 8800, hp: 460, summon: false } };
   //  15~16 복병(E8): 차선을 넘나드는 돌격체(BG4)
-  C[15] = { version: 1, title: '복병', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
+  C[15] = { version: 2, title: '복병', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
     gates: [g2(1400, 2, -7), g3(4200, 4, -10, 6, { max: 20 }), g2(6800, -14, 8, { max: 24 })],
     supplies: [soldier(2200, 150, 5, 10), weapon(3300, 330, 'scatter', 10), soldier(5400, 240, 6, 16)],
     walls: [],
     spawns: [wave(1900, 'rusher', [120, 360], JUMPER), wave(3000, 'grunt', [140, 240, 340]), wave(4800, 'rusher', [100, 200, 280, 380], JUMPER), mass(6000, 'grunt', 10, 2), wave(7400, 'rusher', [160, 240, 320], JUMPER)],
     elite: { z: 8400, hp: 440, summon: false } };
-  C[16] = { version: 1, title: '맨홀 거리', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
+  C[16] = { version: 2, title: '맨홀 거리', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
     gates: [g3(1500, -4, 4, -6), g2(4500, -12, 5, { max: 24 }), g3(7200, 6, -14, 8, { max: 30 })],
     supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 3200, 3700, soldier(0, 120, 6, 14), weapon(0, 326, 'heavy', 18), 'w1'), soldier(6000, 240, 8, 20)],
     walls: [wall(3200, 4400, { kind: 'soldier', n: 6 }, { kind: 'weapon', weapon: 'heavy' })],
     spawns: [wave(2000, 'rusher', [140, 340], JUMPER), wave(5100, 'rusher', [95, 137, 179, 221], { corridorHw: 61, ...JUMPER }), wave(5100, 'shooter', [300, 370]), mass(6600, 'grunt', 14, 2), wave(8000, 'rusher', [120, 240, 360], JUMPER)],
     elite: { z: 9000, hp: 500, summon: true } };
   //  17~18 생성기(E9): 처리 우선순위(BG4)
-  C[17] = { version: 1, title: '생성기', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
+  C[17] = { version: 2, title: '생성기', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
     gates: [g2(1400, 3, -8), g3(4300, -6, 6, -8, { max: 24 }), g2(6900, 8, -18, { max: 30 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 150, 6, 14), soldier(5500, 330, 7, 18)],
     walls: [],
     spawns: [wave(1900, 'shooter', [240], POD), wave(2600, 'grunt', [120, 200, 280, 360]), wave(4900, 'shooter', [150, 330], POD), mass(5800, 'grunt', 12, 2), wave(7500, 'shooter', [120, 240, 360], POD)],
     elite: { z: 8600, hp: 480, summon: true } };
-  C[18] = { version: 1, title: '포드 밭', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
+  C[18] = { version: 2, title: '포드 밭', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
     gates: [g3(1500, -5, 4, -7), g2(4400, -14, 6, { max: 24 }), g3(7200, 6, -16, 8, { max: 30 })],
     supplies: [soldier(2300, 120, 5, 10), soldier(2300, 360, 5, 10), weapon(3600, 240, 'arc', 14), soldier(6000, 240, 8, 20)],
     walls: [cover(80, 186, 4020), cover(293, 400, 4020)],
     spawns: [wave(2000, 'shooter', [160, 320], POD), wave(3100, 'grunt', [140, 240, 340]), wave(5000, 'shooter', [120, 240, 360], POD), mass(6600, 'grunt', 16, 2), wave(8000, 'rusher', [100, 200, 280, 380], HOUND)],
     elite: { z: 9200, hp: 540, summon: true } };
   //  19~20 방해형(E10)(BG5)
-  C[19] = { version: 1, title: '자석 머리', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9200, eliteZ: 8800,
+  C[19] = { version: 2, title: '자석 머리', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9200, eliteZ: 8800,
     gates: [g2(1400, 4, -8), g3(4300, 5, -12, 7, { max: 24 }), g2(7000, -16, 8, { max: 30 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 150, 6, 14), weapon(5400, 330, 'heavy', 18), soldier(6200, 120, 6, 16)],
     walls: [],
     spawns: [wave(1900, 'shooter', [240], MAGNET), wave(2700, 'grunt', [120, 200, 280, 360]), wave(4900, 'shooter', [150, 330], MAGNET), mass(6000, 'grunt', 14, 2), wave(7700, 'shooter', [120, 240, 360], MAGNET)],
     elite: { z: 8800, hp: 520, summon: false } };
-  C[20] = { version: 1, title: '간섭 지대', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
+  C[20] = { version: 2, title: '간섭 지대', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
     gates: [g3(1500, -5, 5, -7), g2(4500, -14, 7, { max: 30 }), g3(7300, 8, -18, 10, { max: 30 })],
     supplies: [...pair(coverZFor, 2200, 2700, soldier(0, 120, 6, 14), weapon(0, 326, 'sniper', 14), 'w1'), soldier(5600, 240, 8, 20), weapon(6400, 240, 'auto', 12)],
     walls: [wall(2200, 3400, { kind: 'soldier', n: 6 }, { kind: 'weapon', weapon: 'sniper' })],
     spawns: [wave(4100, 'shooter', [95, 137, 179, 221], { corridorHw: 61, ...MAGNET }), wave(4100, 'grunt', [300, 370]), mass(5200, 'grunt', 12, 2), wave(6900, 'shooter', [160, 320], MAGNET), mass(8200, 'grunt', 16, 2)],
     elite: { z: 9400, hp: 600, summon: true } };
   //  21~22 카트야드(E7): 굼뜬 장갑 목표(BG5)
-  C[21] = { version: 1, title: '카트야드', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
+  C[21] = { version: 2, title: '카트야드', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
     gates: [g2(1400, 3, -9), g3(4400, -8, 6, -10, { max: 24 }), g2(7100, 8, -20, { max: 30 })],
     supplies: [weapon(2200, 240, 'heavy', 18), soldier(3500, 150, 6, 14), soldier(3500, 330, 6, 14), soldier(5800, 240, 8, 20)],
     walls: [cover(190, 290, 4020)],
     spawns: [wave(1900, 'grunt', [240], CART), wave(2800, 'grunt', [120, 200, 280, 360]), wave(5000, 'grunt', [160, 320], CART), mass(6200, 'grunt', 14, 2), wave(7800, 'grunt', [120, 240, 360], CART)],
     elite: { z: 9000, hp: 560, summon: false } };
-  C[22] = { version: 1, title: '고철 행렬', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10000, eliteZ: 9600,
+  C[22] = { version: 2, title: '고철 행렬', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10000, eliteZ: 9600,
     gates: [g3(1500, -6, 5, -8), g2(4600, -16, 8, { max: 30 }), g3(7500, 8, -20, 10, { max: 36 })],
     supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 3200, 3700, soldier(0, 120, 7, 16), weapon(0, 326, 'arc', 14), 'w1'), soldier(6200, 240, 9, 22), chain(8200, 340, 6, 12, 8)],
     walls: [wall(3200, 4400, { kind: 'soldier', n: 7 }, { kind: 'weapon', weapon: 'arc' })],
@@ -232,7 +235,7 @@ export function makeCourses({ coverZFor }) {
   //   HUD 막대 3칸·'남은 목표 N/3'. version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG5)
   //   r3.18 대항 검수 반영: 체력 합 940 → 5640(260/300/380 → 1560/1800/2280, ×6). 근사 시절 값은 무입력 도착 병력(128명 중화기 ≈ 640 dps)에 1.9초 만에 전멸했다.
   //   봇 실측(sweep.mjs, hp×6): 보통 무입력 10.3초·planBoss 10.2초(포격 4.4 → 소환 9.7 → 장갑 10.2), 지옥 planBoss 11.4초·생존 113/122
-  C[23] = { version: 2, title: '세 정예', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10600, eliteZ: 10200,
+  C[23] = { version: 3, title: '세 정예', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10600, eliteZ: 10200,
     gates: [g2(1400, 4, -10), g3(4400, -8, 8, -10, { max: 30 }), g2(7200, 10, -24, { max: 36 }), g3(9000, -10, 10, -12, { max: 30 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 120, 6, 14), soldier(3400, 360, 6, 14), weapon(5600, 240, 'heavy', 18), soldier(6400, 240, 9, 22), soldier(8000, 150, 6, 16)],
     walls: [cover(190, 290, 4020), cover(80, 186, 8620)],
@@ -242,7 +245,7 @@ export function makeCourses({ coverZFor }) {
   //   마지막 저격수 무리(POD)는 10200 → 9700 으로 당겼다 — 스폰 z ≤ arena.z − 800 불변식(정지된 광장 위에 도로 적이 남지 않게). version 2, 근사 시절 기록은 1 칸에 보존)(BG5)
   //   r3.18 대항 검수 반영: hp 3000 → 4200 + 보호막. 봇 실측(sweep.mjs, 4200): planBoss 보통 12.1초·충격 3회(생존 113/150), 지옥 14.1초·충격 5회(생존 73/142).
   //   5000 은 지옥 생존 51, 6600 은 어려움·지옥 planBoss 전멸 — 사람은 봇보다 못 피하므로 4200 에서 멈춘다
-  C[24] = { version: 2, title: '크라운 브레이커', bg: 5, startUnits: 8, startWeapon: 'rifle', length: 11200, eliteZ: 10800,
+  C[24] = { version: 3, title: '크라운 브레이커', bg: 5, startUnits: 8, startWeapon: 'rifle', length: 11200, eliteZ: 10800,
     gates: [g3(1500, -6, 6, -8), g2(4200, -18, 8, { max: 30 }), g3(6800, 8, -24, 10, { max: 36 }), g2(9200, 12, -30, { max: 40 })],
     supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 8, 18), weapon(0, 326, 'heavy', 18), 'w1'), soldier(5500, 240, 9, 22), chain(7600, 340, 6, 12, 8), soldier(8400, 120, 8, 20), weapon(8400, 360, 'sniper', 14)],
     walls: [wall(3000, 4200, { kind: 'soldier', n: 8 }, { kind: 'weapon', weapon: 'heavy' }), cover(190, 290, 1220), cover(293, 400, 6420)],
@@ -266,7 +269,8 @@ const rnd = (v) => Math.sign(v) * Math.round(Math.abs(v));
 const pos1 = (v) => Math.max(1, rnd(v));
 /** 정의 d 를 제자리에서 배율 g 로 조정한다(makeCourses 는 호출마다 새 객체를 만드므로 제자리 수정이 안전하다).
  *  게이트 칸: 양수 value 는 × g(최소 1), 음수 value 는 그대로, 칸 상한(4번째)·행 상한은 × g(음수 칸 상한도 곱한다 — 0 이상 유지).
- *  통: soldier·capsule n × g(최소 1), chain pads0·maxPads × g(최소 1). 무기 통·내구·좌표·스폰·정예·보너스 표적은 손대지 않는다 */
+ *  통: soldier·capsule n × g(최소 1), chain pads0·maxPads × g(최소 1). 벽 표지(walls[*].signs 의 soldier n)도 같은 식으로 — 표지는 연출이 아니라 계약 데이터라
+ *  화면의 '+N' 과 통 내용이 어긋나면 안 된다(STG-5 가 1~24 전부 대조, r3.21 검수 반영). 무기 통·내구·좌표·스폰·정예·보너스 표적은 손대지 않는다 */
 function applyGain(d, g) {
   if (g === 1) return;
   for (const row of d.gates) {
@@ -280,5 +284,9 @@ function applyGain(d, g) {
   for (const s of d.supplies) {
     if (s.kind === 'soldier' || s.kind === 'capsule') s.n = pos1(s.n * g);
     else if (s.kind === 'chain') { s.pads0 = pos1(s.pads0 * g); s.maxPads = pos1(s.maxPads * g); }
+  }
+  for (const w of d.walls) {
+    if (!w.signs) continue;
+    for (const side of ['L', 'R']) { const sg = w.signs[side]; if (sg && sg.kind === 'soldier') sg.n = pos1(sg.n * g); }
   }
 }

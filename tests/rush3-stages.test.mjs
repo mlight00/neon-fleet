@@ -1,7 +1,7 @@
 // rush3-stages — 스테이지 3개 고정 배치·무기 정의·수치 동결을 잠근다(계약서 5·3-4장, V3-STAGES).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STAGE_IDS, buildStage, stageMeta, stageVersion, coverZFor, VZ_MIN, MAX_DY, lotteryPick } from '../rush3/stages.js';
+import { STAGE_IDS, ALL_STAGE_IDS, buildStage, stageMeta, stageVersion, coverZFor, VZ_MIN, MAX_DY, lotteryPick } from '../rush3/stages.js';
 import { WEAPONS, weaponRank, makeBullet } from '../rush3/weapons.js';
 import { BAL3 } from '../rush3/balance.js';
 
@@ -279,10 +279,11 @@ test('V3-STAGES STG-4: 배제 쌍의 형식(같은 pairId 2개·좌우 1개씩) 
   assert.equal(new Set(buildStage(3).supplies.filter((s) => s.pairId).map((s) => s.pairId)).size, 2);
 });
 
-test('V3-STAGES STG-5: 통로 안내 표지가 그 벽 구간 안 좌/우 통의 실제 내용과 같다', () => {
-  for (const id of STAGE_IDS) {
+test('V3-STAGES STG-5: 통로 안내 표지가 그 벽 구간 안 좌/우 통의 실제 내용과 같다 — 1~24 전부(r3.21 검수 반영: gain 후처리가 표지 n 도 줄인다)', () => {
+  for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id);
     for (const w of st.walls) {
+      if (w.kind === 'cover') { assert.equal(w.signs, undefined, 'S' + id + ' ' + w.id + ' 차폐물엔 표지가 없다'); continue; }
       assert.ok(w.signs, 'S' + id + ' ' + w.id + ' 표지 없음');
       for (const side of ['L', 'R']) {
         const sg = w.signs[side];
