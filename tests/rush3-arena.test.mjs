@@ -13,6 +13,9 @@ import { formationHalfWidth, SQUAD_DEFAULTS } from '../rush3/squad.js';
 import { createInput, isSteerKey } from '../rush3/input.js';
 import { createRenderer3 } from '../rush3/render.js';
 import { boot, ARENA_GUIDE_TEXT } from '../rush3/main.js';
+import { projectorFor } from '../rush3/project.js';
+//  r3.20 검수 반영(2026-09-20): 셸의 세로 드래그(dragDy)도 부대 줄 기울기 near 로 나눈다 — 화면 −100 논리 px = −100/1.45 트랙 px
+const NEAR = projectorFor('standard').near;
 import { createSave3 } from '../rush3/save.js';
 import { pickX, pickInput, botArena } from './lib/rush3-policies.mjs';
 
@@ -573,13 +576,13 @@ test('V3-ARENA A-13: 셸 — 진입 프레임에 배너·열림 연출·lotWarn/
   assert.ok(audio.played.includes('elite') && audio.bgm.some((b) => b.includes('boss')), '정예 등장 결선 재사용');
   shown.length = 0; frames(1);
   assert.ok(shown.includes(ARENA_GUIDE_TEXT[0]) && shown.includes('아레나 전투!'), shown.filter((s) => s.includes('드래그') || s.includes('전투')).join('|'));
-  //  마우스 세로 이동(캔버스 CSS 240×400 = 논리 절반): 첫 이동은 기준만 잡고, 둘째 이동 −50 CSS = −100 논리 → 다음 STEP 에 ay < 0
+  //  마우스 세로 이동(캔버스 CSS 240×400 = 논리 절반): 첫 이동은 기준만 잡고, 둘째 이동 −50 CSS = −100 화면 논리 px = −100/near 트랙 px → 다음 STEP 에 ay < 0
   app.input.state.pointerX = 240;
   canvas.fire('pointermove', { clientX: 120, clientY: 300, pointerType: 'mouse', pointerId: 1 });
   canvas.fire('pointermove', { clientX: 120, clientY: 250, pointerType: 'mouse', pointerId: 1 });
-  assert.equal(app.input.state.dragDy, -100);
+  assert.ok(Math.abs(app.input.state.dragDy - (-100 / NEAR)) < 1e-9, 'dragDy ' + app.input.state.dragDy);
   frames(1);
-  assert.ok(run().ay < 0 && run().tay === -100, 'ay ' + run().ay + ' tay ' + run().tay);
+  assert.ok(run().ay < 0 && Math.abs(run().tay - (-100 / NEAR)) < 1e-9, 'ay ' + run().ay + ' tay ' + run().tay);
   assert.equal(typeof dbg().ay, 'number'); assert.ok(['chase', 'warn', 'dash', 'recover'].includes(dbg().bossState));
   //  예고·돌진 효과음
   audio.played.length = 0;
@@ -611,12 +614,12 @@ test('V3-ARENA A-14: 셸 — 정지 중 pointermove 누적 → 재개 후 tay �
   let n = 0;
   while (!dbg().arena && n < 9000) { app.input.state.pointerX = pickX('planBoss', run()); frames(1); n++; }
   assert.equal(dbg().arena, true, '광장 진입');
-  //  마우스로 위쪽으로 옮겨 둔다(첫 이동 기준 → 둘째 이동 −100 논리)
+  //  마우스로 위쪽으로 옮겨 둔다(첫 이동 기준 → 둘째 이동 −100 화면 논리 = −100/near 트랙)
   canvas.fire('pointermove', { clientX: 120, clientY: 300, pointerType: 'mouse', pointerId: 1 });
   canvas.fire('pointermove', { clientX: 120, clientY: 250, pointerType: 'mouse', pointerId: 1 });
   frames(1);
   const tay0 = run().tay;
-  assert.equal(tay0, -100);
+  assert.ok(Math.abs(tay0 - (-100 / NEAR)) < 1e-9, 'tay0 ' + tay0);
   //  ⏸ 정지(HUD 버튼 자리 클릭과 같은 경로) → 정지 중 마우스가 ⏸(y34) → [계속하기](y428) 로 크게 이동(CSS 절반 크기라 clientY 17 → 214)
   app.pause();
   assert.equal(app.getState(), 'paused');
@@ -630,13 +633,13 @@ test('V3-ARENA A-14: 셸 — 정지 중 pointermove 누적 → 재개 후 tay �
   assert.equal(app.getState(), 'run');
   frames(3);
   assert.equal(run().tay, tay0, '재개 뒤 tay 불변(' + run().tay + ')');
-  //  재개 뒤: 첫 이동은 기준만(0), 둘째 이동 +50 CSS = +100 논리 → tay 0
+  //  재개 뒤: 첫 이동은 기준만(0), 둘째 이동 +50 CSS = +100 화면 논리 = +100/near 트랙 → tay 0
   canvas.fire('pointermove', { clientX: 120, clientY: 200, pointerType: 'mouse', pointerId: 1 });
   frames(1);
   assert.equal(run().tay, tay0, '첫 이동은 기준만');
   canvas.fire('pointermove', { clientX: 120, clientY: 250, pointerType: 'mouse', pointerId: 1 });
   frames(1);
-  assert.equal(run().tay, tay0 + 100);
+  assert.ok(Math.abs(run().tay - (tay0 + 100 / NEAR)) < 1e-9, 'tay ' + run().tay);
   //  ESC 재개 경로도 같다(keydown Escape → pause, 이동, Escape → resume)
   win.fire('keydown', { code: 'Escape' });
   assert.equal(app.getState(), 'paused');

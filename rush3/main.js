@@ -267,7 +267,8 @@ export function boot(canvas, deps = {}) {
   function setZoom(on) { zoom = !!on; save.patch({ zoom }); return zoom; }
   const zoomButton = () => ({ id: 'zoom', ...ZOOM.chip, label: zoom ? ZOOM.label.on : ZOOM.label.off, small: true, primary: zoom });
   //  개발 대조용 평면 변환(계획서 §4-6 "같은 스테이지를 두 방식으로 그리는 비교"): rush3.html?flat=1 → 종전 y = LINE_Y − d 로 그린다
-  const flat = (() => { try { return !!(win && win.location && new URLSearchParams(win.location.search).get('flat')); } catch { return false; } })();
+  //   판정은 값 '1' 만(검수 반영 2026-09-20: `!!get('flat')` 은 ?flat=0 도 참이었다)
+  const flat = (() => { try { return !!(win && win.location) && new URLSearchParams(win.location.search).get('flat') === '1'; } catch { return false; } })();
   //  이번 프레임의 투영기 — 렌더(그리기)와 셸(연출 좌표·마우스 역투영)이 같은 것을 쓴다(project.js 의 모드별 단일 인스턴스)
   const proj = () => projectorFor(projectorMode({ flat, zoom }));
   const au = deps.audio ?? createAudio3({});
@@ -776,8 +777,12 @@ export function boot(canvas, deps = {}) {
 
   //  앱 전환·창 이탈·포인터 취소: 입력 해제 + 자동 일시정지
   const autoPause = () => { input.reset(); pause(); };
-  //  마우스 절대 위치(pointerX)는 화면 x 다 — 부대 줄(d 0, 배율 near)의 역투영으로 트랙 x 를 구한다(r3.20). 터치·펜 드래그는 상대 이동이라 그대로
-  const trackX = (sx, pointerType) => (pointerType === 'mouse' || pointerType === undefined || pointerType === null) ? proj().unproject(sx) : sx;
+  //  화면 좌표 → 트랙 좌표(r3.20). 마우스 절대 위치(pointerX)는 부대 줄(d 0, 배율 near)의 역투영. 터치·펜 드래그도 같은 역투영을 거친다
+  //   (검수 반영 2026-09-20 — 처음엔 상대 이동이라 그대로 넘겼는데 손가락 100px 에 부대가 화면 145px(가까이 180px) 움직여 손가락과 부대가
+  //   어긋났다. 역투영이 선형이라 이동량이 1/near 로 줄어 손가락 1:1 이 된다). 세로(dragDy, 아레나)도 같은 이유로 부대 줄 기울기 near
+  //   (d 0 에서 dy/dd = s(0))로 나눈다 — 상대 이동만 쓰므로 나누기만으로 충분하다
+  const trackX = (sx) => proj().unproject(sx);
+  const trackY = (sy) => sy / proj().near;
 
   canvas.addEventListener('pointerdown', (e) => {
     au.unlock();
@@ -785,14 +790,14 @@ export function boot(canvas, deps = {}) {
     const [x, y] = toLogical(e);
     if (onPress(x, y)) return;
     //  y(r3.17 아레나 세로 입력)는 뒤에 붙는 선택 인자 — 도로에서는 규칙이 읽지 않는다
-    if (state === 'run') input.onPointerDown(trackX(x, e.pointerType), e.pointerType, e.pointerId, y);
+    if (state === 'run') input.onPointerDown(trackX(x), e.pointerType, e.pointerId, trackY(y));
   });
   //  r3.18 대항 검수 반영: 출격 중(state 'run')에만 넘긴다. 정지 화면에서 ⏸ → [계속하기]로 마우스를 옮긴 만큼 dragDy 가 쌓여
   //   재개 첫 STEP 에 부대가 광장 아래로 튀던 문제(tay −242 → +40). pause() 의 input.reset() 뒤 정지 중 이동은 버리고, 재개 뒤 첫 이동은 lastY 기준만 잡는다
   canvas.addEventListener('pointermove', (e) => {
     if (state !== 'run') return;
     const [x, y] = toLogical(e);
-    input.onPointerMove(trackX(x, e.pointerType), e.pointerType, e.pointerId, y);
+    input.onPointerMove(trackX(x), e.pointerType, e.pointerId, trackY(y));
   });
   if (win) {
     //  pointerId 를 넘겨 드래그 중인 손가락의 up 만 드래그를 끝낸다

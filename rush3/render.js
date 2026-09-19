@@ -144,10 +144,23 @@ export function createRenderer3(ctx, sprites) {
   //  배경 그림·도로를 세로로 나누는 조각 수. 설계는 16이었으나 16이면 조각 사이 가로 배율 차이가 옆 건물 윤곽에 계단으로 보여 32로(캡처 대조 _cmp_strips_16_vs_32.png).
   //   비용 = 조각당 drawImage 1~3(가장자리 메움 포함) — 헤드리스 Chromium 실측 16/32 모두 55~60fps(perspective-20260920/fps_log.txt)
   const BG_STRIPS = 32;
-  //  가장자리 기둥을 뜨는 위치(논리 px, 안쪽으로). ARENA1/2 는 테두리 16px 가 검정이라 0 에서 뜨면 검은 쐐기가 된다(2026-09-20 캡처 실측)
-  const EDGE_IN = 24;
-  //  ARENA 그림의 검은 테두리 폭(논리 px) — 조각을 그릴 때 이만큼 잘라 낸다
+  //  ARENA 그림의 검은 테두리 폭(논리 px) — 조각을 그릴 때 이만큼 잘라 낸다(2026-09-20 캡처 실측: 원근에서 좁아진 조각 안쪽으로 검은 계단선이 들어왔다)
   const ARENA_CROP = 16;
+  //  멀어서 조각이 화면보다 좁을 때(s < 1) 양옆 빈 자리 메우기(검수 반영 2026-09-20): 처음엔 그림 가장자리 8px 기둥을 빈 폭으로 늘렸는데
+  //   위 모서리에서 8배 가까이 늘어나 세로 줄무늬 스미어로 보였다. 지금은 조각과 **같은 배율로 가장자리를 거울상**으로 이어 붙인다
+  //   (scale(−1, 1) 한 블록 안에서 조각마다 drawImage 2회 — 늘림이 없어 스미어가 없고, 이음매의 픽셀이 같아 경계선도 없다). 옆 땅 단색을
+  //   두면 쐐기로 드러나므로 쓰지 않는다. 조각 사이 계단(옆 건물 윤곽)은 조각 수의 문제라 그대로다 — 실기기 관찰 뒤 조정
+  function mirrorEdges(im, ipx, c0, segs) {
+    ctx.save();
+    ctx.scale(-1, 1);
+    for (const g of segs) {
+      if (g.gap <= 0) continue;
+      const ew = (g.gap + 1) / g.sm * ipx;                 // 빈 폭(+1 겹침)을 조각 배율 그대로 덮는 그림 폭
+      ctx.drawImage(im, c0, g.sy, ew, g.sh, -(g.gap + 1), g.dy, g.gap + 1, g.dh);
+      ctx.drawImage(im, im.width - c0 - ew, g.sy, ew, g.sh, -W, g.dy, g.gap + 1, g.dh);
+    }
+    ctx.restore();
+  }
 
   //  배경: 옆 땅 + BG 타일(있으면, 세로 16조각·조각마다 가로 배율 s) + 도로(사다리꼴) + 차선(세계 좌표의 대시를 투영) + 도로 경계.
   //  도로와 물체는 같은 속도로 흐른다(세계 고정): 그림 v = (LINE_Y − z) mod h 라 평면에서는 종전 타일 스크롤과 같은 그림이 나온다.
@@ -164,25 +177,24 @@ export function createRenderer3(ctx, sprites) {
     if (im) {
       const h = Math.round(im.height * (W / im.width));   // 타일 한 장의 세계 길이(px)
       const ipp = im.width / W;                            // 논리 px 당 그림 px
+      const segs = [];
       for (let i = 0; i < BG_STRIPS; i++) {
         const ya = (H * i) / BG_STRIPS, yb = (H * (i + 1)) / BG_STRIPS;
         const da = P.dOf(ya), db = P.dOf(yb);              // da > db(위쪽이 멀다)
         const sm = P.s((da + db) / 2);
         //  이 조각이 덮는 세계 구간 [db, da] → 그림 v 구간 [LINE_Y − da − scroll, +(da − db)). 타일 경계를 넘으면 두 번에 나눠 그린다
         let u = ((LINE_Y - da - scroll) % h + h) % h, left = da - db, dy = ya;
-        //  멀어서 조각이 화면보다 좁으면(sm < 1) 양옆 빈 자리는 그림의 가장자리 기둥(원본 EDGE_IN 안쪽 8px)을 늘려 메운다 — 옆 땅 단색이 쐐기로 드러나지 않게
-        const gap = Math.max(0, (W - W * sm) / 2), e0 = EDGE_IN * ipp, ew = 8 * ipp;
+        const gap = Math.max(0, (W - W * sm) / 2);
         while (left > 1e-6) {
           const seg = Math.min(left, h - u);
           const dh = (yb - ya) * seg / (da - db);
-          if (gap > 0) {
-            ctx.drawImage(im, e0, u * ipp, ew, seg * ipp, 0, dy, gap + 1, dh);
-            ctx.drawImage(im, im.width - e0 - ew, u * ipp, ew, seg * ipp, W - gap - 1, dy, gap + 1, dh);
-          }
           ctx.drawImage(im, 0, u * ipp, im.width, seg * ipp, W / 2 - (W / 2) * sm, dy, W * sm, dh);
+          if (gap > 0) segs.push({ sy: u * ipp, sh: seg * ipp, dy, dh, sm, gap });
           u = (u + seg) % h; left -= seg; dy += dh;
         }
       }
+      //  멀어서 화면보다 좁은 조각(sm < 1)의 양옆은 같은 배율의 거울상으로 잇는다(원근일 때만 — flat 은 gap 0)
+      if (segs.length) mirrorEdges(im, ipp, 0, segs);
     }
     //  도로: 화면 위 −10 부터 아래 H+10 까지 BG_STRIPS 등분 점으로 양 가장자리를 잇는 다각형(멀수록 좁아진다 = 사다리꼴)
     const yT = -10, yB = H + 10;
@@ -202,21 +214,18 @@ export function createRenderer3(ctx, sprites) {
     const arenaIm = k > 0 ? get(stageIdx >= 4 ? 'arena2' : 'arena1') : null;
     if (arenaIm) {
       ctx.globalAlpha = k;
+      const ipa = arenaIm.width / W, c0 = ARENA_CROP * ipa;
+      const segs = [];
       for (let i = 0; i < BG_STRIPS; i++) {
         const ya = (H * i) / BG_STRIPS, yb = (H * (i + 1)) / BG_STRIPS;
         const sm = P.s(P.dOf((ya + yb) / 2));
         const sy0 = arenaIm.height * i / BG_STRIPS, sh = arenaIm.height / BG_STRIPS, gap = Math.max(0, (W - W * sm) / 2);
-        const ipa = arenaIm.width / W;
-        //  BG 조각과 같은 규칙: 화면보다 좁은 조각의 양옆은 가장자리 기둥을 늘려 메운다(검은 쐐기 방지)
-        if (gap > 0) {
-          const e0 = EDGE_IN * ipa, ew = 8 * ipa;
-          ctx.drawImage(arenaIm, e0, sy0, ew, sh, 0, ya, gap + 1, yb - ya);
-          ctx.drawImage(arenaIm, arenaIm.width - e0 - ew, sy0, ew, sh, W - gap - 1, ya, gap + 1, yb - ya);
-        }
         //  그림 자체의 검은 테두리(16px)는 잘라 낸다 — 평면에선 화면 밖이지만 원근에선 좁아진 조각 안쪽으로 들어와 검은 계단선이 된다(2026-09-20 캡처 실측)
-        const c0 = ARENA_CROP * ipa;
         ctx.drawImage(arenaIm, c0, sy0, arenaIm.width - 2 * c0, sh, W / 2 - (W / 2) * sm, ya, W * sm, yb - ya);
+        if (gap > 0) segs.push({ sy: sy0, sh, dy: ya, dh: yb - ya, sm, gap });
       }
+      //  BG 조각과 같은 규칙: 화면보다 좁은 조각의 양옆은 같은 배율의 거울상(테두리 크롭 안쪽부터)
+      if (segs.length) mirrorEdges(arenaIm, ipa, c0, segs);
       ctx.globalAlpha = 1;
     }
     if (k > 0 && !arenaIm) {
@@ -296,10 +305,12 @@ export function createRenderer3(ctx, sprites) {
       for (let d = df - 12; d > dn; d -= 36) { const a = pj(w.x0 + 3, d), b = pj(w.x1 - 3, d); ctx.fillRect(a.x, a.y, b.x - a.x, 6 * a.s); }
       //  통로 안내 표지: 벽 앞머리(z0)에 좌·우 통로 내용물. 확정선(z0-60)까지 700px = 3.7초의 판단 시간을 준다
       if (w.signs) {
+        //   화면 위 끝에서 들어올 때 HUD 줄에 가려지지 않게 표지 상자 위 변을 HUD 아래(TIP_MIN_Y)로 클램프한다(gateTip·목표 표지와 같은 규칙,
+        //   검수 반영 2026-09-20 — 원근에선 y ≈ 3 까지 올라가 '+3·기관총' 이 HUD 제목에 가려졌고 완독 시점이 0.25초 늦었다)
         if (!offscreen(d0, 40)) {
           const sl = pj((ROAD0 + w.x0) / 2, d0), sr = pj((w.x1 + ROAD1) / 2, d0);
-          drawSign(w.signs.L, sl.x, sl.y + 26 * sl.s, sl.s);
-          drawSign(w.signs.R, sr.x, sr.y + 26 * sr.s, sr.s);
+          drawSign(w.signs.L, sl.x, Math.max(TIP_MIN_Y + 20 * sl.s, sl.y + 26 * sl.s), sl.s);
+          drawSign(w.signs.R, sr.x, Math.max(TIP_MIN_Y + 20 * sr.s, sr.y + 26 * sr.s), sr.s);
         }
         //  통로 확정선(여기서 통로가 정해진다) — 벽과 같은 회색 실선
         const dc = d0 - BAL3.squad.wallLead;
@@ -926,7 +937,7 @@ export function createRenderer3(ctx, sprites) {
   }
 
   //  부대: 실제 units 배열 — 히어로(units[0], M01) + 병사(SOLDIER). 그림자·행진 바운스·발밑 병력 수·중심 마커
-  //   원근(r3.20): 병사마다 부대 중심 + (dx, dz) 로 각각 투영한다 — 앞줄(d 큰 쪽)은 작게, 뒷줄은 크게(s 상한 1.9). 아레나 ay 는 d 오프셋(−ay)
+  //   원근(r3.20): 병사마다 부대 중심 + (dx, dz) 로 각각 투영한다 — 앞줄(d 큰 쪽)은 작게, 뒷줄은 크게(s 상한 1.5 — 검수 반영 2026-09-20, 처음 1.9). 아레나 ay 는 d 오프셋(−ay)
   //   발밑 숫자는 H − 14 로 클램프(뒷줄이 아래로 내려갔을 때)
   function drawSquad(run, fx, now) {
     const S = BAL3.squad;

@@ -7,7 +7,8 @@
 //   화면 y y(d) = LINE_Y − near·D·ln(1 + d / D)              배율의 적분 — 물체 간 간격이 배율과 같이 줄어 자연스럽다
 //   화면 x x'   = 240 + (x − 240)·s(d)                        가운데로 모인다(도로가 사다리꼴)
 //   D    = depth / (near / far − 1)                          far = 화면 위 끝(d = depth)에서의 배율에서 역산
-//  뒤쪽(d < 0, 부대 뒤 대형·시체)은 같은 식으로 확장하되 s 상한 sMax(1.9). 상한에 닿은 뒤로는 y 도 그 배율로 직선(적분 일관).
+//  뒤쪽(d < 0, 부대 뒤 대형·시체)은 같은 식으로 확장하되 s 상한 sMax(1.5 — 검수 반영 2026-09-20, 처음엔 1.9: 150명 부대의 뒷줄이 1.88배로
+//   화면 아래를 덮어 발밑 숫자와 겹쳤다. 모드의 near 가 더 크면 near 가 상한 — 가까이 1.8). 상한에 닿은 뒤로는 y 도 그 배율로 직선(적분 일관).
 //  평면(flat: near === far)은 종전 변환과 항등 — 검사·캡처 대조용(개발 주소 ?flat=1).
 import { BAL3 } from './balance.js';
 
@@ -18,14 +19,16 @@ export const PERSPECTIVE = Object.freeze({
   standard: Object.freeze({ near: 1.45, far: 0.72, depth: 700 }),
   close:    Object.freeze({ near: 1.8,  far: 0.6,  depth: 700 }),
   flat:     Object.freeze({ near: 1,    far: 1,    depth: 700 }),
-  sMax: 1.9,
+  sMax: 1.5,
   //  가독성 하한(01 §11 "멀리 있는 물체도 선택에 필요한 큰 실루엣·숫자"): 게이트 값·통 내구·표지 글 최소 15px, 게이트 칸 높이 최소 18px
   minFont: 15, minGateH: 18,
 });
 
-export function makeProjector({ near, far, depth, sMax = PERSPECTIVE.sMax, lineY = LINE_Y, cx = CX } = PERSPECTIVE.standard) {
+export function makeProjector({ near, far, depth, sMax: sMaxIn = PERSPECTIVE.sMax, lineY = LINE_Y, cx = CX } = PERSPECTIVE.standard) {
   const flat = near === far;
   const D = flat ? Infinity : depth / (near / far - 1);
+  //  뒤쪽 상한은 near 아래로 내려가지 않는다(가까이 near 1.8 > 1.5): 상한 < near 면 d > 0 에서 걸려 s(0) = near 가 깨진다 → 가까이의 뒤쪽은 near 그대로(자라지 않음)
+  const sMax = Math.max(sMaxIn, near);
   //  s 상한이 걸리는 d(뒤쪽): near / (1 + dCap / D) = sMax → dCap = D·(near / sMax − 1). 그 뒤로 y 는 sMax 기울기의 직선
   const dCap = flat ? -Infinity : D * (near / sMax - 1);
   const yCap = flat ? Infinity : lineY - near * D * Math.log(1 + dCap / D);
@@ -49,7 +52,8 @@ export function makeProjector({ near, far, depth, sMax = PERSPECTIVE.sMax, lineY
     const k = s(d);
     return { x: cx + (x - cx) * k, y: y(d), s: k };
   };
-  //  부대 줄(d 0, s = near)의 역투영: 화면 x → 트랙 x. 마우스 절대 위치(pointerX)가 쓴다
+  //  부대 줄(d 0, s = near)의 역투영: 화면 x → 트랙 x. 마우스 절대 위치(pointerX)와 터치·펜 드래그(검수 반영 2026-09-20 — 선형이라
+  //   이동량도 1/near 로 줄어 손가락과 부대가 1:1 로 붙는다)가 쓴다
   const unproject = (sx, d = 0) => cx + (sx - cx) / s(d);
   return Object.freeze({ near, far, depth, D, flat, sMax, lineY, cx, s, y, dOf, project, unproject });
 }

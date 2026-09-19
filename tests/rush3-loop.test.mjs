@@ -384,9 +384,11 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   canvas.fire('pointerdown', { clientX: 200, clientY: 300, pointerType: 'touch', pointerId: 1 });
   frames(1);
   assert.ok(Math.abs(app.getRun().tx - x0) < 5, '터치 시작만으로 tx 가 튀지 않음: ' + app.getRun().tx);
+  //  r3.20 검수 반영 재기준: 터치 드래그도 부대 줄 역투영(1/near)을 거친다 — 손가락 +30 CSS = +60 화면 논리 px = +60/1.45 ≈ +41.4 트랙 px(손가락과 부대 1:1)
+  const NEAR = projectorFor('standard').near;
   canvas.fire('pointermove', { clientX: 230, clientY: 300, pointerType: 'touch', pointerId: 1 });
   frames(1);
-  assert.ok(app.getRun().tx > x0 + 40, '드래그 +30 CSS px = +60 논리 px 만큼 tx 증가: ' + app.getRun().tx);
+  assert.ok(Math.abs(app.getRun().tx - (x0 + 60 / NEAR)) < 1e-6, '드래그 +30 CSS px = +60 화면 px = +60/near 트랙 px 만큼 tx 증가: ' + app.getRun().tx + ' 기대=' + (x0 + 60 / NEAR));
   //  둘째 손가락 down(멀리)·마우스 move 가 섞여도 tx 는 그대로(실제 결선: e.pointerId·e.pointerType 전달)
   const tx1 = app.getRun().tx;
   canvas.fire('pointerdown', { clientX: 40, clientY: 300, pointerType: 'touch', pointerId: 2 });
@@ -395,10 +397,10 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   frames(1);
   assert.equal(app.getRun().tx, tx1, '둘째 손가락·마우스 이동은 tx 에 반영되지 않는다');
   assert.equal(app.input.state.pointerId, 1);
-  //  첫 손가락 +10 CSS px → tx +20 논리 px(둘째 손가락 위치와의 거리만큼 점프하지 않음)
+  //  첫 손가락 +10 CSS px → tx +20/near 트랙 px(둘째 손가락 위치와의 거리만큼 점프하지 않음)
   canvas.fire('pointermove', { clientX: 240, clientY: 300, pointerType: 'touch', pointerId: 1 });
   frames(1);
-  assert.ok(Math.abs(app.getRun().tx - (tx1 + 20)) < 1e-6, 'tx=' + app.getRun().tx + ' 기대=' + (tx1 + 20));
+  assert.ok(Math.abs(app.getRun().tx - (tx1 + 20 / NEAR)) < 1e-6, 'tx=' + app.getRun().tx + ' 기대=' + (tx1 + 20 / NEAR));
   //  둘째 손가락 up 은 드래그를 끝내지 않고, 첫 손가락 up 이 끝낸다(window pointerup 에 pointerId 전달)
   win.fire('pointerup', { pointerId: 2, pointerType: 'touch' });
   assert.equal(app.input.state.dragging, true);

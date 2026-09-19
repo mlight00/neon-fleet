@@ -64,8 +64,8 @@ test('V3-PROJECT 식: s(0)=near · y(0)=LINE_Y · d 가 커지면 s·y 단조 �
       assert.ok(Math.abs((P.project(CX + 100, d).x - CX) + (P.project(CX - 100, d).x - CX)) < 1e-9);
       //  x 는 배율만큼 모인다
       assert.ok(Math.abs(P.project(80, d).x - (CX + (80 - CX) * s)) < 1e-9);
-      //  s 상한(뒤쪽)
-      assert.ok(s <= PERSPECTIVE.sMax + 1e-12);
+      //  s 상한(뒤쪽) = max(PERSPECTIVE.sMax, near) — 검수 반영 2026-09-20: 1.9 → 1.5, 가까이(near 1.8)는 near 가 상한
+      assert.ok(s <= P.sMax + 1e-12);
     }
     //  위 끝 d 700 이 화면 위 근처(−50~−70): 앞이 보이는 거리는 종전(평면 640 → y 0)과 비슷하다
     const yTop = P.y(700);
@@ -73,7 +73,8 @@ test('V3-PROJECT 식: s(0)=near · y(0)=LINE_Y · d 가 커지면 s·y 단조 �
     //  역함수
     for (const d of [-120, -20, 0, 100, 400, 700]) assert.ok(Math.abs(P.dOf(P.y(d)) - d) < 1e-6, mode + ': dOf(y(d)) = d @' + d);
     //  뒤쪽 확장: s 가 상한에 닿은 뒤로는 상한 그대로, y 는 계속 내려간다(직선)
-    assert.equal(P.s(-600), PERSPECTIVE.sMax);
+    assert.equal(P.sMax, Math.max(PERSPECTIVE.sMax, c.near), mode + ': 뒤쪽 상한 = max(1.5, near)');
+    assert.equal(P.s(-600), P.sMax);
     assert.ok(P.y(-600) > P.y(-300));
   }
   //  표준 vs 가까이: 부대는 더 크고(1.45 → 1.8) 위 끝 배율은 더 작다(0.72 → 0.6) — "앞은 그대로 보이고 부대만 더 크다"
@@ -143,8 +144,13 @@ test('V3-PROJECT 렌더: HUD 글 위치 불변 · 게이트 값 글자 크기 �
   assert.equal(fontPx(dur), PERSPECTIVE.minFont, '내구 숫자는 하한 15px 로 고정');
   const durFlat = drawWith(run2, { flat: true }).find((o) => o.op === 'fillText' && o.args[0] === String(Math.ceil(c1.durability)) && o.fill === BAL3.colors.bulletHeavy);
   assert.equal(fontPx(durFlat), 16, 'flat 에서는 종전 16px');
-  //  ③ 균일 확대(r3.19 의 translate/scale/translate)는 더 이상 쓰지 않는다 — 자물쇠 배지(scale ≤ 1.9)만 남는다
-  for (const ops of [persp, close]) assert.ok(!ops.some((o) => o.op === 'scale' && o.args[0] > PERSPECTIVE.sMax), '균일 확대 변환 없음');
+  //  ③ 균일 확대(r3.19 의 translate/scale/translate — 배경보다 먼저 장면 전체를 감쌌다)는 더 이상 쓰지 않는다: 첫 그리기(배경 fillRect) 앞에 scale 이 없다.
+  //     남은 scale 은 자물쇠 배지 안(save 다음)뿐이다. (재기준 2026-09-20: 종전 'scale ≤ sMax' 는 sMax 1.5 · 가까이 배지 1.4·s 에서 뜻이 안 맞는다)
+  for (const ops of [persp, close]) {
+    const first = ops.findIndex((o) => o.op === 'fillRect');
+    assert.ok(first >= 0 && !ops.slice(0, first).some((o) => o.op === 'scale'), '장면 전체를 감싸는 균일 확대 변환 없음');
+    ops.forEach((o, i) => { if (o.op === 'scale') assert.ok(ops.slice(Math.max(0, i - 2), i).some((q) => q.op === 'save'), 'scale 은 save 안(자물쇠 배지)에서만'); });
+  }
   //  ④ 같은 프레임을 flat/표준/가까이로 그리면 호출 수가 같다(화면 밖 판정이 평면 d 기준이라 같은 물체 집합)
   assert.equal(persp.length, flat.length, 'flat 과 원근의 ops 수');
   assert.equal(close.length, flat.length, 'flat 과 가까이의 ops 수');

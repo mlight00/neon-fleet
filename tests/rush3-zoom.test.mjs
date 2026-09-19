@@ -65,8 +65,10 @@ test('V3-ZOOM 렌더: zoom=true 면 가까이 투영(near 1.8)으로 부대가 �
   const sway = Math.sin(1 * 4.5) * 0.8;
   assert.ok(Math.abs(hOff.x - projectorFor('standard').project(run.x + sway, 0).x) < 1e-9);
   assert.ok(Math.abs(hOn.x - projectorFor('close').project(run.x + sway, 0).x) < 1e-9);
-  //  균일 확대(translate/scale/translate) 변환은 더 이상 없다
-  assert.equal(on.some((o) => o.op === 'scale' && o.args[0] > PERSPECTIVE.sMax), false);
+  //  균일 확대(translate/scale/translate — 배경보다 먼저 장면 전체를 감쌌다) 변환은 더 이상 없다: 첫 그리기(배경 fillRect) 앞에 scale 이 없다
+  //   (재기준 2026-09-20: 종전 'scale ≤ sMax' 는 sMax 1.5 · 가까이의 자물쇠 배지 배율에서 뜻이 안 맞는다)
+  const firstOn = on.findIndex((o) => o.op === 'fillRect');
+  assert.ok(firstOn >= 0 && !on.slice(0, firstOn).some((o) => o.op === 'scale'), '장면 전체를 감싸는 scale 없음');
   //  HUD 제목 위치는 모드와 무관하게 HUD_ROW.left
   for (const ops of [on, off]) {
     const t = ops.find((o) => o.op === 'fillText' && String(o.args[0]).includes('첫 진격'));
