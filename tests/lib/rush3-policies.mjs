@@ -2,6 +2,8 @@
 //  검사 여러 개가 같은 정책 정의를 쓰므로 한 곳에 둔다. 규칙 코드는 건드리지 않는다(읽기 전용 · stepRun 그대로).
 import { createRun, stepRun, drainEvents, STEP } from '../../rush3/combat.js';
 import { buildStage } from '../../rush3/stages.js';
+import { targetX } from '../../rush3/bonus.js';
+import { BAL3 } from '../../rush3/balance.js';
 
 /** 탐욕 봇(aim): 가장 가까운(z 최소) 미획득 통·발판·게이트의 **현재 값이 큰 칸** 차선으로 이동.
  *  ⚠️게이트 칸을 '지금 값'으로 고르므로 상한이 큰 음수 칸(예: −25 → +40)을 절대 고르지 않는다 — POL-8 의 구분 축. */
@@ -42,7 +44,20 @@ export function botPlan(run) {
 /** 보스 조준 봇(planBoss): 정예(run.boss)가 나타나기 전은 계획 봇과 완전히 같고, 나타나면 보스의 현재 x 를 따라간다.
  *  ⚠️조작은 pointerX 하나뿐이라 이동은 실제 STEP 의 이동 속도 제한을 그대로 받는다 — 탄 회피를 최적화한 봇이 아니다.
  *  2차 검수(2026-09-17 §4 Q3)가 시험한 'bossFollow' 변형과 같은 조작이며, 정예전 성공 경로가 존재하는지만 본다. */
+//  r3.15 보너스전: 승리 확정 뒤(run.phase === 'bonus')는 살아 있는 표적 중 부대에 가장 가까운(|t.x − run.x| 최소) 것을 고르고,
+//   탄이 닿을 때(비행시간 dz ÷ (탄 속도 − 전진 속도))의 x 를 targetX 로 미리 계산해 그 자리로 간다(현재 x 를 쫓으면 왕복 표적을 늘 놓친다).
+//   승리·peak·완주 판정은 이미 끝난 뒤라 SD-7~9 에 영향 없음 — 점수 실측(tiers 보정 근거)만 의미 있어진다. 분기 순서 = bonus → 보스 별칭 → plan
 export function botPlanBoss(run) {
+  if (run.phase === 'bonus') {
+    const vz = (BAL3.weapons[run.weapon] ?? BAL3.weapons.rifle).vz;
+    let best = null, bd = Infinity;
+    for (const t of run.bonusTargets || []) {
+      if (!t.alive) continue;
+      const d = Math.abs(t.x - run.x);
+      if (d < bd) { bd = d; best = targetX(t, run.bonus.t + t.dz / Math.max(1, vz - BAL3.scroll)); }
+    }
+    return best ?? run.x;
+  }
   return run.boss ? run.boss.x : botPlan(run);
 }
 

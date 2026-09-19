@@ -120,6 +120,12 @@ export const BAL3 = deepFreeze({
         hint: '랜덤 길의 확정 게이트는 상한이 자기 값이라 쏜 만큼 줄어들지 않습니다' },
     ],
   },
+  // 보너스전(r3.15 · 01 §5-9): 본전투 승리 확정 뒤 sec 초 표적전. tiers = 보상 단계 문턱(점수, 오름차순 — 넘을 때마다 단계 +1),
+  //  targetR = 표적 반지름(px, 탄 반폭을 더해 직격 판정), bannerSec = 시작 배너 '보너스전! N초' 표시 시간.
+  //  tiers 는 봇 실측(2026-09-19, x240 고정 20초, S8 표적 3개)으로 잡았다: 소총 15명 46 · 기관총 15명 83 → 단계 1, 기관총 30명 133 → 2,
+  //   기관총 100명 227 → 3(planBoss 보통 64명 기관총 ≈ 190 = 단계 2). '단계 1 은 보통 병력이면 닿고 단계 3 은 병력을 많이 살린 판만'
+  //  respawn = 표적 파괴 뒤 재등장까지 기본 초(정의가 안 적으면). 짧을수록 화력이 점수로 더 직접 이어진다(봇 실측 2026-09-19: 1.5 는 점수가 30 처치에서 포화)
+  bonus: { tiers: [30, 100, 200], targetR: 22, respawn: 0.5, bannerSec: 1.5 },
   // 연출 상수(6장 + 기존 값 이식)
   //  gateTipSec   = 셔터 칸 위 짧은 글('가까워지면 열림' · '지금 쏘면 +1') 표시 시간(계약서 6장 N2-③)
   //  shutterGuideSec = 첫 셔터 조우 배너(저장 seenShutter 로 판당 아닌 사용자당 1회) 표시 시간
@@ -139,6 +145,8 @@ export const BAL3 = deepFreeze({
     supplyBody: '#FFE9B8', supplyDark: '#8A6D1F', chainPad: '#35E5FF', wall: '#9AA1AC', wallTop: '#DFE6F5',
     //  구출 캡슐(r3.14): 유리 테·받침 선(capsule) + 유리 반투명 채움(capsuleGlass). 새 그림 없이 도형으로 그린다
     capsule: '#7FE8DC', capsuleGlass: 'rgba(127,232,220,0.38)',
+    //  보너스전 표적(r3.15): 노란 선물 상자(bonusBox) + 붉은 리본(bonusRibbon). 새 그림 없이 도형으로 그린다
+    bonusBox: '#FFD34A', bonusRibbon: '#FF4A6A',
     enemy: { grunt: '#B3402F', rusher: '#3A3A3A', shooter: '#2B2F36', elite: '#2B1420' },
     eshot: '#FF3DA5', eshotCore: '#FF3020', warn: '#C2273B',
     bg: [

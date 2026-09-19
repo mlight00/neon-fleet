@@ -5,6 +5,7 @@ import { WEAPONS, weaponRank, makeBullet, weaponStats, fanAngles, clampMk, MK_MA
 import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm } from './gates.js';
 import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward, moveSupply } from './supply.js';
 import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit } from './squad.js';
+import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.js';
 
 export const STEP = BAL3.STEP;
 
@@ -63,6 +64,10 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
     //  판 목표(r3.14 구출 캡슐): stage.objective 가 있으면 { kind, supplyId, done, missed, n }. done·missed 는 동시에 true 가 되지 않는다.
     //   supply.applySupplyReward(개봉)·passSupply(지나침)만 쓴다. 승패(verdict)는 이 칸을 읽지 않는다 — 놓쳐도 실패가 아니다
     objective: stage.objective ? { kind: stage.objective.kind, supplyId: stage.objective.supplyId, done: false, missed: false, n: 0 } : null,
+    //  단계(r3.15): 'main'(도로 본전투) | 'bonus'(승리 확정 뒤 표적전). 단방향 전이, 종료 플래그는 over 하나뿐.
+    //   bonusDef = stage.bonus { sec, tiers, targets } | null · bonus = { t, sec, score, tier, hits } | null · bonusTargets = 표적 런타임(본전투 중엔 빈 배열)
+    //   mainResult = 본전투 승리 확정 시점의 { wonAt, survivors, peak, kills }(보너스 유무와 무관하게 모든 승리에서 기록 — 기록 저장은 이 값으로)
+    phase: 'main', bonusDef: stage.bonus ?? null, bonus: null, bonusTargets: [], mainResult: null,
     pendingRewards: [],
     time: 0, peak: 0, kills: 0, lossByTouch: 0, lossByShot: 0, lossByGate: 0, missedSupplies: 0, skippedSupplies: 0, badGatesPassed: 0, lastBadGateId: null,
     over: false, won: false, wonAt: null,
@@ -81,9 +86,10 @@ export function drainEvents(run) {
   return ev;
 }
 
-// 4장 11단계를 순서 그대로. over 뒤에는 아무것도 하지 않는다.
+// 4장 11단계를 순서 그대로. over 뒤에는 아무것도 하지 않는다. 보너스 단계(r3.15)는 첫머리 한 곳에서 stepBonus 로 갈라진다
 export function stepRun(run, input, dt = STEP) {
   if (run.over) return run;
+  if (run.phase === 'bonus') return stepBonus(run, input, dt);
   const ev = run.events;
   const inp = input || NO_INPUT;
   steer(run, inp, dt);
@@ -102,6 +108,26 @@ export function stepRun(run, input, dt = STEP) {
   applyRewards(run, ev);
   cleanup(run, ev);
   verdict(run, ev);
+  return run;
+}
+
+/** 보너스 STEP(r3.15): 승리는 이미 확정됐고 피해원이 없다. 조향(1) → 전진·시계(2) → 표적 이동 → 사격(4) → 아군 탄(5, 표적 후보 포함) →
+ *  탄 정리 → 시간 소진이면 over + bonusEnd. 스폰·셔터·적·적탄·접촉·보상·승패는 부르지 않는다(병력 불변 — 보너스 구간엔 게이트·통이 없다는
+ *  스테이지 불변식은 V3-BONUS B-1 이 잠근다). dt 는 STEP 고정 간격이다 */
+function stepBonus(run, input, dt) {
+  const ev = run.events;
+  const inp = input || NO_INPUT;
+  steer(run, inp, dt);
+  run.prevZ = run.z;
+  run.z += BAL3.scroll * dt;
+  run.time += dt;
+  run.bonus.t += dt;
+  moveTargets(run, dt, ev);
+  fireUnits(run, ev, dt);
+  moveBullets(run, ev, dt);
+  const ahead = run.z + LINE_Y + BAL3.cull.bulletAhead;
+  run.bullets = run.bullets.filter((b) => !b.dead && b.z <= ahead);
+  endBonusIfDue(run, ev);
   return run;
 }
 
@@ -229,10 +255,13 @@ function moveBullets(run, ev, dt) {
     for (const e of run.enemies) if (!e.dead && !hitAlready(e.id)) consider(circleContactZ(b, e.x, e.z, e.r + halfW), 3, 3, e, null);
     const bo = run.boss;
     if (bo && !bo.dead && !hitAlready('boss')) consider(circleContactZ(b, bo.x, bo.z, bo.r + halfW), 3, 3, bo, null);
+    //  보너스 표적(r3.15): 적과 같은 층(우선순위 3, 동시엔 적이 앞). 본전투 중엔 bonusTargets 가 빈 배열이라 종전 판정이 한 줄도 바뀌지 않는다
+    for (const t of run.bonusTargets) if (t.alive && !hitAlready(t.id)) consider(circleContactZ(b, t.x, t.z, t.r + halfW), 3, 4, t, null);
     if (kind === 0) { b.dead = true; ev.push({ type: obj.kind === 'cover' ? 'coverHit' : 'wallHit', x: b.x, z: bestZ }); }
     else if (kind === 1) hitSupply(obj, b, ev, run);
     else if (kind === 2) hitGateCell(obj, cell, b, ev);
     else if (kind === 3) hitEnemy(run, obj, b, ev);
+    else if (kind === 4) hitBonusTarget(run, obj, b, ev);
   }
 }
 
@@ -489,12 +518,17 @@ function cleanup(run, ev) {
 }
 
 // 11단계 승패: 승리 우선. 정예 스테이지 = 정예 격파 && 적 없음, 아니면 z >= length && 적 없음. 패배 = 유닛 0
+//  r3.15: 승리는 여기서 **확정**(won·wonAt·mainResult·win 이벤트). over 는 보너스가 없을 때만 여기서 — 있으면 startBonus 로 넘어가고
+//   bonusEnd(시간 소진)가 over 를 세운다. 보너스를 다 못 깼다고 이미 확정한 승리·기록(mainResult)은 되돌리지 않는다
 function verdict(run, ev) {
   const noEnemies = run.enemies.length === 0;
   const win = run.elite ? (run.bossDefeated && noEnemies) : (run.z >= run.length && noEnemies);
   if (win) {
-    run.won = true; run.over = true; run.wonAt = run.time;
+    run.won = true; run.wonAt = run.time;
+    run.mainResult = { wonAt: run.time, survivors: run.units.length, peak: run.peak, kills: run.kills };
     ev.push({ type: 'win', time: run.time, units: run.units.length, x: run.x, z: run.z });
+    if (run.bonusDef) startBonus(run, ev);
+    else run.over = true;
     return;
   }
   if (run.units.length === 0) {

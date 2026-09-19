@@ -50,6 +50,13 @@ export function objectiveLine(run) {
   return o.done ? '구출 성공 · +' + (o.n || 0) + '명' : '구출 실패 — 캡슐을 열지 못했습니다';
 }
 
+/** 결과 화면의 보너스전 한 줄(r3.15). 순수 — result.bonus { score, tier, hits, isBestBonus } 만 읽는다. 보너스가 없던 판은 null.
+ *  승리·기록은 본전투 확정값이고 이 줄은 그 아래 덧붙는 별개 점수다(bestBonus 신기록은 생존 신기록 '신기록!' 과 따로 소자 표기) */
+export function bonusLine(bonus) {
+  if (!bonus) return null;
+  return '보너스 ' + (bonus.score | 0) + '점 · 단계 ' + (bonus.tier | 0) + (bonus.isBestBonus ? ' · 신기록' : '');
+}
+
 /** 쏴도 값이 오르지 않는 행인가 = 모든 칸이 음수이고 상한이 자기 값 이하(확정 손실).
  *  랜덤 길 ⑤ `trapGate`(−10 · 상한 −10)가 여기에 해당한다 — 몇 발을 맞아도 −10 그대로다(gates.js 값 갱신 공식).
  *  ⚠️이런 행에 '지금 쏘면 +1' 을 띄우면 같은 화면에 이미 붙어 있는 '확정' 꼬리표와 정면으로 어긋나,
@@ -123,8 +130,10 @@ function makeFx() {
            lotOpen: 0, lotSeen: false, lotSame: false,
            //  vehicleTipSeen(r3.13) = 이 판에서 차량 통이 처음 화면에 들어온 것을 이미 처리했는가(배너는 저장 seenVehicle 로 사용자당 1회)
            vehicleTipSeen: false,
-           //  objT/objText(r3.14) = 출격 직후 작전 목표 배너(startRun 이 판당 1회 세우고 updateFx 가 줄인다 — 다른 곳은 켜지 않는다)
+           //  objT/objText(r3.14) = 출격 직후 작전 목표 배너(startRun 이 판당 1회 세우고 updateFx 가 줄인다 — 다른 곳은 켜지지 않는다)
            objT: 0, objText: null,
+           //  bonusT/bonusText(r3.15) = 보너스전 시작 배너 '보너스전! N초'(bonusStart 이벤트가 세우고 updateFx 가 줄인다). 슬롯 A(y196)
+           bonusT: 0, bonusText: null,
            //  동작 시트 타이머(6장): heroFire = 사격 시트 남은 초 · heroWalk = 마지막 사격 뒤 걸은 초 · enemyHit = { id: 피격 시트 남은 초 } · corpses = 쓰러진 잡졸
            heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [] };
 }
@@ -371,7 +380,10 @@ export function boot(canvas, deps = {}) {
     const id = run.stageId, ver = run.stageVersion, diff = run.difficulty;
     const cur = save.getStage(id, ver, diff);
     const won = !!run.won;
-    const survivors = run.units.length;
+    //  생존·최고·처치·시간은 **본전투 확정값**(r3.15 run.mainResult — 보너스 구간은 기록에 섞지 않는다). 없으면(패배·옛 run) 종전 run 값
+    const mr = run.mainResult;
+    const survivors = mr ? mr.survivors : run.units.length;
+    const peak = mr ? mr.peak : run.peak, kills = mr ? mr.kills : run.kills;
     const time = won ? run.wonAt ?? run.time : run.time;
     //  best = 성공 판의 최다 생존·최단 시간(각각 독립)
     const isBest = won && survivors > (cur.bestSurvivors || 0);
@@ -382,15 +394,22 @@ export function boot(canvas, deps = {}) {
     }
     //  구출 기록(r3.14): true 일 때만 쓴다(희소 필드 — false 는 절대 쓰지 않는다). 승패와 무관하게 구출했으면 남는다
     if (run.objective && run.objective.done) patch.rescued = true;
+    //  보너스 점수(r3.15): 보너스가 있던 판만(희소 필드 bestBonus, 병합은 max). 신기록 여부는 생존 신기록과 별개
+    const bo = run.bonus;
+    const isBestBonus = !!bo && bo.score > (cur.bestBonus || 0);
+    if (bo) patch.bestBonus = Math.max(cur.bestBonus || 0, bo.score);
     if (!run.devWeapon) save.updateStage(id, patch, ver, diff);
     const o = run.objective;
+    const bonus = bo ? { score: bo.score, tier: bo.tier, hits: bo.hits, isBestBonus } : null;
     result = {
-      stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
+      stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak, time, timeText: timeText(time), kills,
       missedLine: missedLine(run), advice: adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }), isBest, saveOk: save.ok,
       nextId: won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null,
       //  작전 목표(r3.14): 결과 한 줄 + 성공/실패 색 분기용 사본. 목표가 없는 판은 둘 다 null
       objective: o ? { kind: o.kind, done: o.done, missed: o.missed, n: o.n } : null,
       objectiveLine: objectiveLine(run),
+      //  보너스전(r3.15): 점수 사본 + 결과 한 줄 '보너스 N점 · 단계 K'. 보너스가 없던 판은 둘 다 null
+      bonus, bonusLine: bonusLine(bonus),
     };
     state = 'result';
     loop.stop(nowSec());
@@ -503,6 +522,17 @@ export function boot(canvas, deps = {}) {
         case 'elite': fx.eliteT = FX.eliteBannerSec; fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]); break;
         case 'bossKill': spawnBurst(fx, ev.x, sy(ev.z), ev.r, true); fx.shakeT = FX.shakeDur; fx.sfx.push(['win']); break;
         case 'win': break;
+        //  보너스전(r3.15): 시작 배너(슬롯 A) + 합류음 재사용, 보스 BGM 을 스테이지 BGM 으로 되돌린다(승리는 이미 확정 — 결과 화면은 over 로만)
+        case 'bonusStart':
+          fx.bonusT = BAL3.bonus.bannerSec; fx.bonusText = '보너스전! ' + ev.sec + '초';
+          fx.sfx.push(['joinMany']);
+          au.bgmPlay(BGM.stage[Math.max(0, Math.min(2, run.stageId - 1))]);
+          break;
+        case 'bonusTargetHit': fx.sfx.push(['crateHit']); break;
+        case 'bonusHit': spawnBurst(fx, ev.x, sy(ev.z), BAL3.bonus.targetR, false, C.bonusBox); floater(fx, ev.x, sy(ev.z) - 30, '+' + ev.value, C.gold); fx.sfx.push(['crateBreak']); break;
+        case 'bonusTier': floater(fx, run.x, LINE_Y - 130, '보상 단계 ' + ev.tier + '!', C.gold, true); fx.sfx.push(['weaponSwap']); break;
+        case 'bonusEnd': fx.sfx.push(['gateFlip']); break;
+        case 'bonusRespawn': break;
         case 'lose': fx.sfx.push(['lose']); break;
         default: break;
       }
@@ -523,6 +553,7 @@ export function boot(canvas, deps = {}) {
     fx.eliteT = Math.max(0, fx.eliteT - dt);
     fx.shutterT = Math.max(0, fx.shutterT - dt);
     fx.objT = Math.max(0, fx.objT - dt);
+    fx.bonusT = Math.max(0, fx.bonusT - dt);
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
     //  동작 시트 타이머: 사격이 끝나면 걷기 시간을 다시 센다 · 피격은 0 이하 삭제 · 쓰러진 잡졸은 재생+머묾이 끝나면 지운다
     fx.heroFire = Math.max(0, fx.heroFire - dt);
@@ -723,6 +754,11 @@ export function boot(canvas, deps = {}) {
     vehicles: run ? run.supplies.filter((s) => s.move).map((s) => ({ id: s.id, x: Math.round(s.x), moveT: s.moveT, opened: s.opened, missed: s.missed })) : [],
     //  판 목표(r3.14 구출 캡슐) 관찰: { kind, supplyId, done, missed, n } | null
     objective: run ? run.objective : null,
+    //  보너스전(r3.15) 관찰: phase·bonus { t, sec, score, tier, hits }·bossX(봇이 마우스를 보스로 옮기는 데 쓴다)·targets(살아 있는 표적 x)
+    phase: run ? run.phase : null,
+    bonus: run && run.bonus ? { t: Math.round(run.bonus.t * 10) / 10, sec: run.bonus.sec, score: run.bonus.score, tier: run.bonus.tier, hits: run.bonus.hits } : null,
+    bossX: run && run.boss ? Math.round(run.boss.x) : null,
+    targets: run ? run.bonusTargets.filter((t) => t.alive).map((t) => ({ id: t.id, x: Math.round(t.x), hp: t.hp })) : [],
   });
   if (win) win.__rush3Dbg = dbg;
 

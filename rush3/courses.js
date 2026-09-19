@@ -1,6 +1,6 @@
 // rush3/courses.js — 4~24 스테이지 정의(묶음 B-2·B-3, 2026-09-19 1차 배치). 순수 데이터 + 작은 조립 헬퍼, 난수 없음.
 //  1~3 은 stages.DEFS 그대로(코스 버전 2, 기록 보존). 여기 21개는 실게임 구현계획 B-2 설계표·B-3 역할표·C-1~C-3 자산표를 따른다.
-//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 보너스전(8)·복수 정예(9·23)·아레나(10·11·24)는
+//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 복수 정예(9·23)·아레나(10·11·24)는
 //   장치가 아직 없어 **기존 장치로 그 자리의 '배우는 것'을 근사**한다. 13~22 의 새 역할(장갑체·복병·생성기·방해형·카트)은
 //   기존 행동(잡졸·돌격체·저격수)에 **체력·그림(skin)만 바꿔** 근사한다 — 행동 자체는 다음 회차.
 //  공통 규칙: 길이 30~60초(z = 초 × 190) · 게이트 행은 도로 80~400 완전 피복 · 배제 쌍은 coverZ = coverZFor(벽 z0, 통 z) · 초반엔 명확한 성공 경로.
@@ -21,6 +21,13 @@ const capsule = (z, x, n, durability, o = {}) => ({ z, x, kind: 'capsule', n, du
 //  차량 통(r3.13): 통 정의의 마지막 인자 o 에 펼친다 — soldier(2000, 120, 3, 6, { ...mv(120, 360, 4), hint }). x0 < x1(px)·period = 왕복 1회 초.
 //   통의 x 는 x0 또는 x1 이어야 한다(양 끝에서 출발). 속도 2·(x1−x0)/period 가 STEP 당 반지름(30px) 이하(C-4·VEH-10 이 잠근다)
 const mv = (x0, x1, period) => ({ move: { x0, x1, period } });
+//  보너스전(r3.15): 스테이지 정의에 bonus: bonus(sec, [target(...), ...]) 를 둔다 — 본전투 승리가 확정된 뒤 sec 초 동안 표적을 맞혀 점수를 쌓는다.
+//   target(dz, x0, x1, period, hp, value, o) — dz = 부대 앞 고정 거리(px, 탄 정리선 650 미만이어야 닿는다), x0~x1 = 옆으로 왕복(px, 반지름 22 포함 도로 안),
+//   period = 왕복 1회 초, hp = 내구(직격만), value = 파괴 점수, o.phase = 0~1 위상, o.respawn = 재등장까지 초(생략 = BAL3.bonus.respawn).
+//   ⚠️사거리 무기(산탄포 range 420)는 전진 중이라 닿는 거리가 range × (vz − scroll) / vz − 대형 깊이 ≈ 200 px 뿐이다 — 그 무기가 나오는 스테이지는 dz 를 그 안에 둔다
+//   보너스 스테이지 불변식: 게이트·통·스폰 z 가 전부 eliteZ 이하(보너스 구간엔 피해원·보상이 없다 — V3-BONUS B-1 이 잠근다)
+const bonus = (sec, targets, o = {}) => ({ sec, targets, ...o });
+const target = (dz, x0, x1, period, hp, value, o = {}) => ({ dz, x0, x1, period, hp, value, phase: o.phase ?? 0, ...(o.respawn != null ? { respawn: o.respawn } : {}) });
 const wall = (z0, z1, L, R) => ({ z0, z1, signs: { L, R } });
 const cover = (x0, x1, z0) => ({ kind: 'cover', x0, x1, z0, z1: z0 + 40 });
 const wave = (z, kind, xs, o = {}) => ({ z, kind, n: xs.length, xs, corridorHw: null, ...o });
@@ -73,13 +80,17 @@ export function makeCourses({ coverZFor }) {
     walls: [cover(150, 330, 4420)],
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(3200, 'rusher', [200, 280], HOUND), wave(4400, 'shooter', [240]), mass(5900, 'grunt', 14, 2), wave(7400, 'shooter', [120, 240, 360])],
     elite: { z: 8600, hp: 280, summon: false } };
-  //  8 남은 군단(근사: 짧은 본전투 + 큰 병력 보상 뒤 소환형 정예 — 살려 온 병력이 곧 보상)(BG1)
-  C[8] = { version: 1, title: '남은 군단', bg: 1, startUnits: 3, startWeapon: 'rifle', length: 7800, eliteZ: 7400,
+  //  8 남은 군단(r3.15 보너스전 실제 장치 — 짧은 본전투 + 소환형 정예를 깨면 승리가 **그 자리에서 확정**되고, 살려 온 군단으로 20초 표적전.
+  //   더 많은 병사·강한 무기를 살렸을수록 점수가 오른다. version 2, 근사 시절 기록은 1 칸에 보존)(BG1)
+  //   본전투(길이 7800·정예 7400·게이트·통·스폰)는 근사 시절 그대로. 표적 3개: 가까운 것(y400)은 느리고 값이 작고, 먼 것(y160)은 단단하고 값이 크다.
+  //   내구 12/20/32·재등장 0.5/0.5/0.8 은 봇 실측(2026-09-19)으로 점수가 병력·무기에 비례하게 잡은 값(내구 6/10/16·재등장 1.5 는 30 처치에서 포화했다)
+  C[8] = { version: 2, title: '남은 군단', bg: 1, startUnits: 3, startWeapon: 'rifle', length: 7800, eliteZ: 7400,
     gates: [g2(1300, 3, -5), g3(3600, 4, 6, -12, { max: 24 }), g2(5600, -10, -10, { max: 20, hint: '양쪽 다 음수: 쏴서 0 까지 올리거나 병력을 아끼세요' })],
     supplies: [soldier(2200, 150, 5, 10), soldier(2200, 330, 5, 10), weapon(4500, 240, 'auto', 12), soldier(6500, 240, 8, 20)],
     walls: [],
     spawns: [wave(1800, 'grunt', [140, 340]), mass(3000, 'grunt', 10, 2), wave(4200, 'rusher', [120, 240, 360], HOUND), mass(6200, 'grunt', 16, 2)],
-    elite: { z: 7400, hp: 260, summon: true } };
+    elite: { z: 7400, hp: 260, summon: true },
+    bonus: bonus(20, [target(240, 120, 360, 4.0, 12, 2), target(400, 200, 280, 2.2, 20, 3, { phase: 0.5 }), target(480, 105, 375, 6.0, 32, 5, { phase: 0.25, respawn: 0.8 })]) };
   //  9 둘을 동시에(근사: 정예 B2 그림 + 소환 — 복수 정예는 다음 회차)(BG2)
   C[9] = { version: 1, title: '갠트리', bg: 2, startUnits: 5, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
     gates: [g3(1600, -4, 3, -6), g2(4200, -14, 4, { max: 24 }), g3(7000, 5, -12, -3, { max: 24 })],

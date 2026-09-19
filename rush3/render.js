@@ -703,6 +703,32 @@ export function createRenderer3(ctx, sprites) {
     outlinedText(String(Math.max(0, Math.ceil(hp))), x, y, 16, C.bulletHeavy, 'bold', 4);
   }
 
+  //  보너스전 표적(r3.15): 노란 선물 상자(roundRect) + 붉은 리본(세로·가로 띠 + 매듭 원 2개) + 그림자 + 위 '+value' 금색 소자 + 아래 내구 숫자(통과 같은 자리 규약).
+  //   새 그림 없이 도형으로만. 살아 있는 표적만 그린다(파괴된 것은 respawn 뒤 같은 궤적에 다시 나타난다)
+  function drawBonusTargets(run, sy) {
+    const list = run.bonusTargets ?? [];
+    if (!list.length) return;
+    for (const t of list) {
+      if (!t.alive) continue;
+      const y = sy(t.z);
+      if (y < -60 || y > H + 60) continue;
+      const r = t.r;
+      shadow(t.x, y + r * 0.95, r * 0.9);
+      ctx.fillStyle = C.bonusBox;
+      roundRect(t.x - r, y - r * 0.8, r * 2, r * 1.6, 6); ctx.fill();
+      ctx.strokeStyle = C.outline; ctx.lineWidth = 3;
+      roundRect(t.x - r, y - r * 0.8, r * 2, r * 1.6, 6); ctx.stroke();
+      ctx.fillStyle = C.bonusRibbon;
+      ctx.fillRect(t.x - r * 0.18, y - r * 0.8, r * 0.36, r * 1.6);
+      ctx.fillRect(t.x - r, y - r * 0.16, r * 2, r * 0.32);
+      ctx.beginPath(); ctx.arc(t.x - r * 0.32, y - r * 0.92, r * 0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(t.x + r * 0.32, y - r * 0.92, r * 0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.textAlign = 'center';
+      outlinedText('+' + t.value, t.x, y - r * 1.15, 13, C.gold, 'bold', 4);
+      outlinedText(String(Math.max(0, Math.ceil(t.hp))), t.x, y + r + 18, 16, C.bulletHeavy, 'bold', 4);
+    }
+  }
+
   //  정예: 스프라이트(폴백 원) + 발밑 HP 숫자. 막대는 HUD 에서
   function drawBoss(b, sy, now) {
     const y = sy(b.z);
@@ -882,8 +908,15 @@ export function createRenderer3(ctx, sprites) {
     let titleText = full, titleFs = HUD_ROW.titleFs;
     if (!fits(full, titleFs)) { titleFs = HUD_ROW.titleFsSmall; if (!fits(full, titleFs)) titleText = short; }
     outlinedText(titleText, HUD_ROW.left, cy, titleFs, C.hud, '900', 6, titleMaxW);
-    const goal = run.boss ? '정예 전투!' : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
-    outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
+    //  보너스전(r3.15): 목표 줄에 남은 초·점수·단계(금색). 비보너스 경로('정예 전투!'/'작전 완료'/'남은 거리')는 한 줄도 바뀌지 않는다
+    const bo = run.bonus ?? null;
+    if (bo) {
+      const left = Math.max(0, Math.ceil(bo.sec - bo.t));
+      outlinedText('보너스 ' + left + '초 · ' + bo.score + '점 · 단계 ' + bo.tier, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, C.gold, 'bold', 5);
+    } else {
+      const goal = run.boss ? '정예 전투!' : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
+      outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
+    }
     //  무기 칩
     const wb = HUD_ROW.box.weapon;
     const w = WEAPONS[run.weapon] ?? WEAPONS.rifle;
@@ -931,6 +964,19 @@ export function createRenderer3(ctx, sprites) {
       roundRect(90, 76, 300 * Math.max(0, run.boss.hp / run.boss.max), 16, 8); ctx.fill();
       ctx.textAlign = 'center';
       outlinedText('정예 ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
+    }
+    //  보너스전 진행 막대(r3.15): 정예 HP 막대 자리(y 76, 300×16)를 재사용 — 다음 단계 문턱까지 score/next(만렙이면 가득) + 아래 글
+    if (bo && !run.boss) {
+      const tiers = (run.bonusDef && run.bonusDef.tiers) || [];
+      const next = tiers[bo.tier] ?? null;
+      const prev = bo.tier > 0 ? tiers[bo.tier - 1] : 0;
+      const k = next == null ? 1 : Math.max(0, Math.min(1, (bo.score - prev) / Math.max(1, next - prev)));
+      ctx.fillStyle = 'rgba(20,35,58,0.85)';
+      roundRect(90, 76, 300, 16, 8); ctx.fill();
+      ctx.fillStyle = C.gold;
+      roundRect(90, 76, 300 * k, 16, 8); ctx.fill();
+      ctx.textAlign = 'center';
+      outlinedText(next == null ? '최고 단계' : '다음 단계까지 ' + Math.max(0, next - bo.score) + '점', W / 2, 111, 15, C.hud, 'bold', 4);
     }
   }
 
@@ -980,6 +1026,17 @@ export function createRenderer3(ctx, sprites) {
       ctx.font = '900 30px ' + FONT;
       ctx.fillStyle = '#FFFFFF';
       ctx.fillText('정예 접근!', W / 2, 224);
+      ctx.globalAlpha = 1;
+    }
+    //  보너스전 시작 배너(r3.15): 정예 경고와 같은 슬롯 A(y196 h56) 를 금색 띠로 — 시간상 배타(정예 배너는 보스 등장 때 0.8초로 이미 끝났다). fx 새 칸은 ?? 로 관용
+    if ((fx.bonusT ?? 0) > 0 && fx.bonusText) {
+      const k = fx.bonusT / (BAL3.bonus.bannerSec || 1.5);
+      ctx.globalAlpha = Math.min(1, k * 3);
+      ctx.fillStyle = 'rgba(246,200,74,0.9)';
+      ctx.fillRect(0, 196, W, 56);
+      ctx.font = '900 30px ' + FONT;
+      ctx.fillStyle = C.outline;
+      ctx.fillText(fx.bonusText, W / 2, 224);
       ctx.globalAlpha = 1;
     }
     ctx.textBaseline = 'alphabetic';
@@ -1121,6 +1178,13 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillText(r.objectiveLine, W / 2, extraY);
       extraY += 18;
     }
+    //  보너스전 한 줄(r3.15): '보너스 N점 · 단계 K(· 신기록)' 금색 — 추가 줄 순서 랜덤 길 → 목표 → 보너스(y 212 부터 18px 스택)
+    if (r.bonusLine) {
+      ctx.font = 'bold 14px ' + FONT;
+      ctx.fillStyle = C.gold;
+      ctx.fillText(r.bonusLine, W / 2, extraY);
+      extraY += 18;
+    }
     const lines = [
       ['생존 병력', r.survivors + '명'],
       ['최고 병력', r.peak + '명'],
@@ -1227,6 +1291,7 @@ export function createRenderer3(ctx, sprites) {
     for (const row of run.gateRows) if (!hidden(row.id)) drawGateRow(row, sy, fx, run.z);
     for (const s of run.supplies) if (!hidden(s.id)) drawSupply(s, sy, run.z);
     drawLotteryBox(run, sy, mask);
+    drawBonusTargets(run, sy);
     drawCorpses(fx, sy);
     for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, sy, fx);
     if (run.boss && !run.boss.dead) drawBoss(run.boss, sy, now);

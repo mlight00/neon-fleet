@@ -345,6 +345,15 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     bg: d.bg ?? (typeof id === 'number' ? Math.min(3, id) : 1),
     //  판 목표(r3.14 구출 캡슐): 정의의 objective { kind, supplyId } 사본. 없는 스테이지는 null(1~3·PROTO·나머지 코스)
     objective: d.objective ? { kind: d.objective.kind, supplyId: d.objective.supplyId } : null,
+    //  보너스전(r3.15): 정의의 bonus { sec, targets } → { sec, tiers, targets }(전부 사본 — 호출마다 새 객체). 없는 스테이지는 null.
+    //   표적 id 는 't' + 순번(보스 'b'·통 'c'·게이트 'g' 와 접두가 겹치지 않는다 — 저격총 b.hit 목록이 id 를 섞어 담는다).
+    //   tiers 는 정의가 적지 않으면 BAL3.bonus.tiers, respawn 은 BAL3.bonus.respawn, r 은 BAL3.bonus.targetR(규칙 모듈 bonus.js 는 balance 를 모른다)
+    bonus: d.bonus ? {
+      sec: d.bonus.sec,
+      tiers: [...(d.bonus.tiers ?? BAL3.bonus.tiers)],
+      targets: d.bonus.targets.map((t, i) => ({ id: 't' + (i + 1), dz: t.dz, x0: t.x0, x1: t.x1, period: t.period, phase: t.phase ?? 0,
+                                                hp: t.hp, max: t.hp, value: t.value, respawn: t.respawn ?? BAL3.bonus.respawn, r: BAL3.bonus.targetR })),
+    } : null,
   };
   //  빌드 시점 정합성 guard(unknown stage 와 같은 계열의 데이터 오류): 목표가 가리키는 통은 반드시 capsule 이어야 한다
   if (stage.objective && stage.objective.kind === 'capsule'
