@@ -31,12 +31,14 @@ const clampNum = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 //  eliteFireRate → elite shootEvery ÷ 배수. r·vz·가속·예고·소환 등 나머지는 그대로. 정예 hp 는 stage.elite.hp(buildStage 가 eliteHp 배수 적용).
 //  hpMul(r3.21) = 스테이지 구간 배율(stage.enemyHpMul, balance.enemyHpMulFor). hp = round(표 hp × hpMul × enemyHp) — stages.makeSpawn 과 같은 식이라
 //   정예·아레나 보스가 **소환하는 잡졸**(ev.hp 없이 spawnEnemy)도 그 스테이지의 도로 잡졸과 같은 체력이다. 생략 = 1(검사 합성·1~3).
-export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY, hpMul = 1) {
+//  difficultyHp(r3.21 대항 검수 반영) = 난이도 체력 배수 enemyHp 적용 여부(stage.difficultyHp, balance.difficultyHpFor). 1~3 기준 코스는 false → 소환 잡졸도 표 hp 그대로.
+//   생략 = true(검사 합성·4~24). 적탄·접촉·발사/소환 빈도 배수는 이 플래그와 무관하게 걸린다
+export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY, hpMul = 1, difficultyHp = true) {
   const m = difficultyMult(difficulty);
   const out = {};
   for (const [kind, d] of Object.entries(EN)) {
     const e = { ...d };
-    if (d.hp != null) e.hp = Math.round(d.hp * hpMul * m.enemyHp);
+    if (d.hp != null) e.hp = Math.round(d.hp * hpMul * (difficultyHp ? m.enemyHp : 1));
     if (d.touchDmg) e.touchDmg = Math.round(d.touchDmg * m.touchDmg);
     if (d.shot) e.shot = Object.freeze({ ...d.shot, dmg: Math.round(d.shot.dmg * m.eshotDmg) });
     if (kind === 'elite') { e.shootEvery = d.shootEvery / m.eliteFireRate; e.summonEvery = d.summonEvery / (m.eliteSummonRate ?? 1); }
@@ -74,7 +76,7 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
   } : null;
   const run = {
     stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null, bg: stage.bg ?? 1,
-    difficulty: diff, enemyDefs: enemyDefsFor(diff, stage.enemyHpMul ?? 1),
+    difficulty: diff, enemyDefs: enemyDefsFor(diff, stage.enemyHpMul ?? 1, stage.difficultyHp ?? true),
     z: 0, prevZ: 0, x: ROAD.startX, tx: ROAD.startX,
     units: [], nextUnitId: 1,
     weapon, weaponMk,

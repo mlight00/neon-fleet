@@ -1,6 +1,6 @@
 // rush3/stages.js — 기준 전투 3개 고정 배치(계약서 5장). buildStage 는 호출마다 새 객체(구조 공유 금지).
 // 난수는 빌드 시점 좌표 확정용 hashSeed/mulberry32 만(규칙 진행 중 난수 없음).
-import { BAL3, DEFAULT_DIFFICULTY, difficultyMult, enemyHpMulFor } from './balance.js';
+import { BAL3, DEFAULT_DIFFICULTY, difficultyMult, enemyHpMulFor, difficultyHpFor } from './balance.js';
 import { makeCourses, COURSE_IDS } from './courses.js';
 import { WEAPONS } from './weapons.js';
 import { formation } from './squad.js';
@@ -381,18 +381,22 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   const solid = walls.filter((w) => w.kind !== 'cover');
   //  적 체력 스테이지 구간 배율(r3.21): 1~3 ×1 … 19~24 ×12. 스폰 ev.hp 에 박히고, createRun 이 run.enemyDefs(소환 잡졸 hp)에도 같은 값을 곱한다
   const hpMul = enemyHpMulFor(id);
+  //  난이도 체력 배수 적용 여부(r3.21 대항 검수 반영): 1~3 기준 코스(difficultyHp: false)는 enemyHp·eliteHp 를 ×1 로 읽는다 — 세 난이도의 적·정예 체력이
+  //   r3.9 와 같다(hard S2 성공 경로 보존). 빈도(waves·spawnCount)·적탄·접촉 배수는 그대로. stage.difficultyHp 로 createRun 에 흘러 소환 잡졸 hp 도 같은 규칙
+  const diffHp = difficultyHpFor(id);
+  const hpMult = diffHp ? mult : { ...mult, enemyHp: 1, eliteHp: 1 };
   const stage = {
-    id, version: d.version ?? 1, difficulty, enemyHpMul: hpMul,
+    id, version: d.version ?? 1, difficulty, enemyHpMul: hpMul, difficultyHp: diffHp,
     title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ ?? d.arena?.z ?? null,
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
-    spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, mult, hpMul)),
+    spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, hpMult, hpMul)),
     //  정예(r3.16 복수 정예): 정의 `elites: [...]`(1~3체) 또는 단수 `elite`(배열 1개로 정규화). 원소 z 는 정의의 eliteZ(전원 같은 z 에서 함께 등장).
     //   난이도 배수 eliteHp 는 원소마다 반올림 적용(종전과 같은 자리). role/x/patrol 은 정의에 있을 때만 싣는다 — 단수 정의의 원소는
     //   종전 stage.elite 와 **키 집합까지 같은 모양**({ z, hp, summon(, skin) })이라 C-2·C-6·STG·DIFF 의 읽기가 그대로 통과한다.
     //   role 기본값('elite')·차선 기본값(도로 전체)은 combat.createRun 이 해석한다(stage 에 박지 않는다)
-    elites: makeElites(d, mult),
+    elites: makeElites(d, hpMult),
     //  배경 번호(C-3 표). 1~3 은 스테이지 번호와 같다
     bg: d.bg ?? (typeof id === 'number' ? Math.min(3, id) : 1),
     //  판 목표(r3.14 구출 캡슐): 정의의 objective { kind, supplyId } 사본. 없는 스테이지는 null(1~3·PROTO·나머지 코스)

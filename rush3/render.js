@@ -58,6 +58,10 @@ export const ZOOM = Object.freeze({ chip: Object.freeze({ x: 16, y: 84, w: 70, h
 //  탄 그림의 화면 길이(px, Mk I 기준). 무기마다 실루엣이 달라 길이도 다르게: 저격 바늘이 가장 길고 산탄 펠릿 뭉치는 짧고 넓다
 export const BULLET_LEN = Object.freeze({ rifle: 24, auto: 26, heavy: 34, scatter: 22, sniper: 48, arc: 34 });
 //  탄의 진행 방향(라디안, 0 = 화면 위). vx 가 있는 탄(산탄 부채꼴·아레나 자동 조준)은 그 방향으로 그림을 돌린다
+//  체력 숫자를 생략하는 화면 위 띠: HUD 줄(제목·남은 거리·난이도/무기/가까이 칩) 아래 선.
+//  ⚠️원근에서는 그리는 y 가 곧 화면 y 다(균일 확대 변환 없음) — 되돌릴 배율이 없다
+export const HP_TAG_MIN_Y = ZOOM.chip.y + ZOOM.chip.h + 18;
+
 export function bulletAngle(b) {
   const vx = b.vx || 0, vz = b.vz || 1;
   return vx === 0 ? 0 : Math.atan2(vx, vz);
@@ -841,7 +845,13 @@ export function createRenderer3(ctx, sprites) {
     //   자리는 종전 HP 태그 그대로 **적 아래**(투영 x·배율 k, 글자 12px 하한) — 머리 위에 두면 화면 위로 들어오는 동안
     //   HUD 줄(제목·거리·칩)과 겹친다(B안 대항 검수 Important #1). 아래 두기가 그 겹침을 구조적으로 없앤다.
     //   hpMax 가 없는 적(검사 합성)은 hp 로 대신 본다
-    if ((e.hpMax ?? e.hp) > 2) drawHpTag(x, y + r + 16 * k, e.hp, k);
+    //   ⚠️부대를 지나친 적(e.z < run.z — 멈춰 선 저격수 등)은 숫자를 그리지 않는다: 부대 발밑 병력 수 옆에 뜬다(B안 대항 검수 ① 덤)
+    //   ⚠️아래에 두어도 **먼 구간**(표준 dz 491~647 · 가까이 469~646 실측)에서는 숫자가 HUD 띠에 들어온다 → 그 띠에서는 생략한다.
+    //    클램프가 아니라 생략인 이유: 끌어내리면 숫자가 다른 적 그림 위에 얹힌다(B안 대항 검수 ① 처방 그대로, 판정만 투영 y 로 재유도)
+    if ((e.hpMax ?? e.hp) > 2 && e.z >= run.z) {
+      const ty = y + r + 16 * k;
+      if (ty >= HP_TAG_MIN_Y) drawHpTag(x, ty, e.hp, k);
+    }
   }
 
   //  쓰러진 잡졸(셸 fx.corpses — 규칙의 enemies 에는 이미 없다): 사망 시트를 한 번 재생하고 corpseLingerSec 머문 뒤 흐려진다

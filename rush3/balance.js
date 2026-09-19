@@ -131,6 +131,7 @@ export const BAL3 = deepFreeze({
     //  r3.9(2026-09-18 이사 결정 2)는 위협을 **출현 빈도**로만 올렸다(enemyHp·eliteHp 1 고정). → **r3.21(2026-09-20 이사 결정 B안)로 뒤집음**:
     //   이사 실기(지옥, 24까지 조작 없이 클리어) "일반 적 체력이 낮아 한두 방에 다 파괴된다" — 체력 배수를 되살린다(hard 1.5/1.25 · brutal 2/1.5).
     //   빈도 배수(waves·waveGap·spawnCount·eliteSummonRate)와 적탄·접촉 피해 배수는 r3.9 그대로 둔다. 스테이지 구간 배율(enemyHpByStage)은 여기에 곱해진다.
+    //   ⚠️1~3 기준 코스(enemyHpByStage difficultyHp: false)에서는 enemyHp·eliteHp 가 ×1 로 읽힌다(stages.buildStage·combat.createRun) — 대항 검수 반영.
     normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    eliteSummonRate: 1 },
     //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다: hard 2/360·brutal 2/360 만 성공 경로 잠금(SD-7)·정예전 도달(SD-8)·단조성(SD-5)을 전부 지킨다.
     //   brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반). 지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
@@ -141,8 +142,11 @@ export const BAL3 = deepFreeze({
   //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).
   //   정예 hp 는 r3.18 재산정값 그대로(구간 배율 적용 안 함 — 난이도 eliteHp 배수만). 구간은 to(이 번호까지) 오름차순·mul 단조 증가(V3-DIFFB 가 잠근다).
   //   1~3 ×1 은 기준 코스 불변(STAGE_IDS). 번호가 아닌 id(proto3·검사 합성)는 ×1. 출발값은 이사 지시 그대로 — 봇 스윕(보고서 difficulty-b-20260920)에서 조정 여지.
+  //   difficultyHp: false(r3.21 대항 검수 반영) = 그 구간에서는 난이도 체력 배수(enemyHp·eliteHp)도 **×1** — 1~3 기준 코스는 구간 배율 ×1 과 같은 원칙으로
+  //    세 난이도의 적·정예 체력이 r3.9(33568b2)와 완전히 같다(hard S2 의 봇 성공 경로 보존·SD-7 잠금 유지). 이사 소감('한두 방에 파괴')은 지옥 24 스테이지 실기에서 나왔고
+  //    1~3 은 2명 시작 코스라 체력 1.5배가 치명적이었다(hard S2 planBoss 4/17 → 0/10). 빈도·적탄·접촉 배수는 1~3 에서도 그대로 걸린다. 생략 = true(4~24·proto3·합성)
   enemyHpByStage: [
-    { to: 3, mul: 1 }, { to: 8, mul: 2 }, { to: 12, mul: 4 }, { to: 18, mul: 7 }, { to: 24, mul: 12 },
+    { to: 3, mul: 1, difficultyHp: false }, { to: 8, mul: 2 }, { to: 12, mul: 4 }, { to: 18, mul: 7 }, { to: 24, mul: 12 },
   ],
   // 랜덤 길(계약서 3-9 · 2026-09-16 이사 지시 "빈 길이 아니라 랜덤 길"). S3 분리벽 w3 우측 통로에 걸리는 5종 풀.
   //  좋음 3(병사 통·무기 통·연속 증원) : 꽝 2(막을 수 있는 음수 게이트·확정 손실 게이트) 를 균등 1/5 로 뽑는다.
@@ -228,8 +232,15 @@ export function difficultyMult(id) {
 }
 
 // 적 체력 스테이지 배율 조회(r3.21). 숫자 스테이지 번호만 표를 읽고, 그 밖(proto3·검사 합성 id·표 범위 밖 번호)은 1. 데이터 접근만.
+function hpRowFor(stageId) {
+  if (typeof stageId !== 'number' || !Number.isFinite(stageId)) return null;
+  for (const row of BAL3.enemyHpByStage) if (stageId <= row.to) return row;
+  return null;
+}
 export function enemyHpMulFor(stageId) {
-  if (typeof stageId !== 'number' || !Number.isFinite(stageId)) return 1;
-  for (const row of BAL3.enemyHpByStage) if (stageId <= row.to) return row.mul;
-  return 1;
+  return hpRowFor(stageId)?.mul ?? 1;
+}
+// 난이도 체력 배수(enemyHp·eliteHp)를 적용하는 스테이지인가(r3.21 대항 검수 반영). 표의 difficultyHp: false 구간(1~3)만 false, 그 밖은 true. 데이터 접근만.
+export function difficultyHpFor(stageId) {
+  return hpRowFor(stageId)?.difficultyHp !== false;
 }

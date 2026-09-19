@@ -1,16 +1,18 @@
 // rush3-difficulty-b — 난이도 B안(r3.21, 이사 결정 2026-09-20) V3-DIFFB.
 //  ① 적 체력 스테이지 구간 배율(BAL3.enemyHpByStage) 단조 증가 · makeSpawn 이 ev.hp 를 항상 명시 · 소환 잡졸도 같은 배율 · spawnEnemy 가 hpMax 기록
 //  ② 획득 숫자 후처리(gain 0.5 → 1.0) 정수·단조(벽 표지 soldier n 도 — 검수 반영, 대조는 STG-5 가 1~24 전부) · 3칸 행 값 서로 다름 · 음수 칸 max > 양수 칸 max · 부대 상한 100(BAL3 = SQUAD_DEFAULTS)
-//  ③ 봇 실측: planBoss 보통 1~24 완주 · 지옥 무입력 S13 이상 실패 ≥ 70% · 머리 위 체력 숫자 렌더(12px, hpMax > 2 만)
+//  ③ 봇 실측: planBoss 보통 1~24 완주(⚠️4~24 planBoss = 정예 전 무입력) · evLead 보통 4~24 완주(DB-7b, 4~24 성공 경로) · 지옥 무입력 S13 이상 실패 ≥ 70% · 머리 위 체력 숫자 렌더(12px, hpMax > 2 만, HUD 아래·지나간 적 제외)
+//  ④ 대항 검수 반영(2026-09-20): 1~3 기준 코스는 난이도 체력 배수(enemyHp·eliteHp)도 ×1(enemyHpByStage difficultyHp: false) — hard S2 성공 경로(SD-7) 보존
 //  ⚠️봇 결과는 사람의 성공률이 아니다(결정적 1판). 표 전체는 보고서 newmode/v3/research/difficulty-b-20260920/report.md
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BAL3, enemyHpMulFor, difficultyMult } from '../rush3/balance.js';
+import { BAL3, enemyHpMulFor, difficultyHpFor, difficultyMult } from '../rush3/balance.js';
 import { buildStage, ALL_STAGE_IDS, STAGE_IDS, MAX_DY } from '../rush3/stages.js';
 import { COURSE_IDS, gainFor } from '../rush3/courses.js';
 import { createRun, stepRun, drainEvents, enemyDefsFor, STEP } from '../rush3/combat.js';
 import { SQUAD_DEFAULTS, formation } from '../rush3/squad.js';
-import { createRenderer3 } from '../rush3/render.js';
+import { createRenderer3, ZOOM, HUD_ROW, HP_TAG_MIN_Y } from '../rush3/render.js';
+import { projectorFor } from '../rush3/project.js';
 import { playPolicy } from './lib/rush3-policies.mjs';
 
 const DIFFS = ['normal', 'hard', 'brutal'];
@@ -28,7 +30,7 @@ function play(run, sec, x = 240) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-DIFFB DB-1: 구간 배율 표 — to 오름차순·mul 단조 증가·1~3 은 1·24 까지 덮음, enemyHpMulFor 는 표 값(비숫자·범위 밖은 1), 난이도 표 hard 1.5/1.25·brutal 2/1.5', () => {
+test('V3-DIFFB DB-1: 구간 배율 표 — to 오름차순·mul 단조 증가·1~3 은 1(difficultyHp false)·24 까지 덮음, enemyHpMulFor/difficultyHpFor 는 표 값(비숫자·범위 밖은 1/true), 난이도 표 hard 1.5/1.25·brutal 2/1.5', () => {
   const T = BAL3.enemyHpByStage;
   assert.ok(Object.isFrozen(T) && T.length >= 2);
   for (let i = 1; i < T.length; i++) { assert.ok(T[i].to > T[i - 1].to, '구간 오름차순'); assert.ok(T[i].mul > T[i - 1].mul, '배율 단조 증가'); }
@@ -39,10 +41,16 @@ test('V3-DIFFB DB-1: 구간 배율 표 — to 오름차순·mul 단조 증가·1
   for (const id of ALL_STAGE_IDS) assert.equal(enemyHpMulFor(id), want(id), 'S' + id);
   for (const id of STAGE_IDS) assert.equal(enemyHpMulFor(id), 1);
   assert.equal(enemyHpMulFor('proto3'), 1); assert.equal(enemyHpMulFor('d'), 1); assert.equal(enemyHpMulFor(undefined), 1); assert.equal(enemyHpMulFor(999), 1);
+  //  대항 검수 반영: 1~3 구간만 difficultyHp: false(난이도 체력 배수 미적용). 나머지 구간·비숫자·범위 밖은 true
+  assert.equal(T[0].difficultyHp, false);
+  for (let i = 1; i < T.length; i++) assert.notEqual(T[i].difficultyHp, false, '구간 ' + i);
+  for (const id of STAGE_IDS) assert.equal(difficultyHpFor(id), false, 'S' + id);
+  for (const id of COURSE_IDS) assert.equal(difficultyHpFor(id), true, 'S' + id);
+  assert.equal(difficultyHpFor('proto3'), true); assert.equal(difficultyHpFor(undefined), true); assert.equal(difficultyHpFor(999), true);
   assert.deepEqual(DIFFS.map((d) => [difficultyMult(d).enemyHp, difficultyMult(d).eliteHp]), [[1, 1], [1.5, 1.25], [2, 1.5]]);
 });
 
-test('V3-DIFFB DB-2: makeSpawn — 1~24 × 3난이도 모든 스폰의 hp = round((정의 hp ?? 표 hp) × 구간 배율 × enemyHp) 를 항상 명시, stage.enemyHpMul 기록, 정예 hp 는 구간 배율 없이 × eliteHp 만', () => {
+test('V3-DIFFB DB-2: makeSpawn — 1~24 × 3난이도 모든 스폰의 hp = round((정의 hp ?? 표 hp) × 구간 배율 × enemyHp) 를 항상 명시(1~3 은 enemyHp·eliteHp ×1 = 세 난이도 같은 체력), stage.enemyHpMul·difficultyHp 기록, 정예 hp 는 구간 배율 없이 × eliteHp 만', () => {
   for (const id of ALL_STAGE_IDS) {
     const mul = enemyHpMulFor(id);
     const base = buildStage(id);
@@ -50,14 +58,16 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 3난이도 모든 스폰의 hp = roun
       const st = buildStage(id, { difficulty: d });
       const m = difficultyMult(d);
       assert.equal(st.enemyHpMul, mul, `S${id} ${d} enemyHpMul`);
+      assert.equal(st.difficultyHp, id > 3, `S${id} ${d} difficultyHp`);
+      const eh = st.difficultyHp ? m.enemyHp : 1, bh = st.difficultyHp ? m.eliteHp : 1;
       assert.ok(st.spawns.length > 0);
       for (const sp of st.spawns) {
         const defHp = SKIN_HP[sp.skin] ?? BAL3.enemies[sp.kind].hp;
         assert.ok(Number.isInteger(sp.hp) && sp.hp > 0, `S${id} ${d} 스폰 hp 정수`);
-        assert.equal(sp.hp, Math.round(defHp * mul * m.enemyHp), `S${id} ${d} ${sp.kind}${sp.skin ? '(' + sp.skin + ')' : ''} z${sp.z} hp`);
+        assert.equal(sp.hp, Math.round(defHp * mul * eh), `S${id} ${d} ${sp.kind}${sp.skin ? '(' + sp.skin + ')' : ''} z${sp.z} hp`);
       }
-      //  정예: 구간 배율 없음 — normal 값 × eliteHp
-      for (let k = 0; k < st.elites.length; k++) assert.equal(st.elites[k].hp, Math.round(base.elites[k].hp * m.eliteHp), `S${id} ${d} 정예 ${k}`);
+      //  정예: 구간 배율 없음 — normal 값 × eliteHp(1~3 은 ×1)
+      for (let k = 0; k < st.elites.length; k++) assert.equal(st.elites[k].hp, Math.round(base.elites[k].hp * bh), `S${id} ${d} 정예 ${k}`);
     }
     //  같은 스테이지 안에서 난이도 순으로 단조 증가
     for (let k = 0; k < base.spawns.length; k++) {
@@ -74,21 +84,32 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 3난이도 모든 스폰의 hp = roun
     prev = g.hp;
   }
   assert.deepEqual([4, 9, 13, 19].map((id) => buildStage(id).spawns.find((s) => s.kind === 'grunt' && !s.skin).hp), [4, 8, 14, 24]);
+  //  1~3: 세 난이도의 잡졸·정예 체력이 같다(r3.9 = 33568b2 와 동일) · 4 부터 난이도 배수
+  assert.deepEqual(DIFFS.map((d) => buildStage(2, { difficulty: d }).spawns.map((s) => s.hp)), Array(3).fill(buildStage(2).spawns.map((s) => s.hp)));
+  assert.deepEqual(DIFFS.map((d) => buildStage(3, { difficulty: d }).elite.hp), [500, 500, 500]);
+  assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).spawns[0].hp), [4, 6, 8]);
   assert.equal(buildStage(13).spawns.find((s) => s.skin === 'E3_wallguard').hp, 70, '장갑체 10 × 7');
   assert.equal(buildStage(21, { difficulty: 'brutal' }).spawns.find((s) => s.skin === 'E7_cartyard').hp, 480, '카트 20 × 12 × 2');
 });
 
-test('V3-DIFFB DB-3: enemyDefsFor(difficulty, hpMul) — 표 hp × hpMul × enemyHp(반올림), run.enemyDefs 가 stage.enemyHpMul 을 받는다, 정예·아레나 보스 소환 잡졸도 같은 체력, spawnEnemy 가 hpMax 를 기록', () => {
+test('V3-DIFFB DB-3: enemyDefsFor(difficulty, hpMul, difficultyHp) — 표 hp × hpMul × enemyHp(반올림, difficultyHp false 면 enemyHp 대신 1), run.enemyDefs 가 stage.enemyHpMul·difficultyHp 를 받는다, 정예·아레나 보스 소환 잡졸도 같은 체력, spawnEnemy 가 hpMax 를 기록', () => {
   for (const d of DIFFS) for (const mul of [1, 2, 4, 7, 12]) {
     const e = enemyDefsFor(d, mul), m = difficultyMult(d);
     for (const kind of ['grunt', 'rusher', 'shooter']) assert.equal(e[kind].hp, Math.round(BAL3.enemies[kind].hp * mul * m.enemyHp), `${d} ×${mul} ${kind}`);
     assert.equal(e.elite.hp, undefined);
+    //  difficultyHp false: 체력만 배수 없이(적탄·접촉·주기는 그대로 배수)
+    const f = enemyDefsFor(d, mul, false);
+    for (const kind of ['grunt', 'rusher', 'shooter']) assert.equal(f[kind].hp, BAL3.enemies[kind].hp * mul, `${d} ×${mul} ${kind} difficultyHp false`);
+    assert.deepEqual([f.shooter.shot.dmg, f.grunt.touchDmg, f.elite.shootEvery], [e.shooter.shot.dmg, e.grunt.touchDmg, e.elite.shootEvery], d + ' 나머지 배수는 그대로');
   }
   assert.deepEqual(enemyDefsFor('normal', 1), enemyDefsFor('normal'), '생략 = 1');
-  for (const id of [1, 4, 9, 13, 19]) for (const d of DIFFS) {
+  assert.deepEqual(enemyDefsFor('hard', 2, true), enemyDefsFor('hard', 2), '생략 = true');
+  for (const id of [1, 2, 3, 4, 9, 13, 19]) for (const d of DIFFS) {
     const st = buildStage(id, { difficulty: d });
-    assert.deepEqual(createRun(st).enemyDefs, enemyDefsFor(d, st.enemyHpMul), `S${id} ${d} run.enemyDefs`);
+    assert.deepEqual(createRun(st).enemyDefs, enemyDefsFor(d, st.enemyHpMul, st.difficultyHp), `S${id} ${d} run.enemyDefs`);
   }
+  //  1~3(S3 정예 소환): run.enemyDefs 의 잡졸 hp 가 세 난이도에서 2 = r3.9 와 같다
+  for (const d of DIFFS) assert.equal(createRun(buildStage(3, { difficulty: d })).enemyDefs.grunt.hp, 2, d + ' S3 소환 잡졸 hp');
   //  도로 스폰: ev.hp 그대로 + hpMax 기록
   const g = createRun(synth({ spawns: [{ z: 0, kind: 'grunt', n: 2, xs: [200, 280], zs: [3000, 3000], hp: 14 }] }));
   play(g, STEP);
@@ -195,13 +216,39 @@ test('V3-DIFFB DB-6: 부대 상한 100 — BAL3.squad.unitCap = SQUAD_DEFAULTS.u
 const NORMAL_BOSS = ALL_STAGE_IDS.map((id) => [id, playPolicy(id, 'planBoss', 14400, 'normal')]);
 const BRUTAL_CENTER = ALL_STAGE_IDS.filter((id) => id >= 13).map((id) => [id, playPolicy(id, 'center', 14400, 'brutal')]);
 
-test('V3-DIFFB DB-7: 성공 경로 — planBoss 보통 1~24 전부 완주(봇 결과 — 사람 성공률 아님), 최고 병력 ≤ 100', (t) => {
+test('V3-DIFFB DB-7: 성공 경로 — planBoss 보통 1~24 전부 완주(봇 결과 — 사람 성공률 아님. ⚠️PLAN 은 1~3 뿐이라 4~24 planBoss = 정예 전 무입력 x240 + 정예 뒤 보스 추종 — 4~24 의 조작 성공 경로는 DB-7b), 최고 병력 ≤ 100', (t) => {
   for (const [id, r] of NORMAL_BOSS) {
     t.diagnostic(`DIFFB normal planBoss S${id} won=${r.run.won} units=${r.run.units.length} peak=${r.run.peak} steps=${r.steps}`);
     assert.equal(r.run.over, true, `S${id} 끝나지 않음`);
     assert.equal(r.run.won, true, `S${id} planBoss 보통 미완주(병력 ${r.run.units.length}, 정예 잔여 ${r.run.boss ? Math.ceil(r.run.boss.hp) : 0})`);
     assert.ok(r.run.peak <= 100, `S${id} peak ${r.run.peak} > 100`);
   }
+});
+
+//  4~24 성공 경로 봇(대항 검수 반영): evLead = 정예 전 '예상 최종값이 큰 칸'(설계 의도 — 음수 칸을 끝까지 올린다) + 차량 lead, 정예 뒤 planBoss 와 같음(tests/lib/rush3-policies.mjs)
+const EV_RUNS = {};
+for (const d of DIFFS) for (const id of COURSE_IDS) EV_RUNS[d + ':' + id] = playPolicy(id, 'evLead', 14400, d);
+
+test('V3-DIFFB DB-7b: 4~24 성공 경로 — evLead 보통 4~24 전부 완주(정예 전 조작이 있는 봇 — 사람 성공률 아님) · 최고 병력 ≤ 100 · 어려움/지옥 완주 수는 기록하되 어려움 ≥ 지옥(난이도 순서)', (t) => {
+  const tally = {};
+  for (const d of DIFFS) {
+    tally[d] = 0;
+    for (const id of COURSE_IDS) {
+      const r = EV_RUNS[d + ':' + id];
+      const bossLeft = (r.run.bosses ?? []).filter((b) => !b.dead).reduce((a, b) => a + Math.ceil(b.hp), 0);
+      t.diagnostic(`DIFFB ${d} evLead S${id} won=${r.run.won} units=${r.run.units.length} peak=${r.run.peak} bossLeft=${bossLeft} weapon=${r.run.weapon}`);
+      assert.equal(r.run.over, true, `${d} S${id} 끝나지 않음`);
+      assert.ok(r.run.peak <= 100, `${d} S${id} peak ${r.run.peak} > 100`);
+      if (r.run.won) tally[d]++;
+      if (d === 'normal') assert.equal(r.run.won, true, `보통 S${id} evLead 미완주(병력 ${r.run.units.length}, 정예 잔여 ${bossLeft})`);
+    }
+  }
+  t.diagnostic(`DIFFB evLead 4~24 완주: 보통 ${tally.normal}/21 · 어려움 ${tally.hard}/21 · 지옥 ${tally.brutal}/21`);
+  assert.equal(tally.normal, 21);
+  assert.ok(tally.hard >= tally.brutal, `어려움 ${tally.hard} < 지옥 ${tally.brutal}`);
+  //  evLead 는 정예 전에 무입력보다 병력을 더 모은다(설계 의도대로 게이트를 올린 결과): 보통 4~24 의 peak 합
+  const peak = (p) => COURSE_IDS.reduce((a, id) => a + (p === 'evLead' ? EV_RUNS['normal:' + id] : NORMAL_BOSS.find(([i]) => i === id)[1]).run.peak, 0);
+  assert.ok(peak('evLead') > peak('planBoss'), `evLead peak 합 ${peak('evLead')} ≤ planBoss ${peak('planBoss')}`);
 });
 
 test('V3-DIFFB DB-8: 지옥 무입력(x240 고정)은 S13 이상에서 실패 비율 ≥ 70% — 조작 없이 끝까지 가는 판이 사라졌다(이사 실기 소감의 반증)', (t) => {
@@ -242,7 +289,9 @@ function recCtx() {
 const fxLike = () => ({ parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, gateTip: {}, shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0,
                         shutterT: 0, shutterText: null, lotOpen: 0, lotSeen: false, lotSame: false, shocks: [] });
 
-test('V3-DIFFB DB-9: 렌더 — hpMax > 2 인 적은 그림 위에 남은 체력 정수를 12px 로, hpMax ≤ 2 인 적은 숫자 없음, 정예 발밑 16px 숫자는 그대로', () => {
+test('V3-DIFFB DB-9: 렌더 — hpMax > 2 인 적만 남은 체력 정수를 **적 아래**(투영 x·배율 k, 12px 하한)에, hpMax ≤ 2 는 숫자 없음, 정예 발밑 숫자는 그대로', () => {
+  //  ⚠️r3.20 원근 화해(2026-09-21): 숫자를 '머리 위'가 아니라 종전 HP 태그 자리(적 아래)에 그린다.
+  //   머리 위에 두면 적이 화면 위로 들어오는 동안 HUD 줄과 겹친다(B안 대항 검수 ①) — 아래 두기가 그 겹침을 구조적으로 없앤다.
   const run = createRun(synth({ startUnits: 3, spawns: [
     { z: 0, kind: 'grunt', n: 3, xs: [120, 240, 360], zs: [1200, 1200, 1200] },
   ] }));
@@ -251,25 +300,89 @@ test('V3-DIFFB DB-9: 렌더 — hpMax > 2 인 적은 그림 위에 남은 체력
   a.hp = 7; a.hpMax = 7;         // 체력 큰 잡졸 → 숫자
   b.hp = 1; b.hpMax = 2;         // 다친 체력 2 잡졸 → 숫자 없음(1~3 스테이지 잡졸)
   c.hp = 30.4; c.hpMax = 40;     // 소수 → 올림 정수 31
-  //  적이 화면 안(dz 300 = y 340)에 오도록 z 를 맞춘다
-  for (const e of run.enemies) { e.z = run.z + 300; e.pz = e.z; }
+  const DZ = 300;
+  for (const e of run.enemies) { e.z = run.z + DZ; e.pz = e.z; }
   const { ctx, ops } = recCtx();
   createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true });
   const texts = ops.filter((o) => o.op === 'fillText');
-  const y = BAL3.view.LINE_Y - 300, h = a.r * 2.4;
-  const t7 = texts.find((o) => o.args[0] === '7' && o.args[1] === a.x);
+  //  기대 자리: 투영(표준) 그대로 — x 는 투영 x(트랙 x 가 아니다), y 는 적 아래 y + r·k + 16k, 글자 max(12, 16k)
+  const P = projectorFor('standard');
+  const qa = P.project(a.x, DZ), k = qa.s;
+  const fsExp = Math.max(12, 16 * k);
+  const t7 = texts.find((o) => o.args[0] === '7');
   assert.ok(t7, '체력 7 숫자');
-  assert.ok(/\b12px\b/.test(t7.font), '12px: ' + t7.font);
-  assert.ok(t7.args[2] < y - h / 2, '그림 위에 그린다(y ' + t7.args[2] + ' < ' + (y - h / 2) + ')');
+  assert.ok(Math.abs(t7.args[1] - qa.x) < 1e-6, '투영 x(' + qa.x + ') 에 그린다 — 트랙 x ' + a.x + ' 가 아니다');
+  assert.ok(Math.abs(t7.args[2] - (qa.y + a.r * k + 16 * k)) < 1e-6, '적 아래: ' + t7.args[2]);
+  assert.ok(t7.args[2] > qa.y, '그림 중심보다 아래');
+  assert.ok(new RegExp('\\b' + fsExp.toFixed(0) + 'px\\b').test(t7.font) || parseFloat(t7.font.match(/([\d.]+)px/)[1]) === fsExp, '글자 ' + fsExp + ': ' + t7.font);
   assert.equal(t7.fill, BAL3.colors.bulletHeavy);
-  assert.ok(texts.find((o) => o.args[0] === '31' && o.args[1] === c.x && /\b12px\b/.test(o.font)), '30.4 → 31');
-  assert.equal(texts.some((o) => o.args[1] === b.x && /^\d+$/.test(String(o.args[0])) && Math.abs(o.args[2] - y) < 80), false, '체력 2 잡졸엔 숫자 없음');
-  //  정예: 발밑 16px 숫자 그대로
+  //  소수 체력은 올림, 좌우 적도 각자의 투영 x
+  const qc = P.project(c.x, DZ);
+  const t31 = texts.find((o) => o.args[0] === '31');
+  assert.ok(t31 && Math.abs(t31.args[1] - qc.x) < 1e-6, '30.4 → 31, 투영 x');
+  //  체력 2 잡졸은 숫자 없음(가운데 x 근처에 숫자가 없어야 한다)
+  const qb = P.project(b.x, DZ);
+  assert.equal(texts.some((o) => /^\d+$/.test(String(o.args[0])) && Math.abs(o.args[1] - qb.x) < 1 && Math.abs(o.args[2] - (qb.y + b.r * k + 16 * k)) < 1), false, '체력 2 잡졸엔 숫자 없음');
+  //  정예: 발밑 숫자 그대로(크기는 배율을 따른다)
   const r2 = createRun(synth({ startUnits: 3, elite: { z: 0, hp: 500, summon: false } }));
   play(r2, 3);
   assert.ok(r2.boss);
   const rec = recCtx();
   createRenderer3(rec.ctx, null).draw({ state: 'run', now: 1, run: r2, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true });
-  const bt = rec.ops.find((o) => o.op === 'fillText' && o.args[0] === String(Math.ceil(r2.boss.hp)) && o.args[1] === r2.boss.x && /\b16px\b/.test(o.font));
-  assert.ok(bt, '정예 발밑 16px 체력 숫자');
+  assert.ok(rec.ops.some((o) => o.op === 'fillText' && o.args[0] === String(Math.ceil(r2.boss.hp))), '정예 체력 숫자');
 });
+
+//  숫자를 적 아래에 둔 뒤의 규약 두 가지: ① 부대를 지나친 적은 생략(부대 발밑 병력 수 옆에 뜬다) ② HUD 줄과 겹치지 않는다
+function hpTexts(run, zoom = false) {
+  const { ctx, ops } = recCtx();
+  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true, zoom });
+  return ops.filter((o) => o.op === 'fillText' && /^\d+$/.test(String(o.args[0])) && o.fill === BAL3.colors.bulletHeavy);
+}
+test('V3-DIFFB DB-9b: 체력 숫자는 지나친 적·HUD 띠에서 생략하고 그 아래에서만 그린다 — 임계 거리는 투영에서 직접 구한다(표준·가까이)', () => {
+  //  ⚠️r3.20 원근 화해(2026-09-21) 실측: 숫자를 적 아래로 옮겨도 **먼 구간**에서는 HUD 띠(y < HP_TAG_MIN_Y)를 지난다
+  //   (표준 dz 491~647 · 가까이 469~646). 그래서 B안 대항 검수 ① 의 '생략' 은 그대로 살리고 판정만 투영 y 로 재유도했다.
+  assert.equal(HP_TAG_MIN_Y, ZOOM.chip.y + ZOOM.chip.h + 18);
+  assert.ok(HP_TAG_MIN_Y > HUD_ROW.distCy && HP_TAG_MIN_Y > ZOOM.chip.y + ZOOM.chip.h, 'HUD 줄·가까이 칩 아래');
+  const mk = (dz) => {
+    const run = createRun(synth({ startUnits: 3, spawns: [{ z: 0, kind: 'grunt', n: 1, xs: [240], zs: [1200], hp: 40 }] }));
+    play(run, STEP);
+    const e = run.enemies[0]; e.z = run.z + dz; e.pz = e.z;
+    return run;
+  };
+  //  ① 지나친 적(dz < 0)은 어느 모드에서도 생략 — 종전에는 부대 발밑 병력 수 옆에 숫자가 떴다
+  assert.equal(hpTexts(mk(-60)).length, 0, '지나친 적');
+  assert.equal(hpTexts(mk(-60), true).length, 0, '지나친 적(가까이)');
+  const tagY = (P, dz) => { const q = P.project(240, dz); return q.y + 14 * q.s + 16 * q.s; };
+  for (const [mode, zoom] of [['standard', false], ['close', true]]) {
+    const P = projectorFor(mode);
+    //  임계 dz: 숫자 y 가 HP_TAG_MIN_Y 아래로 내려오는 첫 거리(1px 단위로 찾는다 — 매핑이 바뀌면 이 값도 같이 움직인다)
+    let dzEdge = null;
+    for (let dz = 0; dz <= 900; dz++) if (tagY(P, dz) >= HP_TAG_MIN_Y) dzEdge = dz;
+    assert.ok(dzEdge !== null && dzEdge > 200, mode + ' 임계 거리');
+    //  바로 안쪽은 그리고, 바로 바깥(더 먼 쪽)은 생략
+    const inside = hpTexts(mk(dzEdge), zoom);
+    assert.equal(inside.length, 1, mode + ' dz ' + dzEdge + ' 표시');
+    assert.ok(inside[0].args[2] >= HP_TAG_MIN_Y, mode + ' 숫자 y ' + inside[0].args[2].toFixed(1) + ' ≥ ' + HP_TAG_MIN_Y);
+    assert.equal(hpTexts(mk(dzEdge + 2), zoom).length, 0, mode + ' dz ' + (dzEdge + 2) + ' 는 HUD 띠라 생략');
+    //  HUD 띠 한가운데(숫자 y 가 0~128 인 거리)도 생략 — 겹침이 실제로 사라졌다
+    let banded = null;
+    for (let dz = 0; dz <= 900; dz++) { const ty = tagY(P, dz); if (ty >= 0 && ty < HP_TAG_MIN_Y) { banded = dz; break; } }
+    assert.ok(banded !== null, mode + ' 띠 구간 존재');
+    assert.equal(hpTexts(mk(banded), zoom).length, 0, mode + ' dz ' + banded + '(숫자 y ' + tagY(P, banded).toFixed(0) + ') 생략');
+    //  가까운 거리들은 전부 표시 + 자리는 언제나 적 아래 + 12px 하한
+    for (const dz of [0, 100, 300]) {
+      const t = hpTexts(mk(dz), zoom);
+      assert.equal(t.length, 1, mode + ' dz ' + dz + ' 표시');
+      const q = P.project(240, dz);
+      assert.ok(Math.abs(t[0].args[1] - q.x) < 1e-6, mode + ' 투영 x');
+      assert.ok(Math.abs(t[0].args[2] - tagY(P, dz)) < 1e-6, mode + ' 적 아래 자리');
+      assert.ok(t[0].args[2] > q.y, mode + ' 그림 중심보다 아래');
+      assert.ok(parseFloat(t[0].font.match(/([\d.]+)px/)[1]) >= 12, '12px 하한');
+    }
+  }
+  //  1~3 스테이지 실제 잡졸(hpMax 2)은 어느 위치에서도 숫자 없음
+  const r2 = createRun(synth({ startUnits: 3, spawns: [{ z: 0, kind: 'grunt', n: 1, xs: [240], zs: [1200] }] }));
+  play(r2, STEP); r2.enemies[0].z = r2.z + 300; r2.enemies[0].pz = r2.enemies[0].z;
+  assert.equal(hpTexts(r2).length, 0);
+});
+

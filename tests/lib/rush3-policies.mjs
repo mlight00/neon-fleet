@@ -77,6 +77,8 @@ export function botVehicleLead(run) {
   return vehicleX(s.move, s.homeX, s.moveT + (s.z - run.z) / Math.max(1, w.vz - BAL3.scroll));
 }
 
+//  ⚠️PLAN 은 1~3 뿐이다 — 4~24 의 planBoss 는 **정예 전 무입력(x240 고정) + 정예 뒤 보스 추종**이다(botPlan 이 PLAN[1] 로 폴백). 4~24 의 '이길 수 있는 조작이 있는가'는
+//   아래 botAimLead·botEvLead(V3-DIFFB DB-7b)로 따로 본다. 보고서 difficulty-b-20260920 §2 범례와 같은 뜻.
 export function botPlanBoss(run) {
   if (run.phase === 'bonus') {
     const vz = (BAL3.weapons[run.weapon] ?? BAL3.weapons.rifle).vz;
@@ -93,10 +95,60 @@ export function botPlanBoss(run) {
   return run.boss ? run.boss.x : botPlan(run);
 }
 
+//  ─── 4~24 성공 경로 봇(r3.21 대항 검수 반영). 정예 뒤·광장·보너스는 planBoss 와 완전히 같고, **정예 전**만 다르다.
+//   aimLead = 화면에 든(moveT !== null) 미개봉 차량 통이 있으면 lead(갈 자리에 미리 서기), 없으면 aim(가장 가까운 통·발판·게이트의 **지금 값** 큰 칸). 대항 검수가 돌린 봇과 같은 조작.
+//   evLead  = aimLead 와 같되 게이트 칸을 **예상 최종값** = min(칸 상한, 지금 값 + 활성 구간(armZ ÷ 전진 속도 초) 동안의 예상 명중 수)로 고른다 —
+//             설계 의도('음수 칸을 끝까지 올리면 옆 양수 칸보다 크다')를 기계적으로 따르는 봇. 명중 수 = 병력 × 발/발사 × (구간 초 ÷ 발사 간격) × 칸 안 비율(GATE_HIT_FRAC).
+//             예상 최종값이 전부 음수이고 우회로(bypass)가 있으면 우회. 동률은 현재 x 에 가까운 칸.
+//   ⚠️둘 다 회피를 최적화한 봇이 아니다(pointerX 하나·실제 STEP 이동 제한). 결정적 1판 = 사람의 성공률이 아니다.
+const GATE_HIT_FRAC = 0.8;
+function nearestVehicle(run) {
+  let s = null;
+  for (const c of run.supplies) if (c.move && !c.opened && !c.missed && !c.skipped && c.z > run.z && c.z - run.z <= 760 && (!s || c.z < s.z)) s = c;
+  return s && s.moveT !== null ? s : null;
+}
+export function expectedGateHits(run, row) {
+  const w = weaponStats(run.weapon, run.weaponMk || 1);
+  const fan = w.fan ?? 1;
+  const armSec = (row.armZ == null ? BAL3.enterZ : Math.min(row.armZ, Math.max(0, row.z - run.z))) / BAL3.scroll;
+  return run.units.length * fan * (armSec / w.interval) * GATE_HIT_FRAC;
+}
+export function botEvLead(run) {
+  if (run.boss || run.phase === 'bonus' || run.phase === 'arena') return botPlanBoss(run);
+  if (nearestVehicle(run)) return botVehicleLead(run);
+  let best = null, bz = Infinity;
+  for (const s of run.supplies) {
+    if (s.missed || s.skipped) continue;
+    for (const p of s.pads) if (!p.taken && p.z > run.z && p.z < bz) { bz = p.z; best = p.x; }
+    if ((s.opened && s.kind !== 'chain') || s.locked) continue;
+    if (s.z > run.z && s.z < bz) { bz = s.z; best = s.x; }
+  }
+  for (const row of run.gateRows) {
+    if (row.passed || row.z <= run.z || row.z >= bz) continue;
+    const hits = expectedGateHits(run, row);
+    let c = null, cv = -Infinity, cd = Infinity;
+    for (const k of row.cells) {
+      const v = Math.min(k.maxValue, k.value + hits), d = Math.abs((k.x0 + k.x1) / 2 - run.x);
+      if (v > cv || (v === cv && d < cd)) { c = k; cv = v; cd = d; }
+    }
+    bz = row.z;
+    best = cv < 0 && row.bypass ? (c.x0 === 80 ? 320 : 160) : (c.x0 + c.x1) / 2;
+  }
+  return best ?? 240;
+}
+export function botAimLead(run) {
+  if (run.boss || run.phase === 'bonus' || run.phase === 'arena') return botPlanBoss(run);
+  if (nearestVehicle(run)) return botVehicleLead(run);
+  return botAim(run) ?? 240;
+}
+//  정예 뒤가 planBoss 와 같은 정책(광장에서 dragDy 도 넘긴다)
+const BOSS_LIKE = new Set(['planBoss', 'lead', 'aimLead', 'evLead']);
+
 /** 정책 → STEP 입력(r3.17). planBoss 가 광장에 있으면 botArena 의 x 를 pointerX 로, ay 를 dragDy(= 목표 − 현재 tay)로 넘긴다.
- *  그 밖의 정책·구간은 종전 `{ pointerX, dragDx: 0, keyDir: 0 }` 그대로(24판·27판 표·SD-7~9 불변 — combat 은 빠진 칸을 0 으로 읽는다) */
+ *  그 밖의 정책·구간은 종전 `{ pointerX, dragDx: 0, keyDir: 0 }` 그대로(24판·27판 표·SD-7~9 불변 — combat 은 빠진 칸을 0 으로 읽는다)
+ *  r3.21: aimLead·evLead·lead 도 광장에서는 planBoss 와 같은 입력(정예 뒤는 planBoss 별칭이라 x 만 같고 dragDy 가 빠지면 광장 회피가 안 된다) */
 export function pickInput(policy, run) {
-  if (policy === 'planBoss' && run.phase === 'arena' && run.boss) {
+  if (BOSS_LIKE.has(policy) && run.phase === 'arena' && run.boss) {
     const c = botArena(run);
     return { pointerX: c.x, dragDx: 0, keyDir: 0, dragDy: c.ay - run.tay, keyDirY: 0 };
   }
@@ -122,6 +174,9 @@ export function pickX(policy, run) {
     case 'planBoss': return botPlanBoss(run);
     //  r3.18: 차량 선행 조준(POLICIES 목록엔 넣지 않는다 — 24판·27판 표 불변). 정예 뒤는 planBoss 와 같다
     case 'lead': return run.boss ? botPlanBoss(run) : botVehicleLead(run);
+    //  r3.21 대항 검수 반영: 4~24 성공 경로 봇 2종(POLICIES 목록엔 넣지 않는다)
+    case 'aimLead': return botAimLead(run);
+    case 'evLead': return botEvLead(run);
     default: throw new Error('unknown policy ' + policy);
   }
 }
