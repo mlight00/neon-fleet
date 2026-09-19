@@ -622,7 +622,11 @@ export function createRenderer3(ctx, sprites) {
       //  heroFireAlways: 출격 중엔 사격 시트를 now 기준으로 계속 돌린다. 아니면 fx.heroFire 창에서만 사격, 나머지는 걷기
       const always = !!FX.heroFireAlways;
       const firing = always || !!(fx && fx.heroFire > 0);
-      const unitSh = hero ? (firing ? sheet('m1_fire') : sheet('m1_walk')) : (firing ? sheet('soldier_fire') : sheet('soldier_walk'));
+      //  사격 시트는 무기별(m1_fire_rifle 등, 2026-09-19 장착 그림 기반)이 있으면 그것을, 없으면 공용 사격 시트를 쓴다
+      const wid = run.weapon || 'rifle';
+      const unitSh = hero
+        ? (firing ? (sheet('m1_fire_' + wid) || sheet('m1_fire')) : sheet('m1_walk'))
+        : (firing ? (sheet('soldier_fire_' + wid) || sheet('soldier_fire')) : sheet('soldier_walk'));
       if (unitSh) {
         //  병사는 i 마다 위상을 0.13초씩 어긋나게 — 부대가 한 몸처럼 딱딱 맞지 않게(사격 시트는 루프라 위상만 돈다)
         const animT = (firing && !always ? unitSh.frames / unitSh.fps - fx.heroFire : now) + (hero ? 0 : i * 0.13);
