@@ -97,6 +97,8 @@ function spawnBurst(fx, x, y, r, big, color) {
 
 //  게이트 피격 플래시(초): 규칙의 cell.flashT 는 감소되지 않으므로(계약서 4장 STEP 순서에 없음) 연출 타이머는 셸이 갖는다
 const GATE_FLASH_SEC = BAL3.gate.flashT;
+//  무기 강화 단계 표기(HUD·플로터 공용, render.MK_LABEL 과 같은 값)
+const MK_LABEL = ['', 'I', 'II', 'III'];
 
 function makeFx() {
   //  gateFlash: { 'rowId:idx': 남은 초 } · gateOpen: { rowId: 남은 초 }(셔터가 걷히는 연출) — 렌더가 이것만 읽는다
@@ -136,7 +138,7 @@ export function missedLine(run) {
  *  추첨 종류의 이름(label)만으로는 "−15 게이트를 0 으로 막아 손실 0" 인 판과 "10명을 잃은" 판이 같은 문구로 나온다.
  *  그래서 규칙 계층이 이미 내는 이벤트(gatePass·joinMany·padTake·weaponSwap·weaponSame)를 셸이 모아 둔다. */
 export function emptyLotteryOutcome() {
-  return { passed: false, value: 0, applied: 0, soldiers: 0, pads: 0, padsTotal: 0, swapped: false, same: false };
+  return { passed: false, value: 0, applied: 0, soldiers: 0, pads: 0, padsTotal: 0, swapped: false, same: false, mk: 0 };
 }
 
 /** 이벤트 한 묶음을 랜덤 길 결과에 누적한다(순수 — out 을 고쳐 돌려준다).
@@ -164,6 +166,9 @@ export function collectLotteryOutcome(out, events, run) {
       out.swapped = true;
     } else if (ev.type === 'weaponSame' && weaponHere()) {
       out.same = true;
+    } else if (ev.type === 'weaponMk' && weaponHere()) {
+      //  r3.10: 같은 무기 통 = 강화. 결과 문구는 '중복'이 아니라 '강화 · Mk n'
+      out.mk = ev.mk;
     }
   }
   return out;
@@ -187,6 +192,7 @@ function chosenLine(run, lot, out, weaponSame) {
   }
   if (lot.kind === 'weapon') {
     if (weaponSame || (out && out.same && !out.swapped)) return '랜덤 길: ' + lot.label + ' 중복 · 교체 없음';
+    if (out && out.mk > 1 && !out.swapped) return '랜덤 길: ' + lot.label + ' 강화 · Mk ' + MK_LABEL[out.mk];
     return '랜덤 길: ' + lot.label + ' 획득';
   }
   const n = out && out.soldiers ? out.soldiers : null;
@@ -262,7 +268,10 @@ export function boot(canvas, deps = {}) {
     const tries = save.getStage(id, stageVersion(id), difficulty).attempts || 0;
     const lotterySeed = hashSeed('lot:' + id + ':' + tries + ':' + dateNow());
     const stage = buildStage(id, { difficulty, lotterySeed });
-    run = createRun(stage);
+    //  개발 확인용 시작 무기(r3.10): rush3.html?weapon=scatter&mk=2 — 규칙엔 startWeapon/startMk 로만 들어가고, 이 판은 기록에 남기지 않는다
+    const devStart = devStartWeapon();
+    run = createRun(stage, devStart);
+    run.devWeapon = !!devStart.startWeapon;
     //  랜덤 길 실제 결과 집계(계약서 3-9 결과 문구). 규칙이 아니라 셸이 갖는 칸이다 — 규칙 모듈은 lottery 를 모른다
     run.lotteryOutcome = run.lottery ? emptyLotteryOutcome() : null;
     //  기록은 stageId + 코스 버전 + 난이도로 묶는다(run.stageVersion = stage.version, run.difficulty = stage.difficulty)
@@ -307,6 +316,15 @@ export function boot(canvas, deps = {}) {
   }
 
   //  결과 확정 + 저장(attempts 는 출격 때, cleared/best 는 여기서). 신기록 비교는 같은 코스 버전·같은 난이도 안에서만
+  function devStartWeapon() {
+    try {
+      const q = win && win.location && typeof URLSearchParams === 'function' ? new URLSearchParams(win.location.search) : null;
+      const w = q && q.get('weapon');
+      if (!w || !WEAPONS[w]) return {};
+      return { startWeapon: w, startMk: Number(q.get('mk') || 1) };
+    } catch { return {}; }
+  }
+
   function finishRun() {
     const id = run.stageId, ver = run.stageVersion, diff = run.difficulty;
     const cur = save.getStage(id, ver, diff);
@@ -320,7 +338,7 @@ export function boot(canvas, deps = {}) {
       patch.bestSurvivors = Math.max(cur.bestSurvivors || 0, survivors);
       patch.bestTime = cur.bestTime > 0 ? Math.min(cur.bestTime, time) : time;
     }
-    save.updateStage(id, patch, ver, diff);
+    if (!run.devWeapon) save.updateStage(id, patch, ver, diff);
     result = {
       stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
       missedLine: missedLine(run), advice: adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }), isBest, saveOk: save.ok,
@@ -410,6 +428,10 @@ export function boot(canvas, deps = {}) {
         case 'padTake': floater(fx, ev.x, LINE_Y - 70, '+1', C.chainPad); break;
         case 'chainOn': floater(fx, ev.x, sy(ev.z) - 40, '증원 설비 가동!', C.chainPad, true); break;
         case 'weaponSwap': fx.sfx.push(['weaponSwap']); floater(fx, run.x, LINE_Y - 110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' 장착!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
+        //  r3.10 강화: 같은 무기 통 → Mk 상승 표시
+        case 'weaponMk': fx.sfx.push(['weaponSwap']); floater(fx, run.x, LINE_Y - 110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' ' + MK_LABEL[ev.mk] + ' 강화!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
+        //  전격포 연쇄: 맞은 쪽에 작은 청보라 스파크
+        case 'arc': spawnBurst(fx, ev.tx, sy(ev.tz), 8, false, WEAPONS.arc.color); break;
         case 'weaponSame':
           //  랜덤 길 무기 통이 동급이라 교체되지 않은 경우 — 결과 한 줄이 '획득'이라 거짓말하지 않게 표식을 남긴다
           if (run.lottery && run.lottery.kind === 'weapon' && run.z >= run.lottery.revealZ) fx.lotSame = true;
@@ -624,7 +646,7 @@ export function boot(canvas, deps = {}) {
   const dbg = () => ({
     state, stageId: run ? run.stageId : null, difficulty: run ? run.difficulty : difficulty,
     z: run ? Math.round(run.z) : 0, x: run ? Math.round(run.x) : 0,
-    units: run ? run.units.length : 0, weapon: run ? run.weapon : null, boss: run ? !!run.boss : false,
+    units: run ? run.units.length : 0, weapon: run ? run.weapon : null, weaponMk: run ? run.weaponMk : null, boss: run ? !!run.boss : false,
     enemies: run ? run.enemies.length : 0, bullets: run ? run.bullets.length : 0,
   });
   if (win) win.__rush3Dbg = dbg;

@@ -40,7 +40,19 @@ export const BAL3 = deepFreeze({
     auto:  { id: 'auto',  rank: 2, interval: 0.25, dmg: 1, vz: 800, w: 5, color: '#35E5FF', name: '기관총', gateHit: 1 },
     // heavy: 적 직격 시 반경 28 폭발(폭발 dmg 2, 직격 적은 3만, 벽 반대편 제외). 통·게이트·벽 명중 시 폭발 없음
     heavy: { id: 'heavy', rank: 3, interval: 0.6,  dmg: 3, vz: 650, w: 8, color: '#FF9A4A', name: '중화기', gateHit: 1, blastR: 28, blastDmg: 2 },
+    //  r3.10(2026-09-19 이사 결정 A) 신규 3종(이미지프롬프트_v5 §5). 같은 순위끼리는 교체 없음.
+    //   scatter: 발사마다 fan 발을 ±spreadDeg 부채꼴로, 사거리 range px 뒤 소멸(근거리·게이트 특화 — 3발 모두 gateHit 1)
+    //   sniper : 관통 pierce 체(같은 적은 다시 안 맞음), dmg 3 · arc: 직격 시 chainR 안 적 chain 체에 chainDmg 연쇄(벽 너머 제외)
+    scatter: { id: 'scatter', rank: 2, interval: 0.55, dmg: 1, vz: 520, w: 4, color: '#B6FF4A', name: '산탄포', gateHit: 1, fan: 3, spreadDeg: 14, range: 420 },
+    sniper:  { id: 'sniper',  rank: 3, interval: 0.9,  dmg: 3, vz: 900, w: 4, color: '#DDEBFF', name: '저격총', gateHit: 1, pierce: 2 },
+    arc:     { id: 'arc',     rank: 3, interval: 0.7,  dmg: 1, vz: 750, w: 5, color: '#7F9BFF', name: '전격포', gateHit: 1, chain: 2, chainR: 90, chainDmg: 1 },
   },
+  //  무기 강화 Mk I~III(r3.10): 같은 무기 통을 다시 먹으면 한 단계. 같은 무기 안에서 발사 간격·탄 폭·피해가 한 단계씩(그림 3단계와 1:1)
+  weaponMk: Object.freeze([
+    Object.freeze({ dmgAdd: 0, intervalMul: 1,    wMul: 1 }),
+    Object.freeze({ dmgAdd: 0, intervalMul: 0.85, wMul: 1.25 }),
+    Object.freeze({ dmgAdd: 1, intervalMul: 0.75, wMul: 1.5 }),
+  ]),
   // 게이트(3-2장): 두께 24, 피격 플래시 0.12s, 색(+파랑/−빨강/0회색)
   //  armZ = 게이트 전용 사격 활성 구간(부대 중심 기준 전방 거리 px). row.z - run.z <= armZ 가 되면 셔터가 열린다.
   //  null 인 행은 항상 열림(학습용). 닫힌 셔터에 닿은 탄은 흡수되고 값은 변하지 않는다(계약서 3-2)

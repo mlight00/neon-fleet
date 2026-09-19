@@ -224,7 +224,8 @@ function lotterySupplySeeds() {
 }
 
 test('V3-STAGES STG-4: 배제 쌍의 형식(같은 pairId 2개·좌우 1개씩) + 차폐를 가진 모든 통(c9·랜덤 길 통 포함)의 벽·coverZ 공식·여유·통로 배타', () => {
-  const vzMin = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
+  //  r3.10: 사거리 제한 무기(산탄포)는 차폐선 기준에서 제외(stages.VZ_MIN 과 같은 식)
+  const vzMin = Math.min(...Object.values(WEAPONS).filter((w) => w.range == null).map((w) => w.vz));
   //  ⚠ 옛 ③④는 'pairId 있는 통만' 돌아 S3 좌 통 c9(z6300, coverZ 6094)와 랜덤 길 통이 빠져 있었다
   //   (c9 를 옛 값 6046 으로 되돌려도 검사 전건이 통과했다 — 2026-09-17 변이 검사). 이제 coverZ 가 있으면 전부 본다.
   const stages = STAGE_IDS.map((id) => ({ id, st: buildStage(id), tag: 'S' + id }));

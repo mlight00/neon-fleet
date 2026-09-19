@@ -1,7 +1,7 @@
 // rush3/combat.js — 전투 STEP 통합(계약서 3-1·3-7·4장). 순수 규칙: 난수·화면·시계 없음(rng import 금지).
 // 모든 좌표는 트랙 z(클수록 앞). 화면 y 변환은 렌더 몫. 규칙은 STEP = 1/60 단위로만 진행한다.
 import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
-import { WEAPONS, weaponRank, makeBullet } from './weapons.js';
+import { WEAPONS, weaponRank, makeBullet, weaponStats, fanAngles, clampMk, MK_MAX } from './weapons.js';
 import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm } from './gates.js';
 import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward } from './supply.js';
 import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit } from './squad.js';
@@ -32,15 +32,17 @@ export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY) {
 // 3-1 run 생성. 게이트 행·통은 gates/supply 의 make 함수로 다시 만들어 규칙 모듈이 요구하는 내부 필드(rowId/idx·activated/queuedPads/padStart)를 보장한다.
 // 벽·스폰·정예 정의는 stage 것을 그대로 보유(buildStage 가 매번 새 객체라 복사 불필요).
 //  난이도: 기본은 stage.difficulty(buildStage 가 박는다). opts.difficulty 는 합성 스테이지(검사)용 덮어쓰기 — 셸은 항상 buildStage 경로만 쓴다.
-export function createRun(stage, { difficulty } = {}) {
-  const weapon = WEAPONS[stage.startWeapon] ? stage.startWeapon : 'rifle';
+//  startWeapon/startMk(r3.10): 합성 스테이지·개발 확인용 시작 무기 덮어쓰기. 셸은 URL ?weapon= 로만 넘긴다(기록 저장 제외)
+export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
+  const weapon = WEAPONS[startWeapon] ? startWeapon : (WEAPONS[stage.startWeapon] ? stage.startWeapon : 'rifle');
+  const weaponMk = clampMk(startMk ?? 1);
   const diff = difficulty ?? stage.difficulty ?? DEFAULT_DIFFICULTY;
   const run = {
     stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null,
     difficulty: diff, enemyDefs: enemyDefsFor(diff),
     z: 0, prevZ: 0, x: ROAD.startX, tx: ROAD.startX,
     units: [], nextUnitId: 1,
-    weapon,
+    weapon, weaponMk,
     bullets: [],
     gateRows: (stage.gateRows || []).map(makeGateRow),
     supplies: (stage.supplies || []).map(makeSupply),
@@ -60,7 +62,7 @@ export function createRun(stage, { difficulty } = {}) {
     time: 0, peak: 0, kills: 0, lossByTouch: 0, lossByShot: 0, lossByGate: 0, missedSupplies: 0, skippedSupplies: 0, badGatesPassed: 0, lastBadGateId: null,
     over: false, won: false, wonAt: null,
   };
-  const interval = WEAPONS[weapon].interval;
+  const interval = weaponStats(weapon, weaponMk).interval;
   for (let i = 0; i < (stage.startUnits | 0); i++) run.units.push(makeUnit(run.nextUnitId++, interval));
   layoutUnits(run.units);
   run.peak = run.units.length;
@@ -145,12 +147,15 @@ function spawnEnemy(run, kind, x, z, hp) {
 
 // 4단계 유닛 사격: 각자 자기 위치(run.x + dx, run.z - dy)에서 직진. 이벤트 fire {count} STEP당 1개
 function fireUnits(run, ev, dt) {
-  const w = WEAPONS[run.weapon] || WEAPONS.rifle;
+  const mk = run.weaponMk || 1;
+  const w = weaponStats(run.weapon, mk);
+  const angles = fanAngles(w.id);
   let count = 0;
   for (const u of run.units) {
     u.fireT -= dt;
     while (u.fireT <= 0) {
-      run.bullets.push(makeBullet(w.id, run.x + u.dx, run.z - u.dy, u.id));
+      //  부채꼴(산탄포): 각도마다 1발, vx = tan(각)·vz. 나머지 무기는 각도 [0] 한 발
+      for (const a of angles) run.bullets.push(makeBullet(w.id, run.x + u.dx, run.z - u.dy, u.id, mk, a ? Math.tan(a) * w.vz : 0));
       u.fireT += w.interval;
       count++;
     }
@@ -188,6 +193,9 @@ function moveBullets(run, ev, dt) {
     if (b.dead) continue;
     b.pz = b.z;
     b.z += b.vz * dt;
+    if (b.vx) b.x += b.vx * dt;
+    //  사거리(산탄포): range 를 넘긴 탄은 이번 STEP 에 닿는 것 없이 소멸
+    if (b.range != null && b.z - b.z0 > b.range) { b.dead = true; continue; }
     let bestZ = Infinity, bestP = 9, kind = -1, obj = null, cell = null;
     // 후보 등록: cz = 교차 함수가 돌려준 최초 교차 z(이미 스윕 시작 이상으로 잘려 있다)
     const consider = (cz, p, k, o, c) => {
@@ -201,9 +209,11 @@ function moveBullets(run, ev, dt) {
       for (const c of row.cells) consider(sweepContactGate(row, c, b), 2, 2, row, c);
     }
     const halfW = b.w / 2;
-    for (const e of run.enemies) if (!e.dead) consider(circleContactZ(b, e.x, e.z, e.r + halfW), 3, 3, e, null);
+    //  관통탄(저격총)이 이미 맞힌 적은 후보에서 뺀다(같은 적을 STEP 마다 다시 맞히지 않게)
+    const hitAlready = (id) => !!(b.hit && b.hit.includes(id));
+    for (const e of run.enemies) if (!e.dead && !hitAlready(e.id)) consider(circleContactZ(b, e.x, e.z, e.r + halfW), 3, 3, e, null);
     const bo = run.boss;
-    if (bo && !bo.dead) consider(circleContactZ(b, bo.x, bo.z, bo.r + halfW), 3, 3, bo, null);
+    if (bo && !bo.dead && !hitAlready('boss')) consider(circleContactZ(b, bo.x, bo.z, bo.r + halfW), 3, 3, bo, null);
     if (kind === 0) { b.dead = true; ev.push({ type: 'wallHit', x: b.x, z: bestZ }); }
     else if (kind === 1) hitSupply(obj, b, ev, run);
     else if (kind === 2) hitGateCell(obj, cell, b, ev);
@@ -213,12 +223,36 @@ function moveBullets(run, ev, dt) {
 
 // 적·보스 직격. hp <= 0 즉시 dead(같은 STEP 이후 처리에서 제외). heavy 는 적 직격 시에만 폭발
 function hitEnemy(run, e, b, ev) {
-  b.dead = true;
+  //  관통(저격총): 맞힌 적 id 를 기억하고, 맞힌 수가 pierce 미만이면 탄은 살아서 계속 간다(pierce 2 = 적 2체까지)
+  if (b.pierce) { b.hit.push(e.id ?? 'boss'); if (b.hit.length >= b.pierce) b.dead = true; }
+  else b.dead = true;
   e.hp -= b.dmg;
   ev.push({ type: 'enemyHit', id: e.id, kind: e.kind, hp: e.hp, x: e.x, z: e.z });
   if (e.hp <= 0) e.dead = true;
   const w = WEAPONS[b.kind];
   if (w && w.blastR) blast(run, e, w.blastR, w.blastDmg, ev);
+  if (w && w.chain) chainArc(run, e, w.chain, w.chainR, w.chainDmg, ev);
+}
+
+// 전격포 연쇄(r3.10): 직격한 적에서 chainR 안(원 겹침 기준)의 다른 !dead 적·보스 중 가까운 순 n 체에 dmg. 벽 너머 제외.
+//  같은 거리면 id 순 — 결정성. 이벤트 arc {x,z,tx,tz} 는 연출 전용
+function chainArc(run, from, n, r, dmg, ev) {
+  const pool = run.boss ? run.enemies.concat([run.boss]) : run.enemies;
+  const cand = [];
+  for (const t of pool) {
+    if (t === from || t.dead) continue;
+    const d = Math.hypot(t.x - from.x, t.z - from.z);
+    if (d > r + t.r) continue;
+    if (wallBetween(run.walls, from.x, from.z, t.x, t.z)) continue;
+    cand.push({ t, d, id: t.id ?? Number.MAX_SAFE_INTEGER });
+  }
+  cand.sort((a, b) => a.d - b.d || a.id - b.id);
+  for (const { t } of cand.slice(0, n)) {
+    t.hp -= dmg;
+    ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, arc: true });
+    ev.push({ type: 'arc', x: from.x, z: from.z, tx: t.x, tz: t.z });
+    if (t.hp <= 0) t.dead = true;
+  }
 }
 
 // 폭발 중심과 적 사이에 벽 x 범위가 끼면(벽 z 구간 안) 제외
@@ -406,7 +440,7 @@ function pruneDeadUnits(run, ev) {
 function applyRewards(run, ev) {
   const pend = run.pendingRewards;
   run.pendingRewards = [];
-  for (const r of pend) applySupplyReward(r, run, ev, { weaponRank, supplies: run.supplies });
+  for (const r of pend) applySupplyReward(r, run, ev, { weaponRank, mkMax: MK_MAX, supplies: run.supplies });
   for (const row of run.gateRows) passGateRow(row, run, ev);
   for (const s of run.supplies) passSupply(s, run, ev);
   for (const s of run.supplies) if (s.kind === 'chain' && s.pads.length) takePads(s, run, ev);

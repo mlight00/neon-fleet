@@ -306,7 +306,7 @@ test('V3-LOTTERY LOT-4 ①: 병사 통(내구 14) → 정확히 병사 8명 합�
   assert.equal(ev.at(-1).n, 8);
 });
 
-test('V3-LOTTERY LOT-4 ②: 무기 통(heavy, 내구 24) → 중화기 교체 · 이미 heavy 면 weaponSame(교체 없음)', () => {
+test('V3-LOTTERY LOT-4 ②: 무기 통(heavy, 내구 24) → 중화기 교체 · 이미 heavy 면 Mk 강화(r3.10, 교체 없음)', () => {
   const st = stageFor('heavy'), s = lotSupply(st);
   assert.equal(s.kind, 'weapon');
   assert.equal(s.durability, 24);
@@ -318,12 +318,15 @@ test('V3-LOTTERY LOT-4 ②: 무기 통(heavy, 내구 24) → 중화기 교체 ·
   applySupplyReward(run.pendingRewards[0], run, ev, { weaponRank: rank });
   assert.equal(run.weapon, 'heavy');
   assert.equal(ev.at(-1).type, 'weaponSwap');
-  //  이미 중화기면 동급이라 교체하지 않는다(계약서 3-3 보상 적용)
+  //  이미 중화기면 교체하지 않고 Mk 한 단계(r3.10). 만렙(III)이면 weaponSame
   const st2 = stageFor('heavy'), s2 = lotSupply(st2);
   const run2 = miniRun(6, { weapon: 'heavy' }), ev2 = [];
   for (let i = 0; i < 24; i++) hitSupply(s2, bullet(s2.x), ev2, run2);
   applySupplyReward(run2.pendingRewards[0], run2, ev2, { weaponRank: rank });
   assert.equal(run2.weapon, 'heavy');
+  assert.equal(ev2.at(-1).type, 'weaponMk'); assert.equal(run2.weaponMk, 2);
+  run2.weaponMk = 3;
+  applySupplyReward(run2.pendingRewards[0], run2, ev2, { weaponRank: rank });
   assert.equal(ev2.at(-1).type, 'weaponSame');
 });
 
@@ -516,10 +519,12 @@ test('V3-LOTTERY LOT-7b: 우측 통로를 고르면 결과 한 줄이 실제 결
   assert.equal(bad.run.wallSideLog.w3, 'R');
   assert.equal(bad.run.lossByGate, 0, '쏴서 0 으로 만든 뒤 통과 = 실제 손실 0');
   assert.equal(lotteryLine(bad.run), '랜덤 길: 위험 게이트 무력화 · 손실 0');
-  //  무기 통이 이미 같은 등급이라 교체되지 않은 판은 '획득'이라 거짓말하지 않는다(셸 opts.weaponSame 경로도 그대로)
+  //  이미 중화기인 판이 중화기 통을 열면 r3.10 부터는 강화(Mk II)다 — '획득'도 '중복'도 아니라 '강화'로 적는다
   const hv = playRight(SEED_OF.heavy, 'normal', heavyThenRight);
   assert.equal(hv.run.weapon, 'heavy');
-  assert.equal(lotteryLine(hv.run), '랜덤 길: 중화기 중복 · 교체 없음');
+  assert.equal(hv.run.weaponMk, 2);
+  assert.equal(lotteryLine(hv.run), '랜덤 길: 중화기 강화 · Mk II');
+  //  만렙(III)이라 교체·강화 모두 없던 판은 '중복 · 교체 없음'(셸 opts.weaponSame 경로)
   assert.equal(lotteryLine(hv.run, { weaponSame: true }), '랜덤 길: 중화기 중복 · 교체 없음');
   //  랜덤 길이 없는 스테이지는 한 줄도 없다
   assert.equal(lotteryLine(createRun(buildStage(1))), null);

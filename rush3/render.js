@@ -45,6 +45,8 @@ const hudBoxOf = (w, right) => Object.freeze({ x: right - w, y: HUD_TOP, w, h: H
 const HUD_PAUSE = hudBoxOf(44, W - HUD_RIGHT);
 const HUD_WEAPON = hudBoxOf(122, HUD_PAUSE.x - HUD_GAP);
 const HUD_DIFF = hudBoxOf(64, HUD_WEAPON.x - HUD_GAP);
+//  무기 강화 단계 표기(r3.10). Mk I 은 표기 없음
+export const MK_LABEL = Object.freeze(['', '', ' II', ' III']);
 export const HUD_ROW = Object.freeze({
   top: HUD_TOP, h: HUD_H, r: HUD_R, fs: HUD_FS, gap: HUD_GAP, right: HUD_RIGHT,
   cy: HUD_TOP + HUD_H / 2,
@@ -672,11 +674,12 @@ export function createRenderer3(ctx, sprites) {
       const y = sy(b.z);
       if (y < -20 || y > H + 20) continue;
       const w = WEAPONS[b.kind] ?? WEAPONS.rifle;
-      const len = 10 + w.w * 1.5;
+      const bw = b.w ?? w.w;   // Mk 강화로 탄 폭이 커진다
+      const len = 10 + bw * 1.5;
       ctx.fillStyle = w.color;
-      ctx.fillRect(b.x - w.w / 2, y - len, w.w, len);
+      ctx.fillRect(b.x - bw / 2, y - len, bw, len);
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.fillRect(b.x - w.w / 6, y - len + 2, w.w / 3, len * 0.5);
+      ctx.fillRect(b.x - bw / 6, y - len + 2, bw / 3, len * 0.5);
     }
   }
 
@@ -753,7 +756,8 @@ export function createRenderer3(ctx, sprites) {
     const wb = HUD_ROW.box.weapon;
     const w = WEAPONS[run.weapon] ?? WEAPONS.rifle;
     hudChip(wb);
-    const wim = icon(w.id);
+    const mk = run.weaponMk || 1;
+    const wim = icon(w.id, mk) || icon(w.id);
     if (wim) drawIconCentered(wim, wb.x + 26, cy, 24, 34);
     else {
       ctx.fillStyle = w.color;
@@ -764,7 +768,7 @@ export function createRenderer3(ctx, sprites) {
     }
     ctx.font = 'bold ' + HUD_ROW.fs + 'px ' + FONT;
     ctx.fillStyle = w.color;
-    ctx.fillText(w.name, wb.x + 48, cy);
+    ctx.fillText(w.name + (MK_LABEL[mk] ?? ''), wb.x + 48, cy);
     //  난이도 태그(어려움·지옥만): 무기 칩 왼쪽 옆. 보통은 short 가 빈 문자열이라 칩 자체를 그리지 않는다
     const ds = diffShort(run.difficulty);
     if (ds) {

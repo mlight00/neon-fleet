@@ -12,8 +12,10 @@ const WALL_X = BAL3.wall;
 const ENTER = BAL3.enterZ;
 //  벽 활성(통로 확정) 선행 여유 — squad.clampCenter 와 같은 값
 const WALL_LEAD = BAL3.squad.wallLead;
-//  가장 느린 탄 속도(현재 heavy 650). coverZ 공식이 여기에 매달려 있다(더 느린 무기를 넣으면 배제가 다시 열린다)
-export const VZ_MIN = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
+//  가장 느린 탄 속도(현재 heavy 650). coverZ 공식이 여기에 매달려 있다(더 느린 무기를 넣으면 배제가 다시 열린다).
+//  r3.10: 사거리 제한(range)이 있는 무기(산탄포 520)는 제외 — 1~3스테이지엔 등장하지 않고, 등장하는 스테이지는 24스테이지 설계에서
+//   그 무기의 사거리(range)가 통까지의 거리보다 짧은지까지 포함해 coverZ 를 다시 계산한다(STG-4 가 그 스테이지에서 잡는다)
+export const VZ_MIN = Math.min(...Object.values(WEAPONS).filter((w) => w.range == null).map((w) => w.vz));
 //  대형 최대 깊이(유닛 상한까지 채운 대형의 dy 최대). 탄은 부대 중심이 아니라 run.z - dy 에서 출발하므로 그만큼 더 날아간다
 export const MAX_DY = Math.max(...formation(BAL3.squad.unitCap).map((p) => p.dy));
 

@@ -197,8 +197,20 @@ export function applySupplyReward(reward, run, events, opts = {}) {
   if (reward.kind === 'weapon') {
     const rank = opts.weaponRank;
     const w = reward.payload.weapon;
+    //  r3.10 강화: 지금 든 무기와 같은 통이면 Mk 한 단계(최대 opts.mkMax). 만렙이면 weaponSame
+    if (w === run.weapon) {
+      const mk = run.weaponMk || 1, max = opts.mkMax ?? 3;
+      if (mk < max) {
+        run.weaponMk = mk + 1;
+        events.push({ type: 'weaponMk', weapon: w, mk: run.weaponMk, x: reward.x, z: reward.z });
+        return true;
+      }
+      events.push({ type: 'weaponSame', weapon: w, x: reward.x, z: reward.z });
+      return false;
+    }
     if (typeof rank === 'function' && rank(w) > rank(run.weapon)) {
       run.weapon = w;
+      run.weaponMk = 1;
       events.push({ type: 'weaponSwap', weapon: w, x: reward.x, z: reward.z });
       return true;
     }

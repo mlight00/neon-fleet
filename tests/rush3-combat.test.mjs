@@ -192,7 +192,7 @@ test('V3-WEAPON: 병력 30→1 감소 뒤에도 무기 유지(강등 없음)', (
   assert.equal(run.weapon, 'auto');
 });
 
-test('V3-WEAPON: 동급·하급 무기 통(rifle)은 무시(weaponSame)·heavy 는 상급이라 교체', () => {
+test('V3-WEAPON: 하급 무기 통(rifle)은 무시(weaponSame)·같은 무기 통(auto)은 Mk 강화(r3.10)·heavy 는 상급이라 교체(Mk I 로)', () => {
   const run = createRun(mkStage({ startWeapon: 'auto', supplies: [
     { id: 'r', z: 500, x: 240, kind: 'weapon', durability: 1, payload: { weapon: 'rifle' } },
     { id: 'a', z: 700, x: 240, kind: 'weapon', durability: 1, payload: { weapon: 'auto' } },
@@ -200,9 +200,11 @@ test('V3-WEAPON: 동급·하급 무기 통(rifle)은 무시(weaponSame)·heavy �
   ] }));
   const ev = play(run, 360);
   assert.equal(count(ev, 'supplyOpen'), 3);
-  assert.equal(count(ev, 'weaponSame'), 2);
+  assert.equal(count(ev, 'weaponSame'), 1, '하급 rifle 만 weaponSame');
+  assert.equal(count(ev, 'weaponMk'), 1, '같은 auto 통 = Mk II');
   assert.equal(count(ev, 'weaponSwap'), 1);
   assert.equal(run.weapon, 'heavy');
+  assert.equal(run.weaponMk, 1, '상위 무기로 교체되면 Mk I 부터');
 });
 
 // S2 벽(z 1800~3000, x 228~252) 통합

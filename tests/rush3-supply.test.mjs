@@ -135,7 +135,7 @@ test('V3-SUPPLY: 열린 통은 통과해도 missed 가 아니다', () => {
   assert.equal(run.missedSupplies, 0);
 });
 
-test('V3-SUPPLY: weapon 통 보상은 pendingRewards 에 무기 id 로 쌓이고, 동급·하급은 무시(weaponSame)', () => {
+test('V3-SUPPLY: weapon 통 보상은 pendingRewards 에 무기 id 로 쌓이고, 같은 무기는 Mk 강화(r3.10)·하급은 무시(weaponSame)', () => {
   const run = makeRun(1), ev = [];
   const same = makeSupply({ id: 'w1', z: 4000, x: 240, kind: 'weapon', durability: 1, payload: { weapon: 'auto' } });
   const lower = makeSupply({ id: 'w2', z: 4100, x: 240, kind: 'weapon', durability: 1, payload: { weapon: 'rifle' } });
@@ -143,11 +143,11 @@ test('V3-SUPPLY: weapon 통 보상은 pendingRewards 에 무기 id 로 쌓이고
   for (const s of [same, lower, higher]) hitSupply(s, bullet(240), ev, run);
   assert.deepEqual(run.pendingRewards.map((r) => [r.kind, r.payload.weapon]), [['weapon', 'auto'], ['weapon', 'rifle'], ['weapon', 'heavy']]);
   assert.equal(run.weapon, 'auto', 'hitSupply 는 무기를 바꾸지 않는다');
-  assert.equal(applySupplyReward(run.pendingRewards[0], run, ev, { weaponRank: rank }), false);
-  assert.equal(run.weapon, 'auto', '동급 무시');
+  assert.equal(applySupplyReward(run.pendingRewards[0], run, ev, { weaponRank: rank }), true, '같은 무기 = Mk 강화');
+  assert.equal(run.weapon, 'auto'); assert.equal(run.weaponMk, 2); assert.equal(ev.at(-1).type, 'weaponMk');
   assert.equal(applySupplyReward(run.pendingRewards[1], run, ev, { weaponRank: rank }), false);
   assert.equal(run.weapon, 'auto', '하급 무시');
-  assert.equal(ev.filter((e) => e.type === 'weaponSame').length, 2);
+  assert.equal(ev.filter((e) => e.type === 'weaponSame').length, 1);
   assert.equal(applySupplyReward(run.pendingRewards[2], run, ev, { weaponRank: rank }), true);
   assert.equal(run.weapon, 'heavy');
   assert.equal(ev.at(-1).type, 'weaponSwap');
@@ -608,7 +608,8 @@ function lotterySupplySeeds() {
 }
 
 test('V3-SUPPLY-PAIR PAIR-4c: 차폐(coverZ)를 가진 모든 통 — 배제 쌍 4 + 짝 없는 c9 + 랜덤 길 통 — 의 coverZ 가 비행시간 보정선 공식과 정확히 같다', () => {
-  const vzMin = Math.min(...Object.values(WEAPONS).map((w) => w.vz));
+  //  r3.10: 사거리 제한 무기(산탄포)는 차폐선 기준에서 제외(stages.VZ_MIN 과 같은 식)
+  const vzMin = Math.min(...Object.values(WEAPONS).filter((w) => w.range == null).map((w) => w.vz));
   assert.equal(vzMin, VZ_MIN);
   //  ⚠ 옛 순회는 'pairId 있는 통만' 이라 S3 좌 통 c9(z6300, coverZ 6094)와 랜덤 길 통이 공식 검사에서 통째로 빠졌다
   //   (c9 를 옛 값 6046 으로 되돌려도 검사 전건이 통과했다 — 2026-09-17 변이 검사). 이제 coverZ 가 있으면 전부 본다.
