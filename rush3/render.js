@@ -235,6 +235,13 @@ export function createRenderer3(ctx, sprites) {
       //  랜덤 길: 무엇이 걸릴지 모른다는 표시. 확정선을 지나야 실제 물체가 드러난다(계약서 3-9)
       outlinedText('?', x - 22, y, 26, C.gold, 'bold', 5);
       outlinedText('랜덤', x + 16, y, 17, C.gold, 'bold', 4);
+    } else if (sg.kind === 'capsule') {
+      //  구출 캡슐(r3.14): 작은 유리 캡슐 아이콘 + '구출'. 뒤 회차의 분리벽 안 캡슐에 대비한 표지(C[7] 에는 벽이 없다)
+      ctx.fillStyle = C.capsuleGlass;
+      roundRect(x - 34, y - 13, 16, 26, 8); ctx.fill();
+      ctx.strokeStyle = C.capsule; ctx.lineWidth = 2;
+      roundRect(x - 34, y - 13, 16, 26, 8); ctx.stroke();
+      outlinedText('구출', x + 12, y, 16, C.capsule, 'bold', 4);
     } else {
       outlinedText('빈 길', x, y, 17, C.gateZero, 'bold', 4);
     }
@@ -461,6 +468,13 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillRect(x - 12, y - 10, 8, 6);
       }
       outlinedText(w.name, x, y + 14, 15, w.color, 'bold', 4);
+    } else if (s.kind === 'capsule') {
+      //  구출 캡슐(r3.14): 유리 안의 사람 실루엣(머리 원 + 몸통, 그림자 없음) + 합류 수. 몸체(유리·받침)는 drawCapsuleBody 가 먼저 그린다
+      const r = s.r;
+      ctx.fillStyle = C.soldier;
+      ctx.beginPath(); ctx.arc(x, y - r * 0.5, r * 0.22, 0, Math.PI * 2); ctx.fill();
+      roundRect(x - r * 0.26, y - r * 0.24, r * 0.52, r * 0.58, r * 0.12); ctx.fill();
+      outlinedText('+' + (s.payload.n ?? 0), x, y + r * 0.45, 14, C.supplyBody, 'bold', 4);
     } else {
       ctx.fillStyle = C.chainPad;
       roundRect(x - 14, y - 14, 28, 20, 4);
@@ -517,6 +531,47 @@ export function createRenderer3(ctx, sprites) {
     }
   }
 
+  //  구출 캡슐 몸체(r3.14): 그림자 + 받침(어두운 받침 + 청록 윗선) + 연한 청록 반투명 유리 캡슐 + 왼쪽 위 흰 하이라이트. 새 그림 없음(캔버스 도형만).
+  //   sprites 에 'capsule' 그림이 들어오면 drawImgCentered 폴백 한 줄로 교체할 수 있게 폴백 함수 꼴로 둔다.
+  //   내용물(실루엣)·'목표' 표지·내구 숫자·차폐 막·missed/skipped 알파는 정지 통과 같은 경로를 그대로 공유한다
+  function drawCapsuleBody(s, y, r) {
+    shadow(s.x, y + r * 0.95, r * 0.9);
+    drawImgCentered('capsule', s.x, y, r * 2.2, () => {
+      //  받침: 폭 1.8r(크레이트 폴백 2r 과 다른 크기 — 검사가 폭으로 구분한다)
+      ctx.fillStyle = C.supplyDark;
+      roundRect(s.x - r * 0.9, y + r * 0.55, r * 1.8, r * 0.5, 6); ctx.fill();
+      ctx.strokeStyle = C.capsule; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(s.x - r * 0.9, y + r * 0.55); ctx.lineTo(s.x + r * 0.9, y + r * 0.55); ctx.stroke();
+      //  유리
+      ctx.fillStyle = C.capsuleGlass;
+      roundRect(s.x - r * 0.75, y - r * 1.05, r * 1.5, r * 2.0, r * 0.75); ctx.fill();
+      ctx.strokeStyle = C.capsule; ctx.lineWidth = 3;
+      roundRect(s.x - r * 0.75, y - r * 1.05, r * 1.5, r * 2.0, r * 0.75); ctx.stroke();
+      //  하이라이트(왼쪽 위 세로 선)
+      ctx.save();
+      ctx.globalAlpha = ctx.globalAlpha * 0.5;
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(s.x - r * 0.45, y - r * 0.6); ctx.lineTo(s.x - r * 0.45, y + r * 0.25); ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  //  '목표' 표지(r3.14): 캡슐 유리 위 금색 알약. 화면 위 끝에서 들어올 때 잘리지 않게 HUD 아래(TIP_MIN_Y)로 클램프(gateTip 과 같은 규칙)
+  function drawObjectiveBadge(x, y, r) {
+    const bw = 44, bh = 18;
+    const by = Math.max(TIP_MIN_Y, y - r * 1.05 - 16);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = C.gold;
+    roundRect(x - bw / 2, by - bh / 2, bw, bh, 9); ctx.fill();
+    ctx.font = 'bold 12px ' + FONT;
+    ctx.fillStyle = C.outline;
+    ctx.fillText('목표', x, by);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
   //  보급 통: 그림 + 내용물 + 남은 내구 숫자(병력 수가 아니다). chain 발판 열은 '+1'
   function drawSupply(s, sy, runZ) {
     //  발판(통보다 앞 z = 화면 위쪽)
@@ -543,8 +598,9 @@ export function createRenderer3(ctx, sprites) {
     const covered = s.coverZ != null && runZ != null && runZ < s.coverZ;
     //  skipped = 구조적으로 얻을 수 없던 대안. '밀려나며 사라지는' missed 연출과 달리 흐려지며 뒤로 빠진다
     ctx.globalAlpha = s.skipped ? 0.22 : s.missed ? 0.35 : 1;
-    //  차량(r3.13)은 몸체 그리기만 갈아 끼운다 — 정지 통 경로는 한 줄도 바뀌지 않는다
+    //  차량(r3.13)·캡슐(r3.14)은 몸체 그리기만 갈아 끼운다 — 정지 통 경로는 한 줄도 바뀌지 않는다
     if (s.move) drawVehicleBody(s, y, r);
+    else if (s.kind === 'capsule') drawCapsuleBody(s, y, r);
     else {
       shadow(s.x, y + r * 0.95, r * 0.9);
       drawImgCentered('supply', s.x, y, r * 2.1, () => {
@@ -555,6 +611,8 @@ export function createRenderer3(ctx, sprites) {
       });
     }
     if (!s.opened) drawSupplyContents(s, s.x, y);
+    //  판 목표 표지(r3.14): 아직 얻을 수 있는 캡슐에만(놓친 뒤엔 흐린 몸체만 남는다)
+    if (s.kind === 'capsule' && !s.opened && !s.missed && !s.skipped) drawObjectiveBadge(s.x, y, r);
     //  남은 내구 숫자(주황) — 내용물과 구분되는 위치(통 아래)
     ctx.textAlign = 'center';
     if (!s.opened) outlinedText(String(Math.max(0, Math.ceil(s.durability))), s.x, y + r + 18, 16, C.bulletHeavy, 'bold', 4);
@@ -876,6 +934,21 @@ export function createRenderer3(ctx, sprites) {
     }
   }
 
+  //  배너 상자 1개(셔터 배너·목표 배너 공용): 문구는 줄 배열로 받는다(한 줄로 쓰면 480px 화면에서 양끝이 잘린다 — 줄은 어절 경계에서만 나눈다).
+  //   반환 = 상자 높이(다음 배너를 그 아래에 쌓기 위해)
+  function bannerBox(text, y, alpha) {
+    const lines = Array.isArray(text) ? text : [text];
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgba(20,35,58,0.86)';
+    const bh = 22 + lines.length * 24;
+    roundRect(28, y, W - 56, bh, 14); ctx.fill();
+    ctx.font = 'bold 16px ' + FONT;
+    ctx.fillStyle = C.hud;
+    for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], W / 2, y + 23 + i * 24);
+    ctx.globalAlpha = 1;
+    return bh;
+  }
+
   //  안내·경고 배너
   function drawBanners(fx) {
     ctx.textAlign = 'center';
@@ -889,19 +962,15 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillText('좌우로 드래그 · 쏴서 숫자를 키우세요', W / 2, 294);
       ctx.globalAlpha = 1;
     }
+    //  슬롯 C(y 332): 첫 플레이 안내(y 268)·정예 경고(y 196)와 겹치지 않는 자리. 여러 배너가 동시에 살아 있으면 셔터 → 목표 순으로 아래로 쌓는다(+bh+8)
+    let slotY = 332;
     //  첫 셔터 조우 배너(N2-⑥): 셔터가 걸린 행이 처음 화면에 들어온 그 시점에 1회. 문구는 셸이 넘긴다
     if (fx.shutterT > 0 && fx.shutterText) {
-      //  문구는 줄 배열로 받는다(한 줄로 쓰면 480px 화면에서 양끝이 잘린다 — 줄은 어절 경계에서만 나눈다)
-      const lines = Array.isArray(fx.shutterText) ? fx.shutterText : [fx.shutterText];
-      ctx.globalAlpha = Math.min(1, fx.shutterT / 0.5);
-      ctx.fillStyle = 'rgba(20,35,58,0.86)';
-      //  첫 플레이 안내(y 268)·정예 경고(y 196)와 겹치지 않는 자리
-      const bh = 22 + lines.length * 24;
-      roundRect(28, 332, W - 56, bh, 14); ctx.fill();
-      ctx.font = 'bold 16px ' + FONT;
-      ctx.fillStyle = C.hud;
-      for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], W / 2, 332 + 23 + i * 24);
-      ctx.globalAlpha = 1;
+      slotY += bannerBox(fx.shutterText, slotY, Math.min(1, fx.shutterT / 0.5)) + 8;
+    }
+    //  작전 목표 배너(r3.14 구출 캡슐): 출격 직후 판당 1회. fx 새 칸은 ?? 로 관용(옛 fx 꼴에도 그린다)
+    if ((fx.objT ?? 0) > 0 && fx.objText) {
+      slotY += bannerBox(fx.objText, slotY, Math.min(1, fx.objT / 0.5)) + 8;
     }
     if (fx.eliteT > 0) {
       const k = fx.eliteT / FX.eliteBannerSec;
@@ -942,7 +1011,8 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillText(b.label, cx, cy - 10);
         ctx.font = '13px ' + FONT;
         ctx.fillStyle = b.primary ? 'rgba(255,255,255,0.75)' : 'rgba(243,241,232,0.75)';
-        ctx.fillText(b.sub, cx, cy + 12);
+        //  maxWidth: '완료 · 63명 · 0:47 · 구출✓'(r3.14) 처럼 긴 sub 가 칸을 넘치면 가로로 조금 압축, 안 넘치면 무변화
+        ctx.fillText(b.sub, cx, cy + 12, b.w - 12);
       } else {
         ctx.font = '700 ' + (b.small ? 15 : 19) + 'px ' + FONT;
         ctx.fillText(b.label, cx, cy);
@@ -1035,11 +1105,21 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillText(rds, x0, 184);
       ctx.textAlign = 'center';
     }
+    //  제목 아래 추가 줄(y 212 부터 18px 씩 쌓는다 — 통계 첫 줄 246 과 겹치지 않는 최소 간격): 랜덤 길 → 작전 목표 순
+    let extraY = 212;
     //  랜덤 길 한 줄(계약서 3-9): 고른 판은 결과, 안 고른 판은 이번 판에 무엇이었는지 공개
     if (r.lottery) {
       ctx.font = '700 14px ' + FONT;
       ctx.fillStyle = C.gold;
-      ctx.fillText(r.lottery, W / 2, 212);
+      ctx.fillText(r.lottery, W / 2, extraY);
+      extraY += 18;
+    }
+    //  작전 목표 한 줄(r3.14 구출 캡슐): 승리 여부와 별개 — 성공은 청록, 실패는 주황
+    if (r.objectiveLine) {
+      ctx.font = 'bold 14px ' + FONT;
+      ctx.fillStyle = r.objective && r.objective.done ? C.chainPad : C.bulletHeavy;
+      ctx.fillText(r.objectiveLine, W / 2, extraY);
+      extraY += 18;
     }
     const lines = [
       ['생존 병력', r.survivors + '명'],

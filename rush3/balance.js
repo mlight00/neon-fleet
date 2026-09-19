@@ -125,6 +125,8 @@ export const BAL3 = deepFreeze({
   //  shutterGuideSec = 첫 셔터 조우 배너(저장 seenShutter 로 판당 아닌 사용자당 1회) 표시 시간
   fx: { shakeDur: 0.25, shakeAmp: 7, hurtFlashDur: 0.35, guideSec: 3, eliteBannerSec: 0.8, rewardPopSec: 0.5,
         fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3, gateTipSec: 1.2, shutterGuideSec: 3,
+        //  objectiveBannerSec(r3.14 구출 캡슐) = 출격 직후 '작전 목표' 배너(판당 1회) 표시 시간
+        objectiveBannerSec: 3,
         //  동작 시트(6장, 2026-09-18 파일럿): 히어로는 걷기 heroWalkMinSec 뒤 발사 이벤트에 사격 시트 1회,
         //  쓰러진 잡졸은 사망 시트 뒤 corpseLingerSec 머물다 corpseFadeSec 동안 흐려진다(최대 corpseCap 구)
         //  heroFireAlways(이사 결정 9/18): 출격 중엔 사격 시트만 계속 재생(걷기 시트 미사용). false 면 heroFire 타이머로 걷기↔사격 교대
@@ -135,6 +137,8 @@ export const BAL3 = deepFreeze({
     gatePos: '#35E5FF', gateNeg: '#FF6A3D', gateZero: '#9AA1AC', gateFlash: '#FFFFFF',
     bulletRifle: '#F6C84A', bulletAuto: '#35E5FF', bulletHeavy: '#FF9A4A',
     supplyBody: '#FFE9B8', supplyDark: '#8A6D1F', chainPad: '#35E5FF', wall: '#9AA1AC', wallTop: '#DFE6F5',
+    //  구출 캡슐(r3.14): 유리 테·받침 선(capsule) + 유리 반투명 채움(capsuleGlass). 새 그림 없이 도형으로 그린다
+    capsule: '#7FE8DC', capsuleGlass: 'rgba(127,232,220,0.38)',
     enemy: { grunt: '#B3402F', rusher: '#3A3A3A', shooter: '#2B2F36', elite: '#2B1420' },
     eshot: '#FF3DA5', eshotCore: '#FF3020', warn: '#C2273B',
     bg: [

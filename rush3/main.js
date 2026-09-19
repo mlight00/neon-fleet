@@ -39,6 +39,16 @@ export const GATE_TIP_OPEN_FIXED = '쏴도 그대로예요';
 export const SHUTTER_GUIDE_TEXT = Object.freeze(['회색 셔터는 잠긴 게이트예요', '가까워지면 열리고 그때부터 숫자가 오릅니다']);
 //  첫 차량 통 조우 배너(r3.13). 셔터 배너와 같은 슬롯(fx.shutterText/shutterT)을 쓰고 사용자당 1회(저장 seenVehicle). 줄은 어절 경계에서만 나눈다
 export const VEHICLE_GUIDE_TEXT = Object.freeze(['움직이는 통은 앞을 보고 쏘세요', '통이 갈 자리에 미리 서면 탄이 거기서 만납니다']);
+//  작전 목표 배너(r3.14 구출 캡슐): 출격 직후 판당 1회(fx.objText/objT, BAL3.fx.objectiveBannerSec). 셔터 배너 아래 슬롯에 쌓인다. 줄은 어절 경계에서만 나눈다
+export const OBJECTIVE_BANNER_TEXT = Object.freeze(['작전 목표: 캡슐 구출', '놓쳐도 실패는 아닙니다']);
+
+/** 결과 화면의 작전 목표 한 줄(r3.14). 순수 — run.objective 만 읽는다. 목표가 없는 판은 null.
+ *  성공 = 실제 합류 수(n) · 그 밖(놓쳤든 닿기 전에 끝났든)은 '열지 못했다'. 승패(run.won)와는 별개다 */
+export function objectiveLine(run) {
+  const o = run && run.objective;
+  if (!o || o.kind !== 'capsule') return null;
+  return o.done ? '구출 성공 · +' + (o.n || 0) + '명' : '구출 실패 — 캡슐을 열지 못했습니다';
+}
 
 /** 쏴도 값이 오르지 않는 행인가 = 모든 칸이 음수이고 상한이 자기 값 이하(확정 손실).
  *  랜덤 길 ⑤ `trapGate`(−10 · 상한 −10)가 여기에 해당한다 — 몇 발을 맞아도 −10 그대로다(gates.js 값 갱신 공식).
@@ -113,6 +123,8 @@ function makeFx() {
            lotOpen: 0, lotSeen: false, lotSame: false,
            //  vehicleTipSeen(r3.13) = 이 판에서 차량 통이 처음 화면에 들어온 것을 이미 처리했는가(배너는 저장 seenVehicle 로 사용자당 1회)
            vehicleTipSeen: false,
+           //  objT/objText(r3.14) = 출격 직후 작전 목표 배너(startRun 이 판당 1회 세우고 updateFx 가 줄인다 — 다른 곳은 켜지 않는다)
+           objT: 0, objText: null,
            //  동작 시트 타이머(6장): heroFire = 사격 시트 남은 초 · heroWalk = 마지막 사격 뒤 걸은 초 · enemyHit = { id: 피격 시트 남은 초 } · corpses = 쓰러진 잡졸
            heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [] };
 }
@@ -311,6 +323,8 @@ export function boot(canvas, deps = {}) {
     //  첫 플레이 안내: 지금까지 출격 기록이 없을 때 3초
     const total = STAGE_IDS.reduce((n, s) => n + totalAttempts(s), 0);
     fx.guideT = total === 0 ? FX.guideSec : 0;
+    //  작전 목표 배너(r3.14): 목표가 있는 판은 출격 직후 3초, 판당 1회. 첫 플레이 안내(y268)와 자리가 다르다
+    if (run.objective && run.objective.kind === 'capsule') { fx.objText = OBJECTIVE_BANNER_TEXT; fx.objT = FX.objectiveBannerSec; }
     save.updateStage(id, { attempts: (save.getStage(id, ver, diff).attempts || 0) + 1 }, ver, diff);
     save.patch({ lastStage: id });
     state = 'run';
@@ -366,11 +380,17 @@ export function boot(canvas, deps = {}) {
       patch.bestSurvivors = Math.max(cur.bestSurvivors || 0, survivors);
       patch.bestTime = cur.bestTime > 0 ? Math.min(cur.bestTime, time) : time;
     }
+    //  구출 기록(r3.14): true 일 때만 쓴다(희소 필드 — false 는 절대 쓰지 않는다). 승패와 무관하게 구출했으면 남는다
+    if (run.objective && run.objective.done) patch.rescued = true;
     if (!run.devWeapon) save.updateStage(id, patch, ver, diff);
+    const o = run.objective;
     result = {
       stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak: run.peak, time, timeText: timeText(time), kills: run.kills,
       missedLine: missedLine(run), advice: adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }), isBest, saveOk: save.ok,
       nextId: won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null,
+      //  작전 목표(r3.14): 결과 한 줄 + 성공/실패 색 분기용 사본. 목표가 없는 판은 둘 다 null
+      objective: o ? { kind: o.kind, done: o.done, missed: o.missed, n: o.n } : null,
+      objectiveLine: objectiveLine(run),
     };
     state = 'result';
     loop.stop(nowSec());
@@ -402,11 +422,17 @@ export function boot(canvas, deps = {}) {
           spawnBurst(fx, ev.x, y, 30, false, C.gold);
           fx.sfx.push(['crateBreak']);
           const s = run.supplies.find((c) => c.id === ev.id);
-          const text = !s ? '보급' : s.kind === 'soldier' ? '+' + (s.payload.n ?? 0) + '명' : s.kind === 'weapon' ? (WEAPONS[s.payload.weapon]?.name ?? '무기') : '증원 설비';
+          //  캡슐(r3.14)은 깨지는 연출(스파크 + crateBreak)을 그대로 쓰고 팝 문구만 '구출!'
+          const text = !s ? '보급' : s.kind === 'soldier' ? '+' + (s.payload.n ?? 0) + '명' : s.kind === 'weapon' ? (WEAPONS[s.payload.weapon]?.name ?? '무기') : s.kind === 'capsule' ? '구출!' : '증원 설비';
           fx.pops.push({ x: ev.x, y, x0: ev.x, y0: y, t: 0, life: FX.rewardPopSec + 0.3, text, color: C.gold });
           break;
         }
-        case 'supplyMissed': floater(fx, ev.x, sy(ev.z) - 20, '놓침', C.gateZero); break;
+        //  캡슐은 capsuleMissed 가 '캡슐 놓침'을 띄우므로 '놓침'을 겹쳐 그리지 않는다(supplySkipped 의 '다른 길'은 그대로)
+        case 'supplyMissed': if (ev.kind !== 'capsule') floater(fx, ev.x, sy(ev.z) - 20, '놓침', C.gateZero); break;
+        //  구출 캡슐(r3.14): 합류 플로터·효과음은 같은 STEP 의 joinMany 가 이미 낸다 — 여기서는 목표 달성 글 하나만 더 띄운다.
+        //   ⚠️캡슐 자리(ev.z)가 아니라 부대 위에 띄운다 — 병력이 많으면 캡슐이 화면 위 끝에 들어오자마자 열려 그 자리 글은 화면 밖이다(2026-09-19 캡처 실측)
+        case 'capsuleRescue': floater(fx, run.x, LINE_Y - 130, '구출 성공!', C.gold, true); break;
+        case 'capsuleMissed': floater(fx, ev.x, sy(ev.z) - 20, '캡슐 놓침', C.gateZero); break;
         //  구조적으로 얻을 수 없던 대안 — '놓침'이 아니라 '다른 길'로 알린다(흐려지며 뒤로 빠진다)
         case 'supplySkipped': floater(fx, ev.x, sy(ev.z) - 20, '다른 길', C.wall); break;
         case 'supplyBlock': break;
@@ -496,6 +522,7 @@ export function boot(canvas, deps = {}) {
     fx.guideT = Math.max(0, fx.guideT - dt);
     fx.eliteT = Math.max(0, fx.eliteT - dt);
     fx.shutterT = Math.max(0, fx.shutterT - dt);
+    fx.objT = Math.max(0, fx.objT - dt);
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
     //  동작 시트 타이머: 사격이 끝나면 걷기 시간을 다시 센다 · 피격은 0 이하 삭제 · 쓰러진 잡졸은 재생+머묾이 끝나면 지운다
     fx.heroFire = Math.max(0, fx.heroFire - dt);
@@ -555,7 +582,9 @@ export function boot(canvas, deps = {}) {
         const id = ALL_STAGE_IDS[pg * TITLE_PAGE + i];
         if (id === undefined) break;
         const m = stageMeta(id), st = save.getStage(id, stageVersion(id), difficulty);
-        const sub = st.cleared ? '완료 · ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전';
+        //  구출 기록(r3.14)은 그 난이도 칸에서 한 번이라도 구출했으면 어느 상태에든 덧붙인다(없던 필드는 false 로 읽힌다)
+        const sub = (st.cleared ? '완료 · ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전')
+          + (st.rescued === true ? ' · 구출✓' : '');
         const col = i % 2, row = Math.floor(i / 2);
         v.buttons.push({ id: 'stage' + id, x: 60 + col * 184, y: TITLE_GRID.y + row * TITLE_GRID.dy, w: 176, h: TITLE_GRID.h, label: id + ' ' + m.title, sub, primary: last === id, small: true });
       }
@@ -692,6 +721,8 @@ export function boot(canvas, deps = {}) {
     enemies: run ? run.enemies.length : 0, bullets: run ? run.bullets.length : 0,
     //  차량 통(r3.13) 관찰: Playwright 가 이동을 읽는다
     vehicles: run ? run.supplies.filter((s) => s.move).map((s) => ({ id: s.id, x: Math.round(s.x), moveT: s.moveT, opened: s.opened, missed: s.missed })) : [],
+    //  판 목표(r3.14 구출 캡슐) 관찰: { kind, supplyId, done, missed, n } | null
+    objective: run ? run.objective : null,
   });
   if (win) win.__rush3Dbg = dbg;
 

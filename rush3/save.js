@@ -1,7 +1,7 @@
 // rush3/save.js — rush/save.js 복제(계약서 7장). 단일 키 localStorage, storage 주입으로 Node 테스트 가능.
 //  starforgeRush.v1 은 읽지도 쓰지도 않는다. 손상 원문은 .bak 에 보존 후 기본값.
 //  최상위 필드: lastStage · difficulty(타이틀에서 마지막으로 고른 난이도) · volume · mute · seenShutter(첫 셔터 안내를 봤는가) · seenVehicle(첫 차량 안내를 봤는가, r3.13).
-//  스테이지 기록은 stageId + stageVersion + 난이도로 묶는다: stages[id].versions[key] = { cleared, attempts, bestSurvivors, bestTime }.
+//  스테이지 기록은 stageId + stageVersion + 난이도로 묶는다: stages[id].versions[key] = { cleared, attempts, bestSurvivors, bestTime, rescued?: true }.
 //   key = `${version}`(보통 normal — 접미 없음, 옛 기록 그대로) | `${version}:${difficulty}`(어려움·지옥). 계약서 7장·3-8.
 //  코스 배치를 고치면(stages.js 의 version 상향) 새 버전 칸에 따로 쌓이므로 옛 기록과 섞이지 않는다. 난이도도 같은 원리로 칸이 갈린다.
 //  구 저장(stages[id] 에 기록이 바로 있던 형식)은 지우지 않고 버전 1 로 귀속시킨다(마이그레이션).
@@ -10,7 +10,9 @@ export const BAK3 = 'starforgeRush.v3.bak';
 //  접미를 붙이지 않는 기본 난이도(BAL3.difficulty 의 normal). save 는 balance 를 import 하지 않는다(순수 I/O 모듈 유지)
 export const BASE_DIFFICULTY = 'normal';
 const STAGE_DEFAULTS = Object.freeze({ cleared: false, attempts: 0, bestSurvivors: 0, bestTime: 0 });
-const REC_KEYS = ['cleared', 'attempts', 'bestSurvivors', 'bestTime'];
+//  rescued(r3.14 구출 캡슐) = 희소(sparse) 필드: **true 일 때만 존재·직렬화**하고 false 는 절대 쓰지 않는다. 기본값 4필드는 그대로라
+//   구출 전 getStage() 에는 키 자체가 없다(읽는 쪽은 === true 로 판정 = 없던 필드는 false). 옛 저장·다른 칸과 완전 호환
+const REC_KEYS = ['cleared', 'attempts', 'bestSurvivors', 'bestTime', 'rescued'];
 
 const isPlainObject = (o) => o !== null && typeof o === 'object' && !Array.isArray(o);
 const num = (v, d) => (Number.isFinite(v) ? v : d);
@@ -32,12 +34,14 @@ const hasRecFields = (o) => REC_KEYS.some((k) => k in o);
 //  기록 한 칸 정규화: 숫자 필드는 Number.isFinite 강제, cleared 는 boolean
 function normRec(s) {
   const src = isPlainObject(s) ? s : {};
-  return {
+  const out = {
     cleared: src.cleared === true,
     attempts: num(src.attempts, 0),
     bestSurvivors: num(src.bestSurvivors, 0),
     bestTime: num(src.bestTime, 0),
   };
+  if (src.rescued === true) out.rescued = true;
+  return out;
 }
 
 //  스테이지 한 칸의 원문을 { 버전키: 원문기록 } 으로 편다(정규화 전 — 부분 갱신 조각도 그대로 둔다).
@@ -79,7 +83,13 @@ function normStage(s) {
 function mergeStage(cur, inc) {
   const a = rawVersions(cur), b = rawVersions(inc);
   const versions = {};
-  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) versions[k] = normRec({ ...(a[k] ?? {}), ...(b[k] ?? {}) });
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const ra = a[k] ?? {}, rb = b[k] ?? {};
+    const rec = normRec({ ...ra, ...rb });
+    //  희소 단조 필드 rescued: OR 병합 — 한 번 true 면 어느 조각이 false·비불리언을 보내도 유지된다(구출 기록은 되돌리지 않는다)
+    if (ra.rescued === true || rb.rescued === true) rec.rescued = true;
+    versions[k] = rec;
+  }
   return { versions };
 }
 

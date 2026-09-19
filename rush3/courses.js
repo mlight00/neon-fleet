@@ -1,6 +1,6 @@
 // rush3/courses.js — 4~24 스테이지 정의(묶음 B-2·B-3, 2026-09-19 1차 배치). 순수 데이터 + 작은 조립 헬퍼, 난수 없음.
 //  1~3 은 stages.DEFS 그대로(코스 버전 2, 기록 보존). 여기 21개는 실게임 구현계획 B-2 설계표·B-3 역할표·C-1~C-3 자산표를 따른다.
-//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 구출 캡슐(7)·보너스전(8)·복수 정예(9·23)·아레나(10·11·24)는
+//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 보너스전(8)·복수 정예(9·23)·아레나(10·11·24)는
 //   장치가 아직 없어 **기존 장치로 그 자리의 '배우는 것'을 근사**한다. 13~22 의 새 역할(장갑체·복병·생성기·방해형·카트)은
 //   기존 행동(잡졸·돌격체·저격수)에 **체력·그림(skin)만 바꿔** 근사한다 — 행동 자체는 다음 회차.
 //  공통 규칙: 길이 30~60초(z = 초 × 190) · 게이트 행은 도로 80~400 완전 피복 · 배제 쌍은 coverZ = coverZFor(벽 z0, 통 z) · 초반엔 명확한 성공 경로.
@@ -15,6 +15,9 @@ const g3 = (z, a, b, c, o = {}) => ({ z, maxValue: o.max ?? 15, bypass: !!o.bypa
 const soldier = (z, x, n, durability, o = {}) => ({ z, x, kind: 'soldier', n, durability, ...o });
 const weapon = (z, x, w, durability, o = {}) => ({ z, x, kind: 'weapon', weapon: w, durability, ...o });
 const chain = (z, x, pads0, maxPads, durability, o = {}) => ({ z, x, kind: 'chain', pads0, maxPads, durability, ...o });
+//  구출 캡슐(r3.14): soldier 와 같은 인자 순서. 스테이지 정의에 objective: { kind: 'capsule', supplyId } 를 함께 둔다(supplyId = 'c' + (순번 + 1)).
+//   n = 구출 시 합류 병사 수 — 사람 체감 조정은 여기 인자 한 곳(봇은 이 통을 열지 않아 영향 0)
+const capsule = (z, x, n, durability, o = {}) => ({ z, x, kind: 'capsule', n, durability, ...o });
 //  차량 통(r3.13): 통 정의의 마지막 인자 o 에 펼친다 — soldier(2000, 120, 3, 6, { ...mv(120, 360, 4), hint }). x0 < x1(px)·period = 왕복 1회 초.
 //   통의 x 는 x0 또는 x1 이어야 한다(양 끝에서 출발). 속도 2·(x1−x0)/period 가 STEP 당 반지름(30px) 이하(C-4·VEH-10 이 잠근다)
 const mv = (x0, x1, period) => ({ move: { x0, x1, period } });
@@ -61,10 +64,12 @@ export function makeCourses({ coverZFor }) {
     walls: [],
     spawns: [wave(2400, 'rusher', [240], HOUND), wave(3100, 'grunt', [100, 180, 300, 380]), wave(5200, 'shooter', [130, 350]), mass(6300, 'grunt', 12, 2), wave(7600, 'rusher', [140, 240, 340], HOUND)],
     elite: { z: 8400, hp: 240, summon: false } };
-  //  7 캡슐(근사: 길에서 벗어난 큰 병사 통 — 놓쳐도 실패는 아니다)(BG3)
-  C[7] = { version: 1, title: '갓길의 보상', bg: 3, startUnits: 5, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
+  //  7 구출 캡슐(r3.14 실제 장치 — 갓길 끝의 캡슐이 판 목표. 놓쳐도 실패는 아니고 보상만 없다. version 2, 근사 통 시절 기록은 1 칸에 보존)(BG3)
+  //   캡슐은 놓치기 쉬운 자리(x120 갓길 끝) 그대로. 내구 20·차폐물·게이트·스폰·정예는 근사 시절과 같다
+  C[7] = { version: 2, title: '갓길의 보상', bg: 3, startUnits: 5, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
     gates: [g3(1500, -5, 3, -5), g2(3800, 5, -14, { max: 24 }), g3(6600, -6, 6, -6, { max: 20 })],
-    supplies: [weapon(2400, 240, 'auto', 12), soldier(4800, 120, 8, 20, { hint: '갓길 통은 크지만 왼쪽 끝까지 가야 합니다' }), soldier(5600, 360, 3, 6)],
+    supplies: [weapon(2400, 240, 'auto', 12), capsule(4800, 120, 3, 20, { hint: '갓길 끝의 캡슐은 왼쪽 끝까지 붙어야 열립니다. 놓쳐도 실패는 아닙니다' }), soldier(5600, 360, 3, 6)],
+    objective: { kind: 'capsule', supplyId: 'c2' },
     walls: [cover(150, 330, 4420)],
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(3200, 'rusher', [200, 280], HOUND), wave(4400, 'shooter', [240]), mass(5900, 'grunt', 14, 2), wave(7400, 'shooter', [120, 240, 360])],
     elite: { z: 8600, hp: 280, summon: false } };

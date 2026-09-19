@@ -4,6 +4,7 @@ import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
 import { makeCourses, COURSE_IDS } from './courses.js';
 import { WEAPONS } from './weapons.js';
 import { formation } from './squad.js';
+import { CAPSULE_N_DEFAULT } from './supply.js';
 import { hashSeed, mulberry32 } from '../rush/rng.js';
 
 //  STAGE_IDS = 검사·봇 실측·계약서 기준 코스(1~3, 코스 버전 2). ALL_STAGE_IDS = 셸(타이틀·다음 작전)이 보는 공개 목록 1~24(4~24 는 courses.js).
@@ -197,10 +198,12 @@ function makeRow(idx, g) {
 
 // 보급 통: 계약서 3-3 필드 전부 초기값 포함
 //  move(r3.13 차량) = { x0, x1, period } 복사본(구조 공유 금지 — buildStage 두 번이 deepEqual 이되 참조는 다르다). 정지 통은 null
+//  capsule(r3.14 구출 캡슐) = payload { n }(생략 시 supply.CAPSULE_N_DEFAULT). 이 분기가 없으면 chain payload 로 떨어져 합류 수가 NaN 이 된다
 function makeSupplyDef(idx, s) {
   let payload;
   if (s.kind === 'soldier') payload = { n: s.n };
   else if (s.kind === 'weapon') payload = { weapon: s.weapon };
+  else if (s.kind === 'capsule') payload = { n: s.n ?? CAPSULE_N_DEFAULT };
   else payload = { pads0: s.pads0, maxPads: s.maxPads };
   return { id: 'c' + idx, z: s.z, x: s.x, r: BAL3.supply.r, kind: s.kind,
            durability: s.durability, maxDurability: s.durability,
@@ -340,7 +343,14 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     elite: d.elite ? { z: d.elite.z, hp: Math.round(d.elite.hp * mult.eliteHp), summon: !!d.elite.summon, ...(d.elite.skin ? { skin: d.elite.skin } : {}) } : null,
     //  배경 번호(C-3 표). 1~3 은 스테이지 번호와 같다
     bg: d.bg ?? (typeof id === 'number' ? Math.min(3, id) : 1),
+    //  판 목표(r3.14 구출 캡슐): 정의의 objective { kind, supplyId } 사본. 없는 스테이지는 null(1~3·PROTO·나머지 코스)
+    objective: d.objective ? { kind: d.objective.kind, supplyId: d.objective.supplyId } : null,
   };
+  //  빌드 시점 정합성 guard(unknown stage 와 같은 계열의 데이터 오류): 목표가 가리키는 통은 반드시 capsule 이어야 한다
+  if (stage.objective && stage.objective.kind === 'capsule'
+      && !stage.supplies.some((s) => s.id === stage.objective.supplyId && s.kind === 'capsule')) {
+    throw new Error('stage ' + id + ': objective supplyId 가 capsule 통을 가리키지 않는다');
+  }
   applyLottery(d, stage, lotterySeed);
   stage.spawns.sort((a, b) => a.z - b.z);
   return stage;

@@ -60,6 +60,9 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
     wallSideLog: {},
     //  랜덤 길 추첨 결과(stages.buildStage 가 판마다 박는다). 규칙은 읽지 않고 셸의 결과 문구·'?' 연출만 쓴다
     lottery: stage.lottery ?? null,
+    //  판 목표(r3.14 구출 캡슐): stage.objective 가 있으면 { kind, supplyId, done, missed, n }. done·missed 는 동시에 true 가 되지 않는다.
+    //   supply.applySupplyReward(개봉)·passSupply(지나침)만 쓴다. 승패(verdict)는 이 칸을 읽지 않는다 — 놓쳐도 실패가 아니다
+    objective: stage.objective ? { kind: stage.objective.kind, supplyId: stage.objective.supplyId, done: false, missed: false, n: 0 } : null,
     pendingRewards: [],
     time: 0, peak: 0, kills: 0, lossByTouch: 0, lossByShot: 0, lossByGate: 0, missedSupplies: 0, skippedSupplies: 0, badGatesPassed: 0, lastBadGateId: null,
     over: false, won: false, wonAt: null,

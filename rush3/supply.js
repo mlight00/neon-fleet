@@ -1,7 +1,9 @@
 // rush3/supply.js — 보급 통(병사/무기/연속 증원). 순수 규칙만(난수·화면·balance 없음). 계약서 3-3.
 // s = { id, z, x, r, kind, durability, maxDurability, payload, opened, missed, locked, skipped, coverZ, pairId, hint, activated, queuedPads, pads,
 //       move, homeX, moveT, prevX }
-// payload: soldier { n } / weapon { weapon } / chain { pads0, maxPads }   pads = [{ z, x, taken }]
+// payload: soldier { n } / weapon { weapon } / chain { pads0, maxPads } / capsule { n }   pads = [{ z, x, taken }]
+// capsule(r3.14 구출 캡슐) = 판 목표(run.objective)가 가리키는 통. 탄·차폐·내구·개봉 경로는 일반 통과 같고, 열리면 joinMany + capsuleRescue,
+//   미개봉으로 지나치면 capsuleMissed 를 더 낸다. 승패(run.won)에는 관여하지 않는다 — 놓쳐도 실패가 아니고 구출도 승리가 아니다.
 // coverZ = 차폐 개방선(비행시간 보정선). run.z < coverZ 이면 탄을 흡수하고 내구는 줄지 않는다(계약서 3-3 · 개정 r3 §3-3).
 // pairId = 벽으로 배제되는 쌍의 이름. 한 판에서 같은 pairId 는 최대 1개만 열린다.
 // move(r3.13 차량) = { x0, x1, period } | null. 통의 z 는 고정이고 x 만 삼각파(왕복)로 움직인다. homeX = 출발 x(위상 원점),
@@ -17,10 +19,13 @@ export const PAD_REACH = 70;
 export const WALL_LEAD = 60;
 // 화면 진입선(px). BAL3.enterZ 와 같은 값 — 차량 통의 자기 시계는 여기서부터 센다(WALL_LEAD 처럼 상수로 복제, 검사가 일치를 잠근다)
 export const ENTER_Z = 760;
+// 구출 캡슐 합류 병사 수 기본값(r3.14). 배치(courses)가 n 을 안 적으면 이 값 — stages.makeSupplyDef 도 같은 상수를 쓴다(단일 출처)
+export const CAPSULE_N_DEFAULT = 3;
 
 // def = { id, z, x, kind, durability, maxDurability?, r?, payload, padStart?, padGap?, coverZ?, pairId?, hint?, move? }
 export function makeSupply(def) {
   const payload = def.payload ? { ...def.payload } : {};
+  if (def.kind === 'capsule' && payload.n == null) payload.n = CAPSULE_N_DEFAULT;
   const move = def.move ? { x0: def.move.x0, x1: def.move.x1, period: def.move.period } : null;
   const s = {
     id: def.id, z: def.z, x: def.x, r: def.r ?? SUPPLY_R, kind: def.kind,
@@ -201,6 +206,13 @@ export function passSupply(s, run, events) {
       run.missedSupplies = (run.missedSupplies || 0) + 1;
       events.push({ type: 'supplyMissed', id: s.id, kind: s.kind, x: s.x, z: s.z });
     }
+    //  구출 캡슐(r3.14): 놓친 통 집계·supplyMissed/supplySkipped 는 위에서 그대로 내고, 판 목표만 따로 알린다.
+    //   run.objective 가 없는 합성 run(검사)에서도 이벤트만 나고 throw 하지 않는다. 승패는 건드리지 않는다
+    if (s.kind === 'capsule') {
+      events.push({ type: 'capsuleMissed', id: s.id, x: s.x, z: s.z, reason: s.skipped ? 'skipped' : 'missed' });
+      const o = run.objective;
+      if (o && o.kind === 'capsule' && o.supplyId === s.id && !o.done) o.missed = true;
+    }
     changed = true;
   }
   //  ⚠️미개봉 chain 도 지나는 순간 locked(기존 V3-CHAIN 계약). skipped 분기에서도 실제로 발생한다(S3 p1 좌 = chain)
@@ -234,6 +246,16 @@ export function applySupplyReward(reward, run, events, opts = {}) {
     const n = reward.payload.n ?? 0;
     const added = addUnits(run, n);
     events.push({ type: 'joinMany', id: reward.id, n: added, x: reward.x, z: reward.z });
+    return true;
+  }
+  //  구출 캡슐(r3.14): 병사 통과 같은 joinMany(셸의 '+N명 합류'·효과음·집계가 그대로 산다) + capsuleRescue 1회.
+  //   run.objective 가 이 통을 가리키면 done — n 은 실제 합류 수(unitCap 클램프 뒤). objective 가 없는 합성 run 도 throw 없음
+  if (reward.kind === 'capsule') {
+    const added = addUnits(run, reward.payload.n ?? 0);
+    events.push({ type: 'joinMany', id: reward.id, n: added, x: reward.x, z: reward.z });
+    events.push({ type: 'capsuleRescue', id: reward.id, n: added, x: reward.x, z: reward.z });
+    const o = run.objective;
+    if (o && o.kind === 'capsule' && o.supplyId === reward.id) { o.done = true; o.missed = false; o.n = added; }
     return true;
   }
   if (reward.kind === 'weapon') {
