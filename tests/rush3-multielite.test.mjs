@@ -56,20 +56,22 @@ function driveUntil(run, policy, cond, max = 14400) {
 const hpSum = (st) => st.elites.reduce((a, e) => a + e.hp, 0);
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-MULTIELITE ME-1: 형식·정규화 — 9 는 2체(gunner·summoner, x 160/320, 합 440), 23 은 3체(tank patrol 0, 합 940), 나머지는 단수 모양 그대로·결정적', () => {
+test('V3-MULTIELITE ME-1: 형식·정규화 — 9 는 2체(gunner·summoner, x 160/320, 합 1320), 23 은 3체(tank patrol 0, 합 5640), 나머지는 단수 모양 그대로·결정적', () => {
   const s9 = buildStage(9);
   assert.equal(s9.elites.length, 2);
   assert.deepEqual(s9.elites.map((e) => e.role), ['gunner', 'summoner']);
   assert.deepEqual(s9.elites.map((e) => e.x), [160, 320]);
   assert.ok(s9.elites.every((e) => e.z === s9.eliteZ && e.z === 9000), '전원 eliteZ');
-  assert.equal(hpSum(s9), 440);
+  //  r3.18 대항 검수 반영: 440 → 1320(무입력 도착 156 dps × 8초 안팎)
+  assert.equal(hpSum(s9), 1320);
   assert.equal(s9.elite, s9.elites[0], 'stage.elite 는 첫 원소와 같은 객체');
   const s23 = buildStage(23);
   assert.equal(s23.elites.length, 3);
   assert.deepEqual(s23.elites.map((e) => e.role), ['gunner', 'summoner', 'tank']);
   const tank = s23.elites.find((e) => e.role === 'tank');
   assert.equal(tank.patrol, 0); assert.equal(tank.x, 240); assert.equal(tank.skin, 'B4_smelter');
-  assert.equal(hpSum(s23), 940);
+  //  r3.18: 940 → 5640(무입력 도착 640 dps × 9초 안팎)
+  assert.equal(hpSum(s23), 5640);
   assert.ok(s23.elites.every((e) => e.z === 10200));
   //  단수 정의 스테이지(9·23 제외 전부): elites 길이 1 이고 stage.elite 가 종전 키 집합 { z, hp, summon(, skin) } 그대로
   for (const id of ALL_STAGE_IDS) {
@@ -112,7 +114,7 @@ test('V3-MULTIELITE ME-2: 동시 등장·z 정지 — S9 정예 2체가 같은 S
   assert.deepEqual(spawnEv.map((e) => [e.id, e.index, e.total, e.role]), [['b1', 0, 2, 'gunner'], ['b2', 1, 2, 'summoner']]);
   assert.deepEqual(spawnEv.map((e) => e.x), [160, 320]);
   for (const e of spawnEv) { assert.equal(e.z - zAtSpawn, E.spawnAhead); assert.ok(e.hp > 0); }
-  assert.deepEqual(spawnEv.map((e) => e.hp), [200, 240]);
+  assert.deepEqual(spawnEv.map((e) => e.hp), [600, 720]);
   //  다시 굴려 등장 직후 상태를 본다(직접 루프)
   const run3 = createRun(buildStage(9));
   for (let i = 0; i < 14400 && !run3.bosses.length; i++) { stepRun(run3, at(240), STEP); drainEvents(run3); }
@@ -253,21 +255,32 @@ test('V3-MULTIELITE ME-5: 단수 회귀 — 1~3 은 elites 1·별칭·role elite
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-MULTIELITE ME-6: C[9]·C[23] planBoss 보통 완주 — won·상한 안, 체력 합은 종전(360·760)의 1.2~1.5배, 코스 버전 2', (t) => {
-  for (const [id, prev] of [[9, 360], [23, 760]]) {
+//  r3.18 재기준: '종전 단수 정예의 1.2~1.5배' 기준은 폐기(대항 검수 — 그 값은 무입력 도착 병력에 2~5초 만에 전멸해 순서 선택이 화면에 남지 않았다).
+//   새 기준 = 무입력 도착 병력의 dps × 목표 전투 초. 합은 정확한 값으로, 그리고 등장 → 마지막 격파까지의 **최소 생존 초**를 planBoss 보통에서 잠근다(S9 ≥ 8초, S23 ≥ 6초 — 실측 15.6·10.2초)
+test('V3-MULTIELITE ME-6: C[9]·C[23] planBoss 보통 완주 — won·상한 안, 체력 합 1320·5640, 등장→마지막 격파 최소 생존 초(9: 8초·23: 6초), 코스 버전 2', (t) => {
+  for (const [id, expectSum, minSec] of [[9, 1320, 8], [23, 5640, 6]]) {
     const r = playPolicy(id, 'planBoss', 14400, 'normal');
     assert.equal(r.run.won, true, `S${id} planBoss 미완주(남은 보스 ${r.run.bosses.filter((b) => !b.dead).map((b) => b.id + ':' + Math.ceil(b.hp)).join(',')} 병력 ${r.run.units.length})`);
     assert.ok(r.steps < 14400);
     assert.equal(r.events.elite, buildStage(id).elites.length, '등장 이벤트는 보스 수만큼');
     assert.equal(r.events.bossKill, buildStage(id).elites.length);
     const sum = hpSum(buildStage(id));
-    assert.ok(sum >= prev * 1.2 && sum <= prev * 1.5, `S${id} 체력 합 ${sum} / 종전 ${prev}`);
+    assert.equal(sum, expectSum, `S${id} 체력 합`);
     assert.equal(stageVersion(id), 2);
-    //  처치 순서·잔여 병력 기록
+    //  처치 순서·잔여 병력·생존 초 기록(등장 STEP 의 run.time → 마지막 bossKill STEP 의 run.time)
     const run = createRun(buildStage(id));
-    const { events } = driveUntil(run, 'planBoss', () => false);
-    const order = events.filter((e) => e.type === 'bossKill').map((e) => e.id + '(' + e.role + ')');
-    t.diagnostic(`MULTIELITE S${id} won=${run.won} units=${run.units.length} weapon=${run.weapon} time=${run.time.toFixed(1)} order=${order.join('→')}`);
+    let spawnT = null, lastKillT = null;
+    const order = [];
+    for (let i = 0; i < 14400 && !run.over; i++) {
+      stepRun(run, at(pickX('planBoss', run)), STEP);
+      for (const e of drainEvents(run)) {
+        if (e.type === 'elite' && spawnT === null) spawnT = run.time;
+        if (e.type === 'bossKill') { lastKillT = run.time; order.push(e.id + '(' + e.role + ')'); }
+      }
+    }
+    assert.ok(spawnT !== null && lastKillT !== null);
+    assert.ok(lastKillT - spawnT >= minSec, `S${id} 정예 생존 ${(lastKillT - spawnT).toFixed(1)}초 < ${minSec}`);
+    t.diagnostic(`MULTIELITE S${id} won=${run.won} units=${run.units.length} weapon=${run.weapon} time=${run.time.toFixed(1)} fight=${(lastKillT - spawnT).toFixed(1)}s order=${order.join('→')}`);
   }
 });
 
@@ -353,10 +366,10 @@ test('V3-MULTIELITE ME-8: 렌더 — 3체 중 1 격파 상태에서 HUD 3칸(격
   const texts = textsOf(ops);
   assert.ok(texts.includes('정예 전투! 남은 목표 2/3'), texts.filter((t) => t.startsWith('정예')).join('|'));
   assert.ok(texts.includes('격파'), 'HUD 격파 칸');
-  assert.ok(texts.includes('소환 300/300') && texts.includes('장갑 380/380'), 'HUD 역할 칸: ' + texts.filter((t) => /\d+\/\d+/.test(t)).join('|'));
+  assert.ok(texts.includes('소환 1800/1800') && texts.includes('장갑 2280/2280'), 'HUD 역할 칸: ' + texts.filter((t) => /\d+\/\d+/.test(t)).join('|'));
   assert.ok(texts.includes('소환') && texts.includes('장갑'), '보스 발밑 역할 이름');
   assert.equal(texts.includes('포격'), false, '죽은 gunner 는 그리지 않는다');
-  assert.ok(texts.includes('300') && texts.includes('380') && !texts.includes('260'), '살아 있는 보스 hp 숫자만');
+  assert.ok(texts.includes('1800') && texts.includes('2280') && !texts.includes('1560'), '살아 있는 보스 hp 숫자만');
   //  막대 칸: 배경 3 + 채움 2(죽은 칸은 채움 없음) — render.roundRect 는 moveTo(x+r, 76) 로 시작하므로 y 76 의 moveTo 를 센다
   const barsOf = (o) => o.filter((q) => q.op === 'moveTo' && q.args[1] === 76).length;
   assert.equal(barsOf(ops), 5, '막대 수 ' + barsOf(ops));

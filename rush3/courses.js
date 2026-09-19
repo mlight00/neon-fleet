@@ -19,6 +19,7 @@ const chain = (z, x, pads0, maxPads, durability, o = {}) => ({ z, x, kind: 'chai
 const capsule = (z, x, n, durability, o = {}) => ({ z, x, kind: 'capsule', n, durability, ...o });
 //  차량 통(r3.13): 통 정의의 마지막 인자 o 에 펼친다 — soldier(2000, 120, 3, 6, { ...mv(120, 360, 4), hint }). x0 < x1(px)·period = 왕복 1회 초.
 //   통의 x 는 x0 또는 x1 이어야 한다(양 끝에서 출발). 속도 2·(x1−x0)/period 가 STEP 당 반지름(30px) 이하(C-4·VEH-10 이 잠근다)
+//   armZ: true(r3.18) = BAL3.supply.armZ(440) 안에 들어와야(화면 y ≥ 200) 탄이 먹힌다 — 화면 밖에서 탄 줄기에 열리는 것을 막는다. 차량·캡슐만 켠다
 const mv = (x0, x1, period) => ({ move: { x0, x1, period } });
 //  보너스전(r3.15): 스테이지 정의에 bonus: bonus(sec, [target(...), ...]) 를 둔다 — 본전투 승리가 확정된 뒤 sec 초 동안 표적을 맞혀 점수를 쌓는다.
 //   target(dz, x0, x1, period, hp, value, o) — dz = 부대 앞 고정 거리(px, 탄 정리선 650 미만이어야 닿는다), x0~x1 = 옆으로 왕복(px, 반지름 22 포함 도로 안),
@@ -30,12 +31,13 @@ const target = (dz, x0, x1, period, hp, value, o = {}) => ({ dz, x0, x1, period,
 //  복수 정예(r3.16): 스테이지 정의에 elites: [elite(hp, role, x, o), ...](1~3체) — 전원 eliteZ 에서 함께 등장한다.
 //   role = 'gunner'(부채꼴 사격만) | 'summoner'(잡졸 소환만) | 'tank'(사격·소환 없음, 느리게 더 가까이 정지, 순찰 절반) | 'elite'(단수 정예 그대로).
 //   x = 스폰 x 이자 순찰 차선 중심(반폭 BAL3.elites.laneHw 32, o.patrol 로 덮어쓴다 — 0 이면 제자리). 2체는 160/320, 3체는 130/240/350 이면 원(r48)이 겹치지 않는다.
-//   o.skin = 그림(B2·B3·B4). 체력 합은 종전 단수 정예의 1.2~1.5배 안에서 봇(planBoss) 완주가 되는 값으로 잡는다(C-5·V3-MULTIELITE ME-6 이 잠근다)
+//   o.skin = 그림(B2·B3·B4). 체력 합은 **무입력으로 그 z 에 도착하는 병력의 dps × 목표 전투 초(10초 안팎)** 로 잡고 봇(planBoss) 완주가 되는지 본다
+//   (r3.18 대항 검수 반영 — 종전 '단수 정예의 1.2~1.5배' 기준은 폐기. C-5·V3-MULTIELITE ME-6 이 완주·최소 생존 초를 잠근다)
 const elite = (hp, role, x, o = {}) => ({ hp, role, x, ...o });
 //  아레나(r3.17): 스테이지 정의에 arena: arena(z, boss, o) 를 두고 elite/elites 는 적지 않는다(buildStage 가 arena.boss 에서 정예 정의를 파생한다). eliteZ 는 z 와 같게.
 //   z = 진입 z(부대 중심 run.z 가 닿는 순간 광장 전환·스크롤 정지·보스 등장). o.w/o.depth 를 생략하면 BAL3.arena 기본(40~440 · −280~40).
 //   boss = { hp(고정값), skin, speed(추격 px/s), dash: { every, first, warn, speed, range, recover }, shock: { r, dmg }, summon?: { every, kind, n, dx, dz }, shoot?: { every, fan, fanDeg } }
-//   — 빠진 칸은 BAL3.arena.boss 기본값. hp 는 자동 조준(명중률 ≈ 100%)을 감안해 옛 정예값보다 크게 잡은 출발값(봇·관찰 실측 뒤 조정).
+//   — 빠진 칸은 BAL3.arena.boss 기본값(guard true = 첫 착지 충격까지 보호막, r3.18). hp 는 무입력 도착 병력의 dps × (보호막 뒤 목표 전투 초) 로 잡는다(sweep.mjs 실측).
 //   불변식: 게이트·통·벽·스폰 z 가 전부 z − 800 이하(광장에서 run.z 가 멈추므로 — buildStage 가 throw 로 잠근다)
 const arena = (z, boss, o = {}) => ({ z, ...(o.w ? { w: o.w } : {}), ...(o.depth ? { depth: o.depth } : {}), boss });
 const wall = (z0, z1, L, R) => ({ z0, z1, signs: { L, R } });
@@ -73,19 +75,23 @@ export function makeCourses({ coverZFor }) {
     spawns: [wave(2100, 'grunt', [140, 240, 340]), wave(3300, 'shooter', [200, 280]), mass(5300, 'grunt', 12, 2), wave(6900, 'rusher', [120, 360], HOUND)],
     elite: { z: 8000, hp: 200, summon: false } };
   //  6 달리는 보급(r3.13 차량 3대 — 왕복하는 통은 '지금 자리'가 아니라 '갈 자리'에 서야 열린다. version 2, 정지 통 시절 기록은 1 칸에 보존)(BG4)
+  //   r3.18 대항 검수 반영: 차량 3대에 armZ(440, 화면 y 200 아래에서만 피격)·내구 6/6/8 → 40/40/48. 봇 실측(2026-09-19, review-fix/sweep.mjs):
+  //   무입력(x240 고정)·현재 위치 추종(track)은 셋 다 못 열고, 비행시간만큼 앞을 보는 lead 봇만 dz 217/179/194 에서 연다(보통·지옥 동일) — '갈 자리에 미리 서라'가 실제로 필요해졌다
   const VH = '움직이는 통은 지금 자리가 아니라 갈 자리에 미리 서야 열립니다';
   C[6] = { version: 2, title: '차선 바꾸기', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
     gates: [g2(1400, 2, -6), g2(4600, -8, 3, { max: 20 }), g3(7000, 4, -12, 3, { max: 24 })],
-    supplies: [soldier(2000, 120, 3, 6, { ...mv(120, 360, 4), hint: VH }), soldier(2700, 360, 3, 6, { ...mv(120, 360, 4), hint: '오른쪽에서 출발한 통은 왼쪽으로 먼저 갑니다. 탄이 날아가는 동안 통이 어디까지 가는지 보세요' }),
-               weapon(3400, 120, 'scatter', 10), soldier(4000, 330, 4, 8, { ...mv(150, 330, 3), hint: '빠른 통은 앞을 더 많이 봐야 합니다. 통이 되돌아오는 끝점에서 기다리면 쉽습니다' }), soldier(5800, 240, 6, 16)],
+    supplies: [soldier(2000, 120, 3, 40, { ...mv(120, 360, 4), armZ: true, hint: VH }), soldier(2700, 360, 3, 40, { ...mv(120, 360, 4), armZ: true, hint: '오른쪽에서 출발한 통은 왼쪽으로 먼저 갑니다. 탄이 날아가는 동안 통이 어디까지 가는지 보세요' }),
+               weapon(3400, 120, 'scatter', 10), soldier(4000, 330, 4, 48, { ...mv(150, 330, 3), armZ: true, hint: '빠른 통은 앞을 더 많이 봐야 합니다. 통이 되돌아오는 끝점에서 기다리면 쉽습니다' }), soldier(5800, 240, 6, 16)],
     walls: [],
     spawns: [wave(2400, 'rusher', [240], HOUND), wave(3100, 'grunt', [100, 180, 300, 380]), wave(5200, 'shooter', [130, 350]), mass(6300, 'grunt', 12, 2), wave(7600, 'rusher', [140, 240, 340], HOUND)],
     elite: { z: 8400, hp: 240, summon: false } };
   //  7 구출 캡슐(r3.14 실제 장치 — 갓길 끝의 캡슐이 판 목표. 놓쳐도 실패는 아니고 보상만 없다. version 2, 근사 통 시절 기록은 1 칸에 보존)(BG3)
-  //   캡슐은 놓치기 쉬운 자리(x120 갓길 끝) 그대로. 내구 20·차폐물·게이트·스폰·정예는 근사 시절과 같다
+  //   캡슐은 놓치기 쉬운 자리(x120 갓길 끝) 그대로. 차폐물·게이트·스폰·정예는 근사 시절과 같다
+  //   r3.18 대항 검수 반영: armZ(440) + 내구 20 → 80. 근사 시절 내구 20 은 화면 밖(dz ≈ 600, y ≈ 40)에서 탄 줄기에 열려 캡슐을 본 적 없이 '구출 성공!'만 떴다.
+  //   봇 실측(sweep.mjs): x120 고정 봇이 dz 291(y 349, 화면 한가운데)에서 열고, x160 봇은 dz 262, x240 무입력은 못 연다(보통·지옥 동일)
   C[7] = { version: 2, title: '갓길의 보상', bg: 3, startUnits: 5, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
     gates: [g3(1500, -5, 3, -5), g2(3800, 5, -14, { max: 24 }), g3(6600, -6, 6, -6, { max: 20 })],
-    supplies: [weapon(2400, 240, 'auto', 12), capsule(4800, 120, 3, 20, { hint: '갓길 끝의 캡슐은 왼쪽 끝까지 붙어야 열립니다. 놓쳐도 실패는 아닙니다' }), soldier(5600, 360, 3, 6)],
+    supplies: [weapon(2400, 240, 'auto', 12), capsule(4800, 120, 3, 80, { armZ: true, hint: '갓길 끝의 캡슐은 왼쪽 끝까지 붙어야 열립니다. 놓쳐도 실패는 아닙니다' }), soldier(5600, 360, 3, 6)],
     objective: { kind: 'capsule', supplyId: 'c2' },
     walls: [cover(150, 330, 4420)],
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(3200, 'rusher', [200, 280], HOUND), wave(4400, 'shooter', [240]), mass(5900, 'grunt', 14, 2), wave(7400, 'shooter', [120, 240, 360])],
@@ -103,40 +109,46 @@ export function makeCourses({ coverZFor }) {
     elite: { z: 7400, hp: 260, summon: true },
     bonus: bonus(20, [target(240, 120, 360, 4.0, 12, 2), target(320, 140, 340, 3.0, 16, 3, { phase: 0.75 }), target(400, 200, 280, 2.2, 20, 3, { phase: 0.5 }), target(480, 105, 375, 6.0, 32, 5, { phase: 0.25, respawn: 0.8 })]) };
   //  9 둘을 동시에(r3.16 복수 정예 실제 장치 — 포격형 B1(좌, x160) + 소환형 B2(우, x320)가 같은 STEP 에 등장. 둘 다 잡아야 승리이고
-  //   소환형을 먼저 잡으면 그가 낳은 잡졸은 남는다 = 순서를 고른 결과가 화면에 남는다. 체력 합 440 = 근사 시절 단수 360 의 1.22배.
-  //   version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG2)
+  //   소환형을 먼저 잡으면 그가 낳은 잡졸은 남는다 = 순서를 고른 결과가 화면에 남는다. version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG2)
+  //   r3.18 대항 검수 반영: 체력 합 440 → 1320(200/240 → 600/720, ×3). 근사 시절 값은 무입력 도착 병력(78명 소총 ≈ 156 dps)에 3.5초 만에 전멸해 순서가 보이지 않았다.
+  //   봇 실측(sweep.mjs, hp×3): 보통 무입력 11.4초·planBoss 15.6초(포격 7.8 → 소환 15.6), 지옥 planBoss 21.9초·생존 47/65. ×4 부터는 지옥 무입력이 8명까지 준다
   C[9] = { version: 2, title: '갠트리', bg: 2, startUnits: 5, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
     gates: [g3(1600, -4, 3, -6), g2(4200, -14, 4, { max: 24 }), g3(7000, 5, -12, -3, { max: 24 })],
     supplies: [...pair(coverZFor, 2400, 2900, soldier(0, 120, 4, 8), weapon(0, 326, 'sniper', 14), 'w1'), soldier(5400, 240, 6, 16), chain(6200, 340, 6, 12, 8)],
     walls: [wall(2400, 3600, { kind: 'soldier', n: 4 }, { kind: 'weapon', weapon: 'sniper' })],
     spawns: [wave(4000, 'grunt', [95, 137, 179, 221], { corridorHw: 61 }), wave(4000, 'shooter', [300, 370]), mass(5800, 'grunt', 12, 2), wave(7600, 'rusher', [120, 240, 360], HOUND), wave(8200, 'shooter', [150, 330])],
-    elites: [elite(200, 'gunner', 160), elite(240, 'summoner', 320, { skin: 'B2_gantrywidow' })] };
+    elites: [elite(600, 'gunner', 160), elite(720, 'summoner', 320, { skin: 'B2_gantrywidow' })] };
   //  10 광장(r3.17 아레나 실제 장치 — z9200 에서 도로가 광장(40~440)으로 열리고 스크롤이 멈춘다. 보스 B3 가 부대를 추격하며 3초마다 예고 1초 뒤 돌진·착지 충격(r60, 병사 hp −1).
-  //   배우는 것 = "여기서는 위아래로도 움직인다". 도로 구간(게이트·통·스폰)은 근사 시절 그대로. hp 1400 = 자동 조준 명중률 ≈ 100% 기준 출발값(옛 정예 420).
-  //   version 2, 근사 시절 기록은 1 칸에 보존)(BG4)
+  //   배우는 것 = "여기서는 위아래로도 움직인다". 도로 구간(게이트·통·스폰)은 근사 시절 그대로. version 2, 근사 시절 기록은 1 칸에 보존)(BG4)
+  //   r3.18 대항 검수 반영: hp 1400 → 2400 + 보호막(BAL3.arena.boss.guard — 첫 착지 충격까지 피격 무효). 1400 은 무입력 도착 병력(76명 중화기 ≈ 380 dps)에
+  //   첫 돌진 전(3.1초)에 죽었다. 봇 실측(sweep.mjs, 2400): 보통 무입력 11.5초·충격 2회 뒤 승리(생존 37/76), planBoss 9.6~9.8초·충격 2회(세 난이도 승리).
+  //   3200 부터는 보통 무입력도 전멸(충격 4회)
   C[10] = { version: 2, title: '광장', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
     gates: [g2(1400, 4, -8), g3(4400, -6, 5, -6, { max: 20 }), g2(7200, 6, -16, { max: 30 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3300, 120, 5, 10), soldier(3300, 360, 5, 10), weapon(5600, 240, 'heavy', 18), soldier(8000, 240, 8, 20)],
     walls: [],
     spawns: [mass(2600, 'grunt', 10, 2), wave(3900, 'rusher', [100, 200, 280, 380], HOUND), wave(5000, 'shooter', [160, 240, 320]), mass(6500, 'grunt', 16, 2), wave(8400, 'rusher', [140, 340], HOUND)],
-    arena: arena(9200, { hp: 1400, skin: 'B3_railleviathan', speed: 100,
+    arena: arena(9200, { hp: 2400, skin: 'B3_railleviathan', speed: 100,
                          dash: { every: 3.0, first: 1.5, warn: 1.0, speed: 620, range: 420, recover: 0.6 }, shock: { r: 60, dmg: 1 } }) };
   //  11 사냥터(r3.17 아레나 실제 장치 — 보스 B4 가 5초마다 잡졸 2 를 소환(부대를 양축으로 추격)하고 2.6초마다 돌진·충격(r80, hp −2).
   //   배우는 것 = "피할 수 없는 자리가 생긴다"(범위 + 소환). version 2, 근사 시절 기록은 1 칸에 보존)(BG4)
+  //   r3.18 대항 검수 반영: hp 1800 → 2600 + 보호막. 봇 실측(sweep.mjs, 2600): planBoss 보통 10.6초(생존 77/88)·지옥 14.1초·충격 4회(생존 50/65). 무입력은 세 난이도 모두 전멸(충격 dmg 2)
   C[11] = { version: 2, title: '사냥터', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
     gates: [g3(1500, -5, 4, -5), g3(4600, 3, -10, 6, { max: 24 }), g2(7400, -18, 8, { max: 30 })],
     supplies: [soldier(2300, 240, 5, 10), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 5, 10), weapon(0, 326, 'arc', 14), 'w1'), soldier(6000, 150, 6, 16), weapon(6000, 330, 'auto', 12)],
     walls: [wall(3000, 4200, { kind: 'soldier', n: 5 }, { kind: 'weapon', weapon: 'arc' })],
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(5200, 'shooter', [130, 240, 350]), mass(6800, 'grunt', 16, 2), wave(8000, 'rusher', [110, 200, 280, 370], HOUND), mass(8600, 'grunt', 10, 2)],
-    arena: arena(9400, { hp: 1800, skin: 'B4_smelter', speed: 120,
+    arena: arena(9400, { hp: 2600, skin: 'B4_smelter', speed: 120,
                          dash: { every: 2.6, first: 1.5, warn: 0.8, speed: 640, range: 460, recover: 0.6 }, shock: { r: 80, dmg: 2 },
                          summon: { every: 5, kind: 'grunt', n: 2, dx: 44, dz: -40 } }) };
   //  12 관문 — 지금까지 배운 것을 한 판에(BG5): 3칸+차폐+분리벽+랜덤 길+정예
   //   r3.13: 정예 직전 병사 8 통(z7200)이 차량 — 벽 활성 구간(w1 3940~5200·w3 7740~8600)·차폐물 사선 밖. version 2
+  //   r3.18 대항 검수 반영: c4 에 armZ(440)·내구 20 → 128 — 종전엔 dz 639(화면 밖)에서 열렸다. 봇 실측(sweep.mjs): 무입력 dz 230(보통)/195(지옥), lead dz 217 에서 열린다.
+  //   ⚠️여기서는 무입력도 연다 — 도착 병력(77명 기관총 ≈ 308 dps)이 크고 왕복 폭(150~330)이 좁아 탄 기둥을 못 벗어난다. 240 이상이면 lead 봇도 못 열어(dz 18~✗) '보인 뒤에 열린다'만 잠근다
   C[12] = { version: 2, title: '관문', bg: 5, startUnits: 5, startWeapon: 'rifle', length: 10400, eliteZ: 10000,
     gates: [g3(1500, -4, 3, -6), g2(3300, 4, -10, { max: 20 }), g3(6200, -8, 6, -8, { max: 24 }), g2(8600, 8, -20, { max: 30 })],
     supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 4000, 4600, soldier(0, 120, 5, 12), weapon(0, 326, 'heavy', 18), 'w1'),
-               soldier(7200, 150, 8, 20, { ...mv(150, 330, 3), hint: '정예 앞의 큰 통은 좌우로 달립니다. 통이 되돌아오는 자리에 미리 서세요' }),
+               soldier(7200, 150, 8, 128, { ...mv(150, 330, 3), armZ: true, hint: '정예 앞의 큰 통은 좌우로 달립니다. 통이 되돌아오는 자리에 미리 서세요' }),
                //  랜덤 길 왼쪽의 확정 통(S3 c9 와 같은 꼴: 짝 없는 차폐)
                soldier(8200, 150, 5, 10, { coverZ: coverZFor(7800, 8200) })],
     walls: [wall(4000, 5200, { kind: 'soldier', n: 5 }, { kind: 'weapon', weapon: 'heavy' }), cover(190, 290, 1220), cover(80, 186, 5820), wall(7800, 8600, { kind: 'soldier', n: 5 }, { kind: 'lottery' })],
@@ -209,21 +221,25 @@ export function makeCourses({ coverZFor }) {
     spawns: [wave(2000, 'grunt', [140, 340], CART), wave(5100, 'grunt', [95, 137, 179, 221], { corridorHw: 61 }), wave(5100, 'shooter', [300, 370]), wave(6800, 'grunt', [120, 240, 360], CART), mass(7200, 'grunt', 16, 2), wave(8800, 'rusher', [100, 200, 280, 380], HOUND)],
     elite: { z: 9600, hp: 640, summon: true } };
   //  23 세 정예(r3.16 복수 정예 실제 장치 — 포격형 B3(좌 x130) + 소환형 B2(우 x350) + 장갑형 B4(가운데 x240, 제자리·가장 가까이 정지)가 같은 STEP 에 등장.
-  //   HUD 막대 3칸·'남은 목표 N/3'. 체력 합 940 = 근사 시절 단수 760 의 1.24배. version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG5)
+  //   HUD 막대 3칸·'남은 목표 N/3'. version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG5)
+  //   r3.18 대항 검수 반영: 체력 합 940 → 5640(260/300/380 → 1560/1800/2280, ×6). 근사 시절 값은 무입력 도착 병력(128명 중화기 ≈ 640 dps)에 1.9초 만에 전멸했다.
+  //   봇 실측(sweep.mjs, hp×6): 보통 무입력 10.3초·planBoss 10.2초(포격 4.4 → 소환 9.7 → 장갑 10.2), 지옥 planBoss 11.4초·생존 113/122
   C[23] = { version: 2, title: '세 정예', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10600, eliteZ: 10200,
     gates: [g2(1400, 4, -10), g3(4400, -8, 8, -8, { max: 30 }), g2(7200, 10, -24, { max: 36 }), g3(9000, -10, 10, -10, { max: 30 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 120, 6, 14), soldier(3400, 360, 6, 14), weapon(5600, 240, 'heavy', 18), soldier(6400, 240, 9, 22), soldier(8000, 150, 6, 16)],
     walls: [cover(190, 290, 4020), cover(80, 186, 8620)],
     spawns: [wave(1900, 'grunt', [140, 340], ARMOR), wave(3000, 'rusher', [120, 240, 360], JUMPER), wave(5000, 'shooter', [150, 330], POD), mass(6000, 'grunt', 16, 2), wave(7800, 'grunt', [120, 240, 360], CART), wave(9400, 'shooter', [120, 240, 360], MAGNET), mass(9700, 'grunt', 12, 2)],
-    elites: [elite(260, 'gunner', 130, { skin: 'B3_railleviathan' }), elite(300, 'summoner', 350, { skin: 'B2_gantrywidow' }), elite(380, 'tank', 240, { skin: 'B4_smelter', patrol: 0 })] };
+    elites: [elite(1560, 'gunner', 130, { skin: 'B3_railleviathan' }), elite(1800, 'summoner', 350, { skin: 'B2_gantrywidow' }), elite(2280, 'tank', 240, { skin: 'B4_smelter', patrol: 0 })] };
   //  24 최종(r3.17 아레나 실제 장치 — 최종 보스 B5: 가장 빠른 추격(140)·2.2초 돌진·충격(r90, hp −2)·4초마다 잡졸 3 소환·2.4초마다 부채꼴 5발. 앞의 패턴을 전부 섞는 마지막 판.
   //   마지막 저격수 무리(POD)는 10200 → 9700 으로 당겼다 — 스폰 z ≤ arena.z − 800 불변식(정지된 광장 위에 도로 적이 남지 않게). version 2, 근사 시절 기록은 1 칸에 보존)(BG5)
+  //   r3.18 대항 검수 반영: hp 3000 → 4200 + 보호막. 봇 실측(sweep.mjs, 4200): planBoss 보통 12.1초·충격 3회(생존 113/150), 지옥 14.1초·충격 5회(생존 73/142).
+  //   5000 은 지옥 생존 51, 6600 은 어려움·지옥 planBoss 전멸 — 사람은 봇보다 못 피하므로 4200 에서 멈춘다
   C[24] = { version: 2, title: '크라운 브레이커', bg: 5, startUnits: 8, startWeapon: 'rifle', length: 11200, eliteZ: 10800,
     gates: [g3(1500, -6, 6, -6), g2(4200, -18, 8, { max: 30 }), g3(6800, 8, -24, 8, { max: 36 }), g2(9200, 12, -30, { max: 40 })],
     supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 8, 18), weapon(0, 326, 'heavy', 18), 'w1'), soldier(5500, 240, 9, 22), chain(7600, 340, 6, 12, 8), soldier(8400, 120, 8, 20), weapon(8400, 360, 'sniper', 14)],
     walls: [wall(3000, 4200, { kind: 'soldier', n: 8 }, { kind: 'weapon', weapon: 'heavy' }), cover(190, 290, 1220), cover(293, 400, 6420)],
     spawns: [wave(2000, 'grunt', [120, 240, 360]), wave(4900, 'grunt', [95, 137, 179, 221], { corridorHw: 61, ...ARMOR }), wave(4900, 'shooter', [300, 370], MAGNET), mass(6000, 'grunt', 16, 2), wave(7200, 'rusher', [100, 200, 280, 380], JUMPER), wave(8000, 'grunt', [140, 340], CART), mass(9600, 'grunt', 18, 2), wave(9700, 'shooter', [120, 240, 360], POD)],
-    arena: arena(10800, { hp: 3000, skin: 'B5_crownbreaker', speed: 140,
+    arena: arena(10800, { hp: 4200, skin: 'B5_crownbreaker', speed: 140,
                           dash: { every: 2.2, first: 1.2, warn: 0.7, speed: 680, range: 520, recover: 0.5 }, shock: { r: 90, dmg: 2 },
                           summon: { every: 4, kind: 'grunt', n: 3, dx: 48, dz: -40 }, shoot: { every: 2.4, fan: 5, fanDeg: 14 } }) };
   return C;

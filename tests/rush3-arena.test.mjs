@@ -27,7 +27,9 @@ const squadZ = (run) => run.z - run.ay;
 function synthArena(o = {}) {
   const B = AR.boss;
   const z = o.z ?? 600;
-  const boss = { ...B, ...(o.speed != null ? { speed: o.speed } : {}), ...(o.touchDmg != null ? { touchDmg: o.touchDmg } : {}),
+  //  r3.18 재기준: 합성 판은 보호막(guard)을 기본 끈다 — 조준·돌진·승패 기계 검사(A-7·A-8)는 첫 충격 전에도 맞는 것을 전제한다.
+  //   보호막 규칙 자체는 V3-ARMGUARD(rush3-armguard.test.mjs)가 guard true 로 따로 잠근다. o.guard 로 켤 수 있다
+  const boss = { ...B, guard: o.guard ?? false, ...(o.speed != null ? { speed: o.speed } : {}), ...(o.touchDmg != null ? { touchDmg: o.touchDmg } : {}),
                  dash: { ...B.dash, ...(o.dash ?? {}) }, shock: { ...B.shock, ...(o.shock ?? {}) },
                  summon: o.summon ? { ...o.summon } : null, shoot: o.shoot ? { ...o.shoot } : null };
   const elites = [{ z, hp: o.hp ?? 500, summon: !!o.summon }];
@@ -579,11 +581,72 @@ test('V3-ARENA A-13: 셸 — 진입 프레임에 배너·열림 연출·lotWarn/
   //  예고·돌진 효과음
   audio.played.length = 0;
   n = 0;
-  while (!audio.played.includes('gateClang') && n < 600) { const c = botArena(run()); app.input.state.pointerX = c.x; app.input.state.dragDy += c.ay - run().tay; frames(1); n++; }
+  //  r3.18 재기준: 보호막 흡수음(gateClang)이 진입 직후부터 나므로 '첫 돌진이 끝난 뒤(recover)'까지 돌린다
+  while (dbg().bossState !== 'recover' && n < 600) { const c = botArena(run()); app.input.state.pointerX = c.x; app.input.state.dragDy += c.ay - run().tay; frames(1); n++; }
   assert.ok(audio.played.includes('lotWarn') && audio.played.includes('gateClang'), audio.played.join(','));
   //  결과·저장
   n = 0;
   while (app.getState() !== 'result' && n < 6000) { const c = botArena(run()) ?? { x: 240, ay: 0 }; app.input.state.pointerX = c.x; if (run().boss) app.input.state.dragDy += c.ay - run().tay; frames(1); n++; }
   assert.equal(app.getState(), 'result');
   assert.equal(save.getStage(10, 2).cleared, true); assert.equal(save.getStage(10, 1).cleared, false, '근사 시절 기록 칸은 따로');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+test('V3-ARENA A-14: 셸 — 정지 중 pointermove 누적 → 재개 후 tay 불변(대항 검수 반영), 재개 뒤 첫 이동은 기준만 잡고 둘째 이동부터 tay 가 움직인다', async () => {
+  const queue = [];
+  let nowMs = 1000;
+  const shown = [];
+  const save = createSave3(fakeStorage());
+  const audio = fakeAudio();
+  const canvas = fakeCanvas(shown), win = fakeWin();
+  const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() } });
+  await app.ready;
+  const frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
+  app.setDifficulty('normal');
+  app.startRun(24);
+  const run = () => app.getRun(), dbg = () => app.dbg();
+  let n = 0;
+  while (!dbg().arena && n < 9000) { app.input.state.pointerX = pickX('planBoss', run()); frames(1); n++; }
+  assert.equal(dbg().arena, true, '광장 진입');
+  //  마우스로 위쪽으로 옮겨 둔다(첫 이동 기준 → 둘째 이동 −100 논리)
+  canvas.fire('pointermove', { clientX: 120, clientY: 300, pointerType: 'mouse', pointerId: 1 });
+  canvas.fire('pointermove', { clientX: 120, clientY: 250, pointerType: 'mouse', pointerId: 1 });
+  frames(1);
+  const tay0 = run().tay;
+  assert.equal(tay0, -100);
+  //  ⏸ 정지(HUD 버튼 자리 클릭과 같은 경로) → 정지 중 마우스가 ⏸(y34) → [계속하기](y428) 로 크게 이동(CSS 절반 크기라 clientY 17 → 214)
+  app.pause();
+  assert.equal(app.getState(), 'paused');
+  assert.equal(app.input.state.dragDy, 0, 'pause 가 입력을 비운다');
+  canvas.fire('pointermove', { clientX: 222, clientY: 17, pointerType: 'mouse', pointerId: 1 });
+  canvas.fire('pointermove', { clientX: 120, clientY: 214, pointerType: 'mouse', pointerId: 1 });
+  canvas.fire('pointermove', { clientX: 120, clientY: 214, pointerType: 'mouse', pointerId: 1 });
+  assert.equal(app.input.state.dragDy, 0, '정지 중 이동은 누적되지 않는다');
+  assert.equal(app.input.state.lastY, null);
+  app.resume();
+  assert.equal(app.getState(), 'run');
+  frames(3);
+  assert.equal(run().tay, tay0, '재개 뒤 tay 불변(' + run().tay + ')');
+  //  재개 뒤: 첫 이동은 기준만(0), 둘째 이동 +50 CSS = +100 논리 → tay 0
+  canvas.fire('pointermove', { clientX: 120, clientY: 200, pointerType: 'mouse', pointerId: 1 });
+  frames(1);
+  assert.equal(run().tay, tay0, '첫 이동은 기준만');
+  canvas.fire('pointermove', { clientX: 120, clientY: 250, pointerType: 'mouse', pointerId: 1 });
+  frames(1);
+  assert.equal(run().tay, tay0 + 100);
+  //  ESC 재개 경로도 같다(keydown Escape → pause, 이동, Escape → resume)
+  win.fire('keydown', { code: 'Escape' });
+  assert.equal(app.getState(), 'paused');
+  const tay1 = run().tay;
+  canvas.fire('pointermove', { clientX: 240, clientY: 30, pointerType: 'mouse', pointerId: 1 });
+  canvas.fire('pointermove', { clientX: 240, clientY: 380, pointerType: 'mouse', pointerId: 1 });
+  win.fire('keydown', { code: 'Escape' });
+  assert.equal(app.getState(), 'run');
+  frames(3);
+  assert.equal(run().tay, tay1, 'ESC 재개 뒤 tay 불변');
+  //  타이틀·결과 화면의 pointermove 도 입력에 닿지 않는다
+  app.toTitle();
+  canvas.fire('pointermove', { clientX: 10, clientY: 10, pointerType: 'mouse', pointerId: 1 });
+  canvas.fire('pointermove', { clientX: 200, clientY: 300, pointerType: 'mouse', pointerId: 1 });
+  assert.equal(app.input.state.dragDy, 0); assert.equal(app.input.state.pointerX, null);
 });

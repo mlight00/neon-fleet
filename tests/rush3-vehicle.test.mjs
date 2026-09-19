@@ -138,9 +138,9 @@ test('V3-VEHICLE VEH-4: 결정성 — S6 두 판(입력열 두 가지)에서 STE
   assert.deepEqual(trace(fixed).out, trace(fixed).out, '같은 입력 두 판');
   const a = trace(fixed), b = trace(sway);
   //  입력이 달라도 통의 x 궤적은 같다(진입·위상이 run.z 에만 매달린다). 열린 STEP 까지는 같고 그 다음 STEP 부터 정지하므로
-  //  두 판 중 먼저 열린 STEP 까지만 비교한다(그 STEP 자체는 3-c 이동 뒤 5단계에서 열리므로 아직 같다)
-  assert.ok(a.openAt < 1500 && b.openAt < 1500, 'c1 이 두 판 다 열린다(' + a.openAt + '·' + b.openAt + ')');
-  const upto = Math.min(a.openAt, b.openAt);
+  //  두 판 중 먼저 열린 STEP 까지만 비교한다(그 STEP 자체는 3-c 이동 뒤 5단계에서 열리므로 아직 같다).
+  //  r3.18 재기준: 내구 40·armZ 로 x240 고정·좌우 흔들기 둘 다 c1 을 못 연다(의도 — VEH-11) → 그 경우 지나칠 때까지(1500 STEP) 전 구간 비교
+  const upto = Math.min(a.openAt, b.openAt, 1499);
   assert.ok(upto > 400, '진입(STEP ~392) 뒤에도 비교 구간이 있다: ' + upto);
   for (let i = 0; i <= upto; i++) assert.deepEqual([a.out[i][0], a.out[i][3]], [b.out[i][0], b.out[i][3]], 'STEP ' + i + ' c1 궤적');
   //  c2·c4 는 두 판 모두 아직 열리기 전이므로 전 구간 같다(진입 전 null 포함)
@@ -306,14 +306,23 @@ test('V3-VEHICLE VEH-10: 배치 불변식 — S6·S12 차량은 범위·출발�
   assert.equal(buildStage(6).supplies.length, 5); assert.equal(buildStage(12).supplies.length, 5);
 });
 
-test('V3-VEHICLE VEH-11: 완주 — planBoss 보통이 S6·S12 를 완주하고 차량 통을 연다(봇 결과 — 사람 성공률 아님)', (t) => {
+//  r3.18 재기준(대항 검수 반영): 종전엔 planBoss(도로에서 x240 고정 = 무입력)가 S6 차량 3대를 전부 열었다 — '갈 자리에 미리 서라'가 필요 없다는 지적.
+//   내구 40/40/48 + armZ 440 뒤에는 무입력이 셋 다 못 열고, 선행 조준 봇(lead)만 연다. S12 c4(내구 128)는 도착 병력이 커 무입력도 연다(courses.js 주석)
+test('V3-VEHICLE VEH-11: 완주 — planBoss 보통이 S6·S12 를 완주하되 S6 차량은 못 열고, 선행 조준 봇(lead)은 세 대를 전부 연다(봇 결과 — 사람 성공률 아님)', (t) => {
   const r6 = playPolicy(6, 'planBoss', 14400, 'normal');
   assert.equal(r6.run.won, true, 'S6 완주');
-  for (const id of ['c1', 'c2', 'c4']) assert.ok(r6.opened.includes(id), 'S6 ' + id + ' 개봉: ' + r6.opened.join(','));
+  for (const id of ['c1', 'c2', 'c4']) assert.ok(!r6.opened.includes(id), 'S6 무입력이 ' + id + ' 를 열면 안 된다: ' + r6.opened.join(','));
+  const l6 = playPolicy(6, 'lead', 14400, 'normal');
+  assert.equal(l6.run.won, true, 'S6 lead 완주');
+  for (const id of ['c1', 'c2', 'c4']) assert.ok(l6.opened.includes(id), 'S6 lead ' + id + ' 개봉: ' + l6.opened.join(','));
+  const l6b = playPolicy(6, 'lead', 14400, 'brutal');
+  for (const id of ['c1', 'c2', 'c4']) assert.ok(l6b.opened.includes(id), 'S6 lead(지옥) ' + id + ' 개봉: ' + l6b.opened.join(','));
   const r12 = playPolicy(12, 'planBoss', 14400, 'normal');
   assert.equal(r12.run.won, true, 'S12 완주');
   assert.ok(r12.opened.includes('c4'), 'S12 c4(차량) 개봉: ' + r12.opened.join(','));
-  t.diagnostic(`VEHICLE S6 units=${r6.run.units.length} opened=${r6.opened.join(',')} · S12 units=${r12.run.units.length} opened=${r12.opened.join(',')}`);
+  const l12 = playPolicy(12, 'lead', 14400, 'normal');
+  assert.ok(l12.opened.includes('c4') && l12.run.won);
+  t.diagnostic(`VEHICLE S6 planBoss units=${r6.run.units.length} opened=${r6.opened.join(',')} · lead units=${l6.run.units.length} opened=${l6.opened.join(',')} · S12 units=${r12.run.units.length} opened=${r12.opened.join(',')}`);
 });
 
 //  호출 기록 ctx(rush3-render 의 recCtx 와 같은 꼴)
@@ -374,9 +383,16 @@ test('V3-VEHICLE VEH-12: 렌더 — +3 이 이동한 x 를 따라가고, 바퀴 
   c1.move = saved;
   assert.equal(wheels(ops2), 0); assert.equal(dashes(ops2), 0);
   assert.ok(ops2.find((o) => o.op === 'fillText' && o.args[0] === '+3'), '정지 통도 +3 은 그린다');
-  //  내구 숫자(주황)도 차량을 따라간다
-  const dur = ops.find((o) => o.op === 'fillText' && o.args[0] === String(c1.durability) && o.fill === BAL3.colors.bulletHeavy);
+  //  내구 숫자도 차량을 따라간다. r3.18: z 1450 은 dz 550 > armZ 440 = 활성 전이라 회색(gateZero) + 자물쇠(roundRect 16×13)
+  const dur = ops.find((o) => o.op === 'fillText' && o.args[0] === String(c1.durability) && o.fill === BAL3.colors.gateZero);
   assert.ok(dur && dur.args[1] === c1.x, '내구 숫자 x = c1.x');
+  assert.ok(ops.some((o) => o.op === 'arc' && o.args[2] === 5 && o.args[3] === Math.PI && o.args[4] === 0), '활성 전 자물쇠(고리 arc)');
+  //  활성 구간에 들면 주황
+  const runA = createRun(buildStage(6));
+  while (runA.supplies[0].z - runA.z > BAL3.supply.armZ) { stepRun(runA, IN, STEP); drainEvents(runA); }
+  const opsA = drawRun(runA);
+  const durA = opsA.find((o) => o.op === 'fillText' && o.args[0] === String(runA.supplies[0].durability) && o.fill === BAL3.colors.bulletHeavy);
+  assert.ok(durA && durA.args[1] === runA.supplies[0].x, '활성 뒤 내구 숫자 주황');
   //  왼쪽으로 가는 반주기: 화살표 방향이 뒤집힌다
   while (!(c1.x < c1.prevX) && !c1.opened && run.z < 2000) { stepRun(run, IN, STEP); drainEvents(run); }
   if (!c1.opened) {

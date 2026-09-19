@@ -119,7 +119,7 @@ test('V3-CAPSULE CAP-3: 놓침 — 미개봉 캡슐의 z 를 지나면 supplyMis
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule, c2 }·c2 payload { n: 3 }·내구 20·x120·hint, createRun 이 objective 를 초기화, 다른 스테이지는 null, 잘못된 supplyId 는 throw', () => {
+test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule, c2 }·c2 payload { n: 3 }·내구 80·armZ 440(r3.18)·x120·hint, createRun 이 objective 를 초기화, 다른 스테이지는 null, 잘못된 supplyId 는 throw', () => {
   const a = buildStage(7), b = buildStage(7);
   assert.deepEqual(a, b, '결정성');
   assert.equal(a.version, 2); assert.equal(stageVersion(7), 2);
@@ -127,7 +127,9 @@ test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule
   const c2 = a.supplies[1];
   assert.equal(c2.id, 'c2'); assert.equal(c2.kind, 'capsule');
   assert.equal(c2.x, 120); assert.equal(c2.z, 4800);
-  assert.equal(c2.durability, 20); assert.equal(c2.maxDurability, 20);
+  //  r3.18 대항 검수 반영: 내구 20 → 80 + 피격 활성 구간 armZ 440(화면 y 200 아래에서만 열린다 — CAP-9)
+  assert.equal(c2.durability, 80); assert.equal(c2.maxDurability, 80);
+  assert.equal(c2.armZ, BAL3.supply.armZ); assert.equal(c2.armZ, 440);
   assert.deepEqual(c2.payload, { n: 3 });
   assert.equal(c2.coverZ, null); assert.equal(c2.pairId, null); assert.equal(c2.move, null);
   assert.equal(typeof c2.hint, 'string'); assert.ok(c2.hint.length > 0);
@@ -199,6 +201,34 @@ test('V3-CAPSULE CAP-6: 놓침은 실패가 아니다 — planBoss(x240) 가 캡
   assert.equal(run.over, true); assert.equal(run.won, false);
   assert.deepEqual(run.objective, { kind: 'capsule', supplyId: 'c2', done: true, missed: false, n: 3 });
   assert.equal(drainEvents(run).some((e) => e.type === 'lose'), true);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+test('V3-CAPSULE CAP-9: 보인 뒤에 열린다(r3.18 대항 검수 반영) — 캡슐은 화면 y ≥ 200(dz ≤ armZ 440)에서만 열리고, 활성 전 탄은 supplyBlock(arm)·내구 불변', (t) => {
+  for (const [name, px] of [['x120', 120], ['x160', 160], ['aim', null]]) {
+    const run = createRun(buildStage(7));
+    let openEv = null, blocks = 0, hitsBefore = 0, n = 0;
+    while (!run.over && !openEv && n < 14400) {
+      const x = px ?? pickX('aim', run);
+      stepRun(run, { pointerX: x, dragDx: 0, keyDir: 0 }, STEP);
+      for (const e of drainEvents(run)) {
+        if (e.id !== 'c2') continue;
+        const dz = 4800 - run.z;
+        if (e.type === 'supplyBlock') { assert.equal(e.reason, 'arm'); assert.ok(dz > BAL3.supply.armZ, name + ' 흡수는 활성 전에만(dz ' + dz + ')'); blocks++; }
+        if (e.type === 'supplyHit') { assert.ok(dz <= BAL3.supply.armZ, name + ' 피격은 활성 뒤에만'); if (dz > BAL3.supply.armZ) hitsBefore++; }
+        if (e.type === 'supplyOpen') openEv = { dz, y: BAL3.view.LINE_Y - dz };
+      }
+      n++;
+    }
+    assert.ok(openEv, name + ' 캡슐이 열린다');
+    assert.ok(openEv.dz <= BAL3.supply.armZ && openEv.y >= 200, name + ' 개봉 dz ' + openEv.dz + ' y ' + openEv.y);
+    assert.ok(blocks > 0, name + ' 활성 전 흡수가 있었다(탄 줄기가 캡슐까지 닿는다)');
+    assert.equal(hitsBefore, 0);
+    t.diagnostic(`CAPSULE S7 ${name} open dz=${openEv.dz} y=${Math.round(openEv.y)} blocks=${blocks}`);
+  }
+  //  무입력(x240)은 종전처럼 못 연다(놓침) — 활성 구간 규칙이 '더 쉽게' 만들지 않는다
+  const r = playPolicy(7, 'center', 14400, 'normal');
+  assert.ok(!r.opened.includes('c2') && r.events.capsuleMissed === 1);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -287,16 +317,23 @@ function drawResult(run, result) {
   return ops;
 }
 
-test('V3-CAPSULE CAP-8: 렌더 — 유리 캡슐(capsuleGlass)·목표 표지·내구 20, 크레이트 폴백 없음, 목표 배너 2줄·셔터 아래 스택, 결과 목표 줄 y212/230, 타이틀 sub maxWidth', () => {
-  //  ① S7 을 x120 으로 굴려 캡슐이 화면에 든 프레임
+test('V3-CAPSULE CAP-8: 렌더 — 유리 캡슐(capsuleGlass)·목표 표지·내구 80(활성 전 회색·활성 뒤 주황), 크레이트 폴백 없음, 목표 배너 2줄·셔터 아래 스택, 결과 목표 줄 y212/230, 타이틀 sub maxWidth', () => {
+  //  ① S7 을 x120 으로 굴려 캡슐이 화면에 든 프레임(r3.18: z 4100 은 dz 700 > armZ 440 = 피격 활성 전 → 내구 숫자 회색 + 자물쇠)
   const run = createRun(buildStage(7));
   while (run.z < 4100) { stepRun(run, { pointerX: 120, dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); }
   const c2 = run.supplies[1];
   assert.equal(c2.kind, 'capsule'); assert.equal(c2.opened, false);
+  const ops0 = drawRun(run);
+  const dur0 = textOf(ops0, '80');
+  assert.ok(dur0 && dur0.fill === C.gateZero && dur0.args[1] === 120, '활성 전 내구 80 은 회색');
+  //  활성 구간(dz ≤ 440)에 들어온 프레임: 주황
+  while (c2.z - run.z > BAL3.supply.armZ) { stepRun(run, { pointerX: 120, dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); }
+  assert.equal(c2.opened, false);
   const ops = drawRun(run);
   assert.ok(textOf(ops, '목표'), "'목표' 표지");
-  const dur = textOf(ops, '20');
-  assert.ok(dur && dur.fill === C.bulletHeavy && dur.args[1] === 120, '내구 20 이 캡슐 x 에(주황)');
+  //  활성 STEP 에 이미 날아와 있던 탄이 맞아 숫자는 80 아래일 수 있다 — 현재 내구값을 본다
+  const dur = textOf(ops, String(Math.max(0, Math.ceil(c2.durability))));
+  assert.ok(dur && dur.fill === C.bulletHeavy && dur.args[1] === 120, '내구 숫자가 캡슐 x 에(주황)');
   assert.ok(ops.some((o) => o.op === 'fill' && o.fill === C.capsuleGlass), '유리 반투명 채움');
   assert.ok(ops.some((o) => o.op === 'stroke' && o.stroke === C.capsule), '청록 테');
   assert.ok(textOf(ops, '+3'), '합류 수');

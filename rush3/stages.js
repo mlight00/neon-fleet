@@ -199,6 +199,7 @@ function makeRow(idx, g) {
 // 보급 통: 계약서 3-3 필드 전부 초기값 포함
 //  move(r3.13 차량) = { x0, x1, period } 복사본(구조 공유 금지 — buildStage 두 번이 deepEqual 이되 참조는 다르다). 정지 통은 null
 //  capsule(r3.14 구출 캡슐) = payload { n }(생략 시 supply.CAPSULE_N_DEFAULT). 이 분기가 없으면 chain payload 로 떨어져 합류 수가 NaN 이 된다
+//  armZ(r3.18) = true 면 BAL3.supply.armZ(440), 숫자면 그대로, 없으면 null(항상 활성 — 종전 통 전부)
 function makeSupplyDef(idx, s) {
   let payload;
   if (s.kind === 'soldier') payload = { n: s.n };
@@ -209,7 +210,8 @@ function makeSupplyDef(idx, s) {
            durability: s.durability, maxDurability: s.durability,
            payload, opened: false, missed: false, locked: false, skipped: false, pads: [],
            coverZ: s.coverZ ?? null, pairId: s.pairId ?? null, hint: s.hint ?? null,
-           move: s.move ? { x0: s.move.x0, x1: s.move.x1, period: s.move.period } : null };
+           move: s.move ? { x0: s.move.x0, x1: s.move.x1, period: s.move.period } : null,
+           armZ: s.armZ === true ? BAL3.supply.armZ : (s.armZ ?? null) };
 }
 
 //  signs = 벽 앞머리에 그리는 통로 안내 표지(연출이 아니라 계약 데이터 — V3-STAGES 가 실제 통 내용과 대조한다)
@@ -355,6 +357,7 @@ function makeArena(a) {
     boss: {
       r: b.r ?? B.r, spawnAhead: b.spawnAhead ?? B.spawnAhead, speed: b.speed ?? B.speed,
       touchEvery: b.touchEvery ?? B.touchEvery, touchDmg: b.touchDmg ?? B.touchDmg,
+      guard: b.guard ?? B.guard,
       ...(b.skin ? { skin: b.skin } : {}),
       dash: { ...B.dash, ...(b.dash ?? {}) },
       shock: { ...B.shock, ...(b.shock ?? {}) },

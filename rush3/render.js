@@ -631,9 +631,20 @@ export function createRenderer3(ctx, sprites) {
     if (!s.opened) drawSupplyContents(s, s.x, y);
     //  판 목표 표지(r3.14): 아직 얻을 수 있는 캡슐에만(놓친 뒤엔 흐린 몸체만 남는다)
     if (s.kind === 'capsule' && !s.opened && !s.missed && !s.skipped) drawObjectiveBadge(s.x, y, r);
+    //  피격 활성 전(armZ, r3.18): 통 둘레 회색 점선 링 + 모서리 자물쇠(셔터 잠김과 같은 형태 신호). 내구 숫자는 회색
+    const unarmed = s.armZ != null && runZ != null && !s.opened && s.z - runZ > s.armZ;
+    if (unarmed) {
+      ctx.save();
+      ctx.strokeStyle = C.wallTop; ctx.lineWidth = 2; ctx.globalAlpha = 0.7;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.arc(s.x, y, r + 8, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      drawLockBadge(s.x + r - 2, y - r + 4);
+    }
     //  남은 내구 숫자(주황) — 내용물과 구분되는 위치(통 아래)
     ctx.textAlign = 'center';
-    if (!s.opened) outlinedText(String(Math.max(0, Math.ceil(s.durability))), s.x, y + r + 18, 16, C.bulletHeavy, 'bold', 4);
+    if (!s.opened) outlinedText(String(Math.max(0, Math.ceil(s.durability))), s.x, y + r + 18, 16, unarmed ? C.gateZero : C.bulletHeavy, 'bold', 4);
     else if (!s.locked) outlinedText('쏘면 +1', s.x, y + r + 18, 13, C.chainPad, 'bold', 4);
     if (covered && !s.opened) {
       //  차폐 막 + 개방선(도로 위 가로선). 확정선(벽 회색 실선)과 다른 색으로 그려 '확정 뒤에도 잠깐 못 쏘는 이유'를 남긴다
@@ -781,6 +792,18 @@ export function createRenderer3(ctx, sprites) {
       ctx.strokeStyle = C.warn; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(b.x, y, b.r + 10, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
+    }
+    //  보호막(r3.18 아레나): 첫 착지 충격까지 피격 무효 — 하늘색 점선 링(r+16) + '보호막' 글자. 새 그림 없이 도형으로
+    if (b.guard) {
+      ctx.save();
+      ctx.strokeStyle = C.gatePos; ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.55 + Math.sin(now * 6) * 0.2;
+      ctx.setLineDash([10, 7]);
+      ctx.beginPath(); ctx.arc(b.x, y, b.r + 16, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      ctx.textAlign = 'center';
+      outlinedText('보호막', b.x, y - b.r - 22, 14, C.gatePos, 'bold', 4);
     }
     drawHpTag(b.x, y + b.r + 20, b.hp);
     const rl = role !== 'elite' ? (BAL3.elites?.roles?.[role]?.label ?? null) : null;

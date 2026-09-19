@@ -257,6 +257,8 @@ function enterArena(run, ev) {
     arena: true, r: B.r, x: ROAD.center, z: run.z + B.spawnAhead, state: 'chase', touchT: 0,
     dashT: B.dash.first, warnT: 0, recoverT: 0, dashTx: null, dashTz: null, dashUx: 0, dashUz: 0, dashLeft: 0,
     summon: !!B.summon, spawnT: B.summon ? B.summon.every : 0, shoot: !!B.shoot, shootT: B.shoot ? B.shoot.every : 0,
+    //  보호막(r3.18 대항 검수 반영): 첫 착지 충격까지 피격 무효. 탄은 흡수(bossGuard)·폭발·연쇄 무효. arenaShock 의 첫 호출이 내린다(bossGuardOff)
+    guard: !!B.guard,
   });
   if (B.skin) bo.skin = B.skin;
   bo.px = bo.x; bo.pz = bo.z;
@@ -377,7 +379,9 @@ function moveBullets(run, ev, dt) {
 }
 
 // 적·보스 직격. hp <= 0 즉시 dead(같은 STEP 이후 처리에서 제외). heavy 는 적 직격 시에만 폭발
+//  보호막(r3.18): guard 인 아레나 보스에 닿은 탄은 관통탄이라도 흡수되고(hp 불변·폭발/연쇄 없음) 이벤트 bossGuard 만 낸다 — 셔터·차폐와 같은 '흡수' 계열
 function hitEnemy(run, e, b, ev) {
+  if (e.guard) { b.dead = true; ev.push({ type: 'bossGuard', id: e.id, x: b.x, z: e.z }); return; }
   //  관통(저격총): 맞힌 적 id 를 기억하고, 맞힌 수가 pierce 미만이면 탄은 살아서 계속 간다(pierce 2 = 적 2체까지)
   if (b.pierce) { b.hit.push(e.id ?? 'boss'); if (b.hit.length >= b.pierce) b.dead = true; }
   else b.dead = true;
@@ -396,7 +400,7 @@ function chainArc(run, from, n, r, dmg, ev) {
   const pool = run.enemies.concat(run.bosses);
   const cand = [];
   for (const t of pool) {
-    if (t === from || t.dead) continue;
+    if (t === from || t.dead || t.guard) continue;
     const d = Math.hypot(t.x - from.x, t.z - from.z);
     if (d > r + t.r) continue;
     if (wallBetween(run.walls.concat(run.covers), from.x, from.z, t.x, t.z)) continue;
@@ -425,7 +429,7 @@ function blast(run, center, r, dmg, ev) {
   ev.push({ type: 'blast', x: center.x, z: center.z, r });
   const targets = run.enemies.concat(run.bosses);
   for (const t of targets) {
-    if (t === center || t.dead) continue;
+    if (t === center || t.dead || t.guard) continue;
     const d = Math.hypot(t.x - center.x, t.z - center.z);
     if (d > r + t.r) continue;
     if (wallBetween(run.walls.concat(run.covers), center.x, center.z, t.x, t.z)) continue;
@@ -533,11 +537,13 @@ function arenaBossAct(run, bo, ev, dt) {
 }
 
 //  착지 충격(r3.17): 충격 원(bo.x, bo.z, shock.r)과 겹치는 유닛 전부 hp −dmg(cause 'shock'). 이벤트 bossShock { x, z, r, hits }
+//  r3.18: 첫 충격 STEP 에 보호막 해제(bossShock 뒤 bossGuardOff 1회) — 그 STEP 의 탄(5단계)은 이미 흡수됐고 다음 STEP 부터 맞는다
 function arenaShock(run, bo, ev) {
   const S = run.arena.boss.shock;
   const hits = overlappingUnits(run.units, bo.x, bo.z, S.r, null, squadOrigin(run));
   for (const u of hits) damageUnit(run, u, S.dmg, 'shock', ev, bo.x, bo.z);
   ev.push({ type: 'bossShock', x: bo.x, z: bo.z, r: S.r, hits: hits.length });
+  if (bo.guard) { bo.guard = false; ev.push({ type: 'bossGuardOff', id: bo.id, x: bo.x, z: bo.z }); }
 }
 
 // 저격수: shootEvery 주기로 예고(aim) 시작, aimTime 뒤 발사 시점의 (run.x, run.z)를 조준해 1발. 부대 줄을 지나면 쏘지 않는다

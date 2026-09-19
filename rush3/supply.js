@@ -8,6 +8,8 @@
 // pairId = 벽으로 배제되는 쌍의 이름. 한 판에서 같은 pairId 는 최대 1개만 열린다.
 // move(r3.13 차량) = { x0, x1, period } | null. 통의 z 는 고정이고 x 만 삼각파(왕복)로 움직인다. homeX = 출발 x(위상 원점),
 //   moveT = 화면 진입(obj.z - run.z <= ENTER_Z)부터 센 자기 시계(초, null = 아직 진입 전), prevX = 직전 STEP 의 x(탄 캡슐 스윕용).
+// armZ(r3.18 대항 검수 반영) = 피격 활성 구간(px) | null. s.z − run.z > armZ 인 동안 탄은 흡수되고(supplyBlock reason 'arm') 내구는 줄지 않는다 —
+//   게이트 셔터와 같은 꼴. 화면 위(진입선 760)에서 탄 줄기에 맞아 **보이기도 전에 열리는 것**을 막는다. null = 항상 활성(종전 통 전부).
 // 유닛 증감은 squad.js 의 addUnits/removeUnits 를 직접 호출한다(콜백 주입 없음).
 import { addUnits } from './squad.js';
 import { triWave } from './motion.js';
@@ -36,8 +38,15 @@ export function makeSupply(def) {
     padStart: def.padStart ?? PAD_START, padGap: def.padGap ?? PAD_GAP,
     //  r3.13 차량: move 는 복사본(구조 공유 금지). 정지 통은 move null 이고 prevX 는 항상 x 와 같다
     move, homeX: def.x, moveT: null, prevX: def.x,
+    //  r3.18: 피격 활성 구간. 없으면 null(종전과 같은 객체 키 집합 + 이 칸 하나)
+    armZ: def.armZ ?? null,
   };
   return s;
+}
+
+/** 피격 활성 여부(r3.18). armZ 가 없으면 항상 true. run 이 없으면(옛 합성 호출) true — 흡수를 조용히 만들지 않는다 */
+export function supplyArmed(s, run) {
+  return s.armZ == null || !run || s.z - run.z <= s.armZ;
 }
 
 /** 차량 통의 x(r3.13). 삼각파 왕복: x0 → x1 → x0 가 period 초. homeX 가 x0 이면 오른쪽으로, x1 이면 왼쪽으로 먼저 간다.
@@ -164,7 +173,12 @@ export function hitSupply(s, bullet, events, run) {
   bullet.dead = true;
   //  차폐 구간: 흡수만 하고 내구는 줄지 않는다(⚠️sweepContactSupply·supplyActive 에 넣으면 흡수가 통과로 뒤집힌다)
   if (supplyCovered(s, run)) {
-    events.push({ type: 'supplyBlock', id: s.id, x: bullet.x, z: s.z });
+    events.push({ type: 'supplyBlock', id: s.id, x: bullet.x, z: s.z, reason: 'cover' });
+    return true;
+  }
+  //  피격 활성 전(armZ, r3.18): 차폐와 같은 흡수. 차폐가 먼저 판정되므로 둘 다 걸린 통의 reason 은 'cover'
+  if (!supplyArmed(s, run)) {
+    events.push({ type: 'supplyBlock', id: s.id, x: bullet.x, z: s.z, reason: 'arm' });
     return true;
   }
   if (s.opened) {

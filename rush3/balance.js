@@ -58,7 +58,9 @@ export const BAL3 = deepFreeze({
   //  null 인 행은 항상 열림(학습용). 닫힌 셔터에 닿은 탄은 흡수되고 값은 변하지 않는다(계약서 3-2)
   gate: { h: 24, flashT: 0.12, armZ: 340, openT: 0.25, colors: { pos: '#35E5FF', neg: '#FF6A3D', zero: '#9AA1AC' } },
   // 보급 통(3-3장): 반경 30, chain 발판 = s.z + 60 + i*40, 발판 판정 |run.x - pad.x| <= 70
-  supply: { r: 30, padOffset: 60, padGap: 40, padHalfW: 70 },
+  //  armZ(r3.18 대항 검수 반영) = 통 피격 활성 구간(부대 중심 기준 전방 거리 px). 정의에 armZ: true 인 통은 s.z − run.z <= armZ 가 되기 전까지 탄을 흡수하고 내구가 줄지 않는다
+  //   (게이트 셔터 armZ 와 같은 꼴). 440 = 화면 y 200(HUD 아래) — 화면에 **보인 뒤에 열린다**를 규칙으로 보장(차량·캡슐만 켠다, 정지 통은 종전대로 null)
+  supply: { r: 30, padOffset: 60, padGap: 40, padHalfW: 70, armZ: 440 },
   // 벽(3-6장): 중앙 분리벽 기본 x 228~252
   wall: { x0: 228, x1: 252 },
   // 적 4종(3-7장). vz 는 세계 기준 부대 쪽 접근 속도(양수)
@@ -109,7 +111,10 @@ export const BAL3 = deepFreeze({
     bossZ: [-80, 560],
     boss: { r: 48, spawnAhead: 500, speed: 110, touchEvery: 0.5, touchDmg: 3,
             dash: { every: 3.0, first: 1.5, warn: 0.8, speed: 620, range: 420, recover: 0.6 },
-            shock: { r: 70, dmg: 1 }, summon: null, shoot: null },
+            shock: { r: 70, dmg: 1 }, summon: null, shoot: null,
+            //  guard(r3.18 대항 검수 반영) = 첫 착지 충격까지 피격 무효(보호막). 탄은 흡수(bossGuard), 폭발·연쇄도 무효. 첫 충격 STEP 에 해제(bossGuardOff).
+            //   자동 조준(명중 ≈ 100%)이라 도착 병력이 크면 첫 돌진 전에 죽는 것을 규칙으로 막는다 — 최소 1회 예고·돌진·충격을 반드시 본다
+            guard: true },
   },
   // 난이도 배수(계약서 3-8). 위협만 올리고 성장 축(게이트·보급·무기·병사 hp·armZ·coverZ)은 손대지 않는다.
   //  normal 은 전부 ×1 = 종전과 완전히 같은 판. 배수는 buildStage/createRun 시점에 한 번 적용되고 stepRun 안에는 난이도 분기가 없다.

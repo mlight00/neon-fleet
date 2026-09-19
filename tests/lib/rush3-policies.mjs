@@ -4,6 +4,8 @@ import { createRun, stepRun, drainEvents, STEP } from '../../rush3/combat.js';
 import { buildStage } from '../../rush3/stages.js';
 import { targetX } from '../../rush3/bonus.js';
 import { BAL3 } from '../../rush3/balance.js';
+import { vehicleX } from '../../rush3/supply.js';
+import { weaponStats } from '../../rush3/weapons.js';
 
 /** 탐욕 봇(aim): 가장 가까운(z 최소) 미획득 통·발판·게이트의 **현재 값이 큰 칸** 차선으로 이동.
  *  ⚠️게이트 칸을 '지금 값'으로 고르므로 상한이 큰 음수 칸(예: −25 → +40)을 절대 고르지 않는다 — POL-8 의 구분 축. */
@@ -65,6 +67,16 @@ export function botArena(run) {
   return best;
 }
 
+/** 차량 선행 조준 봇(lead, r3.18 대항 검수 반영): 화면에 든(moveT !== null) 가장 가까운 미개봉 차량 통에 대해, 탄이 닿을 때(비행시간 dz ÷ (탄 속도 − 전진 속도))의
+ *  통 x 를 vehicleX 로 미리 계산해 그 자리로 간다. 차량이 없으면 240. '갈 자리에 미리 서라'를 기계적으로 따르는 봇 — 내구 재산정의 기준(무입력·현재 위치 추종은 못 열고 이 봇만 연다) */
+export function botVehicleLead(run) {
+  let s = null;
+  for (const c of run.supplies) if (c.move && !c.opened && !c.missed && !c.skipped && c.z > run.z && c.z - run.z <= 760 && (!s || c.z < s.z)) s = c;
+  if (!s || s.moveT === null) return 240;
+  const w = weaponStats(run.weapon, run.weaponMk || 1);
+  return vehicleX(s.move, s.homeX, s.moveT + (s.z - run.z) / Math.max(1, w.vz - BAL3.scroll));
+}
+
 export function botPlanBoss(run) {
   if (run.phase === 'bonus') {
     const vz = (BAL3.weapons[run.weapon] ?? BAL3.weapons.rifle).vz;
@@ -108,6 +120,8 @@ export function pickX(policy, run) {
     case 'aim': return botAim(run);
     case 'plan': return botPlan(run);
     case 'planBoss': return botPlanBoss(run);
+    //  r3.18: 차량 선행 조준(POLICIES 목록엔 넣지 않는다 — 24판·27판 표 불변). 정예 뒤는 planBoss 와 같다
+    case 'lead': return run.boss ? botPlanBoss(run) : botVehicleLead(run);
     default: throw new Error('unknown policy ' + policy);
   }
 }

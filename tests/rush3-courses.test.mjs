@@ -7,8 +7,8 @@ import { COURSE_IDS } from '../rush3/courses.js';
 import { cellAt } from '../rush3/gates.js';
 import { WEAPONS } from '../rush3/weapons.js';
 import { BAL3 } from '../rush3/balance.js';
-import { playPolicy } from './lib/rush3-policies.mjs';
-import { createRun, stepRun } from '../rush3/combat.js';
+import { playPolicy, pickInput } from './lib/rush3-policies.mjs';
+import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 
 const NEW = COURSE_IDS;
 //  장치 교체로 코스 버전을 올린 번호(기록은 버전별로 보존된다 — 계약서 7장). 새 장치 담당은 여기에 자기 키만 추가한다.
@@ -104,7 +104,10 @@ test('V3-COURSE C-4: 통·벽·스폰 — 통은 도로 안·무기 id 유효, �
 });
 function stageDefLotteryWall() { return 3; }
 
-test('V3-COURSE C-5: 성공 경로(보통) — 4~24 전부 planBoss 봇이 완주한다(봇 결과 — 사람 성공률 아님)', (t) => {
+//  r3.18 대항 검수 반영 하한: 복수 정예(9·23)는 등장 → 마지막 격파까지 최소 생존 초, 아레나(10·11·24)는 **첫 착지 충격(첫 recover)이 격파보다 먼저**(보호막이 잠근다)
+//   + 최소 전투 초. 종전엔 정예가 1.9~3.5초, 아레나 보스가 첫 돌진 전에 죽어 장치가 화면에 나타날 시간이 없었다
+const MIN_FIGHT = { 9: 8, 23: 6, 10: 6, 11: 6, 24: 6 };
+test('V3-COURSE C-5: 성공 경로(보통) — 4~24 전부 planBoss 봇이 완주한다(봇 결과 — 사람 성공률 아님), 정예 생존·첫 충격 하한', (t) => {
   const rows = [];
   for (const id of NEW) {
     const r = playPolicy(id, 'planBoss', 14400, 'normal');
@@ -112,6 +115,22 @@ test('V3-COURSE C-5: 성공 경로(보통) — 4~24 전부 planBoss 봇이 완�
     assert.equal(r.run.over, true, `S${id} 끝나지 않음`);
     assert.ok(r.steps < 14400, `S${id} 상한 안`);
     assert.equal(r.run.won, true, `S${id} planBoss 미완주(정예 잔여 hp ${r.run.boss ? Math.ceil(r.run.boss.hp) : 0}, 병력 ${r.run.units.length})`);
+  }
+  for (const [id, minSec] of Object.entries(MIN_FIGHT).map(([k, v]) => [Number(k), v])) {
+    const run = createRun(buildStage(id, { difficulty: 'normal' }));
+    let t0 = null, lastKill = null, firstShock = null, firstKill = null;
+    for (let i = 0; i < 14400 && !run.over; i++) {
+      stepRun(run, pickInput('planBoss', run), STEP);
+      for (const e of drainEvents(run)) {
+        if ((e.type === 'elite' || e.type === 'arenaEnter') && t0 === null) t0 = run.time;
+        if (e.type === 'bossShock' && firstShock === null) firstShock = run.time;
+        if (e.type === 'bossKill') { if (firstKill === null) firstKill = run.time; lastKill = run.time; }
+      }
+    }
+    assert.ok(run.won && t0 !== null && lastKill !== null, `S${id} 완주`);
+    assert.ok(lastKill - t0 >= minSec, `S${id} 전투 ${(lastKill - t0).toFixed(1)}초 < ${minSec}초`);
+    if (buildStage(id).arena) assert.ok(firstShock !== null && firstShock < firstKill, `S${id} 첫 충격(${firstShock})이 격파(${firstKill})보다 먼저여야 한다`);
+    rows.push(`S${id} fight=${(lastKill - t0).toFixed(1)}s firstShock=${firstShock == null ? '-' : (firstShock - t0).toFixed(1)}`);
   }
   for (const line of rows) t.diagnostic('COURSE ' + line);
 });

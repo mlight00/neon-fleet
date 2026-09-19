@@ -456,6 +456,7 @@ export function boot(canvas, deps = {}) {
   const trapShown = (id) => !hiddenRow(id) && isFixedGateRow(rowById(id));
   function handleEvents(events) {
     collectLotteryOutcome(run.lotteryOutcome, events, run);
+    let guardSfx = false;
     for (const ev of events) {
       switch (ev.type) {
         case 'fire':
@@ -579,6 +580,9 @@ export function boot(canvas, deps = {}) {
         //  돌진 예고 = 중립 경고음(lotWarn 재사용). 화면의 붉은 원·점선은 이벤트가 아니라 run.boss.state 를 렌더가 직접 읽는다
         case 'bossDashWarn': fx.sfx.push(['lotWarn']); break;
         case 'bossDash': fx.sfx.push(['gateClang']); break;
+        //  보호막(r3.18): 흡수된 탄마다 회색 스파크(차폐물 흡수와 같은 표현), 효과음은 프레임당 1회. 해제는 반전음 + 보스 위 글자
+        case 'bossGuard': spawnBurst(fx, ev.x, sy(ev.z), 4, false, C.wall); if (!guardSfx) { guardSfx = true; fx.sfx.push(['gateClang']); } break;
+        case 'bossGuardOff': fx.sfx.push(['gateFlip']); floater(fx, ev.x, sy(ev.z) - 70, '보호막 해제!', C.gatePos, true); break;
         //  착지 충격: 확장 링 + 흔들림. hits > 0 이면 hurt 이벤트가 따로 나므로 피격 플래시·hurt 음은 그쪽이 맡는다
         case 'bossShock': fx.shocks.push({ x: ev.x, y: sy(ev.z), r: ev.r, t: 0, life: FX.shockRingSec }); fx.shakeT = FX.shakeDur; break;
         case 'lose': fx.sfx.push(['lose']); break;
@@ -759,7 +763,10 @@ export function boot(canvas, deps = {}) {
     //  y(r3.17 아레나 세로 입력)는 뒤에 붙는 선택 인자 — 도로에서는 규칙이 읽지 않는다
     if (state === 'run') input.onPointerDown(x, e.pointerType, e.pointerId, y);
   });
+  //  r3.18 대항 검수 반영: 출격 중(state 'run')에만 넘긴다. 정지 화면에서 ⏸ → [계속하기]로 마우스를 옮긴 만큼 dragDy 가 쌓여
+  //   재개 첫 STEP 에 부대가 광장 아래로 튀던 문제(tay −242 → +40). pause() 의 input.reset() 뒤 정지 중 이동은 버리고, 재개 뒤 첫 이동은 lastY 기준만 잡는다
   canvas.addEventListener('pointermove', (e) => {
+    if (state !== 'run') return;
     const [x, y] = toLogical(e);
     input.onPointerMove(x, e.pointerType, e.pointerId, y);
   });
@@ -823,6 +830,9 @@ export function boot(canvas, deps = {}) {
     dashTx: run && run.boss && run.boss.dashTx != null ? Math.round(run.boss.dashTx) : null,
     dashTz: run && run.boss && run.boss.dashTz != null ? Math.round(run.boss.dashTz) : null,
     bossHp: run && run.boss ? Math.ceil(run.boss.hp) : null, lossByShock: run ? run.lossByShock : 0,
+    //  r3.18: bossGuard(보호막 남아 있는가) · supplyArmed(피격 활성 구간에 든 통 id 목록 — armZ 가 있는 통만)
+    bossGuard: !!(run && run.boss && run.boss.guard),
+    supplyArmed: run ? run.supplies.filter((s) => s.armZ != null && !s.opened && s.z - run.z <= s.armZ).map((s) => s.id) : [],
   });
   if (win) win.__rush3Dbg = dbg;
 
