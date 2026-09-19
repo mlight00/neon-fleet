@@ -469,15 +469,18 @@ export function createRenderer3(ctx, sprites) {
     ctx.textBaseline = 'middle';
     if (s.kind === 'soldier') {
       const n = s.payload.n ?? 0;
-      const show = Math.min(n, 6);
-      for (let i = 0; i < show; i++) {
-        const px = x + (i - (show - 1) / 2) * 9, py = y - 6;
-        ctx.fillStyle = C.soldier;
-        ctx.beginPath();
-        ctx.arc(px, py - 5, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillRect(px - 3, py - 1, 6, 8);
-      }
+      //  병사 수 아이콘(2026-09-19 Gemini ICON_soldiers_1~3): 1·2·3명은 그 그림, 4명 이상은 3명 그림 + 숫자. 없으면 종전 실루엣
+      drawImgCentered('soldiers_' + Math.max(1, Math.min(3, n)), x, y - 8, 30, () => {
+        const show = Math.min(n, 6);
+        for (let i = 0; i < show; i++) {
+          const px = x + (i - (show - 1) / 2) * 9, py = y - 6;
+          ctx.fillStyle = C.soldier;
+          ctx.beginPath();
+          ctx.arc(px, py - 5, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillRect(px - 3, py - 1, 6, 8);
+        }
+      });
       outlinedText('+' + n, x, y + 16, 18, C.supplyBody, 'bold', 4);
     } else if (s.kind === 'weapon') {
       const w = WEAPONS[s.payload.weapon] ?? WEAPONS.rifle;
@@ -494,9 +497,11 @@ export function createRenderer3(ctx, sprites) {
     } else if (s.kind === 'capsule') {
       //  구출 캡슐(r3.14): 유리 안의 사람 실루엣(머리 원 + 몸통, 그림자 없음) + 합류 수. 몸체(유리·받침)는 drawCapsuleBody 가 먼저 그린다
       const r = s.r;
-      ctx.fillStyle = C.soldier;
-      ctx.beginPath(); ctx.arc(x, y - r * 0.5, r * 0.22, 0, Math.PI * 2); ctx.fill();
-      roundRect(x - r * 0.26, y - r * 0.24, r * 0.52, r * 0.58, r * 0.12); ctx.fill();
+      if (!get('capsule')) {
+        ctx.fillStyle = C.soldier;
+        ctx.beginPath(); ctx.arc(x, y - r * 0.5, r * 0.22, 0, Math.PI * 2); ctx.fill();
+        roundRect(x - r * 0.26, y - r * 0.24, r * 0.52, r * 0.58, r * 0.12); ctx.fill();
+      }
       outlinedText('+' + (s.payload.n ?? 0), x, y + r * 0.45, 14, C.supplyBody, 'bold', 4);
     } else {
       ctx.fillStyle = C.chainPad;
@@ -531,18 +536,21 @@ export function createRenderer3(ctx, sprites) {
     ctx.stroke();
     ctx.restore();
     shadow(s.x, y + r * 0.95, r * 1.05);
-    //  바퀴 4개(반지름 6, 외곽선 색)는 몸체보다 먼저 — 위아래 가장자리에서 반쯤 내다보여 위에서 본 차로 읽힌다
-    ctx.fillStyle = C.outline;
-    for (const kx of [-1, 1]) for (const ky of [-1, 1]) {
-      ctx.beginPath(); ctx.arc(s.x + kx * (r - 8), y + ky * (r * 0.7 + 2), 6, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.fillStyle = C.supplyDark;
-    roundRect(s.x - r - 4, y - r * 0.7, r * 2 + 8, r * 1.4, 8); ctx.fill();
-    ctx.strokeStyle = C.gold; ctx.lineWidth = 4;
-    roundRect(s.x - r - 4, y - r * 0.7, r * 2 + 8, r * 1.4, 8); ctx.stroke();
-    //  앞유리: 진행 방향 쪽 가장자리 안쪽(방향이 없으면 오른쪽)
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillRect(dir < 0 ? s.x - r - 4 + 5 : s.x + r + 4 - 11, y - r * 0.45, 6, r * 0.9);
+    //  차량 그림(2026-09-19 Gemini D_vehicle, 뒤·위 3/4 시점)이 있으면 그것을, 없으면 종전 도형(바퀴 4 + 상자 + 앞유리)
+    drawImgCentered('vehicle', s.x, y - r * 0.15, r * 2.5, () => {
+      //  바퀴 4개(반지름 6, 외곽선 색)는 몸체보다 먼저 — 위아래 가장자리에서 반쯤 내다보여 위에서 본 차로 읽힌다
+      ctx.fillStyle = C.outline;
+      for (const kx of [-1, 1]) for (const ky of [-1, 1]) {
+        ctx.beginPath(); ctx.arc(s.x + kx * (r - 8), y + ky * (r * 0.7 + 2), 6, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = C.supplyDark;
+      roundRect(s.x - r - 4, y - r * 0.7, r * 2 + 8, r * 1.4, 8); ctx.fill();
+      ctx.strokeStyle = C.gold; ctx.lineWidth = 4;
+      roundRect(s.x - r - 4, y - r * 0.7, r * 2 + 8, r * 1.4, 8); ctx.stroke();
+      //  앞유리: 진행 방향 쪽 가장자리 안쪽(방향이 없으면 오른쪽)
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillRect(dir < 0 ? s.x - r - 4 + 5 : s.x + r + 4 - 11, y - r * 0.45, 6, r * 0.9);
+    });
     //  방향 화살표: 몸체 밖 진행 방향 쪽 작은 삼각형(꼭짓점 x = s.x + dir·(r + 22))
     if (dir !== 0) {
       ctx.save();
