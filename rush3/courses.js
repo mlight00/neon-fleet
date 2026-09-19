@@ -1,6 +1,6 @@
 // rush3/courses.js — 4~24 스테이지 정의(묶음 B-2·B-3, 2026-09-19 1차 배치). 순수 데이터 + 작은 조립 헬퍼, 난수 없음.
 //  1~3 은 stages.DEFS 그대로(코스 버전 2, 기록 보존). 여기 21개는 실게임 구현계획 B-2 설계표·B-3 역할표·C-1~C-3 자산표를 따른다.
-//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 복수 정예(9·23)·아레나(10·11·24)는
+//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 아레나(10·11·24)는
 //   장치가 아직 없어 **기존 장치로 그 자리의 '배우는 것'을 근사**한다. 13~22 의 새 역할(장갑체·복병·생성기·방해형·카트)은
 //   기존 행동(잡졸·돌격체·저격수)에 **체력·그림(skin)만 바꿔** 근사한다 — 행동 자체는 다음 회차.
 //  공통 규칙: 길이 30~60초(z = 초 × 190) · 게이트 행은 도로 80~400 완전 피복 · 배제 쌍은 coverZ = coverZFor(벽 z0, 통 z) · 초반엔 명확한 성공 경로.
@@ -28,6 +28,11 @@ const mv = (x0, x1, period) => ({ move: { x0, x1, period } });
 //   보너스 스테이지 불변식: 게이트·통·스폰 z 가 전부 eliteZ(없으면 length) 이하(보너스 구간엔 피해원·보상이 없다 — buildStage 가 빌드 시점에 throw 로 잠근다, V3-BONUS B-1)
 const bonus = (sec, targets, o = {}) => ({ sec, targets, ...o });
 const target = (dz, x0, x1, period, hp, value, o = {}) => ({ dz, x0, x1, period, hp, value, phase: o.phase ?? 0, ...(o.respawn != null ? { respawn: o.respawn } : {}) });
+//  복수 정예(r3.16): 스테이지 정의에 elites: [elite(hp, role, x, o), ...](1~3체) — 전원 eliteZ 에서 함께 등장한다.
+//   role = 'gunner'(부채꼴 사격만) | 'summoner'(잡졸 소환만) | 'tank'(사격·소환 없음, 느리게 더 가까이 정지, 순찰 절반) | 'elite'(단수 정예 그대로).
+//   x = 스폰 x 이자 순찰 차선 중심(반폭 BAL3.elites.laneHw 32, o.patrol 로 덮어쓴다 — 0 이면 제자리). 2체는 160/320, 3체는 130/240/350 이면 원(r48)이 겹치지 않는다.
+//   o.skin = 그림(B2·B3·B4). 체력 합은 종전 단수 정예의 1.2~1.5배 안에서 봇(planBoss) 완주가 되는 값으로 잡는다(C-5·V3-MULTIELITE ME-6 이 잠근다)
+const elite = (hp, role, x, o = {}) => ({ hp, role, x, ...o });
 const wall = (z0, z1, L, R) => ({ z0, z1, signs: { L, R } });
 const cover = (x0, x1, z0) => ({ kind: 'cover', x0, x1, z0, z1: z0 + 40 });
 const wave = (z, kind, xs, o = {}) => ({ z, kind, n: xs.length, xs, corridorHw: null, ...o });
@@ -92,13 +97,15 @@ export function makeCourses({ coverZFor }) {
     spawns: [wave(1800, 'grunt', [140, 340]), mass(3000, 'grunt', 10, 2), wave(4200, 'rusher', [120, 240, 360], HOUND), mass(6200, 'grunt', 16, 2)],
     elite: { z: 7400, hp: 260, summon: true },
     bonus: bonus(20, [target(240, 120, 360, 4.0, 12, 2), target(320, 140, 340, 3.0, 16, 3, { phase: 0.75 }), target(400, 200, 280, 2.2, 20, 3, { phase: 0.5 }), target(480, 105, 375, 6.0, 32, 5, { phase: 0.25, respawn: 0.8 })]) };
-  //  9 둘을 동시에(근사: 정예 B2 그림 + 소환 — 복수 정예는 다음 회차)(BG2)
-  C[9] = { version: 1, title: '갠트리', bg: 2, startUnits: 5, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
+  //  9 둘을 동시에(r3.16 복수 정예 실제 장치 — 포격형 B1(좌, x160) + 소환형 B2(우, x320)가 같은 STEP 에 등장. 둘 다 잡아야 승리이고
+  //   소환형을 먼저 잡으면 그가 낳은 잡졸은 남는다 = 순서를 고른 결과가 화면에 남는다. 체력 합 440 = 근사 시절 단수 360 의 1.22배.
+  //   version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG2)
+  C[9] = { version: 2, title: '갠트리', bg: 2, startUnits: 5, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
     gates: [g3(1600, -4, 3, -6), g2(4200, -14, 4, { max: 24 }), g3(7000, 5, -12, -3, { max: 24 })],
     supplies: [...pair(coverZFor, 2400, 2900, soldier(0, 120, 4, 8), weapon(0, 326, 'sniper', 14), 'w1'), soldier(5400, 240, 6, 16), chain(6200, 340, 6, 12, 8)],
     walls: [wall(2400, 3600, { kind: 'soldier', n: 4 }, { kind: 'weapon', weapon: 'sniper' })],
     spawns: [wave(4000, 'grunt', [95, 137, 179, 221], { corridorHw: 61 }), wave(4000, 'shooter', [300, 370]), mass(5800, 'grunt', 12, 2), wave(7600, 'rusher', [120, 240, 360], HOUND), wave(8200, 'shooter', [150, 330])],
-    elite: { z: 9000, hp: 360, summon: true, skin: 'B2_gantrywidow' } };
+    elites: [elite(200, 'gunner', 160), elite(240, 'summoner', 320, { skin: 'B2_gantrywidow' })] };
   //  10 광장(근사: 넓은 직선 + 추격형 정예 B3 그림 — 아레나 전환은 다음 회차)(BG4)
   C[10] = { version: 1, title: '광장', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
     gates: [g2(1400, 4, -8), g3(4400, -6, 5, -6, { max: 20 }), g2(7200, 6, -16, { max: 30 })],
@@ -190,13 +197,14 @@ export function makeCourses({ coverZFor }) {
     walls: [wall(3200, 4400, { kind: 'soldier', n: 7 }, { kind: 'weapon', weapon: 'arc' })],
     spawns: [wave(2000, 'grunt', [140, 340], CART), wave(5100, 'grunt', [95, 137, 179, 221], { corridorHw: 61 }), wave(5100, 'shooter', [300, 370]), wave(6800, 'grunt', [120, 240, 360], CART), mass(7200, 'grunt', 16, 2), wave(8800, 'rusher', [100, 200, 280, 380], HOUND)],
     elite: { z: 9600, hp: 640, summon: true } };
-  //  23 복수 정예(근사: 소환형 정예 B2 그림 + 최대 밀도 — 3체 동시는 다음 회차)(BG5)
-  C[23] = { version: 1, title: '세 정예', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10600, eliteZ: 10200,
+  //  23 세 정예(r3.16 복수 정예 실제 장치 — 포격형 B3(좌 x130) + 소환형 B2(우 x350) + 장갑형 B4(가운데 x240, 제자리·가장 가까이 정지)가 같은 STEP 에 등장.
+  //   HUD 막대 3칸·'남은 목표 N/3'. 체력 합 940 = 근사 시절 단수 760 의 1.24배. version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG5)
+  C[23] = { version: 2, title: '세 정예', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10600, eliteZ: 10200,
     gates: [g2(1400, 4, -10), g3(4400, -8, 8, -8, { max: 30 }), g2(7200, 10, -24, { max: 36 }), g3(9000, -10, 10, -10, { max: 30 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 120, 6, 14), soldier(3400, 360, 6, 14), weapon(5600, 240, 'heavy', 18), soldier(6400, 240, 9, 22), soldier(8000, 150, 6, 16)],
     walls: [cover(190, 290, 4020), cover(80, 186, 8620)],
     spawns: [wave(1900, 'grunt', [140, 340], ARMOR), wave(3000, 'rusher', [120, 240, 360], JUMPER), wave(5000, 'shooter', [150, 330], POD), mass(6000, 'grunt', 16, 2), wave(7800, 'grunt', [120, 240, 360], CART), wave(9400, 'shooter', [120, 240, 360], MAGNET), mass(9700, 'grunt', 12, 2)],
-    elite: { z: 10200, hp: 760, summon: true, skin: 'B2_gantrywidow' } };
+    elites: [elite(260, 'gunner', 130, { skin: 'B3_railleviathan' }), elite(300, 'summoner', 350, { skin: 'B2_gantrywidow' }), elite(380, 'tank', 240, { skin: 'B4_smelter', patrol: 0 })] };
   //  24 최종(근사: 최종 보스 B5 그림, 최대 체력·소환 — 아레나는 다음 회차)(BG5)
   C[24] = { version: 1, title: '크라운 브레이커', bg: 5, startUnits: 8, startWeapon: 'rifle', length: 11200, eliteZ: 10800,
     gates: [g3(1500, -6, 6, -6), g2(4200, -18, 8, { max: 30 }), g3(6800, 8, -24, 8, { max: 36 }), g2(9200, 12, -30, { max: 40 })],

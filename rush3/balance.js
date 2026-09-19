@@ -78,6 +78,22 @@ export const BAL3 = deepFreeze({
                // 소환(S3): 4s 마다 grunt 2 (정예 x±40, z = 정예 z −40)
                summonEvery: 4, summonKind: 'grunt', summonN: 2, summonDx: 40, summonDz: -40 },
   },
+  // 복수 정예(r3.16 · 01 §5-8 · 계획서 B-1 장치 5): 스테이지 정의 `elites: [{ hp, role, x, skin, patrol, summon }]` 의 역할 표.
+  //  ⚠️enemies 에 넣지 않는다 — combat.enemyDefsFor 가 enemies 를 kind 로 순회하므로 거기에 두면 가짜 kind 가 생긴다(DIFF-3 이 kind 4종을 잠근다).
+  //  사격 주기·소환 주기·r·부채꼴·접촉·spawnAhead 는 enemies.elite 그대로(난이도 배수도 종전 자리에서 적용). 역할은 **행동의 유무와 정지 거리·속도 배수**만 정한다.
+  //   elite    = 종전 단수 정예 그대로(사격 + 정의의 summon 플래그대로 소환). summon null = 정의 플래그를 따른다
+  //   gunner   = 사격만(부채꼴 3발) · summoner = 소환만(잡졸 2/4초) · tank = 사격·소환 없음, 체력 큼, 느리게 내려와 더 가까이(360) 정지, 순찰 절반
+  //  laneHw = 정의에 x 가 있을 때 순찰 반폭(px). 2체 x160/320 이면 원 r48 이 겹치지 않는 최대값(160+32+48 = 240 = 320−32−48).
+  //  holdAhead 460 은 화면 y 180(그림 반높이 62 → 위 118)이라 HUD 정예 막대 글(y 111)과 겹치지 않는다. 360 은 y 280.
+  elites: {
+    laneHw: 32,
+    roles: {
+      elite:    { label: '정예', shoot: true,  summon: null,  holdAhead: 420, descendMul: 1,   patrolMul: 1 },
+      gunner:   { label: '포격', shoot: true,  summon: false, holdAhead: 420, descendMul: 1,   patrolMul: 1 },
+      summoner: { label: '소환', shoot: false, summon: true,  holdAhead: 460, descendMul: 1,   patrolMul: 1 },
+      tank:     { label: '장갑', shoot: false, summon: false, holdAhead: 360, descendMul: 0.7, patrolMul: 0.5 },
+    },
+  },
   // 난이도 배수(계약서 3-8). 위협만 올리고 성장 축(게이트·보급·무기·병사 hp·armZ·coverZ)은 손대지 않는다.
   //  normal 은 전부 ×1 = 종전과 완전히 같은 판. 배수는 buildStage/createRun 시점에 한 번 적용되고 stepRun 안에는 난이도 분기가 없다.
   //  근거: 이사 실플레이 3회 소감 "가만히 있으면 손해는 나지만 난이도가 너무 낮아 완전 쉽다"(2026-09-16). 사람이 직접 지점을 고르게 하는 명시적 선택이다.
@@ -134,6 +150,8 @@ export const BAL3 = deepFreeze({
         fireVolBase: 0.4, fireVolPer: 40, joinManyAt: 3, gateTipSec: 1.2, shutterGuideSec: 3,
         //  objectiveBannerSec(r3.14 구출 캡슐) = 출격 직후 '작전 목표' 배너(판당 1회) 표시 시간
         objectiveBannerSec: 3,
+        //  bossKillBannerSec(r3.16 복수 정예) = 정예 하나를 잡았는데 남은 목표가 있을 때 배너 '정예 N 격파 — 남은 목표 M' 표시 시간
+        bossKillBannerSec: 1.2,
         //  동작 시트(6장, 2026-09-18 파일럿): 히어로는 걷기 heroWalkMinSec 뒤 발사 이벤트에 사격 시트 1회,
         //  쓰러진 잡졸은 사망 시트 뒤 corpseLingerSec 머물다 corpseFadeSec 동안 흐려진다(최대 corpseCap 구)
         //  heroFireAlways(이사 결정 9/18): 출격 중엔 사격 시트만 계속 재생(걷기 시트 미사용). false 면 heroFire 타이머로 걷기↔사격 교대

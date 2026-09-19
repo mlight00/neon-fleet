@@ -12,8 +12,8 @@ import { createRun, stepRun } from '../rush3/combat.js';
 
 const NEW = COURSE_IDS;
 //  장치 교체로 코스 버전을 올린 번호(기록은 버전별로 보존된다 — 계약서 7장). 새 장치 담당은 여기에 자기 키만 추가한다.
-//   6·12 = 움직이는 보급(차량, r3.13) · 7 = 구출 캡슐(r3.14) · 8 = 보너스전(r3.15)
-const REPLACED = { 6: 2, 7: 2, 8: 2, 12: 2 };
+//   6·12 = 움직이는 보급(차량, r3.13) · 7 = 구출 캡슐(r3.14) · 8 = 보너스전(r3.15) · 9·23 = 복수 정예(r3.16)
+const REPLACED = { 6: 2, 7: 2, 8: 2, 9: 2, 12: 2, 23: 2 };
 
 test('V3-COURSE C-1: 목록 — STAGE_IDS 는 1~3 그대로, ALL_STAGE_IDS 는 1~24, 4~24 는 전부 buildStage 가능·결정적', () => {
   assert.deepEqual(STAGE_IDS, [1, 2, 3]);

@@ -10,6 +10,8 @@ import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.
 export const STEP = BAL3.STEP;
 
 const SQ = BAL3.squad, ROAD = BAL3.road, EN = BAL3.enemies, LINE_Y = BAL3.view.LINE_Y;
+//  복수 정예(r3.16) 역할 표·순찰 반폭. 파일 상단 상수로 잡아 stepRun 이후 소스가 BAL3.enemies 를 직접 읽지 않는 규약(DIFF-6)을 지킨다
+const ELITES = BAL3.elites;
 const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0 });
 const DEG = Math.PI / 180;
 
@@ -38,6 +40,10 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
   const weapon = WEAPONS[startWeapon] ? startWeapon : (WEAPONS[stage.startWeapon] ? stage.startWeapon : 'rifle');
   const weaponMk = clampMk(startMk ?? 1);
   const diff = difficulty ?? stage.difficulty ?? DEFAULT_DIFFICULTY;
+  //  정예 정의(r3.16 복수 정예): stage.elites 배열이 진실, 없으면 단수 stage.elite 를 배열 1개로(검사 합성 스테이지는 buildStage 를 거치지 않는다).
+  //   role 은 여기서 검증만 한다(모르는 역할 = 데이터 오류 → throw. STEP 도중에 터지지 않게 생성 시점에)
+  const elites = stage.elites ?? (stage.elite ? [stage.elite] : []);
+  for (const e of elites) if (e.role != null && !ELITES.roles[e.role]) throw new Error('unknown elite role ' + e.role);
   const run = {
     stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null, bg: stage.bg ?? 1,
     difficulty: diff, enemyDefs: enemyDefsFor(diff),
@@ -51,11 +57,15 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
     walls: (stage.walls || []).filter((w) => w.kind !== 'cover'),
     covers: (stage.walls || []).filter((w) => w.kind === 'cover'),
     spawns: stage.spawns || [], spawnCursor: 0,
-    elite: stage.elite || null, eliteSpawned: false, bossDefeated: false,
+    //  elites = 정예 정의 배열(진실) · elite = 첫 원소 별칭(종전 읽기용) · eliteSpawned = 전원 같은 STEP 에 등장 · bossDefeated = 전원 격파
+    elites, elite: elites[0] ?? null, eliteSpawned: false, bossDefeated: false,
     events: [],
     enemies: [], nextEnemyId: 1,
     eshots: [],
-    boss: null,
+    //  bosses = 살아 있는 보스와 죽은 보스(dead·reaped) 전부(index 고정 — HUD 칸·이벤트 index 가 흔들리지 않는다). makeBoss 가 만든다.
+    //  boss = **살아 있는 첫 보스(index 순)의 별칭**, 없으면 null. 갱신은 spawnDue(등장 직후)·cleanup(매 STEP 끝) 두 곳뿐 —
+    //   그 사이 단계(5~9)는 bosses 를 !dead 로 순회하므로 별칭의 STEP 중간 값은 아무도 읽지 않는다. 셸·HUD·봇·2단계(z 정지)는 STEP 경계에서만 읽는다
+    bosses: [], boss: null,
     wallSide: {},
     //  지나온 벽의 통로 선택 기록(지워지지 않는다). wallSide 는 벽을 빠져나가면 삭제되므로 결과 화면이 읽을 수 없다
     wallSideLog: {},
@@ -145,7 +155,7 @@ function steer(run, inp, dt) {
   compressUnits(run.units, c.dxLo, c.dxHi);
 }
 
-// 3단계 스폰: ev.z <= z 인 이벤트를 커서 순서로 소비. 정예는 run.boss(스폰 z = run.z + 760)
+// 3단계 스폰: ev.z <= z 인 이벤트를 커서 순서로 소비. 정예는 run.bosses(전원 스폰 z = run.z + 760, 별칭 run.boss = 첫 보스)
 function spawnDue(run, ev) {
   const sp = run.spawns;
   while (run.spawnCursor < sp.length && sp[run.spawnCursor].z <= run.z) {
@@ -153,15 +163,42 @@ function spawnDue(run, ev) {
     for (let i = 0; i < e.n; i++) spawnEnemy(run, e.kind, e.xs[i], e.zs[i], e.hp, e.skin);
     ev.push({ type: 'spawn', kind: e.kind, n: e.n, x: e.xs[0], z: e.z });
   }
-  if (run.elite && !run.eliteSpawned && run.elite.z <= run.z) {
+  //  정예(r3.16 복수 정예): 정의 배열 전원이 **같은 STEP** 에 등장(z 는 전원 run.z + spawnAhead, x 는 정의 x ?? 도로 중앙). 이벤트 elite 는 index 순으로 하나씩
+  if (run.elites.length && !run.eliteSpawned && run.elites[0].z <= run.z) {
     run.eliteSpawned = true;
-    const E = run.enemyDefs.elite;
-    const z = run.z + E.spawnAhead;
-    run.boss = { kind: 'elite', x: ROAD.center, z, px: ROAD.center, pz: z, hp: run.elite.hp, max: run.elite.hp, r: E.r,
-                 state: 'descend', dir: 1, shootT: E.shootEvery, touchT: 0, spawnT: E.summonEvery, summon: !!run.elite.summon, dead: false };
-    if (run.elite.skin) run.boss.skin = run.elite.skin;
-    ev.push({ type: 'elite', x: run.boss.x, z: run.boss.z, hp: run.boss.hp });
+    const total = run.elites.length;
+    run.elites.forEach((d, i) => {
+      const bo = makeBoss(run, d, i);
+      run.bosses.push(bo);
+      ev.push({ type: 'elite', id: bo.id, index: i, total, role: bo.role, x: bo.x, z: bo.z, hp: bo.hp });
+    });
+    run.boss = run.bosses[0];
   }
+}
+
+/** 보스 1체 생성(r3.16). 역할 표(ELITES.roles)가 사격·소환 유무, 정지 거리, 하강·순찰 속도 배수를 정하고 나머지 수치는 run.enemyDefs.elite 그대로.
+ *  차선: 정의에 x 가 없으면 종전대로 도로 전체([x0+r, x1−r])를 왕복, 있으면 [x−patrol, x+patrol](patrol 기본 ELITES.laneHw, 0 = 제자리)을 도로 안으로 클램프.
+ *  dir 은 index 짝수 1·홀수 −1(단수 = 종전 1). summon 은 역할 표가 null(elite)이면 정의 플래그를 따른다(종전과 같음).
+ *  단수 정예(role 없음·x 없음)가 만드는 객체는 종전 객체에 필드 몇 개가 더 붙은 것이고 값은 같다. 아레나(다음 장치)도 이 함수로 만든 뒤 전용 필드를 덧붙인다 */
+export function makeBoss(run, def, index) {
+  const E = run.enemyDefs.elite;
+  const role = def.role ?? 'elite';
+  const rd = ELITES.roles[role];
+  const r = E.r;
+  const x = def.x ?? ROAD.center;
+  const roadLo = ROAD.x0 + r, roadHi = ROAD.x1 - r;
+  const patrol = def.patrol ?? ELITES.laneHw;
+  const clampRoad = (v) => Math.max(roadLo, Math.min(roadHi, v));
+  const laneLo = def.x == null ? roadLo : clampRoad(x - patrol);
+  const laneHi = def.x == null ? roadHi : clampRoad(x + patrol);
+  const z = run.z + E.spawnAhead;
+  const bo = { id: 'b' + (index + 1), index, kind: 'elite', role, x, z, px: x, pz: z, hp: def.hp, max: def.hp, r,
+               state: 'descend', dir: index % 2 === 0 ? 1 : -1, shootT: E.shootEvery, touchT: 0, spawnT: E.summonEvery,
+               shoot: !!rd.shoot, summon: rd.summon == null ? !!def.summon : !!rd.summon,
+               laneLo, laneHi, holdAhead: rd.holdAhead, descendSpeed: E.descendSpeed * rd.descendMul, patrolSpeed: E.patrolSpeed * rd.patrolMul,
+               dead: false, reaped: false };
+  if (def.skin) bo.skin = def.skin;
+  return bo;
 }
 
 // 3-b 단계 게이트 셔터 갱신: run.z 갱신(2단계) 뒤·사격(4단계) 앞. 그 STEP 의 탄 충돌(5단계)이 올바른 셔터 상태를 보게 한다
@@ -253,8 +290,8 @@ function moveBullets(run, ev, dt) {
     //  관통탄(저격총)이 이미 맞힌 적은 후보에서 뺀다(같은 적을 STEP 마다 다시 맞히지 않게)
     const hitAlready = (id) => !!(b.hit && b.hit.includes(id));
     for (const e of run.enemies) if (!e.dead && !hitAlready(e.id)) consider(circleContactZ(b, e.x, e.z, e.r + halfW), 3, 3, e, null);
-    const bo = run.boss;
-    if (bo && !bo.dead && !hitAlready('boss')) consider(circleContactZ(b, bo.x, bo.z, bo.r + halfW), 3, 3, bo, null);
+    //  보스(r3.16 복수 정예): 살아 있는 전부가 후보. 같은 교차 z 면 배열 순(index 순)이 먼저 — 결정적. 관통탄은 보스마다 1회(id 'b1'…)
+    for (const bo of run.bosses) if (!bo.dead && !hitAlready(bo.id)) consider(circleContactZ(b, bo.x, bo.z, bo.r + halfW), 3, 3, bo, null);
     //  보너스 표적(r3.15): 적과 같은 층(우선순위 3, 동시엔 적이 앞). 본전투 중엔 bonusTargets 가 빈 배열이라 종전 판정이 한 줄도 바뀌지 않는다
     for (const t of run.bonusTargets) if (t.alive && !hitAlready(t.id)) consider(circleContactZ(b, t.x, t.z, t.r + halfW), 3, 4, t, null);
     if (kind === 0) { b.dead = true; ev.push({ type: obj.kind === 'cover' ? 'coverHit' : 'wallHit', x: b.x, z: bestZ }); }
@@ -279,16 +316,17 @@ function hitEnemy(run, e, b, ev) {
 }
 
 // 전격포 연쇄(r3.10): 직격한 적에서 chainR 안(원 겹침 기준)의 다른 !dead 적·보스 중 가까운 순 n 체에 dmg. 벽 너머 제외.
-//  같은 거리면 id 순 — 결정성. 이벤트 arc {x,z,tx,tz} 는 연출 전용
+//  같은 거리면 id 순 — 결정성. 보스(r3.16 복수 정예)는 id 가 문자열('b1')이라 정렬 열쇠를 MAX_SAFE_INTEGER − index 로 둔다(적 뒤·index 순).
+//  이벤트 arc {x,z,tx,tz} 는 연출 전용
 function chainArc(run, from, n, r, dmg, ev) {
-  const pool = run.boss ? run.enemies.concat([run.boss]) : run.enemies;
+  const pool = run.enemies.concat(run.bosses);
   const cand = [];
   for (const t of pool) {
     if (t === from || t.dead) continue;
     const d = Math.hypot(t.x - from.x, t.z - from.z);
     if (d > r + t.r) continue;
     if (wallBetween(run.walls.concat(run.covers), from.x, from.z, t.x, t.z)) continue;
-    cand.push({ t, d, id: t.id ?? Number.MAX_SAFE_INTEGER });
+    cand.push({ t, d, id: t.kind === 'elite' ? Number.MAX_SAFE_INTEGER - t.index : t.id });
   }
   cand.sort((a, b) => a.d - b.d || a.id - b.id);
   for (const { t } of cand.slice(0, n)) {
@@ -311,7 +349,7 @@ function wallBetween(walls, ax, az, bx, bz) {
 // heavy 폭발: 직격 적은 제외, 반경 r 원과 적 원이 겹치는 !dead 적·보스에 dmg
 function blast(run, center, r, dmg, ev) {
   ev.push({ type: 'blast', x: center.x, z: center.z, r });
-  const targets = run.boss ? run.enemies.concat([run.boss]) : run.enemies;
+  const targets = run.enemies.concat(run.bosses);
   for (const t of targets) {
     if (t === center || t.dead) continue;
     const d = Math.hypot(t.x - center.x, t.z - center.z);
@@ -333,7 +371,7 @@ function fireAt(run, x, z, tx, tz, shot, fan, spreadRad, ev) {
   ev.push({ type: 'eshot', n: fan, x, z });
 }
 
-// 6단계 적 이동·행동(!dead 만). grunt 추종·rusher 가속·shooter 예고/발사·보스 하강/왕복/사격/소환
+// 6단계 적 이동·행동(!dead 만). grunt 추종·rusher 가속·shooter 예고/발사·보스(전원) 하강/왕복/사격/소환
 function moveEnemies(run, ev, dt) {
   for (const e of run.enemies) {
     if (e.dead) continue;
@@ -349,7 +387,7 @@ function moveEnemies(run, ev, dt) {
     }
     e.z -= e.vz * dt;
   }
-  if (run.boss && !run.boss.dead) bossAct(run, run.boss, ev, dt);
+  for (const bo of run.bosses) if (!bo.dead) bossAct(run, bo, ev, dt);
 }
 
 // 저격수: shootEvery 주기로 예고(aim) 시작, aimTime 뒤 발사 시점의 (run.x, run.z)를 조준해 1발. 부대 줄을 지나면 쏘지 않는다
@@ -367,22 +405,25 @@ function shooterAct(run, e, d, ev, dt) {
   }
 }
 
-// 정예: descend(150/s, run.z + 420 까지) → hold(좌우 60/s 왕복). 1.0s 부채꼴 3발, S3 는 4s 마다 잡졸 2 소환
+// 정예: descend(descendSpeed, run.z + holdAhead 까지) → hold(차선 [laneLo, laneHi] 안에서 patrolSpeed 로 왕복). shoot 이면 shootEvery 마다 부채꼴 3발,
+//  summon 이면 summonEvery 마다 잡졸 2 소환. 정지 거리·속도·차선·행동 유무는 보스 객체(makeBoss 가 역할 표에서 채운 것)에서 읽는다 —
+//  단수 정예는 종전 값(150/s · 420 · 60/s · 도로 전체 · 사격 + 정의 summon)과 같다. shoot 이 없는 보스는 shootT 를 건드리지 않는다(결정적)
 function bossAct(run, bo, ev, dt) {
   const E = run.enemyDefs.elite;
   bo.px = bo.x; bo.pz = bo.z;
   if (bo.state === 'descend') {
-    bo.z -= E.descendSpeed * dt;
-    if (bo.z <= run.z + E.holdAhead) { bo.z = run.z + E.holdAhead; bo.state = 'hold'; }
+    bo.z -= bo.descendSpeed * dt;
+    if (bo.z <= run.z + bo.holdAhead) { bo.z = run.z + bo.holdAhead; bo.state = 'hold'; }
   } else {
-    bo.x += bo.dir * E.patrolSpeed * dt;
-    const lo = ROAD.x0 + bo.r, hi = ROAD.x1 - bo.r;
-    if (bo.x <= lo) { bo.x = lo; bo.dir = 1; } else if (bo.x >= hi) { bo.x = hi; bo.dir = -1; }
+    bo.x += bo.dir * bo.patrolSpeed * dt;
+    if (bo.x <= bo.laneLo) { bo.x = bo.laneLo; bo.dir = 1; } else if (bo.x >= bo.laneHi) { bo.x = bo.laneHi; bo.dir = -1; }
   }
-  bo.shootT -= dt;
-  if (bo.shootT <= 0) {
-    bo.shootT += E.shootEvery;
-    fireAt(run, bo.x, bo.z, run.x, run.z, E.shot, E.fan, E.fanDeg * DEG, ev);
+  if (bo.shoot) {
+    bo.shootT -= dt;
+    if (bo.shootT <= 0) {
+      bo.shootT += E.shootEvery;
+      fireAt(run, bo.x, bo.z, run.x, run.z, E.shot, E.fan, E.fanDeg * DEG, ev);
+    }
   }
   if (bo.summon) {
     bo.spawnT -= dt;
@@ -452,9 +493,9 @@ function contacts(run, ev, dt) {
     damageUnit(run, u, d.touchDmg, 'touch', ev, e.x, e.z);
     ev.push({ type: 'touch', id: e.id, kind: e.kind, x: e.x, z: e.z });
   }
-  const bo = run.boss;
-  if (bo && !bo.dead) {
-    const E = run.enemyDefs.elite;
+  const E = run.enemyDefs.elite;
+  for (const bo of run.bosses) {
+    if (bo.dead) continue;
     bo.touchT = Math.max(0, bo.touchT - dt);
     if (bo.touchT <= 0) {
       const hits = overlappingUnits(run.units, bo.x, bo.z, bo.r, null, run);
@@ -493,7 +534,7 @@ function applyRewards(run, ev) {
   compressUnits(run.units, c.dxLo, c.dxHi);
 }
 
-// 10단계 정리: dead 적 중 !touched 는 kills(이벤트 kill), 보스 사망 bossKill(남은 적·적탄 소거 = 정예 격파 즉시 승리), 범위 밖 정리, peak
+// 10단계 정리: dead 적 중 !touched 는 kills(이벤트 kill), 보스 사망 bossKill·bossesLeft(마지막 보스면 남은 적·적탄 소거 = 정예 격파 즉시 승리), 범위 밖 정리, peak
 function cleanup(run, ev) {
   const behind = run.z - BAL3.cull.enemyBehind, ahead = run.z + LINE_Y + BAL3.cull.bulletAhead;
   run.enemies = run.enemies.filter((e) => {
@@ -503,12 +544,22 @@ function cleanup(run, ev) {
     }
     return e.z >= behind;
   });
-  const bo = run.boss;
-  if (bo && bo.dead) {
+  //  보스(r3.16 복수 정예): 이번 STEP 에 죽은 보스마다 kills+1·bossKill·bossesLeft(left = 이 처치 뒤 남은 수, 같은 STEP 에 둘이 죽어도 1 → 0 단조).
+  //   죽은 보스는 배열에 남긴다(dead·reaped — index 고정). 별칭 boss 는 살아 있는 첫 보스로 옮기고,
+  //   **남은 적·적탄 소거(정예 격파 즉시 승리)는 마지막 보스가 죽을 때만** — 소환형을 먼저 잡으면 그가 낳은 잡졸은 남아서 처리해야 한다(순서 선택의 결과).
+  //   단수 정예는 종전과 같은 한 번의 경로(kills+1·bossKill·소거·별칭 null)
+  const total = run.bosses.length;
+  for (const bo of run.bosses) {
+    if (!bo.dead || bo.reaped) continue;
+    bo.reaped = true;
     run.kills++;
+    const left = run.bosses.filter((b) => !b.reaped).length;
+    ev.push({ type: 'bossKill', id: bo.id, index: bo.index, role: bo.role, left, total, x: bo.x, z: bo.z, r: bo.r });
+    ev.push({ type: 'bossesLeft', left, total, index: bo.index });
+  }
+  run.boss = run.bosses.find((b) => !b.dead) ?? null;
+  if (total && !run.boss && !run.bossDefeated) {
     run.bossDefeated = true;
-    run.boss = null;
-    ev.push({ type: 'bossKill', x: bo.x, z: bo.z, r: bo.r });
     run.enemies.length = 0;
     run.eshots.length = 0;
   }
@@ -522,7 +573,7 @@ function cleanup(run, ev) {
 //   bonusEnd(시간 소진)가 over 를 세운다. 보너스를 다 못 깼다고 이미 확정한 승리·기록(mainResult)은 되돌리지 않는다
 function verdict(run, ev) {
   const noEnemies = run.enemies.length === 0;
-  const win = run.elite ? (run.bossDefeated && noEnemies) : (run.z >= run.length && noEnemies);
+  const win = run.elites.length ? (run.bossDefeated && noEnemies) : (run.z >= run.length && noEnemies);
   if (win) {
     run.won = true; run.wonAt = run.time;
     run.mainResult = { wonAt: run.time, survivors: run.units.length, peak: run.peak, kills: run.kills };

@@ -729,14 +729,16 @@ export function createRenderer3(ctx, sprites) {
     }
   }
 
-  //  정예: 스프라이트(폴백 원) + 발밑 HP 숫자. 막대는 HUD 에서
+  //  정예: 스프라이트(skin 우선 → 'elite' 키 → 폴백 원) + 발밑 HP 숫자. 막대는 HUD 에서.
+  //   r3.16 복수 정예: 역할이 'elite' 가 아니면 HP 숫자 아래 역할 이름('포격'·'소환'·'장갑') 한 줄. 장갑형 폴백 원은 테두리를 두껍게(새 그림 없이 도형으로만)
   function drawBoss(b, sy, now) {
     const y = sy(b.z);
+    const role = b.role ?? 'elite';
     shadow(b.x, y + b.r * 1.05, b.r * 1.15);
     drawImgCentered(b.skin ? 'skin:' + b.skin : 'elite', b.x, y, b.r * 2.6, () => {
       ctx.fillStyle = ENEMY_FALLBACK.elite;
       ctx.beginPath(); ctx.arc(b.x, y, b.r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = C.warn; ctx.lineWidth = 6;
+      ctx.strokeStyle = C.warn; ctx.lineWidth = role === 'tank' ? 9 : 6;
       ctx.beginPath(); ctx.arc(b.x, y, b.r, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = C.eshot;
       ctx.beginPath(); ctx.arc(b.x, y, b.r * 0.35, 0, Math.PI * 2); ctx.fill();
@@ -748,6 +750,8 @@ export function createRenderer3(ctx, sprites) {
       ctx.globalAlpha = 1;
     }
     drawHpTag(b.x, y + b.r + 20, b.hp);
+    const rl = role !== 'elite' ? (BAL3.elites?.roles?.[role]?.label ?? null) : null;
+    if (rl) { ctx.textAlign = 'center'; outlinedText(rl, b.x, y + b.r + 36, 12, C.hud, 'bold', 4); }
   }
 
   //  부대: 실제 units 배열 — 히어로(units[0], M01) + 병사(SOLDIER). 그림자·행진 바운스·발밑 병력 수·중심 마커
@@ -914,7 +918,9 @@ export function createRenderer3(ctx, sprites) {
       const left = Math.max(0, Math.ceil(bo.sec - bo.t));
       outlinedText('보너스 ' + left + '초 · ' + bo.score + '점 · 단계 ' + bo.tier, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, C.gold, 'bold', 5);
     } else {
-      const goal = run.boss ? '정예 전투!' : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
+      //  r3.16 복수 정예: 보스가 둘 이상이면 '정예 전투! 남은 목표 N/M'. 단수는 종전 문구 그대로
+      const bTotal = (run.bosses ?? []).length, bLeft = (run.bosses ?? []).filter((b) => !b.dead).length;
+      const goal = run.boss ? (bTotal > 1 ? '정예 전투! 남은 목표 ' + bLeft + '/' + bTotal : '정예 전투!') : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
       outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
     }
     //  무기 칩
@@ -956,14 +962,31 @@ export function createRenderer3(ctx, sprites) {
       ctx.textAlign = 'left';
     }
     ctx.textBaseline = 'alphabetic';
-    //  정예 HP 막대
+    //  정예 HP 막대. r3.16 복수 정예: 보스가 둘 이상이면 300px 를 gap 6 으로 등분해 칸마다 '역할 hp/max'(격파된 칸은 회색 '격파'). 단수는 종전 그리기 그대로
     if (run.boss) {
-      ctx.fillStyle = 'rgba(20,35,58,0.85)';
-      roundRect(90, 76, 300, 16, 8); ctx.fill();
-      ctx.fillStyle = C.eshot;
-      roundRect(90, 76, 300 * Math.max(0, run.boss.hp / run.boss.max), 16, 8); ctx.fill();
-      ctx.textAlign = 'center';
-      outlinedText('정예 ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
+      const bosses = run.bosses ?? [run.boss];
+      if (bosses.length <= 1) {
+        ctx.fillStyle = 'rgba(20,35,58,0.85)';
+        roundRect(90, 76, 300, 16, 8); ctx.fill();
+        ctx.fillStyle = C.eshot;
+        roundRect(90, 76, 300 * Math.max(0, run.boss.hp / run.boss.max), 16, 8); ctx.fill();
+        ctx.textAlign = 'center';
+        outlinedText('정예 ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
+      } else {
+        const n = bosses.length, gap = 6, segW = (300 - gap * (n - 1)) / n, fs = n >= 3 ? 12 : 13;
+        ctx.textAlign = 'center';
+        for (let i = 0; i < n; i++) {
+          const b = bosses[i], x = 90 + i * (segW + gap);
+          ctx.fillStyle = 'rgba(20,35,58,0.85)';
+          roundRect(x, 76, segW, 16, 8); ctx.fill();
+          if (!b.dead) {
+            ctx.fillStyle = C.eshot;
+            roundRect(x, 76, segW * Math.max(0, Math.min(1, b.hp / b.max)), 16, 8); ctx.fill();
+          }
+          const label = BAL3.elites?.roles?.[b.role ?? 'elite']?.label ?? '정예';
+          outlinedText(b.dead ? '격파' : label + ' ' + Math.max(0, Math.ceil(b.hp)) + '/' + b.max, x + segW / 2, 111, fs, b.dead ? C.gateZero : C.hud, 'bold', 4);
+        }
+      }
     }
     //  보너스전 진행 막대(r3.15): 정예 HP 막대 자리(y 76, 300×16)를 재사용 — 다음 단계 문턱까지 score/next(만렙이면 가득) + 아래 글.
     //   run·paused 상태에서만(검수 반영): 결과 화면은 run 장면 위에 덮이는 규약이라 이 글(y111)이 '작전 성공!' 바로 위에 비쳐 겹쳐 읽혔다
@@ -1026,7 +1049,19 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillRect(0, 196, W, 56);
       ctx.font = '900 30px ' + FONT;
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillText('정예 접근!', W / 2, 224);
+      //  r3.16 복수 정예: 셸이 '정예 2체 접근!' 처럼 문구를 넘기면 그것을, 없으면(옛 fx 꼴) 종전 문구
+      ctx.fillText(fx.eliteText ?? '정예 접근!', W / 2, 224);
+      ctx.globalAlpha = 1;
+    }
+    //  정예 처치 배너(r3.16 복수 정예): 하나를 잡았는데 목표가 남았을 때 같은 슬롯 A(y196 h56)에 붉은 띠로 '정예 N 격파 — 남은 목표 M'. fx 새 칸은 ?? 로 관용
+    if ((fx.bossBannerT ?? 0) > 0 && fx.bossBannerText) {
+      const k = fx.bossBannerT / (FX.bossKillBannerSec || 1.2);
+      ctx.globalAlpha = Math.min(1, k * 3);
+      ctx.fillStyle = 'rgba(194,39,59,0.85)';
+      ctx.fillRect(0, 196, W, 56);
+      ctx.font = '900 26px ' + FONT;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(fx.bossBannerText, W / 2, 224);
       ctx.globalAlpha = 1;
     }
     //  보너스전 시작 배너(r3.15): 정예 경고와 같은 슬롯 A(y196 h56) 를 금색 띠로 — 시간상 배타(정예 배너는 보스 등장 때 0.8초로 이미 끝났다). fx 새 칸은 ?? 로 관용
@@ -1295,7 +1330,8 @@ export function createRenderer3(ctx, sprites) {
     drawBonusTargets(run, sy);
     drawCorpses(fx, sy);
     for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, sy, fx);
-    if (run.boss && !run.boss.dead) drawBoss(run.boss, sy, now);
+    //  보스(r3.16 복수 정예): 살아 있는 것만, 먼 것(z 큰 것)을 먼저 그려 가까운 것이 위에 오게. 죽은 보스는 배열에 남아 있으므로 반드시 거른다
+    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, sy, now);
     drawBullets(run, sy);
     drawEshots(run, sy);
     drawSquad(run, fx, now);

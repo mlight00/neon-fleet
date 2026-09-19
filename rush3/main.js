@@ -134,6 +134,9 @@ function makeFx() {
            objT: 0, objText: null,
            //  bonusT/bonusText(r3.15) = 보너스전 시작 배너 '보너스전! N초'(bonusStart 이벤트가 세우고 updateFx 가 줄인다). 슬롯 A(y196)
            bonusT: 0, bonusText: null,
+           //  eliteText(r3.16 복수 정예) = 정예 경고 배너 문구('정예 접근!' / '정예 2체 접근!') · bossBannerT/bossBannerText = 처치 배너
+           //   '정예 N 격파 — 남은 목표 M'(bossesLeft 이벤트가 left > 0 일 때 세우고 updateFx 가 줄인다). 슬롯 A(y196)
+           eliteText: null, bossBannerT: 0, bossBannerText: null,
            //  동작 시트 타이머(6장): heroFire = 사격 시트 남은 초 · heroWalk = 마지막 사격 뒤 걸은 초 · enemyHit = { id: 피격 시트 남은 초 } · corpses = 쓰러진 잡졸
            heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [] };
 }
@@ -541,8 +544,17 @@ export function boot(canvas, deps = {}) {
         case 'kill': spawnBurst(fx, ev.x, sy(ev.z), BAL3.enemies[ev.kind]?.r ?? 14, false); fx.sfx.push(['kill']); addCorpse(fx, ev); break;
         case 'touch': fx.shakeT = FX.shakeDur; spawnBurst(fx, ev.x, sy(ev.z), 12, false); addCorpse(fx, ev); break;
         case 'blast': spawnBurst(fx, ev.x, sy(ev.z), ev.r, false, C.bulletHeavy); break;
-        case 'elite': fx.eliteT = FX.eliteBannerSec; fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]); break;
-        case 'bossKill': spawnBurst(fx, ev.x, sy(ev.z), ev.r, true); fx.shakeT = FX.shakeDur; fx.sfx.push(['win']); break;
+        //  정예 등장(r3.16 복수 정예): 2~3체가 같은 프레임에 나오므로 index 0 에서만 배너·효과음·BGM(소리가 겹치지 않게). 문구는 체 수를 붙인다
+        case 'elite':
+          if ((ev.index ?? 0) > 0) break;
+          fx.eliteT = FX.eliteBannerSec; fx.eliteText = (ev.total ?? 1) > 1 ? '정예 ' + ev.total + '체 접근!' : '정예 접근!';
+          fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]);
+          break;
+        //  정예 처치: 파편·흔들림은 매번, 효과음은 마지막(left 0)이면 승리음, 아니면 처치음. 남은 목표 배너는 bossesLeft 가 세운다
+        case 'bossKill': spawnBurst(fx, ev.x, sy(ev.z), ev.r, true); fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']); break;
+        case 'bossesLeft':
+          if (ev.left > 0) { fx.bossBannerText = '정예 ' + (ev.index + 1) + ' 격파 — 남은 목표 ' + ev.left; fx.bossBannerT = FX.bossKillBannerSec; }
+          break;
         //  승리 확정 프레임(r3.15 검수 반영): 본전투 기록을 지금 쓴다 — 보너스전·여운 중 나가도 확정된 승리가 남는다
         case 'win': commitMain(run); break;
         //  보너스전(r3.15): 시작 배너(슬롯 A) + 합류음 재사용. 정예가 있던 판만 보스 BGM 을 스테이지 BGM 으로 되돌린다
@@ -578,6 +590,7 @@ export function boot(canvas, deps = {}) {
     fx.shutterT = Math.max(0, fx.shutterT - dt);
     fx.objT = Math.max(0, fx.objT - dt);
     fx.bonusT = Math.max(0, fx.bonusT - dt);
+    fx.bossBannerT = Math.max(0, (fx.bossBannerT ?? 0) - dt);
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
     //  동작 시트 타이머: 사격이 끝나면 걷기 시간을 다시 센다 · 피격은 0 이하 삭제 · 쓰러진 잡졸은 재생+머묾이 끝나면 지운다
     fx.heroFire = Math.max(0, fx.heroFire - dt);
@@ -783,6 +796,9 @@ export function boot(canvas, deps = {}) {
     bonus: run && run.bonus ? { t: Math.round(run.bonus.t * 10) / 10, sec: run.bonus.sec, score: run.bonus.score, tier: run.bonus.tier, hits: run.bonus.hits } : null,
     bossX: run && run.boss ? Math.round(run.boss.x) : null,
     targets: run ? run.bonusTargets.filter((t) => t.alive).map((t) => ({ id: t.id, x: Math.round(t.x), hp: t.hp })) : [],
+    //  복수 정예(r3.16) 관찰: bosses(죽은 것도 dead 로 남는다)·bossesLeft(살아 있는 수 — 캡처 스크립트가 '한 마리 격파 뒤' 시점을 잡는다)
+    bosses: run ? run.bosses.map((b) => ({ id: b.id, role: b.role, hp: Math.ceil(b.hp), x: Math.round(b.x), z: Math.round(b.z), dead: b.dead })) : [],
+    bossesLeft: run ? run.bosses.filter((b) => !b.dead).length : 0,
   });
   if (win) win.__rush3Dbg = dbg;
 

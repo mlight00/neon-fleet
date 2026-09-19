@@ -322,6 +322,20 @@ function applyLottery(d, stage, seed) {
                     z: cfg.z, x: cfg.x, revealZ, openZ, wallId: wall.id, supplyId, rowId };
 }
 
+//  정예 정의 정규화(r3.16 복수 정예): `elites` 배열 우선, 없으면 단수 `elite` 를 배열 1개로. 원소마다 새 객체(구조 공유 금지).
+//   z = 원소 z ?? 정의 eliteZ · hp = round(hp × eliteHp 배수) · summon 은 불리언으로 · skin/x/role/patrol 은 정의에 있을 때만(단수 정의 = 종전 키 집합 그대로).
+//   ⚠️hp 는 **원값**을 받는다 — 여기서 한 번만 배수를 곱하므로 호출부(아레나 등 파생 정의)가 미리 곱하면 이중 배수가 된다
+function makeElites(d, mult) {
+  const defs = d.elites ?? (d.elite ? [d.elite] : []);
+  return defs.map((e) => ({
+    z: e.z ?? d.eliteZ, hp: Math.round(e.hp * mult.eliteHp), summon: !!e.summon,
+    ...(e.skin ? { skin: e.skin } : {}),
+    ...(e.x != null ? { x: e.x } : {}),
+    ...(e.role ? { role: e.role } : {}),
+    ...(e.patrol != null ? { patrol: e.patrol } : {}),
+  }));
+}
+
 // 스테이지 전체를 새 객체로 조립. 재도전 = 재호출(이전 판의 durability/value/passed/opened 가 남지 않는다)
 //  난이도(3-8)는 여기서 한 번 박힌다: stage.difficulty · rows 스폰 n(spawnCount) · 정예 hp(eliteHp, 반올림).
 //  적 hp·적탄·접촉·정예 발사 빈도는 createRun 이 stage.difficulty 를 읽어 run.enemyDefs 로 만든다. 게이트·통·벽·시작 병력·무기는 난이도와 무관.
@@ -340,7 +354,11 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
     spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, mult)),
-    elite: d.elite ? { z: d.elite.z, hp: Math.round(d.elite.hp * mult.eliteHp), summon: !!d.elite.summon, ...(d.elite.skin ? { skin: d.elite.skin } : {}) } : null,
+    //  정예(r3.16 복수 정예): 정의 `elites: [...]`(1~3체) 또는 단수 `elite`(배열 1개로 정규화). 원소 z 는 정의의 eliteZ(전원 같은 z 에서 함께 등장).
+    //   난이도 배수 eliteHp 는 원소마다 반올림 적용(종전과 같은 자리). role/x/patrol 은 정의에 있을 때만 싣는다 — 단수 정의의 원소는
+    //   종전 stage.elite 와 **키 집합까지 같은 모양**({ z, hp, summon(, skin) })이라 C-2·C-6·STG·DIFF 의 읽기가 그대로 통과한다.
+    //   role 기본값('elite')·차선 기본값(도로 전체)은 combat.createRun 이 해석한다(stage 에 박지 않는다)
+    elites: makeElites(d, mult),
     //  배경 번호(C-3 표). 1~3 은 스테이지 번호와 같다
     bg: d.bg ?? (typeof id === 'number' ? Math.min(3, id) : 1),
     //  판 목표(r3.14 구출 캡슐): 정의의 objective { kind, supplyId } 사본. 없는 스테이지는 null(1~3·PROTO·나머지 코스)
@@ -355,6 +373,8 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
                                                 hp: t.hp, max: t.hp, value: t.value, respawn: t.respawn ?? BAL3.bonus.respawn, r: BAL3.bonus.targetR })),
     } : null,
   };
+  //  stage.elite = 첫 원소의 별칭(같은 객체 — verdict·기존 읽기용). 정예 없는 스테이지는 null
+  stage.elite = stage.elites[0] ?? null;
   //  빌드 시점 정합성 guard(unknown stage 와 같은 계열의 데이터 오류): 목표가 가리키는 통은 반드시 capsule 이어야 한다
   if (stage.objective && stage.objective.kind === 'capsule'
       && !stage.supplies.some((s) => s.id === stage.objective.supplyId && s.kind === 'capsule')) {
