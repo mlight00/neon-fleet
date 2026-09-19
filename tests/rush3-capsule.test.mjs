@@ -119,7 +119,7 @@ test('V3-CAPSULE CAP-3: 놓침 — 미개봉 캡슐의 z 를 지나면 supplyMis
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule, c2 }·c2 payload { n: 3 }·내구 80·armZ 440(r3.18)·x120·hint, createRun 이 objective 를 초기화, 다른 스테이지는 null, 잘못된 supplyId 는 throw', () => {
+test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule, c2 }·c2 payload { n: 2 }·내구 24(r3.21: gain 0.575·재산정)·armZ 440(r3.18)·x120·hint, createRun 이 objective 를 초기화, 다른 스테이지는 null, 잘못된 supplyId 는 throw', () => {
   const a = buildStage(7), b = buildStage(7);
   assert.deepEqual(a, b, '결정성');
   assert.equal(a.version, 2); assert.equal(stageVersion(7), 2);
@@ -128,9 +128,9 @@ test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule
   assert.equal(c2.id, 'c2'); assert.equal(c2.kind, 'capsule');
   assert.equal(c2.x, 120); assert.equal(c2.z, 4800);
   //  r3.18 대항 검수 반영: 내구 20 → 80 + 피격 활성 구간 armZ 440(화면 y 200 아래에서만 열린다 — CAP-9)
-  assert.equal(c2.durability, 80); assert.equal(c2.maxDurability, 80);
+  assert.equal(c2.durability, 24); assert.equal(c2.maxDurability, 24);   // r3.21: 80 → 24
   assert.equal(c2.armZ, BAL3.supply.armZ); assert.equal(c2.armZ, 440);
-  assert.deepEqual(c2.payload, { n: 3 });
+  assert.deepEqual(c2.payload, { n: 2 });   // r3.21: 정의 3 × gain(7) 0.575 = 1.7 → 2
   assert.equal(c2.coverZ, null); assert.equal(c2.pairId, null); assert.equal(c2.move, null);
   assert.equal(typeof c2.hint, 'string'); assert.ok(c2.hint.length > 0);
   assert.equal(a.supplies.filter((s) => s.kind === 'capsule').length, 1, '캡슐은 하나');
@@ -139,7 +139,7 @@ test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule
   //  createRun 초기화
   const run = createRun(a);
   assert.deepEqual(run.objective, { kind: 'capsule', supplyId: 'c2', done: false, missed: false, n: 0 });
-  assert.deepEqual(run.supplies[1].payload, { n: 3 });
+  assert.deepEqual(run.supplies[1].payload, { n: 2 });
   assert.equal(run.stageVersion, 2);
   //  다른 스테이지: objective null(1~3·나머지 코스). 버전은 자기 것만 단정한다(순차 적용에서 다른 장치가 올릴 수 있다)
   assert.equal(buildStage(1).objective, null);
@@ -169,13 +169,13 @@ test('V3-CAPSULE CAP-4: 빌드·판 상태 — S7 version 2·objective { capsule
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-CAPSULE CAP-5: 완주·구출(봇 결과) — left 정책이 S7 캡슐을 열고 완주한다. capsuleRescue 1·capsuleMissed 0·objective.done·n 3, 승리는 정예 처치로 결정', (t) => {
+test('V3-CAPSULE CAP-5: 완주·구출(봇 결과) — left 정책이 S7 캡슐을 열고 완주한다. capsuleRescue 1·capsuleMissed 0·objective.done·n 2(r3.21), 승리는 정예 처치로 결정', (t) => {
   const r = playPolicy(7, 'left', 14400, 'normal');
   assert.equal(r.run.over, true); assert.equal(r.run.won, true);
   assert.equal(r.events.capsuleRescue, 1);
   assert.equal(r.events.capsuleMissed, undefined);
   assert.ok(r.opened.includes('c2'), '캡슐 c2 를 열었다');
-  assert.deepEqual(r.run.objective, { kind: 'capsule', supplyId: 'c2', done: true, missed: false, n: 3 });
+  assert.deepEqual(r.run.objective, { kind: 'capsule', supplyId: 'c2', done: true, missed: false, n: 2 });
   assert.equal(r.run.won, r.run.bossDefeated, '승리 = 정예 격파');
   t.diagnostic(`CAPSULE S7 left won=${r.run.won} units=${r.run.units.length} steps=${r.steps} opened=${r.opened.join(',')}`);
 });
@@ -199,7 +199,7 @@ test('V3-CAPSULE CAP-6: 놓침은 실패가 아니다 — planBoss(x240) 가 캡
   run.units.length = 0;
   stepRun(run, { pointerX: 160, dragDx: 0, keyDir: 0 }, STEP);
   assert.equal(run.over, true); assert.equal(run.won, false);
-  assert.deepEqual(run.objective, { kind: 'capsule', supplyId: 'c2', done: true, missed: false, n: 3 });
+  assert.deepEqual(run.objective, { kind: 'capsule', supplyId: 'c2', done: true, missed: false, n: 2 });   // r3.21 n 2
   assert.equal(drainEvents(run).some((e) => e.type === 'lose'), true);
 });
 
@@ -318,15 +318,15 @@ function drawResult(run, result) {
   return ops;
 }
 
-test('V3-CAPSULE CAP-8: 렌더 — 유리 캡슐(capsuleGlass)·목표 표지·내구 80(활성 전 회색·활성 뒤 주황), 크레이트 폴백 없음, 목표 배너 2줄·셔터 아래 스택, 결과 목표 줄 y212/230, 타이틀 sub maxWidth', () => {
+test('V3-CAPSULE CAP-8: 렌더 — 유리 캡슐(capsuleGlass)·목표 표지·내구 24(r3.21 — 활성 전 회색·활성 뒤 주황), 크레이트 폴백 없음, 목표 배너 2줄·셔터 아래 스택, 결과 목표 줄 y212/230, 타이틀 sub maxWidth', () => {
   //  ① S7 을 x120 으로 굴려 캡슐이 화면에 든 프레임(r3.18: z 4100 은 dz 700 > armZ 440 = 피격 활성 전 → 내구 숫자 회색 + 자물쇠)
   const run = createRun(buildStage(7));
   while (run.z < 4100) { stepRun(run, { pointerX: 120, dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); }
   const c2 = run.supplies[1];
   assert.equal(c2.kind, 'capsule'); assert.equal(c2.opened, false);
   const ops0 = drawRun(run);
-  const dur0 = textOf(ops0, '80');
-  assert.ok(dur0 && dur0.fill === C.gateZero && dur0.args[1] === 120, '활성 전 내구 80 은 회색');
+  const dur0 = textOf(ops0, '24');
+  assert.ok(dur0 && dur0.fill === C.gateZero && dur0.args[1] === 120, '활성 전 내구 24 는 회색');
   //  활성 구간(dz ≤ 440)에 들어온 프레임: 주황
   while (c2.z - run.z > BAL3.supply.armZ) { stepRun(run, { pointerX: 120, dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); }
   assert.equal(c2.opened, false);
@@ -337,7 +337,7 @@ test('V3-CAPSULE CAP-8: 렌더 — 유리 캡슐(capsuleGlass)·목표 표지·�
   assert.ok(dur && dur.fill === C.bulletHeavy && dur.args[1] === 120, '내구 숫자가 캡슐 x 에(주황)');
   assert.ok(ops.some((o) => o.op === 'fill' && o.fill === C.capsuleGlass), '유리 반투명 채움');
   assert.ok(ops.some((o) => o.op === 'stroke' && o.stroke === C.capsule), '청록 테');
-  assert.ok(textOf(ops, '+3'), '합류 수');
+  assert.ok(textOf(ops, '+2'), '합류 수(r3.21 n 2)');
   //  크레이트 폴백(supplyDark, 폭 2r = 60) 은 캡슐 x 에 그려지지 않는다(받침은 폭 1.8r = 54)
   assert.equal(ops.some((o) => o.op === 'roundRect' && o.fill === C.supplyDark && o.args[0] === 120 - 30 && o.args[2] === 60), false);
   //  놓친 캡슐엔 '목표' 표지가 없다
@@ -455,7 +455,7 @@ test('V3-CAPSULE-SHELL SHELL-1: 배너 1회 — S7 출격 직후 objT 3·두 줄
   assert.equal(h.app.dbg().objective, null);
 });
 
-test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — aim 정책으로 S7 캡슐을 열면 joinMany 효과음·"구출 성공!"·"+3명 합류", 결과에 "구출 성공 · +3명"과 "작전 성공!", rescued 저장, 타이틀 sub 에 "구출✓"', async () => {
+test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — aim 정책으로 S7 캡슐을 열면 joinMany 효과음 없음(n 2 < joinManyAt 3)·"구출 성공!"·"+2명 합류", 결과에 "구출 성공 · +2명"(r3.21 n 2)과 "작전 성공!", rescued 저장, 타이틀 sub 에 "구출✓"', async () => {
   const h = await bootFake();
   h.app.setDifficulty('normal');
   h.app.startRun(7);
@@ -465,9 +465,10 @@ test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — a
   driveUntil(h, 'aim', () => run().objective.done, 6000);
   assert.equal(run().objective.done, true, '캡슐 구출');
   h.frames(2);
-  assert.ok(h.audio.played.includes('joinMany'), '합류 효과음');
+  //  r3.21: 캡슐 n 3 → 2 라 셸 규칙(main.js joinMany 효과음은 ev.n >= FX.joinManyAt 3)에 걸리지 않는다 — 효과음 없음이 현행 규칙(플로터·'구출!' 은 그대로). 보고서 difficulty-b-20260920 §6
+  assert.equal(h.audio.played.includes('joinMany'), false, 'n 2 < joinManyAt 3: 합류 효과음 없음');
   assert.ok(h.texts.includes('구출 성공!'), '구출 플로터');
-  assert.ok(h.texts.includes('+3명 합류'), '합류 플로터');
+  assert.ok(h.texts.includes('+2명 합류'), '합류 플로터');
   assert.ok(h.texts.includes('구출!'), '개봉 팝 문구');
   assert.equal(h.texts.includes('놓침'), false);
   //  계속 굴려 결과 화면까지
@@ -475,7 +476,7 @@ test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — a
   assert.equal(h.app.getState(), 'result');
   h.texts.length = 0;
   h.frames(1);
-  assert.ok(h.texts.includes('구출 성공 · +3명'), '결과 목표 줄');
+  assert.ok(h.texts.includes('구출 성공 · +2명'), '결과 목표 줄');
   assert.ok(h.texts.includes('작전 성공!'));
   assert.equal(h.save.getStage(7, 2).rescued, true, '구출 기록');
   assert.equal('rescued' in h.save.getStage(7, 2, 'brutal'), false, '다른 난이도 칸엔 없다');

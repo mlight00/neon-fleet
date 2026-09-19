@@ -251,11 +251,11 @@ test('V3-SQUAD: frontmostUnit·removeUnits(뒤쪽부터)·addUnits(cap)', () => 
   assert.equal(removeUnits(run.units, 99), 6);
   assert.equal(run.units.length, 0);
   // addUnits: id 는 nextUnitId 로 이어지고 cap 에서 멈춘다
-  const r2 = mkRun(148);
-  assert.equal(r2.nextUnitId, 149);
-  assert.equal(addUnits(r2, 5, 0.5, 150), 2);
-  assert.equal(r2.units.length, 150);
-  assert.deepEqual(r2.units.slice(-2).map((u) => u.id), [149, 150]);
-  assert.equal(r2.nextUnitId, 151);
-  assert.deepEqual(r2.units.map((u) => [u.dx, u.dy]), formation(150).map((p) => [p.dx, p.dy]));
+  const r2 = mkRun(98);
+  assert.equal(r2.nextUnitId, 99);
+  assert.equal(addUnits(r2, 5, 0.5, 100), 2);
+  assert.equal(r2.units.length, 100);
+  assert.deepEqual(r2.units.slice(-2).map((u) => u.id), [99, 100]);
+  assert.equal(r2.nextUnitId, 101);
+  assert.deepEqual(r2.units.map((u) => [u.dx, u.dy]), formation(100).map((p) => [p.dx, p.dy]));
 });

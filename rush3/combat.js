@@ -29,12 +29,14 @@ const clampNum = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // 난이도별 적 정의 표(계약서 3-8). BAL3.enemies 에 배수를 **한 번** 적용한 새 객체 — run 이 이것만 읽으므로 stepRun 안에 난이도 분기가 없다.
 //  enemyHp → grunt/rusher/shooter hp(반올림) · eshotDmg → shooter/elite shot.dmg · touchDmg → grunt/rusher/elite touchDmg
 //  eliteFireRate → elite shootEvery ÷ 배수. r·vz·가속·예고·소환 등 나머지는 그대로. 정예 hp 는 stage.elite.hp(buildStage 가 eliteHp 배수 적용).
-export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY) {
+//  hpMul(r3.21) = 스테이지 구간 배율(stage.enemyHpMul, balance.enemyHpMulFor). hp = round(표 hp × hpMul × enemyHp) — stages.makeSpawn 과 같은 식이라
+//   정예·아레나 보스가 **소환하는 잡졸**(ev.hp 없이 spawnEnemy)도 그 스테이지의 도로 잡졸과 같은 체력이다. 생략 = 1(검사 합성·1~3).
+export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY, hpMul = 1) {
   const m = difficultyMult(difficulty);
   const out = {};
   for (const [kind, d] of Object.entries(EN)) {
     const e = { ...d };
-    if (d.hp != null) e.hp = Math.round(d.hp * m.enemyHp);
+    if (d.hp != null) e.hp = Math.round(d.hp * hpMul * m.enemyHp);
     if (d.touchDmg) e.touchDmg = Math.round(d.touchDmg * m.touchDmg);
     if (d.shot) e.shot = Object.freeze({ ...d.shot, dmg: Math.round(d.shot.dmg * m.eshotDmg) });
     if (kind === 'elite') { e.shootEvery = d.shootEvery / m.eliteFireRate; e.summonEvery = d.summonEvery / (m.eliteSummonRate ?? 1); }
@@ -72,7 +74,7 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
   } : null;
   const run = {
     stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null, bg: stage.bg ?? 1,
-    difficulty: diff, enemyDefs: enemyDefsFor(diff),
+    difficulty: diff, enemyDefs: enemyDefsFor(diff, stage.enemyHpMul ?? 1),
     z: 0, prevZ: 0, x: ROAD.startX, tx: ROAD.startX,
     units: [], nextUnitId: 1,
     weapon, weaponMk,
@@ -278,10 +280,12 @@ function moveSupplies(run, dt) {
   for (const s of run.supplies) moveSupply(s, run, dt);
 }
 
-// 적 1기 생성. hp 는 스테이지 정의 고정값(병력 무관) — 난이도 배수는 run.enemyDefs 에 이미 들어 있다
+// 적 1기 생성. hp 는 스폰 정의값(stages.makeSpawn 이 구간·난이도 배율까지 박아 항상 명시) — 없으면(소환) run.enemyDefs 의 같은 배율 표.
+//  hpMax(r3.21) = 스폰 시점 체력. render 가 '체력 3 이상인 적'에만 남은 체력 숫자를 그리는 기준(규칙은 읽지 않는다)
 function spawnEnemy(run, kind, x, z, hp, skin) {
   const d = run.enemyDefs[kind];
-  const e = { id: run.nextEnemyId++, kind, x, z, px: x, pz: z, vz: d.vz, hp: hp ?? d.hp, r: d.r, dead: false, touched: false };
+  const h = hp ?? d.hp;
+  const e = { id: run.nextEnemyId++, kind, x, z, px: x, pz: z, vz: d.vz, hp: h, hpMax: h, r: d.r, dead: false, touched: false };
   if (skin) e.skin = skin;
   if (kind === 'shooter') { e.shootT = d.shootEvery; e.aimT = 0; }
   run.enemies.push(e);

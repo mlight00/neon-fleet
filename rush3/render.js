@@ -836,9 +836,12 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = C.eshot;
       ctx.beginPath(); ctx.arc(x, y, Math.max(3, r * 0.28), 0, Math.PI * 2); ctx.fill();
     });
-    //  HP 태그: 잡졸은 다쳤을 때만, 나머지는 항상. 기준 hp 는 그 판의 난이도 표(run.enemyDefs)
-    const base = run.enemyDefs?.[e.kind]?.hp ?? BAL3.enemies[e.kind]?.hp ?? 0;
-    if (e.kind !== 'grunt' || e.hp < base) drawHpTag(x, y + r + 16 * k, e.hp, k);
+    //  체력 숫자(r3.21 B안 ③ × r3.20 원근 화해): **스폰 체력(hpMax)이 2 를 넘는 적만** 남은 체력 정수를 보여 준다
+    //   (체력 1~2 잡졸 = 1~3 스테이지는 숫자 없음 — 이사 결정 "한두 방에 죽는지 몇 방 맞는지 보이게").
+    //   자리는 종전 HP 태그 그대로 **적 아래**(투영 x·배율 k, 글자 12px 하한) — 머리 위에 두면 화면 위로 들어오는 동안
+    //   HUD 줄(제목·거리·칩)과 겹친다(B안 대항 검수 Important #1). 아래 두기가 그 겹침을 구조적으로 없앤다.
+    //   hpMax 가 없는 적(검사 합성)은 hp 로 대신 본다
+    if ((e.hpMax ?? e.hp) > 2) drawHpTag(x, y + r + 16 * k, e.hp, k);
   }
 
   //  쓰러진 잡졸(셸 fx.corpses — 규칙의 enemies 에는 이미 없다): 사망 시트를 한 번 재생하고 corpseLingerSec 머문 뒤 흐려진다

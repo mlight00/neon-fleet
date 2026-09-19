@@ -359,16 +359,16 @@ function drawRun(run) {
 const wheels = (ops) => ops.filter((o) => o.op === 'arc' && o.args[2] === 6 && o.fill === BAL3.colors.outline).length;
 const dashes = (ops) => ops.filter((o) => o.op === 'setLineDash' && Array.isArray(o.args[0]) && o.args[0][0] === 6 && o.args[0][1] === 6).length;
 
-test('V3-VEHICLE VEH-12: 렌더 — +3 이 이동한 x 를 따라가고, 바퀴 arc 4·궤도 점선·진행 방향 화살표가 그려진다. 정지 통엔 바퀴 0', () => {
+test('V3-VEHICLE VEH-12: 렌더 — +2(r3.21: 정의 3 × gain 0.55 → 2)가 이동한 x 를 따라가고, 바퀴 arc 4·궤도 점선·진행 방향 화살표가 그려진다. 정지 통엔 바퀴 0', () => {
   const run = createRun(buildStage(6));
   const c1 = run.supplies[0];
   while (run.z < 1450) { stepRun(run, IN, STEP); drainEvents(run); }
   assert.ok(c1.moveT > 0 && !c1.opened, 'c1 이 움직이는 중');
   assert.notEqual(c1.x, c1.homeX);
   const ops = drawRun(run);
-  const plus = ops.find((o) => o.op === 'fillText' && o.args[0] === '+3');
-  assert.ok(plus, '+3 을 그린다');
-  assert.equal(plus.args[1], c1.x, '+3 의 x = 이동한 c1.x'); assert.notEqual(plus.args[1], 120);
+  const plus = ops.find((o) => o.op === 'fillText' && o.args[0] === '+2' && o.args[1] === c1.x);   // S6 g1 좌 칸 라벨도 '+2'(x160)라 통 x 로 고른다
+  assert.ok(plus, '+2 를 그린다');
+  assert.equal(plus.args[1], c1.x, '+2 의 x = 이동한 c1.x'); assert.notEqual(plus.args[1], 120);
   assert.equal(wheels(ops), 4, '바퀴 4');
   assert.ok(dashes(ops) >= 1, '궤도 점선');
   //  화살표: 진행 방향(prevX → x) 쪽 꼭짓점 x = s.x + dir·(r + 22)
@@ -383,7 +383,7 @@ test('V3-VEHICLE VEH-12: 렌더 — +3 이 이동한 x 를 따라가고, 바퀴 
   const ops2 = drawRun(run);
   c1.move = saved;
   assert.equal(wheels(ops2), 0); assert.equal(dashes(ops2), 0);
-  assert.ok(ops2.find((o) => o.op === 'fillText' && o.args[0] === '+3'), '정지 통도 +3 은 그린다');
+  assert.ok(ops2.find((o) => o.op === 'fillText' && o.args[0] === '+2' && o.args[1] === c1.x), '정지 통도 +2 는 그린다');
   //  내구 숫자도 차량을 따라간다. r3.18: z 1450 은 dz 550 > armZ 440 = 활성 전이라 회색(gateZero) + 자물쇠(roundRect 16×13)
   const dur = ops.find((o) => o.op === 'fillText' && o.args[0] === String(c1.durability) && o.fill === BAL3.colors.gateZero);
   assert.ok(dur && dur.args[1] === c1.x, '내구 숫자 x = c1.x');

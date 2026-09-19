@@ -34,7 +34,7 @@ function drive(run, cond, input = at(240), max = 6000) {
 const count = (ev, type) => ev.filter((e) => e.type === type).length;
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-ARMGUARD AG-1: 형식 — armZ 는 6(c1·c2·c4)·7(c2)·12(c4)만 440(= BAL3.supply.armZ), 나머지 통 전부 null, makeSupply 가 복사, supplyArmed 규칙, 내구 40/40/48·80·128', () => {
+test('V3-ARMGUARD AG-1: 형식 — armZ 는 6(c1·c2·c4)·7(c2)·12(c4)만 440(= BAL3.supply.armZ), 나머지 통 전부 null, makeSupply 가 복사, supplyArmed 규칙, 내구 40/40/48·24·80(r3.21 재산정 — 캡슐 80 → 24·S12 차량 128 → 80)', () => {
   assert.equal(ARM, 440);
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id);
@@ -47,8 +47,8 @@ test('V3-ARMGUARD AG-1: 형식 — armZ 는 6(c1·c2·c4)·7(c2)·12(c4)만 440(
   }
   const s6 = buildStage(6).supplies;
   assert.deepEqual(['c1', 'c2', 'c4'].map((id) => s6.find((s) => s.id === id).durability), [40, 40, 48]);
-  assert.equal(buildStage(7).supplies[1].durability, 80);
-  assert.equal(buildStage(12).supplies.find((s) => s.id === 'c4').durability, 128);
+  assert.equal(buildStage(7).supplies[1].durability, 24);   // r3.21: 80 → 24(양수 칸 상한으로 도착 병력이 줄어 봇 실측 재산정)
+  assert.equal(buildStage(12).supplies.find((s) => s.id === 'c4').durability, 80);   // r3.21: 128 → 80
   //  makeSupply: def.armZ 복사, 없으면 null. run 이 없으면 활성으로 본다(옛 합성 호출 보호)
   const a = makeSupply({ id: 'a', z: 1000, x: 200, kind: 'soldier', durability: 5, payload: { n: 1 }, armZ: 300 });
   const b = makeSupply({ id: 'b', z: 1000, x: 200, kind: 'soldier', durability: 5, payload: { n: 1 } });
@@ -181,7 +181,13 @@ test('V3-ARMGUARD AG-6: 최소 1회 돌진 보장(봇 실측) — 10·11·24 × 
         if (e.type === 'bossKill') kill = run.time;
       }
     }
-    assert.ok(t0 !== null, `S${id} ${diff} ${pol} 광장 진입`);
+    //  r3.21 B안: 어려움·지옥은 광장 전에 전멸할 수 있다(지옥 S10 무입력·planBoss 실측 'pre'). 보통은 두 정책 다 광장에 든다. 광장 전 패배면 보호막 검사 대상이 아니다
+    if (t0 === null) {
+      assert.notEqual(diff, 'normal', `S${id} ${diff} ${pol} 광장 진입`);
+      assert.ok(run.over && !run.won && run.units.length === 0, `S${id} ${diff} ${pol} 광장 전이면 전멸로 끝나야 한다`);
+      t.diagnostic(`ARMGUARD S${id} ${diff} ${pol} 광장 전 전멸(z ${Math.round(run.z)})`);
+      continue;
+    }
     if (kill !== null) { assert.ok(shock !== null && shock <= kill, `S${id} ${diff} ${pol} 첫 충격(${shock})이 격파(${kill})보다 먼저`); assert.equal(guardOff, shock); }
     if (pol === 'planBoss' && diff === 'normal') assert.equal(run.won, true, `S${id} planBoss 보통 승리`);
     t.diagnostic(`ARMGUARD S${id} ${diff} ${pol} won=${run.won} units=${run.units.length} firstShock=${shock == null ? '-' : (shock - t0).toFixed(1)} kill=${kill == null ? '-' : (kill - t0).toFixed(1)}`);
@@ -252,7 +258,7 @@ test('V3-ARMGUARD AG-8: 렌더 — 보호막 중 보스에 하늘색 점선 링(
   const o1 = drawRun(r7);
   assert.ok(o1.some((o) => o.op === 'setLineDash' && Array.isArray(o.args[0]) && o.args[0][0] === 4 && o.args[0][1] === 4), '활성 전 점선 링');
   assert.ok(o1.some((o) => o.op === 'arc' && o.args[2] === 5 && o.args[3] === Math.PI && o.args[4] === 0), '자물쇠(고리 arc — roundRect 는 로컬 헬퍼라 ops 에 없다)');
-  assert.ok(o1.some((o) => o.op === 'fillText' && o.args[0] === '80' && o.fill === BAL3.colors.gateZero), '회색 내구');
+  assert.ok(o1.some((o) => o.op === 'fillText' && o.args[0] === '24' && o.fill === BAL3.colors.gateZero), '회색 내구(r3.21 내구 24)');
   drive(r7, (r) => c2.z - r.z <= ARM, at(120));
   const o2 = drawRun(r7);
   assert.equal(o2.some((o) => o.op === 'setLineDash' && Array.isArray(o.args[0]) && o.args[0][0] === 4 && o.args[0][1] === 4), false);

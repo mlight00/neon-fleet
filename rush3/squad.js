@@ -2,9 +2,10 @@
 // 좌표 규약: 유닛 위치 = (run.x + dx, run.z - dy). dy 양수 = 뒤(화면 아래). "앞줄" = dy 작은 순, "뒤쪽" = dy 큰 순.
 
 // 기본값 = 계약서 값. 호출자가 opts 로 덮어쓸 수 있다(balance.js 를 여기서 import하지 않는다).
+//  unitCap 100(r3.21, 이사 결정 2026-09-20 B안 ⑤ — BAL3.squad.unitCap 과 같은 값. combat 은 cap 인자 없이 addUnits 를 부르므로 실제 상한은 이 칸이다. V3-DIFFB 가 둘의 일치를 잠근다)
 export const SQUAD_DEFAULTS = Object.freeze({
   unitR: 9, unitHp: 2, ringStart: 26, ringGap: 19, soldierSize: 22,
-  roadLo: 80, roadHi: 400, wallLead: 60, wallMargin: 6, freeHalfMax: 60, unitCap: 150,
+  roadLo: 80, roadHi: 400, wallLead: 60, wallMargin: 6, freeHalfMax: 60, unitCap: 100,
 });
 
 function cfg(opts) { return opts ? { ...SQUAD_DEFAULTS, ...opts } : SQUAD_DEFAULTS; }

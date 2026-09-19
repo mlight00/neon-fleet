@@ -24,7 +24,10 @@ export const BAL3 = deepFreeze({
   cull: { bulletAhead: 10, enemyBehind: 200 },
   // 부대·유닛(3-5장, 4장 1단계)
   squad: {
-    unitR: 9, unitHp: 2, unitCap: 150,
+    //  unitCap 150 → 100(r3.21, 이사 결정 2026-09-20 B안). coverDepthUnits = coverZ 비행시간 보정선(stages.MAX_DY)이 전제하는 대형 깊이의 유닛 수 —
+    //   상한을 내려도 150 으로 고정한다: 실제 대형(≤100)은 더 얕아 탄이 통에 더 빨리 닿으므로 150 기준 보정선이 여전히 누출을 막고(보수적),
+    //   1~3 기준 코스의 coverZ(1953·2524·3259·6094)와 기록·검사가 흔들리지 않는다. 100 기준으로 내리면 11px 씩 앞당겨진다(보고서 difficulty-b-20260920)
+    unitR: 9, unitHp: 2, unitCap: 100, coverDepthUnits: 150,
     // 조향: 지수 추종 followRate, 횡이동 상한 moveMax px/s, 키 조향 keySpeed px/s
     followRate: 9, moveMax: 250, keySpeed: 420,
     // 벽 밖 대형 반폭 상한(hw'), 통로 안 여유(corridorWidth/2 - margin)
@@ -125,15 +128,22 @@ export const BAL3 = deepFreeze({
   //  ⚠️표시 이름(label·short)과 id 는 다른 것이다 — 2026-09-18 이사 결정으로 세 칸의 화면 이름은 **보통 / 어려움 / 지옥**이지만
   //   id('normal'·'hard'·'brutal')·배수·저장 칸 키 접미는 종전 그대로다(기록 칸 `2:brutal` 은 옛 저장과 그대로 이어진다).
   difficulty: {
-    //  r3.9(2026-09-18 이사 결정 2): 위협은 **적 체력이 아니라 출현 빈도**로 올린다 — enemyHp·eliteHp 배수 1 고정,
-    //   xs 명시 무리는 waves 배(같은 xs 로 waveGap px 뒤에 한 번 더 들어온다 → 회피 통로 규격 불변), rows 무리는 spawnCount 배,
-    //   정예 소환 주기는 eliteSummonRate 로 나눈다. 적탄·접촉 피해 배수는 종전 유지(체력이 아니다).
-    normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1, eshotDmg: 1, touchDmg: 1, eliteHp: 1, spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    eliteSummonRate: 1 },
+    //  r3.9(2026-09-18 이사 결정 2)는 위협을 **출현 빈도**로만 올렸다(enemyHp·eliteHp 1 고정). → **r3.21(2026-09-20 이사 결정 B안)로 뒤집음**:
+    //   이사 실기(지옥, 24까지 조작 없이 클리어) "일반 적 체력이 낮아 한두 방에 다 파괴된다" — 체력 배수를 되살린다(hard 1.5/1.25 · brutal 2/1.5).
+    //   빈도 배수(waves·waveGap·spawnCount·eliteSummonRate)와 적탄·접촉 피해 배수는 r3.9 그대로 둔다. 스테이지 구간 배율(enemyHpByStage)은 여기에 곱해진다.
+    normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    eliteSummonRate: 1 },
     //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다: hard 2/360·brutal 2/360 만 성공 경로 잠금(SD-7)·정예전 도달(SD-8)·단조성(SD-5)을 전부 지킨다.
     //   brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반). 지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
-    hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1, eshotDmg: 2, touchDmg: 2, eliteHp: 1, spawnCount: 1.4, waves: 2, waveGap: 360, eliteFireRate: 1.25, eliteSummonRate: 1.5 },
-    brutal: { id: 'brutal', label: '지옥',   short: '지옥',   enemyHp: 1, eshotDmg: 3, touchDmg: 3, eliteHp: 1, spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  eliteSummonRate: 2 },
+    hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1.5, eshotDmg: 2, touchDmg: 2, eliteHp: 1.25, spawnCount: 1.4, waves: 2, waveGap: 360, eliteFireRate: 1.25, eliteSummonRate: 1.5 },
+    brutal: { id: 'brutal', label: '지옥',   short: '지옥',   enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  eliteSummonRate: 2 },
   },
+  //  적 체력 스테이지 배율(r3.21, 이사 결정 2026-09-20 B안 ①): 스테이지 번호 구간별 배수. 잡졸·돌격체·저격수(스폰 정의 hp 명시 포함)와
+  //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).
+  //   정예 hp 는 r3.18 재산정값 그대로(구간 배율 적용 안 함 — 난이도 eliteHp 배수만). 구간은 to(이 번호까지) 오름차순·mul 단조 증가(V3-DIFFB 가 잠근다).
+  //   1~3 ×1 은 기준 코스 불변(STAGE_IDS). 번호가 아닌 id(proto3·검사 합성)는 ×1. 출발값은 이사 지시 그대로 — 봇 스윕(보고서 difficulty-b-20260920)에서 조정 여지.
+  enemyHpByStage: [
+    { to: 3, mul: 1 }, { to: 8, mul: 2 }, { to: 12, mul: 4 }, { to: 18, mul: 7 }, { to: 24, mul: 12 },
+  ],
   // 랜덤 길(계약서 3-9 · 2026-09-16 이사 지시 "빈 길이 아니라 랜덤 길"). S3 분리벽 w3 우측 통로에 걸리는 5종 풀.
   //  좋음 3(병사 통·무기 통·연속 증원) : 꽝 2(막을 수 있는 음수 게이트·확정 손실 게이트) 를 균등 1/5 로 뽑는다.
   //  추첨은 buildStage 시점에 한 번(mulberry32 한 번) — 규칙 진행 중 난수는 여전히 0 이다.
@@ -215,4 +225,11 @@ export function difficultyMult(id) {
   const m = BAL3.difficulty[id];
   if (!m) throw new Error('unknown difficulty ' + id);
   return m;
+}
+
+// 적 체력 스테이지 배율 조회(r3.21). 숫자 스테이지 번호만 표를 읽고, 그 밖(proto3·검사 합성 id·표 범위 밖 번호)은 1. 데이터 접근만.
+export function enemyHpMulFor(stageId) {
+  if (typeof stageId !== 'number' || !Number.isFinite(stageId)) return 1;
+  for (const row of BAL3.enemyHpByStage) if (stageId <= row.to) return row.mul;
+  return 1;
 }

@@ -127,11 +127,11 @@ test('V3-GATE: squad.js 실제 run({ units:[makeUnit(1)], nextUnitId:2 })으로 
   assert.equal(ev.at(-1).applied, -2);
 });
 
-test('V3-GATE: 양수 칸도 unitCap 150 에서 클램프(applied = 실제 추가 수)', () => {
-  const row = twoCells(0, 9), run = makeRun(148, 300), ev = [];
+test('V3-GATE: 양수 칸도 unitCap 100(r3.21) 에서 클램프(applied = 실제 추가 수)', () => {
+  const row = twoCells(0, 9), run = makeRun(98, 300), ev = [];
   cross(run, 1140);
   passGateRow(row, run, ev);
-  assert.equal(run.units.length, 150);
+  assert.equal(run.units.length, 100);
   assert.deepEqual([ev[0].value, ev[0].applied], [9, 2]);
 });
 

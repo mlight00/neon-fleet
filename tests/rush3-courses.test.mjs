@@ -139,7 +139,8 @@ test('V3-COURSE C-6: 그림 교체·배경 전달 — 스폰 skin 이 적에게,
   const st13 = buildStage(13);
   const armored = st13.spawns.filter((s) => s.skin === 'E3_wallguard');
   assert.ok(armored.length >= 2, '13 장갑체 물결');
-  for (const s of armored) assert.equal(s.hp, 10);
+  //  r3.21: 정의 hp 10 × 스테이지 구간 배율 7(13~18) × 보통 1 = 70(stages.makeSpawn 이 항상 명시)
+  for (const s of armored) assert.equal(s.hp, 70);
   const run = createRun(st13, { difficulty: 'normal' });
   assert.equal(run.bg, 4);
   //  첫 장갑 물결까지 전진(입력 없음) → 스폰된 적에 skin 이 붙고 kind 는 grunt 그대로
@@ -150,7 +151,7 @@ test('V3-COURSE C-6: 그림 교체·배경 전달 — 스폰 skin 이 적에게,
   }
   assert.ok(seen, '장갑 그림 적이 나타남');
   assert.equal(seen.kind, 'grunt');
-  assert.equal(seen.hp <= 10 && seen.hp > 0, true);
+  assert.equal(seen.hp <= 70 && seen.hp > 0, true);
   //  정예 skin: 24 는 B5_crownbreaker, 4 는 기본(없음)
   const st24 = buildStage(24);
   assert.equal(st24.elite.skin, 'B5_crownbreaker');

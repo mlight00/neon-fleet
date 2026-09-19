@@ -63,11 +63,11 @@ test('V3-SUPPLY: squad.js 실제 run({ units:[makeUnit(1)], nextUnitId:2 })으�
   assert.equal(run.units[2].hp, 2);
 });
 
-test('V3-SUPPLY: 병사 보상은 unitCap 150 에서 클램프(joinMany.n = 실제 추가 수)', () => {
-  const run = makeRun(149), s = soldierCrate(1, 5), ev = [];
+test('V3-SUPPLY: 병사 보상은 unitCap 100(r3.21) 에서 클램프(joinMany.n = 실제 추가 수)', () => {
+  const run = makeRun(99), s = soldierCrate(1, 5), ev = [];
   hitSupply(s, bullet(240), ev, run);
   applySupplyReward(run.pendingRewards[0], run, ev);
-  assert.equal(run.units.length, 150);
+  assert.equal(run.units.length, 100);
   assert.equal(ev.at(-1).n, 1);
 });
 
@@ -288,13 +288,13 @@ test('V3-CHAIN: 통과 시 발판당 1회 유닛 +1(|x 차| <= 70), 같은 발�
   assert.equal(run.units.length, 6);
 });
 
-test('V3-CHAIN: unitCap 150 에서는 발판이 소모되되 applied 0 으로 알린다', () => {
-  const s = chainCrate(), run = makeRun(150), ev = [];
+test('V3-CHAIN: unitCap 100(r3.21) 에서는 발판이 소모되되 applied 0 으로 알린다', () => {
+  const s = chainCrate(), run = makeRun(100), ev = [];
   openWith(s, run, ev);
   activateChain(s, ev);
   run.prevZ = 2850; run.z = 2870;
   assert.equal(takePads(s, run, ev), true);
-  assert.equal(run.units.length, 150);
+  assert.equal(run.units.length, 100);
   assert.equal(s.pads[0].taken, true);
   assert.equal(ev.at(-1).type, 'padTake');
   assert.equal(ev.at(-1).applied, 0);

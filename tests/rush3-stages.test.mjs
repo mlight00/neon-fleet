@@ -158,7 +158,7 @@ test('V3-STAGES: BAL3 는 깊게 동결되어 있고 핵심 수치가 계약서�
   assert.throws(() => { 'use strict'; BAL3.scroll = 1; });
   assert.equal(BAL3.scroll, 190); assert.equal(BAL3.view.LINE_Y, 640); assert.equal(BAL3.STEP, 1 / 60);
   assert.deepEqual([BAL3.squad.unitR, BAL3.squad.unitHp, BAL3.squad.unitCap, BAL3.squad.followRate, BAL3.squad.moveMax, BAL3.squad.keySpeed],
-    [9, 2, 150, 9, 250, 420]);
+    [9, 2, 100, 9, 250, 420]);
   assert.deepEqual([BAL3.enemies.grunt.hp, BAL3.enemies.rusher.hp, BAL3.enemies.shooter.hp], [2, 4, 6]);
   // 개정 r3(2026-09-11): 잡졸 추종 35→0(스폰 열 직진). 비켜야 하는 위협은 돌격체, 사선 다툼은 저격수가 맡는다. hp 는 2 유지
   assert.equal(BAL3.enemies.grunt.track, 0);

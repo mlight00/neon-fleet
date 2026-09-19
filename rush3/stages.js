@@ -1,6 +1,6 @@
 // rush3/stages.js — 기준 전투 3개 고정 배치(계약서 5장). buildStage 는 호출마다 새 객체(구조 공유 금지).
 // 난수는 빌드 시점 좌표 확정용 hashSeed/mulberry32 만(규칙 진행 중 난수 없음).
-import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
+import { BAL3, DEFAULT_DIFFICULTY, difficultyMult, enemyHpMulFor } from './balance.js';
 import { makeCourses, COURSE_IDS } from './courses.js';
 import { WEAPONS } from './weapons.js';
 import { formation } from './squad.js';
@@ -20,8 +20,9 @@ const WALL_LEAD = BAL3.squad.wallLead;
 //  r3.10: 사거리 제한(range)이 있는 무기(산탄포 520)는 제외 — 1~3스테이지엔 등장하지 않고, 등장하는 스테이지는 24스테이지 설계에서
 //   그 무기의 사거리(range)가 통까지의 거리보다 짧은지까지 포함해 coverZ 를 다시 계산한다(STG-4 가 그 스테이지에서 잡는다)
 export const VZ_MIN = Math.min(...Object.values(WEAPONS).filter((w) => w.range == null).map((w) => w.vz));
-//  대형 최대 깊이(유닛 상한까지 채운 대형의 dy 최대). 탄은 부대 중심이 아니라 run.z - dy 에서 출발하므로 그만큼 더 날아간다
-export const MAX_DY = Math.max(...formation(BAL3.squad.unitCap).map((p) => p.dy));
+//  대형 최대 깊이(coverZ 가 전제하는 대형 = coverDepthUnits 150 명의 dy 최대). 탄은 부대 중심이 아니라 run.z - dy 에서 출발하므로 그만큼 더 날아간다.
+//   r3.21 에서 unitCap 이 100 으로 내려갔지만 보정선의 깊이 기준은 150 으로 고정한다(더 얕은 대형은 더 빨리 닿으므로 보수적 — balance.squad 주석)
+export const MAX_DY = Math.max(...formation(BAL3.squad.coverDepthUnits).map((p) => p.dy));
 
 /** 배제 쌍의 차폐 개방선 = '비행시간 보정선'(개정 r3 §3-3 · 2026-09-17 보정).
  *  통로 확정선(wall.z0 - 60)에 두면 확정 **직전에 쏜 탄**이 차폐가 걷힌 뒤 반대편 통에 도착해 배제가 뚫린다.
@@ -240,7 +241,9 @@ function keepOutOfWalls(x, z, r, walls) {
 //  → 발동 순간 zs[i] - run.z >= 760 이라 화면 밖 위에서 등장. combat 은 zs[i] 에 그대로 놓는다(run.z 를 더하지 않는다)
 //  난이도(3-8): xs 없이 rows 로 뿌리는 무리만 n 을 spawnCount 배(반올림)로 늘린다. xs 명시 무리는 배치 그대로(회피 통로 규격이 깨지지 않게).
 //   시드는 i 만 쓰므로 늘어난 뒤에도 앞 n 개의 지터는 종전과 같다(cols 가 바뀌면 대역 폭은 달라진다).
-function makeSpawn(id, sp, walls, mult) {
+//  적 체력(r3.21 B안): ev.hp 를 **항상** 명시 = round((정의 hp ?? 표 hp) × 스테이지 구간 배율(hpMul) × 난이도 enemyHp). 정의에 hp 가 있는 무리(장갑체 10 등)도
+//   같은 배율을 받는다 — '명시 hp 는 그대로' 원칙(r3.3)은 이사 결정으로 폐기. combat.spawnEnemy 는 ev.hp 를 그대로 쓴다(소환 잡졸은 enemyDefs 표가 같은 배율).
+function makeSpawn(id, sp, walls, mult, hpMul) {
   const r = BAL3.enemies[sp.kind].r;
   //  r3.9: xs 명시 무리는 waves 번 반복 — 같은 xs·같은 통로 규격으로 waveGap px 뒤에 다시 들어온다(출현 빈도 = 난이도)
   const waves = sp.xs ? Math.max(1, Math.round(mult.waves ?? 1)) : 1;
@@ -270,8 +273,8 @@ function makeSpawn(id, sp, walls, mult) {
     zs.push(Math.round(z * 100) / 100);
   }
   //  corridorHw = 그 구간 예상 부대 반폭(회피 통로 규격 검사 기준). null = 통로 없음(탄막 무리)
-  const ev = { z: evZ, kind: sp.kind, n, xs, zs, corridorHw: sp.corridorHw ?? null };
-  if (sp.hp != null) ev.hp = sp.hp;
+  const ev = { z: evZ, kind: sp.kind, n, xs, zs, corridorHw: sp.corridorHw ?? null,
+               hp: Math.round((sp.hp ?? BAL3.enemies[sp.kind].hp) * hpMul * mult.enemyHp) };
   //  역할 근사용 그림 교체(B-3): 규칙은 읽지 않고 렌더만 본다
   if (sp.skin) ev.skin = sp.skin;
   return ev;
@@ -376,13 +379,15 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   const walls = d.walls.map((w, i) => makeWall(i + 1, w));
   //  스폰 좌표 보정·랜덤 길은 진짜 벽만 본다(차폐물은 이동을 막지 않는다)
   const solid = walls.filter((w) => w.kind !== 'cover');
+  //  적 체력 스테이지 구간 배율(r3.21): 1~3 ×1 … 19~24 ×12. 스폰 ev.hp 에 박히고, createRun 이 run.enemyDefs(소환 잡졸 hp)에도 같은 값을 곱한다
+  const hpMul = enemyHpMulFor(id);
   const stage = {
-    id, version: d.version ?? 1, difficulty,
+    id, version: d.version ?? 1, difficulty, enemyHpMul: hpMul,
     title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ ?? d.arena?.z ?? null,
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
-    spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, mult)),
+    spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, mult, hpMul)),
     //  정예(r3.16 복수 정예): 정의 `elites: [...]`(1~3체) 또는 단수 `elite`(배열 1개로 정규화). 원소 z 는 정의의 eliteZ(전원 같은 z 에서 함께 등장).
     //   난이도 배수 eliteHp 는 원소마다 반올림 적용(종전과 같은 자리). role/x/patrol 은 정의에 있을 때만 싣는다 — 단수 정의의 원소는
     //   종전 stage.elite 와 **키 집합까지 같은 모양**({ z, hp, summon(, skin) })이라 C-2·C-6·STG·DIFF 의 읽기가 그대로 통과한다.
