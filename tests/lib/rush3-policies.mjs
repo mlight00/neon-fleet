@@ -47,6 +47,24 @@ export function botPlan(run) {
 //  r3.15 보너스전: 승리 확정 뒤(run.phase === 'bonus')는 살아 있는 표적 중 부대에 가장 가까운(|t.x − run.x| 최소) 것을 고르고,
 //   탄이 닿을 때(비행시간 dz ÷ (탄 속도 − 전진 속도))의 x 를 targetX 로 미리 계산해 그 자리로 간다(현재 x 를 쫓으면 왕복 표적을 늘 놓친다).
 //   승리·peak·완주 판정은 이미 끝난 뒤라 SD-7~9 에 영향 없음 — 점수 실측(tiers 보정 근거)만 의미 있어진다. 분기 순서 = bonus → 보스 별칭 → plan
+//  r3.17 아레나: 광장(run.phase === 'arena')에서는 후보 9점(x {100, 240, 380} × ay {d0, (d0+d1)/2, d1}) 중 **위협에서 가장 먼** 점으로 간다.
+//   위협점 = 보스가 warn/dash 중이면 돌진 목표(dashTx, dashTz), 아니면 보스 위치. 동률은 index 순(결정적). 반환 { x, ay }.
+//   ⚠️pointerX 만 쓰는 pickX 호출부(캡처 스크립트·셸 검사)는 x 만 받고, 세로는 pickInput 이 dragDy 로 넘긴다
+export function botArena(run) {
+  const bo = run.boss;
+  const [d0, d1] = run.arena.depth;
+  const tx = bo && (bo.state === 'warn' || bo.state === 'dash') && bo.dashTx != null ? bo.dashTx : (bo ? bo.x : run.x);
+  const tz = bo && (bo.state === 'warn' || bo.state === 'dash') && bo.dashTz != null ? bo.dashTz : (bo ? bo.z : run.z);
+  let best = null, bd = -1;
+  for (const ay of [d0, (d0 + d1) / 2, d1]) {
+    for (const x of [100, 240, 380]) {
+      const d = Math.hypot(x - tx, (run.z - ay) - tz);
+      if (d > bd) { bd = d; best = { x, ay }; }
+    }
+  }
+  return best;
+}
+
 export function botPlanBoss(run) {
   if (run.phase === 'bonus') {
     const vz = (BAL3.weapons[run.weapon] ?? BAL3.weapons.rifle).vz;
@@ -58,7 +76,19 @@ export function botPlanBoss(run) {
     }
     return best ?? run.x;
   }
+  //  분기 순서(다섯 장치 통일 규칙 13): bonus → arena → 보스 별칭 → plan
+  if (run.phase === 'arena' && run.boss) return botArena(run).x;
   return run.boss ? run.boss.x : botPlan(run);
+}
+
+/** 정책 → STEP 입력(r3.17). planBoss 가 광장에 있으면 botArena 의 x 를 pointerX 로, ay 를 dragDy(= 목표 − 현재 tay)로 넘긴다.
+ *  그 밖의 정책·구간은 종전 `{ pointerX, dragDx: 0, keyDir: 0 }` 그대로(24판·27판 표·SD-7~9 불변 — combat 은 빠진 칸을 0 으로 읽는다) */
+export function pickInput(policy, run) {
+  if (policy === 'planBoss' && run.phase === 'arena' && run.boss) {
+    const c = botArena(run);
+    return { pointerX: c.x, dragDx: 0, keyDir: 0, dragDy: c.ay - run.tay, keyDirY: 0 };
+  }
+  return { pointerX: pickX(policy, run), dragDx: 0, keyDir: 0 };
 }
 
 //  ⚠️planBoss 는 아래 POLICIES 목록에 넣지 않는다. 24판 표(V3-SIM-POLICY)·27판 표(V3-SIM-DIFF)는 기존 판 수와 의미를 그대로 두고,
@@ -92,7 +122,7 @@ export function playPolicy(id, policy, maxSteps = 14400, difficulty = 'normal', 
   const opened = [], gates = [], events = {};
   let steps = 0;
   while (!run.over && steps < maxSteps) {
-    stepRun(run, { pointerX: pickX(policy, run), dragDx: 0, keyDir: 0 }, STEP);
+    stepRun(run, pickInput(policy, run), STEP);
     for (const e of drainEvents(run)) {
       events[e.type] = (events[e.type] || 0) + 1;
       if (e.type === 'supplyOpen') opened.push(e.id);

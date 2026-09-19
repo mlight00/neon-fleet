@@ -1,8 +1,7 @@
 // rush3/courses.js — 4~24 스테이지 정의(묶음 B-2·B-3, 2026-09-19 1차 배치). 순수 데이터 + 작은 조립 헬퍼, 난수 없음.
 //  1~3 은 stages.DEFS 그대로(코스 버전 2, 기록 보존). 여기 21개는 실게임 구현계획 B-2 설계표·B-3 역할표·C-1~C-3 자산표를 따른다.
-//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 아레나(10·11·24)는
-//   장치가 아직 없어 **기존 장치로 그 자리의 '배우는 것'을 근사**한다. 13~22 의 새 역할(장갑체·복병·생성기·방해형·카트)은
-//   기존 행동(잡졸·돌격체·저격수)에 **체력·그림(skin)만 바꿔** 근사한다 — 행동 자체는 다음 회차.
+//  ⚠️1차 배치의 한계(계획서에 적어 둔 그대로): 새 장치 5종(6·7·8·9·10·11·12·23·24)은 2026-09-19 회차에 전부 실제 장치로 교체됐고,
+//   13~22 의 새 역할(장갑체·복병·생성기·방해형·카트)만 기존 행동(잡졸·돌격체·저격수)에 **체력·그림(skin)만 바꿔** 근사한 채 남아 있다 — 행동 자체는 다음 회차.
 //  공통 규칙: 길이 30~60초(z = 초 × 190) · 게이트 행은 도로 80~400 완전 피복 · 배제 쌍은 coverZ = coverZFor(벽 z0, 통 z) · 초반엔 명확한 성공 경로.
 const ROAD = { x0: 80, x1: 400 };
 const T3 = [80, 80 + 320 / 3, 80 + 640 / 3, 400];
@@ -33,6 +32,12 @@ const target = (dz, x0, x1, period, hp, value, o = {}) => ({ dz, x0, x1, period,
 //   x = 스폰 x 이자 순찰 차선 중심(반폭 BAL3.elites.laneHw 32, o.patrol 로 덮어쓴다 — 0 이면 제자리). 2체는 160/320, 3체는 130/240/350 이면 원(r48)이 겹치지 않는다.
 //   o.skin = 그림(B2·B3·B4). 체력 합은 종전 단수 정예의 1.2~1.5배 안에서 봇(planBoss) 완주가 되는 값으로 잡는다(C-5·V3-MULTIELITE ME-6 이 잠근다)
 const elite = (hp, role, x, o = {}) => ({ hp, role, x, ...o });
+//  아레나(r3.17): 스테이지 정의에 arena: arena(z, boss, o) 를 두고 elite/elites 는 적지 않는다(buildStage 가 arena.boss 에서 정예 정의를 파생한다). eliteZ 는 z 와 같게.
+//   z = 진입 z(부대 중심 run.z 가 닿는 순간 광장 전환·스크롤 정지·보스 등장). o.w/o.depth 를 생략하면 BAL3.arena 기본(40~440 · −280~40).
+//   boss = { hp(고정값), skin, speed(추격 px/s), dash: { every, first, warn, speed, range, recover }, shock: { r, dmg }, summon?: { every, kind, n, dx, dz }, shoot?: { every, fan, fanDeg } }
+//   — 빠진 칸은 BAL3.arena.boss 기본값. hp 는 자동 조준(명중률 ≈ 100%)을 감안해 옛 정예값보다 크게 잡은 출발값(봇·관찰 실측 뒤 조정).
+//   불변식: 게이트·통·벽·스폰 z 가 전부 z − 800 이하(광장에서 run.z 가 멈추므로 — buildStage 가 throw 로 잠근다)
+const arena = (z, boss, o = {}) => ({ z, ...(o.w ? { w: o.w } : {}), ...(o.depth ? { depth: o.depth } : {}), boss });
 const wall = (z0, z1, L, R) => ({ z0, z1, signs: { L, R } });
 const cover = (x0, x1, z0) => ({ kind: 'cover', x0, x1, z0, z1: z0 + 40 });
 const wave = (z, kind, xs, o = {}) => ({ z, kind, n: xs.length, xs, corridorHw: null, ...o });
@@ -106,20 +111,26 @@ export function makeCourses({ coverZFor }) {
     walls: [wall(2400, 3600, { kind: 'soldier', n: 4 }, { kind: 'weapon', weapon: 'sniper' })],
     spawns: [wave(4000, 'grunt', [95, 137, 179, 221], { corridorHw: 61 }), wave(4000, 'shooter', [300, 370]), mass(5800, 'grunt', 12, 2), wave(7600, 'rusher', [120, 240, 360], HOUND), wave(8200, 'shooter', [150, 330])],
     elites: [elite(200, 'gunner', 160), elite(240, 'summoner', 320, { skin: 'B2_gantrywidow' })] };
-  //  10 광장(근사: 넓은 직선 + 추격형 정예 B3 그림 — 아레나 전환은 다음 회차)(BG4)
-  C[10] = { version: 1, title: '광장', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
+  //  10 광장(r3.17 아레나 실제 장치 — z9200 에서 도로가 광장(40~440)으로 열리고 스크롤이 멈춘다. 보스 B3 가 부대를 추격하며 3초마다 예고 1초 뒤 돌진·착지 충격(r60, 병사 hp −1).
+  //   배우는 것 = "여기서는 위아래로도 움직인다". 도로 구간(게이트·통·스폰)은 근사 시절 그대로. hp 1400 = 자동 조준 명중률 ≈ 100% 기준 출발값(옛 정예 420).
+  //   version 2, 근사 시절 기록은 1 칸에 보존)(BG4)
+  C[10] = { version: 2, title: '광장', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
     gates: [g2(1400, 4, -8), g3(4400, -6, 5, -6, { max: 20 }), g2(7200, 6, -16, { max: 30 })],
     supplies: [weapon(2200, 240, 'auto', 12), soldier(3300, 120, 5, 10), soldier(3300, 360, 5, 10), weapon(5600, 240, 'heavy', 18), soldier(8000, 240, 8, 20)],
     walls: [],
     spawns: [mass(2600, 'grunt', 10, 2), wave(3900, 'rusher', [100, 200, 280, 380], HOUND), wave(5000, 'shooter', [160, 240, 320]), mass(6500, 'grunt', 16, 2), wave(8400, 'rusher', [140, 340], HOUND)],
-    elite: { z: 9200, hp: 420, summon: false, skin: 'B3_railleviathan' } };
-  //  11 사냥터(근사: 소환형 정예 B4 그림 + 밀도 — 장판은 다음 회차)(BG4)
-  C[11] = { version: 1, title: '사냥터', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
+    arena: arena(9200, { hp: 1400, skin: 'B3_railleviathan', speed: 100,
+                         dash: { every: 3.0, first: 1.5, warn: 1.0, speed: 620, range: 420, recover: 0.6 }, shock: { r: 60, dmg: 1 } }) };
+  //  11 사냥터(r3.17 아레나 실제 장치 — 보스 B4 가 5초마다 잡졸 2 를 소환(부대를 양축으로 추격)하고 2.6초마다 돌진·충격(r80, hp −2).
+  //   배우는 것 = "피할 수 없는 자리가 생긴다"(범위 + 소환). version 2, 근사 시절 기록은 1 칸에 보존)(BG4)
+  C[11] = { version: 2, title: '사냥터', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
     gates: [g3(1500, -5, 4, -5), g3(4600, 3, -10, 6, { max: 24 }), g2(7400, -18, 8, { max: 30 })],
     supplies: [soldier(2300, 240, 5, 10), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 5, 10), weapon(0, 326, 'arc', 14), 'w1'), soldier(6000, 150, 6, 16), weapon(6000, 330, 'auto', 12)],
     walls: [wall(3000, 4200, { kind: 'soldier', n: 5 }, { kind: 'weapon', weapon: 'arc' })],
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(5200, 'shooter', [130, 240, 350]), mass(6800, 'grunt', 16, 2), wave(8000, 'rusher', [110, 200, 280, 370], HOUND), mass(8600, 'grunt', 10, 2)],
-    elite: { z: 9400, hp: 480, summon: true, skin: 'B4_smelter' } };
+    arena: arena(9400, { hp: 1800, skin: 'B4_smelter', speed: 120,
+                         dash: { every: 2.6, first: 1.5, warn: 0.8, speed: 640, range: 460, recover: 0.6 }, shock: { r: 80, dmg: 2 },
+                         summon: { every: 5, kind: 'grunt', n: 2, dx: 44, dz: -40 } }) };
   //  12 관문 — 지금까지 배운 것을 한 판에(BG5): 3칸+차폐+분리벽+랜덤 길+정예
   //   r3.13: 정예 직전 병사 8 통(z7200)이 차량 — 벽 활성 구간(w1 3940~5200·w3 7740~8600)·차폐물 사선 밖. version 2
   C[12] = { version: 2, title: '관문', bg: 5, startUnits: 5, startWeapon: 'rifle', length: 10400, eliteZ: 10000,
@@ -205,13 +216,16 @@ export function makeCourses({ coverZFor }) {
     walls: [cover(190, 290, 4020), cover(80, 186, 8620)],
     spawns: [wave(1900, 'grunt', [140, 340], ARMOR), wave(3000, 'rusher', [120, 240, 360], JUMPER), wave(5000, 'shooter', [150, 330], POD), mass(6000, 'grunt', 16, 2), wave(7800, 'grunt', [120, 240, 360], CART), wave(9400, 'shooter', [120, 240, 360], MAGNET), mass(9700, 'grunt', 12, 2)],
     elites: [elite(260, 'gunner', 130, { skin: 'B3_railleviathan' }), elite(300, 'summoner', 350, { skin: 'B2_gantrywidow' }), elite(380, 'tank', 240, { skin: 'B4_smelter', patrol: 0 })] };
-  //  24 최종(근사: 최종 보스 B5 그림, 최대 체력·소환 — 아레나는 다음 회차)(BG5)
-  C[24] = { version: 1, title: '크라운 브레이커', bg: 5, startUnits: 8, startWeapon: 'rifle', length: 11200, eliteZ: 10800,
+  //  24 최종(r3.17 아레나 실제 장치 — 최종 보스 B5: 가장 빠른 추격(140)·2.2초 돌진·충격(r90, hp −2)·4초마다 잡졸 3 소환·2.4초마다 부채꼴 5발. 앞의 패턴을 전부 섞는 마지막 판.
+  //   마지막 저격수 무리(POD)는 10200 → 9700 으로 당겼다 — 스폰 z ≤ arena.z − 800 불변식(정지된 광장 위에 도로 적이 남지 않게). version 2, 근사 시절 기록은 1 칸에 보존)(BG5)
+  C[24] = { version: 2, title: '크라운 브레이커', bg: 5, startUnits: 8, startWeapon: 'rifle', length: 11200, eliteZ: 10800,
     gates: [g3(1500, -6, 6, -6), g2(4200, -18, 8, { max: 30 }), g3(6800, 8, -24, 8, { max: 36 }), g2(9200, 12, -30, { max: 40 })],
     supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 8, 18), weapon(0, 326, 'heavy', 18), 'w1'), soldier(5500, 240, 9, 22), chain(7600, 340, 6, 12, 8), soldier(8400, 120, 8, 20), weapon(8400, 360, 'sniper', 14)],
     walls: [wall(3000, 4200, { kind: 'soldier', n: 8 }, { kind: 'weapon', weapon: 'heavy' }), cover(190, 290, 1220), cover(293, 400, 6420)],
-    spawns: [wave(2000, 'grunt', [120, 240, 360]), wave(4900, 'grunt', [95, 137, 179, 221], { corridorHw: 61, ...ARMOR }), wave(4900, 'shooter', [300, 370], MAGNET), mass(6000, 'grunt', 16, 2), wave(7200, 'rusher', [100, 200, 280, 380], JUMPER), wave(8000, 'grunt', [140, 340], CART), mass(9600, 'grunt', 18, 2), wave(10200, 'shooter', [120, 240, 360], POD)],
-    elite: { z: 10800, hp: 900, summon: true, skin: 'B5_crownbreaker' } };
+    spawns: [wave(2000, 'grunt', [120, 240, 360]), wave(4900, 'grunt', [95, 137, 179, 221], { corridorHw: 61, ...ARMOR }), wave(4900, 'shooter', [300, 370], MAGNET), mass(6000, 'grunt', 16, 2), wave(7200, 'rusher', [100, 200, 280, 380], JUMPER), wave(8000, 'grunt', [140, 340], CART), mass(9600, 'grunt', 18, 2), wave(9700, 'shooter', [120, 240, 360], POD)],
+    arena: arena(10800, { hp: 3000, skin: 'B5_crownbreaker', speed: 140,
+                          dash: { every: 2.2, first: 1.2, warn: 0.7, speed: 680, range: 520, recover: 0.5 }, shock: { r: 90, dmg: 2 },
+                          summon: { every: 4, kind: 'grunt', n: 3, dx: 48, dz: -40 }, shoot: { every: 2.4, fan: 5, fanDeg: 14 } }) };
   return C;
 }
 

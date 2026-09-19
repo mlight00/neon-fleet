@@ -94,6 +94,23 @@ export const BAL3 = deepFreeze({
       tank:     { label: '장갑', shoot: false, summon: false, holdAhead: 360, descendMul: 0.7, patrolMul: 0.5 },
     },
   },
+  // 아레나 보스(r3.17 · 01 §5-1·§5-8 · 계획서 B-1 장치 6): 스테이지 정의 `arena: { z, w?, depth?, boss: {...} }` 의 기본값. 정의의 boss 칸이 덮어쓴다.
+  //  w     = 광장 x 범위(도로 80~400 이 40~440 으로 열린다). 부대 중심 허용 = w ± 대형 반폭(최대 60) → 100~380
+  //  depth = 부대 세로 오프셋 ay(기준선 LINE_Y 기준, 음수 = 화면 위쪽) 허용 범위. −280 이면 앞줄 y≈248(정예 배너 196~252 아래), +40 이면 150명 뒷줄(dy 159)이 y 839 → 화면 밖 아래로 조금 나간다(발밑 숫자는 H−14 로 클램프)
+  //  bossZ = 보스 z 허용 = run.z + [lo, hi](화면 y 80~720)
+  //  boss  = r · spawnAhead(진입 시 등장 z = run.z + 500 → y 140) · speed(추격 px/s) · touchEvery/touchDmg(겹침 접촉, 도로 정예와 같은 값)
+  //          dash { every(돌진 주기 초, 회복 뒤부터), first(진입 뒤 첫 예고까지), warn(예고 초), speed(돌진 px/s), range(최대 돌진 px), recover(착지 뒤 정지 초) }
+  //          shock { r(착지 충격 반지름), dmg(반지름 안 병사 hp 손실) } · summon { every, kind, n, dx, dz } | null · shoot { every, fan, fanDeg } | null
+  //  상하 조향 속도·추종·상한은 squad.keySpeed(420)·followRate(9)·moveMax(250) 를 축별로 그대로 쓴다(대각선은 최대 354 px/s)
+  //  난이도 배수는 createRun 이 한 번 적용한다: shock.dmg·touchDmg × touchDmg(반올림) · dash.every·shoot.every ÷ eliteFireRate · summon.every ÷ eliteSummonRate
+  //  ⚠️enemies 에 넣지 않는다(enemyDefsFor 가 enemies 를 kind 로 순회한다 — elites 와 같은 이유)
+  arena: {
+    w: [40, 440], depth: [-280, 40],
+    bossZ: [-80, 560],
+    boss: { r: 48, spawnAhead: 500, speed: 110, touchEvery: 0.5, touchDmg: 3,
+            dash: { every: 3.0, first: 1.5, warn: 0.8, speed: 620, range: 420, recover: 0.6 },
+            shock: { r: 70, dmg: 1 }, summon: null, shoot: null },
+  },
   // 난이도 배수(계약서 3-8). 위협만 올리고 성장 축(게이트·보급·무기·병사 hp·armZ·coverZ)은 손대지 않는다.
   //  normal 은 전부 ×1 = 종전과 완전히 같은 판. 배수는 buildStage/createRun 시점에 한 번 적용되고 stepRun 안에는 난이도 분기가 없다.
   //  근거: 이사 실플레이 3회 소감 "가만히 있으면 손해는 나지만 난이도가 너무 낮아 완전 쉽다"(2026-09-16). 사람이 직접 지점을 고르게 하는 명시적 선택이다.
@@ -152,6 +169,8 @@ export const BAL3 = deepFreeze({
         objectiveBannerSec: 3,
         //  bossKillBannerSec(r3.16 복수 정예) = 정예 하나를 잡았는데 남은 목표가 있을 때 배너 '정예 N 격파 — 남은 목표 M' 표시 시간
         bossKillBannerSec: 1.2,
+        //  아레나(r3.17): arenaOpenSec = 도로가 광장으로 열리는 연출 초 · arenaGuideSec = '드래그로 피하세요' 배너(판마다 진입 시 1회) · shockRingSec = 착지 충격 확장 링
+        arenaOpenSec: 0.6, arenaGuideSec: 2.4, shockRingSec: 0.45,
         //  동작 시트(6장, 2026-09-18 파일럿): 히어로는 걷기 heroWalkMinSec 뒤 발사 이벤트에 사격 시트 1회,
         //  쓰러진 잡졸은 사망 시트 뒤 corpseLingerSec 머물다 corpseFadeSec 동안 흐려진다(최대 corpseCap 구)
         //  heroFireAlways(이사 결정 9/18): 출격 중엔 사격 시트만 계속 재생(걷기 시트 미사용). false 면 heroFire 타이머로 걷기↔사격 교대

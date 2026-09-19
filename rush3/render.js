@@ -119,9 +119,14 @@ export function createRenderer3(ctx, sprites) {
   }
 
   //  배경: BG 타일(있으면) + 도로 80~400 + 차선. 도로와 물체는 같은 속도로 흐른다(세계 고정)
-  function drawBackground(scroll, stageIdx) {
+  //  아레나(r3.17): 셋째 인자 arena = { w, depth, k }(k 0 → 1 = 열리는 정도). k > 0 이면 도로 사각형 x 를 80~400 에서 w0~w1 로 보간하고
+  //   차선 대시는 (1 − k) 로 사라지며, 그 위에 어두운 원형(타원) 광장 바닥을 덧그린다. 새 그림 없음 — bg 그림은 그대로 밑에. run.z 가 멈추므로 스크롤은 자동 정지
+  function drawBackground(scroll, stageIdx, arena = null) {
     const pal = C.bg[Math.min(stageIdx, C.bg.length - 1)] ?? C.bg[0];
     const im = get('bg' + (stageIdx + 1));
+    const k = arena ? Math.max(0, Math.min(1, arena.k ?? 1)) : 0;
+    const w0 = arena && arena.w ? arena.w[0] : ROAD0, w1 = arena && arena.w ? arena.w[1] : ROAD1;
+    const x0 = ROAD0 + (w0 - ROAD0) * k, x1 = ROAD1 + (w1 - ROAD1) * k;
     if (im) {
       const h = Math.round(im.height * (W / im.width));
       const off = ((scroll % h) + h) % h;
@@ -129,26 +134,39 @@ export function createRenderer3(ctx, sprites) {
       //  그림 위에 v3 도로 폭(80~400)을 얹는다 — 게이트·벽과 같은 폭
       ctx.globalAlpha = 0.82;
       ctx.fillStyle = pal.road;
-      ctx.fillRect(ROAD0, 0, ROAD1 - ROAD0, H);
+      ctx.fillRect(x0, 0, x1 - x0, H);
       ctx.globalAlpha = 1;
     } else {
       ctx.fillStyle = pal.side;
       ctx.fillRect(0, 0, W, H);
       ctx.fillStyle = pal.road;
-      ctx.fillRect(ROAD0, 0, ROAD1 - ROAD0, H);
+      ctx.fillRect(x0, 0, x1 - x0, H);
     }
-    //  차선 2줄(대시 스크롤) + 도로 경계
-    ctx.strokeStyle = pal.line;
-    ctx.lineWidth = 3;
-    ctx.setLineDash([18, 22]);
-    ctx.lineDashOffset = -(((scroll % 40) + 40) % 40);
-    for (const x of [ROAD0 + (ROAD1 - ROAD0) / 3, ROAD0 + (ROAD1 - ROAD0) * 2 / 3]) {
-      ctx.beginPath(); ctx.moveTo(x, -40); ctx.lineTo(x, H + 40); ctx.stroke();
+    if (k > 0) {
+      //  광장 바닥: 보스 등장 자리(y 140)부터 화면 아래까지 덮는 어두운 타원 + 옅은 테두리
+      const yTop = 130;
+      ctx.fillStyle = 'rgba(18,22,30,' + (0.6 * k).toFixed(3) + ')';
+      ctx.beginPath(); ctx.ellipse(W / 2, (yTop + H) / 2, (x1 - x0) / 2, (H - yTop) / 2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.18 * k).toFixed(3) + ')';
+      ctx.lineWidth = 3;
+      ctx.stroke();
     }
-    ctx.setLineDash([]);
+    //  차선 2줄(대시 스크롤) + 도로 경계. 광장에서는 차선이 사라진다
+    if (k < 1) {
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = pal.line;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([18, 22]);
+      ctx.lineDashOffset = -(((scroll % 40) + 40) % 40);
+      for (const x of [ROAD0 + (ROAD1 - ROAD0) / 3, ROAD0 + (ROAD1 - ROAD0) * 2 / 3]) {
+        ctx.beginPath(); ctx.moveTo(x, -40); ctx.lineTo(x, H + 40); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
     ctx.strokeStyle = 'rgba(20,35,58,0.35)';
     ctx.lineWidth = 4;
-    for (const x of [ROAD0, ROAD1]) {
+    for (const x of [x0, x1]) {
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
     }
   }
@@ -645,7 +663,7 @@ export function createRenderer3(ctx, sprites) {
       ctx.globalAlpha = 0.55;
       ctx.strokeStyle = C.eshot; ctx.lineWidth = 2;
       ctx.setLineDash([6, 6]);
-      ctx.beginPath(); ctx.moveTo(e.x, y); ctx.lineTo(run.x, LINE_Y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(e.x, y); ctx.lineTo(run.x, LINE_Y + (run.ay || 0)); ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
@@ -731,9 +749,24 @@ export function createRenderer3(ctx, sprites) {
 
   //  정예: 스프라이트(skin 우선 → 'elite' 키 → 폴백 원) + 발밑 HP 숫자. 막대는 HUD 에서.
   //   r3.16 복수 정예: 역할이 'elite' 가 아니면 HP 숫자 아래 역할 이름('포격'·'소환'·'장갑') 한 줄. 장갑형 폴백 원은 테두리를 두껍게(새 그림 없이 도형으로만)
-  function drawBoss(b, sy, now) {
+  //   r3.17 아레나: 예고(warn)·돌진(dash) 중이면 목표 지점에 붉은 원(반지름 = 충격 r, 깜빡임)과 보스→목표 점선을 **보스보다 먼저** 그린다. shockR 은 run.arena.boss.shock.r
+  function drawBoss(b, sy, now, shockR = null) {
     const y = sy(b.z);
     const role = b.role ?? 'elite';
+    if (b.arena && (b.state === 'warn' || b.state === 'dash') && b.dashTx != null) {
+      const ty = sy(b.dashTz), r = shockR ?? 70;
+      ctx.save();
+      ctx.strokeStyle = C.warn; ctx.fillStyle = C.warn; ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.12;
+      ctx.beginPath(); ctx.arc(b.dashTx, ty, r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.35 + 0.35 * Math.abs(Math.sin(now * 14));
+      ctx.beginPath(); ctx.arc(b.dashTx, ty, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 0.6;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.dashTx, ty); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
     shadow(b.x, y + b.r * 1.05, b.r * 1.15);
     drawImgCentered(b.skin ? 'skin:' + b.skin : 'elite', b.x, y, b.r * 2.6, () => {
       ctx.fillStyle = ENEMY_FALLBACK.elite;
@@ -743,7 +776,7 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = C.eshot;
       ctx.beginPath(); ctx.arc(b.x, y, b.r * 0.35, 0, Math.PI * 2); ctx.fill();
     });
-    if (b.state === 'descend') {
+    if (b.state === 'descend' || b.state === 'warn') {
       ctx.globalAlpha = 0.5 + Math.sin(now * 12) * 0.3;
       ctx.strokeStyle = C.warn; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(b.x, y, b.r + 10, 0, Math.PI * 2); ctx.stroke();
@@ -755,17 +788,19 @@ export function createRenderer3(ctx, sprites) {
   }
 
   //  부대: 실제 units 배열 — 히어로(units[0], M01) + 병사(SOLDIER). 그림자·행진 바운스·발밑 병력 수·중심 마커
+  //   r3.17 아레나: 부대 중심 y = LINE_Y + run.ay(도로에서는 0). 발밑 숫자는 H − 14 로 클램프(뒷줄이 아래로 내려갔을 때)
   function drawSquad(run, fx, now) {
     const S = BAL3.squad;
     const units = run.units;
     if (!units.length) return;
+    const ay = run.ay || 0;
     const order = units.map((u, i) => ({ u, i })).sort((a, b) => a.u.dy - b.u.dy || a.i - b.i);
     let maxDy = 0;
     for (const u of units) if (u.dy > maxDy) maxDy = u.dy;
     for (const { u, i } of order) {
       const hero = i === 0;
       const size = hero ? S.heroSize : S.soldierSize;
-      shadow(run.x + u.dx, LINE_Y + u.dy + size * 0.42, size * 0.42);
+      shadow(run.x + u.dx, LINE_Y + ay + u.dy + size * 0.42, size * 0.42);
     }
     for (const { u, i } of order) {
       const hero = i === 0;
@@ -773,7 +808,7 @@ export function createRenderer3(ctx, sprites) {
       const phase = now * 9 + i * 1.7;
       const bob = hero ? Math.sin(now * 9) * 2 : Math.sin(phase) * 1.6;
       const sway = hero ? Math.sin(now * 4.5) * 0.8 : Math.sin(phase * 0.5 + i) * 1.1;
-      const px = run.x + u.dx + sway, py = LINE_Y + u.dy + bob;
+      const px = run.x + u.dx + sway, py = LINE_Y + ay + u.dy + bob;
       const hurt = u.hp < S.unitHp;
       //  히어로 동작 시트: 사격 중(fx.heroFire 남은 초)이면 사격 시트, 아니면 걷기 루프(now 기준). 시트가 없으면 정지 그림
       //  heroFireAlways: 출격 중엔 사격 시트를 now 기준으로 계속 돌린다. 아니면 fx.heroFire 창에서만 사격, 나머지는 걷기
@@ -804,7 +839,7 @@ export function createRenderer3(ctx, sprites) {
       }
     }
     //  부대 중심 마커(삼각) — 게이트 칸 판정 기준
-    const my = LINE_Y - S.heroSize / 2 - 14;
+    const my = LINE_Y + ay - S.heroSize / 2 - 14;
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.beginPath();
     ctx.moveTo(run.x, my - 8);
@@ -819,7 +854,19 @@ export function createRenderer3(ctx, sprites) {
     ctx.setLineDash([]);
     //  발밑 병력 수(피격 중 빨강)
     ctx.textAlign = 'center';
-    outlinedText(String(units.length), run.x, LINE_Y + maxDy + 34, 26, fx.hurtT > 0 ? C.heroHurt : C.hero, 'bold', 6);
+    outlinedText(String(units.length), run.x, Math.min(H - 14, LINE_Y + ay + maxDy + 34), 26, fx.hurtT > 0 ? C.heroHurt : C.hero, 'bold', 6);
+  }
+
+  //  착지 충격 링(r3.17 아레나, 셸 fx.shocks — 화면 좌표): 반지름 r·(0.5 + 0.9k) 로 퍼지며 (1 − k) 로 옅어진다. 새 그림 없음
+  function drawShocks(list) {
+    for (const s of list) {
+      const k = Math.max(0, Math.min(1, s.t / (s.life || 0.45)));
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = C.warn;
+      ctx.lineWidth = 2 + 6 * (1 - k);
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r * (0.5 + 0.9 * k), 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   }
 
   //  아군 탄: 무기별 색·폭
@@ -920,7 +967,8 @@ export function createRenderer3(ctx, sprites) {
     } else {
       //  r3.16 복수 정예: 보스가 둘 이상이면 '정예 전투! 남은 목표 N/M'. 단수는 종전 문구 그대로
       const bTotal = (run.bosses ?? []).length, bLeft = (run.bosses ?? []).filter((b) => !b.dead).length;
-      const goal = run.boss ? (bTotal > 1 ? '정예 전투! 남은 목표 ' + bLeft + '/' + bTotal : '정예 전투!') : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
+      //  r3.17 아레나: 광장 보스전은 '아레나 전투!'(도로 정예 문구는 그대로)
+      const goal = run.boss ? (run.phase === 'arena' ? '아레나 전투!' : bTotal > 1 ? '정예 전투! 남은 목표 ' + bLeft + '/' + bTotal : '정예 전투!') : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
       outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
     }
     //  무기 칩
@@ -1041,6 +1089,10 @@ export function createRenderer3(ctx, sprites) {
     //  작전 목표 배너(r3.14 구출 캡슐): 출격 직후 판당 1회. fx 새 칸은 ?? 로 관용(옛 fx 꼴에도 그린다)
     if ((fx.objT ?? 0) > 0 && fx.objText) {
       slotY += bannerBox(fx.objText, slotY, Math.min(1, fx.objT / 0.5)) + 8;
+    }
+    //  아레나 안내 배너(r3.17): 광장 전환 시 판마다 1회 '드래그로 피하세요'(두 줄). 같은 슬롯 C 에 셔터 → 목표 → 아레나 순으로 쌓인다. fx 새 칸은 ?? 로 관용
+    if ((fx.arenaT ?? 0) > 0 && fx.arenaText) {
+      slotY += bannerBox(fx.arenaText, slotY, Math.min(1, fx.arenaT / 0.5)) + 8;
     }
     if (fx.eliteT > 0) {
       const k = fx.eliteT / FX.eliteBannerSec;
@@ -1321,7 +1373,11 @@ export function createRenderer3(ctx, sprites) {
     const mask = lotteryMask(run, fx);
     //  가려진 동안에는 실제 물체를 아예 그리지 않는다('?' 상자가 그 자리를 대신한다)
     const hidden = (id) => mask >= 1 && id != null && run.lottery && (run.lottery.supplyId === id || run.lottery.rowId === id);
-    drawBackground(run.z, Math.max(0, (run.bg || 1) - 1));
+    //  아레나(r3.17): 광장 단계면 배경에 { w, depth, k } — k = 열림 정도(셸 fx.arenaOpen 이 줄어들며 0 → 1, fx 에 칸이 없으면 1)
+    const arena = run.phase === 'arena' && run.arena
+      ? { w: run.arena.w, depth: run.arena.depth, k: 1 - Math.max(0, Math.min(1, (fx.arenaOpen ?? 0) / (FX.arenaOpenSec || 0.6))) }
+      : null;
+    drawBackground(run.z, Math.max(0, (run.bg || 1) - 1), arena);
     drawWalls(run, sy);
     drawCovers(run, sy);
     for (const row of run.gateRows) if (!hidden(row.id)) drawGateRow(row, sy, fx, run.z);
@@ -1331,10 +1387,12 @@ export function createRenderer3(ctx, sprites) {
     drawCorpses(fx, sy);
     for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, sy, fx);
     //  보스(r3.16 복수 정예): 살아 있는 것만, 먼 것(z 큰 것)을 먼저 그려 가까운 것이 위에 오게. 죽은 보스는 배열에 남아 있으므로 반드시 거른다
-    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, sy, now);
+    const shockR = run.arena && run.arena.boss && run.arena.boss.shock ? run.arena.boss.shock.r : null;
+    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, sy, now, shockR);
     drawBullets(run, sy);
     drawEshots(run, sy);
     drawSquad(run, fx, now);
+    drawShocks(fx.shocks ?? []);
     drawParts(fx.parts);
     drawFloaters(fx.floaters);
     drawPops(fx.pops);

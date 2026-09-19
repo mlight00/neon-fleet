@@ -6,6 +6,8 @@
 export const ADVICE_DEFAULT = Object.freeze({
   shot: '저격수는 예고선이 보일 때 옆으로 한 번만 비키면 됩니다',
   touch: '돌격체는 쏘는 것보다 비키는 게 빠릅니다',
+  //  아레나 착지 충격(r3.17): 붉은 원이 뜨면 그 원 밖으로 — 광장에서는 위아래로도 갈 수 있다
+  shock: '붉은 원이 뜨면 그 원 밖으로 드래그하세요. 위아래로도 움직일 수 있어요',
   won: '다음엔 반대쪽 보급을 골라 보세요',
   //  ⚠️기본 문구도 **지금 할 수 있는 행동**이어야 한다(2026-09-17 2차 검수 N1). '병력을 더 모은 뒤'는
   //   그 게이트 앞에 보급이 없는 배치에서는 실행할 수 없는 권유였다 — 같은 줄에서 고를 수 있는 길을 알려준다
@@ -25,6 +27,7 @@ function hintOf(obj, list, fallback) {
 /** 결과 화면 제안 한 줄. 우선순위(결정적·무작위 없음)
  *   1 음수 게이트 손실  → 마지막으로 통과한 음수 게이트 행의 hint(배치 문구가 있으면 **언제나 그것을 먼저** 쓴다)
  *   2 놓친 통(missed)   → z 가 가장 작은 놓친 통의 hint      ※ skipped(의도된 선택)는 후보에서 제외
+ *   3′ 충격 손실 우세   → 아레나 기본 문구(r3.17 — lossByShock ≥ max(shot, touch) 이고 > 0. 종전 판은 lossByShock 이 없어 0 → 판정 불변)
  *   3 피격 손실 우세    → 저격수 기본 문구
  *   4 접촉 손실         → 돌격체 기본 문구
  *   5 그 외             → 성공 판은 '반대쪽 보급' 문구, 실패 판은 null(셸이 missedLine 을 쓴다)
@@ -49,7 +52,8 @@ export function adviceLine(run, stage) {
     }
     if (s) return hintOf(s, stage && stage.supplies, ADVICE_DEFAULT.supply);
   }
-  const shot = run.lossByShot || 0, touch = run.lossByTouch || 0;
+  const shot = run.lossByShot || 0, touch = run.lossByTouch || 0, shock = run.lossByShock || 0;
+  if (shock >= Math.max(shot, touch) && shock > 0) return ADVICE_DEFAULT.shock;
   if (shot >= touch && shot > 0) return ADVICE_DEFAULT.shot;
   if (touch > 0) return ADVICE_DEFAULT.touch;
   return run.won ? ADVICE_DEFAULT.won : null;

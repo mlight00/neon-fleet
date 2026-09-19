@@ -41,6 +41,8 @@ export const SHUTTER_GUIDE_TEXT = Object.freeze(['회색 셔터는 잠긴 게이
 export const VEHICLE_GUIDE_TEXT = Object.freeze(['움직이는 통은 앞을 보고 쏘세요', '통이 갈 자리에 미리 서면 탄이 거기서 만납니다']);
 //  작전 목표 배너(r3.14 구출 캡슐): 출격 직후 판당 1회(fx.objText/objT, BAL3.fx.objectiveBannerSec). 셔터 배너 아래 슬롯에 쌓인다. 줄은 어절 경계에서만 나눈다
 export const OBJECTIVE_BANNER_TEXT = Object.freeze(['작전 목표: 캡슐 구출', '놓쳐도 실패는 아닙니다']);
+//  아레나 안내 배너(r3.17): 광장 전환 시 판마다 1회(fx.arenaText/arenaT, BAL3.fx.arenaGuideSec). 슬롯 C(셔터·목표 아래). 줄은 어절 경계에서만 나눈다
+export const ARENA_GUIDE_TEXT = Object.freeze(['드래그로 피하세요', '광장에서는 위아래로도 움직입니다']);
 
 /** 결과 화면의 작전 목표 한 줄(r3.14). 순수 — run.objective 만 읽는다. 목표가 없는 판은 null.
  *  성공 = 실제 합류 수(n) · 그 밖(놓쳤든 닿기 전에 끝났든)은 '열지 못했다'. 승패(run.won)와는 별개다 */
@@ -137,6 +139,8 @@ function makeFx() {
            //  eliteText(r3.16 복수 정예) = 정예 경고 배너 문구('정예 접근!' / '정예 2체 접근!') · bossBannerT/bossBannerText = 처치 배너
            //   '정예 N 격파 — 남은 목표 M'(bossesLeft 이벤트가 left > 0 일 때 세우고 updateFx 가 줄인다). 슬롯 A(y196)
            eliteText: null, bossBannerT: 0, bossBannerText: null,
+           //  아레나(r3.17): arenaOpen = 광장 열림 연출 남은 초 · arenaT/arenaText = '드래그로 피하세요' 배너 · shocks = 착지 충격 링 [{ x, y, r, t, life }](화면 좌표)
+           arenaOpen: 0, arenaT: 0, arenaText: null, shocks: [],
            //  동작 시트 타이머(6장): heroFire = 사격 시트 남은 초 · heroWalk = 마지막 사격 뒤 걸은 초 · enemyHit = { id: 피격 시트 남은 초 } · corpses = 쓰러진 잡졸
            heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [] };
 }
@@ -161,6 +165,7 @@ export function missedLine(run) {
   if (run.lossByGate > 0) parts.push('게이트 손실 ' + run.lossByGate);
   if (run.lossByTouch > 0) parts.push('접촉 손실 ' + run.lossByTouch);
   if (run.lossByShot > 0) parts.push('피격 손실 ' + run.lossByShot);
+  if ((run.lossByShock || 0) > 0) parts.push('충격 손실 ' + run.lossByShock);
   return parts.length ? parts.join(' · ') : '놓친 것 없음';
 }
 
@@ -569,6 +574,13 @@ export function boot(canvas, deps = {}) {
         case 'bonusTier': floater(fx, run.x, LINE_Y - 130, '보상 단계 ' + ev.tier + '!', C.gold, true); fx.sfx.push(['weaponSwap']); break;
         case 'bonusEnd': fx.sfx.push(['gateFlip']); break;
         case 'bonusRespawn': break;
+        //  아레나(r3.17): 광장 열림 연출 + 안내 배너(판마다 진입 시 1회). 정예 배너·효과음·BGM 은 같은 STEP 의 elite 이벤트가 맡는다
+        case 'arenaEnter': fx.arenaOpen = FX.arenaOpenSec; fx.arenaT = FX.arenaGuideSec; fx.arenaText = ARENA_GUIDE_TEXT; break;
+        //  돌진 예고 = 중립 경고음(lotWarn 재사용). 화면의 붉은 원·점선은 이벤트가 아니라 run.boss.state 를 렌더가 직접 읽는다
+        case 'bossDashWarn': fx.sfx.push(['lotWarn']); break;
+        case 'bossDash': fx.sfx.push(['gateClang']); break;
+        //  착지 충격: 확장 링 + 흔들림. hits > 0 이면 hurt 이벤트가 따로 나므로 피격 플래시·hurt 음은 그쪽이 맡는다
+        case 'bossShock': fx.shocks.push({ x: ev.x, y: sy(ev.z), r: ev.r, t: 0, life: FX.shockRingSec }); fx.shakeT = FX.shakeDur; break;
         case 'lose': fx.sfx.push(['lose']); break;
         default: break;
       }
@@ -591,6 +603,10 @@ export function boot(canvas, deps = {}) {
     fx.objT = Math.max(0, fx.objT - dt);
     fx.bonusT = Math.max(0, fx.bonusT - dt);
     fx.bossBannerT = Math.max(0, (fx.bossBannerT ?? 0) - dt);
+    fx.arenaOpen = Math.max(0, (fx.arenaOpen ?? 0) - dt);
+    fx.arenaT = Math.max(0, (fx.arenaT ?? 0) - dt);
+    for (const s of fx.shocks) s.t += dt;
+    fx.shocks = fx.shocks.filter((s) => s.t < s.life);
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
     //  동작 시트 타이머: 사격이 끝나면 걷기 시간을 다시 센다 · 피격은 0 이하 삭제 · 쓰러진 잡졸은 재생+머묾이 끝나면 지운다
     fx.heroFire = Math.max(0, fx.heroFire - dt);
@@ -740,10 +756,12 @@ export function boot(canvas, deps = {}) {
     if (state === 'title' || state === 'result') au.bgmPlay(BGM.title);
     const [x, y] = toLogical(e);
     if (onPress(x, y)) return;
-    if (state === 'run') input.onPointerDown(x, e.pointerType, e.pointerId);
+    //  y(r3.17 아레나 세로 입력)는 뒤에 붙는 선택 인자 — 도로에서는 규칙이 읽지 않는다
+    if (state === 'run') input.onPointerDown(x, e.pointerType, e.pointerId, y);
   });
   canvas.addEventListener('pointermove', (e) => {
-    input.onPointerMove(toLogical(e)[0], e.pointerType, e.pointerId);
+    const [x, y] = toLogical(e);
+    input.onPointerMove(x, e.pointerType, e.pointerId, y);
   });
   if (win) {
     //  pointerId 를 넘겨 드래그 중인 손가락의 up 만 드래그를 끝낸다
@@ -799,6 +817,12 @@ export function boot(canvas, deps = {}) {
     //  복수 정예(r3.16) 관찰: bosses(죽은 것도 dead 로 남는다)·bossesLeft(살아 있는 수 — 캡처 스크립트가 '한 마리 격파 뒤' 시점을 잡는다)
     bosses: run ? run.bosses.map((b) => ({ id: b.id, role: b.role, hp: Math.ceil(b.hp), x: Math.round(b.x), z: Math.round(b.z), dead: b.dead })) : [],
     bossesLeft: run ? run.bosses.filter((b) => !b.dead).length : 0,
+    //  아레나(r3.17) 관찰: arena(광장 단계인가)·ay/tay(세로 오프셋·목표)·bossState('chase'|'warn'|'dash'|'recover')·bossZ·dashTx/dashTz(돌진 목표)·bossHp — Playwright 시간 검증용
+    arena: !!(run && run.phase === 'arena'), ay: run ? Math.round(run.ay) : 0, tay: run ? Math.round(run.tay) : 0,
+    bossState: run && run.boss ? (run.boss.state ?? null) : null, bossZ: run && run.boss ? Math.round(run.boss.z) : null,
+    dashTx: run && run.boss && run.boss.dashTx != null ? Math.round(run.boss.dashTx) : null,
+    dashTz: run && run.boss && run.boss.dashTz != null ? Math.round(run.boss.dashTz) : null,
+    bossHp: run && run.boss ? Math.ceil(run.boss.hp) : null, lossByShock: run ? run.lossByShock : 0,
   });
   if (win) win.__rush3Dbg = dbg;
 

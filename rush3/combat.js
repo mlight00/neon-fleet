@@ -12,8 +12,19 @@ export const STEP = BAL3.STEP;
 const SQ = BAL3.squad, ROAD = BAL3.road, EN = BAL3.enemies, LINE_Y = BAL3.view.LINE_Y;
 //  복수 정예(r3.16) 역할 표·순찰 반폭. 파일 상단 상수로 잡아 stepRun 이후 소스가 BAL3.enemies 를 직접 읽지 않는 규약(DIFF-6)을 지킨다
 const ELITES = BAL3.elites;
-const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0 });
+//  아레나(r3.17) 보스 z 허용 범위(run.z 기준). 파일 상단 상수 — stepRun 이후는 run.arena 만 읽는다
+const ARENA_BOSS_Z = BAL3.arena.bossZ;
+const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
 const DEG = Math.PI / 180;
+
+//  아레나(r3.17) 공통 헬퍼. 부대 중심은 (run.x, run.z − run.ay) 2차원 — ay 는 LINE_Y 기준 세로 오프셋(음수 = 화면 위 = z 큰 쪽).
+//   도로에서는 ay 가 항상 0 이라 squadZ === run.z, squadOrigin 은 **같은 run 객체**를 돌려줘 종전 판정과 바이트 단위로 같다
+const inArena = (run) => run.phase === 'arena';
+const squadZ = (run) => run.z - (run.ay || 0);
+const squadOrigin = (run) => (run.ay ? { x: run.x, z: run.z - run.ay } : run);
+//  광장에서는 clampCenter 의 도로 가장자리를 광장 폭(40~440)으로 넓힌다. 도로에서는 undefined(= SQUAD_DEFAULTS 그대로)
+const squadOpts = (run) => (inArena(run) ? run.arena.squadOpts : undefined);
+const clampNum = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 // 난이도별 적 정의 표(계약서 3-8). BAL3.enemies 에 배수를 **한 번** 적용한 새 객체 — run 이 이것만 읽으므로 stepRun 안에 난이도 분기가 없다.
 //  enemyHp → grunt/rusher/shooter hp(반올림) · eshotDmg → shooter/elite shot.dmg · touchDmg → grunt/rusher/elite touchDmg
@@ -44,6 +55,21 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
   //   role 은 여기서 검증만 한다(모르는 역할 = 데이터 오류 → throw. STEP 도중에 터지지 않게 생성 시점에)
   const elites = stage.elites ?? (stage.elite ? [stage.elite] : []);
   for (const e of elites) if (e.role != null && !ELITES.roles[e.role]) throw new Error('unknown elite role ' + e.role);
+  //  아레나(r3.17): stage.arena 정의의 사본에 난이도 배수를 **여기서 한 번** 적용(접촉·충격 피해 × touchDmg 반올림, 돌진·사격 주기 ÷ eliteFireRate, 소환 주기 ÷ eliteSummonRate).
+  //   hp 는 elites[0].hp(buildStage 파생값)가 진실. squadOpts = clampCenter 에 넘길 광장 폭. 아레나가 없는 스테이지는 null
+  const m = difficultyMult(diff);
+  const A = stage.arena;
+  const arena = A ? {
+    z: A.z, w: [...A.w], depth: [...A.depth], bossZ: [...ARENA_BOSS_Z], squadOpts: Object.freeze({ roadLo: A.w[0], roadHi: A.w[1] }),
+    boss: {
+      ...A.boss,
+      touchDmg: Math.round(A.boss.touchDmg * m.touchDmg),
+      dash: { ...A.boss.dash, every: A.boss.dash.every / m.eliteFireRate },
+      shock: { ...A.boss.shock, dmg: Math.round(A.boss.shock.dmg * m.touchDmg) },
+      summon: A.boss.summon ? { ...A.boss.summon, every: A.boss.summon.every / (m.eliteSummonRate ?? 1) } : null,
+      shoot: A.boss.shoot ? { ...A.boss.shoot, every: A.boss.shoot.every / m.eliteFireRate } : null,
+    },
+  } : null;
   const run = {
     stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null, bg: stage.bg ?? 1,
     difficulty: diff, enemyDefs: enemyDefsFor(diff),
@@ -77,7 +103,10 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
     //  단계(r3.15): 'main'(도로 본전투) | 'bonus'(승리 확정 뒤 표적전). 단방향 전이, 종료 플래그는 over 하나뿐.
     //   bonusDef = stage.bonus { sec, tiers, targets } | null · bonus = { t, sec, score, tier, hits } | null · bonusTargets = 표적 런타임(본전투 중엔 빈 배열)
     //   mainResult = 본전투 승리 확정 시점의 { wonAt, survivors, peak, kills }(보너스 유무와 무관하게 모든 승리에서 기록 — 기록 저장은 이 값으로)
+    //   'arena'(r3.17) = 광장 보스전(spawnDue 의 enterArena 가 main → arena 로 세운다. run.z 정지·상하 조향·자동 조준). 아레나 뒤 보너스는 verdict 승리에서 같은 경로
     phase: 'main', bonusDef: stage.bonus ?? null, bonus: null, bonusTargets: [], mainResult: null,
+    //  아레나(r3.17): ay/tay = 부대 중심 세로 오프셋·목표(LINE_Y 기준, 광장 밖에서는 항상 0). arena = 설정 사본(위) | null. lossByShock = 착지 충격 손실 집계(hurt cause 'shock')
+    ay: 0, tay: 0, arena, lossByShock: 0,
     pendingRewards: [],
     time: 0, peak: 0, kills: 0, lossByTouch: 0, lossByShot: 0, lossByGate: 0, missedSupplies: 0, skippedSupplies: 0, badGatesPassed: 0, lastBadGateId: null,
     over: false, won: false, wonAt: null,
@@ -104,7 +133,8 @@ export function stepRun(run, input, dt = STEP) {
   const inp = input || NO_INPUT;
   steer(run, inp, dt);
   run.prevZ = run.z;
-  if (!run.boss) run.z += BAL3.scroll * dt;
+  //  2단계 전진: 보스전·광장(r3.17)에서는 멈춘다(아레나 보스가 run.boss 라 종전 조건만으로도 멈추지만 뜻을 드러내기 위해 명시)
+  if (!run.boss && !inArena(run)) run.z += BAL3.scroll * dt;
   run.time += dt;
   spawnDue(run, ev);
   armGates(run, ev);
@@ -142,6 +172,8 @@ function stepBonus(run, input, dt) {
 }
 
 // 1단계 조향: 지수 추종(followRate) + 속도 상한 → clampCenter(벽 진입 규칙·tx 클램프) → compressUnits
+//  아레나(r3.17): 광장 안에서만 dragDy·keyDirY 로 세로 목표 tay 를 옮기고 ay 가 같은 추종·상한(축별 독립)으로 따라간다. depth 로 클램프.
+//   광장 밖에서는 dragDy·keyDirY 를 **읽지 않는다**(회귀 없음). x 범위는 squadOpts 로 광장 폭(40~440 → 중심 100~380)까지 넓어진다
 function steer(run, inp, dt) {
   const px = inp.pointerX;
   //  pointerX 가 null 이면 tx 를 덮어쓰지 않는다(키·드래그로 옮긴 목표가 옛 마우스 위치로 되돌아가지 않게 — 계약서 6장 장치 우선순위)
@@ -151,7 +183,15 @@ function steer(run, inp, dt) {
   const want = (run.tx - run.x) * (1 - Math.exp(-SQ.followRate * dt));
   const cap = SQ.moveMax * dt;
   run.x += Math.max(-cap, Math.min(cap, want));
-  const c = clampCenter(run, run.walls);
+  if (inArena(run)) {
+    const [d0, d1] = run.arena.depth;
+    run.tay += Number.isFinite(inp.dragDy) ? inp.dragDy : 0;
+    run.tay += (inp.keyDirY || 0) * SQ.keySpeed * dt;
+    run.tay = clampNum(run.tay, d0, d1);
+    const wantY = (run.tay - run.ay) * (1 - Math.exp(-SQ.followRate * dt));
+    run.ay = clampNum(run.ay + Math.max(-cap, Math.min(cap, wantY)), d0, d1);
+  }
+  const c = clampCenter(run, run.walls, squadOpts(run));
   compressUnits(run.units, c.dxLo, c.dxHi);
 }
 
@@ -164,8 +204,10 @@ function spawnDue(run, ev) {
     ev.push({ type: 'spawn', kind: e.kind, n: e.n, x: e.xs[0], z: e.z });
   }
   //  정예(r3.16 복수 정예): 정의 배열 전원이 **같은 STEP** 에 등장(z 는 전원 run.z + spawnAhead, x 는 정의 x ?? 도로 중앙). 이벤트 elite 는 index 순으로 하나씩
+  //   아레나(r3.17): 같은 발동 조건에서 광장 전환 + 아레나 보스 1체(enterArena)
   if (run.elites.length && !run.eliteSpawned && run.elites[0].z <= run.z) {
     run.eliteSpawned = true;
+    if (run.arena) { enterArena(run, ev); return; }
     const total = run.elites.length;
     run.elites.forEach((d, i) => {
       const bo = makeBoss(run, d, i);
@@ -201,6 +243,28 @@ export function makeBoss(run, def, index) {
   return bo;
 }
 
+/** 광장 전환(r3.17 아레나, spawnDue 에서 1회). phase main → arena(단방향), ay/tay 0, 아레나 보스 = makeBoss(run, elites[0], 0) 에 전용 필드를 덧붙인 것을
+ *  run.bosses 에 넣고 별칭 run.boss 갱신. 이벤트 arenaEnter 뒤 종전 elite { id, index 0, total 1, role, x, z, hp }(배너·BGM 결선 재사용).
+ *  보스 전용 필드: arena true · state 'chase'|'warn'|'dash'|'recover' · dashT(다음 예고까지, 처음은 dash.first) · warnT · recoverT ·
+ *   dashTx/dashTz(예고 시점의 부대 중심 = 돌진 목표) · dashUx/dashUz(돌진 단위벡터) · dashLeft(남은 돌진 px) · summon/shoot 는 아레나 설정의 유무 */
+function enterArena(run, ev) {
+  const A = run.arena, B = A.boss;
+  run.phase = 'arena';
+  run.ay = 0; run.tay = 0;
+  ev.push({ type: 'arenaEnter', z: run.z, x: run.x, w: [A.w[0], A.w[1]], depth: [A.depth[0], A.depth[1]] });
+  const bo = makeBoss(run, run.elites[0], 0);
+  Object.assign(bo, {
+    arena: true, r: B.r, x: ROAD.center, z: run.z + B.spawnAhead, state: 'chase', touchT: 0,
+    dashT: B.dash.first, warnT: 0, recoverT: 0, dashTx: null, dashTz: null, dashUx: 0, dashUz: 0, dashLeft: 0,
+    summon: !!B.summon, spawnT: B.summon ? B.summon.every : 0, shoot: !!B.shoot, shootT: B.shoot ? B.shoot.every : 0,
+  });
+  if (B.skin) bo.skin = B.skin;
+  bo.px = bo.x; bo.pz = bo.z;
+  run.bosses.push(bo);
+  ev.push({ type: 'elite', id: bo.id, index: 0, total: 1, role: bo.role, x: bo.x, z: bo.z, hp: bo.hp });
+  run.boss = bo;
+}
+
 // 3-b 단계 게이트 셔터 갱신: run.z 갱신(2단계) 뒤·사격(4단계) 앞. 그 STEP 의 탄 충돌(5단계)이 올바른 셔터 상태를 보게 한다
 function armGates(run, ev) {
   for (const row of run.gateRows) updateGateArm(row, run, ev);
@@ -222,17 +286,27 @@ function spawnEnemy(run, kind, x, z, hp, skin) {
   return e;
 }
 
-// 4단계 유닛 사격: 각자 자기 위치(run.x + dx, run.z - dy)에서 직진. 이벤트 fire {count} STEP당 1개
+// 4단계 유닛 사격: 각자 자기 위치(run.x + dx, squadZ - dy)에서 직진. 이벤트 fire {count} STEP당 1개
+//  아레나(r3.17) 자동 조준: 광장에서 보스가 살아 있으면 유닛마다 부대→보스 각도(atan2, 0 = +z 정면)로 makeBullet(…, angle) — 부채꼴은 각도 오프셋을 진짜 회전으로 더한다
+//   (도로의 tan 방식과 다름). 보스가 없으면(격파 직후 같은 STEP) 종전 직진
 function fireUnits(run, ev, dt) {
   const mk = run.weaponMk || 1;
   const w = weaponStats(run.weapon, mk);
   const angles = fanAngles(w.id);
+  const oz = squadZ(run);
+  const aim = inArena(run) && run.boss && !run.boss.dead ? run.boss : null;
   let count = 0;
   for (const u of run.units) {
     u.fireT -= dt;
     while (u.fireT <= 0) {
-      //  부채꼴(산탄포): 각도마다 1발, vx = tan(각)·vz. 나머지 무기는 각도 [0] 한 발
-      for (const a of angles) run.bullets.push(makeBullet(w.id, run.x + u.dx, run.z - u.dy, u.id, mk, a ? Math.tan(a) * w.vz : 0));
+      const ox = run.x + u.dx, uz = oz - u.dy;
+      if (aim) {
+        const base = Math.atan2(aim.x - ox, aim.z - uz);
+        for (const a of angles) run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, 0, base + a));
+      } else {
+        //  부채꼴(산탄포): 각도마다 1발, vx = tan(각)·vz. 나머지 무기는 각도 [0] 한 발
+        for (const a of angles) run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, a ? Math.tan(a) * w.vz : 0));
+      }
       u.fireT += w.interval;
       count++;
     }
@@ -271,8 +345,8 @@ function moveBullets(run, ev, dt) {
     b.pz = b.z;
     b.z += b.vz * dt;
     if (b.vx) b.x += b.vx * dt;
-    //  사거리(산탄포): range 를 넘긴 탄은 이번 STEP 에 닿는 것 없이 소멸
-    if (b.range != null && b.z - b.z0 > b.range) { b.dead = true; continue; }
+    //  사거리(산탄포): range 를 넘긴 탄은 이번 STEP 에 닿는 것 없이 소멸. 조준탄(r3.17)은 직선 거리, 도로 탄은 종전대로 z 차이
+    if (b.range != null && (b.aimed ? Math.hypot(b.z - b.z0, b.x - b.x0) : b.z - b.z0) > b.range) { b.dead = true; continue; }
     let bestZ = Infinity, bestP = 9, kind = -1, obj = null, cell = null;
     // 후보 등록: cz = 교차 함수가 돌려준 최초 교차 z(이미 스윕 시작 이상으로 잘려 있다)
     const consider = (cz, p, k, o, c) => {
@@ -372,11 +446,17 @@ function fireAt(run, x, z, tx, tz, shot, fan, spreadRad, ev) {
 }
 
 // 6단계 적 이동·행동(!dead 만). grunt 추종·rusher 가속·shooter 예고/발사·보스(전원) 하강/왕복/사격/소환
+//  아레나(r3.17): chase 적(광장 소환)은 부대 중심 (run.x, squadZ) 로 d.vz 등속 양축 추격(직진 e.z −= vz 를 건너뛴다). 아레나 보스는 arenaBossAct
 function moveEnemies(run, ev, dt) {
   for (const e of run.enemies) {
     if (e.dead) continue;
     const d = run.enemyDefs[e.kind];
     e.px = e.x; e.pz = e.z;
+    if (e.chase) {
+      const dx = run.x - e.x, dz = squadZ(run) - e.z, dist = Math.hypot(dx, dz), mv = d.vz * dt;
+      if (dist > 1e-9) { const k = Math.min(1, mv / dist); e.x += dx * k; e.z += dz * k; }
+      continue;
+    }
     if (e.kind === 'grunt') {
       const want = run.x - e.x, mv = d.track * dt;
       e.x += Math.abs(want) <= mv ? want : Math.sign(want) * mv;
@@ -387,7 +467,77 @@ function moveEnemies(run, ev, dt) {
     }
     e.z -= e.vz * dt;
   }
-  for (const bo of run.bosses) if (!bo.dead) bossAct(run, bo, ev, dt);
+  for (const bo of run.bosses) if (!bo.dead) { if (bo.arena) arenaBossAct(run, bo, ev, dt); else bossAct(run, bo, ev, dt); }
+}
+
+/** 아레나 보스 상태기계(r3.17, 전부 STEP 타이머·난수 0). 목표 = 부대 중심 (run.x, squadZ).
+ *   chase   : 목표로 speed 등속(도착하면 정지). dashT −= dt ≤ 0 → 목표 지점 = 부대 중심 **지금 위치**(dashTx/dashTz), warn, 이벤트 bossDashWarn
+ *   warn    : 정지. warnT −= dt ≤ 0 → 단위벡터·dashLeft = min(거리, dash.range), dash, 이벤트 bossDash
+ *   dash    : min(dashLeft, dash.speed·dt) 만큼 직선 전진. 0 이 되면 착지 충격(arenaShock) → recover
+ *   recover : recoverT −= dt ≤ 0 → chase, dashT = dash.every
+ *  모든 상태에서 x 는 [w0+r, w1−r]·z 는 run.z + bossZ 로 클램프(목표가 그 안이라 돌진 착지점은 바뀌지 않는다), summon·shoot 타이머는 상태와 무관하게 돈다.
+ *  소환 적은 e.chase = true(양축 추격), x 는 bo.x + 균등 오프셋(n 2 = ±dx, n 3 = −dx/0/+dx)을 광장 안으로 클램프. 사격은 fireAt(360° 지원) 재사용 */
+function arenaBossAct(run, bo, ev, dt) {
+  const A = run.arena, B = A.boss, D = B.dash;
+  bo.px = bo.x; bo.pz = bo.z;
+  const tx = run.x, tz = squadZ(run);
+  if (bo.state === 'chase') {
+    const dx = tx - bo.x, dz = tz - bo.z, dist = Math.hypot(dx, dz), mv = B.speed * dt;
+    if (dist > 1e-9) { const k = Math.min(1, mv / dist); bo.x += dx * k; bo.z += dz * k; }
+    bo.dashT -= dt;
+    if (bo.dashT <= 0) {
+      bo.state = 'warn'; bo.warnT = D.warn; bo.dashTx = tx; bo.dashTz = tz;
+      ev.push({ type: 'bossDashWarn', x: bo.x, z: bo.z, tx, tz, warn: D.warn });
+    }
+  } else if (bo.state === 'warn') {
+    bo.warnT -= dt;
+    if (bo.warnT <= 0) {
+      const dx = bo.dashTx - bo.x, dz = bo.dashTz - bo.z, dist = Math.hypot(dx, dz);
+      bo.dashUx = dist > 1e-9 ? dx / dist : 0; bo.dashUz = dist > 1e-9 ? dz / dist : 0;
+      bo.dashLeft = Math.min(dist, D.range);
+      bo.state = 'dash';
+      ev.push({ type: 'bossDash', x: bo.x, z: bo.z, tx: bo.dashTx, tz: bo.dashTz, range: bo.dashLeft });
+    }
+  } else if (bo.state === 'dash') {
+    const mv = Math.min(bo.dashLeft, D.speed * dt);
+    bo.x += bo.dashUx * mv; bo.z += bo.dashUz * mv; bo.dashLeft -= mv;
+    if (bo.dashLeft <= 1e-9) { bo.dashLeft = 0; arenaShock(run, bo, ev); bo.state = 'recover'; bo.recoverT = D.recover; }
+  } else {
+    bo.recoverT -= dt;
+    if (bo.recoverT <= 0) { bo.state = 'chase'; bo.dashT = D.every; }
+  }
+  bo.x = clampNum(bo.x, A.w[0] + bo.r, A.w[1] - bo.r);
+  bo.z = clampNum(bo.z, run.z + A.bossZ[0], run.z + A.bossZ[1]);
+  if (bo.summon) {
+    const SM = B.summon;
+    bo.spawnT -= dt;
+    if (bo.spawnT <= 0) {
+      bo.spawnT += SM.every;
+      const r = run.enemyDefs[SM.kind].r;
+      for (let k = 0; k < SM.n; k++) {
+        const off = SM.n > 1 ? (k / (SM.n - 1) * 2 - 1) * SM.dx : 0;
+        const e = spawnEnemy(run, SM.kind, clampNum(bo.x + off, A.w[0] + r, A.w[1] - r), bo.z + SM.dz);
+        e.chase = true;
+      }
+      ev.push({ type: 'summon', kind: SM.kind, n: SM.n, x: bo.x, z: bo.z + SM.dz });
+    }
+  }
+  if (bo.shoot) {
+    const SH = B.shoot;
+    bo.shootT -= dt;
+    if (bo.shootT <= 0) {
+      bo.shootT += SH.every;
+      fireAt(run, bo.x, bo.z, tx, tz, run.enemyDefs.elite.shot, SH.fan, SH.fanDeg * DEG, ev);
+    }
+  }
+}
+
+//  착지 충격(r3.17): 충격 원(bo.x, bo.z, shock.r)과 겹치는 유닛 전부 hp −dmg(cause 'shock'). 이벤트 bossShock { x, z, r, hits }
+function arenaShock(run, bo, ev) {
+  const S = run.arena.boss.shock;
+  const hits = overlappingUnits(run.units, bo.x, bo.z, S.r, null, squadOrigin(run));
+  for (const u of hits) damageUnit(run, u, S.dmg, 'shock', ev, bo.x, bo.z);
+  ev.push({ type: 'bossShock', x: bo.x, z: bo.z, r: S.r, hits: hits.length });
 }
 
 // 저격수: shootEvery 주기로 예고(aim) 시작, aimTime 뒤 발사 시점의 (run.x, run.z)를 조준해 1발. 부대 줄을 지나면 쏘지 않는다
@@ -396,7 +546,7 @@ function shooterAct(run, e, d, ev, dt) {
   e.shootT -= dt;
   if (e.aimT > 0) {
     e.aimT -= dt;
-    if (e.aimT <= 0) { e.aimT = 0; fireAt(run, e.x, e.z, run.x, run.z, d.shot, 1, 0, ev); }
+    if (e.aimT <= 0) { e.aimT = 0; fireAt(run, e.x, e.z, run.x, squadZ(run), d.shot, 1, 0, ev); }
   }
   if (e.shootT <= 0) {
     e.shootT += d.shootEvery;
@@ -460,6 +610,7 @@ function damageUnit(run, u, dmg, cause, ev, x, z) {
   ev.push({ type: 'hurt', n: dmg, cause, unitId: u.id, x, z });
   if (u.hp <= 0) {
     if (cause === 'shot') run.lossByShot++;
+    else if (cause === 'shock') run.lossByShock++;   // r3.17 아레나 착지 충격 — 접촉 손실과 따로 센다
     else run.lossByTouch++;
   }
 }
@@ -475,7 +626,7 @@ function moveEshots(run, ev, dt) {
     for (const w of run.walls) if (segHitsRect(s.px, s.pz, s.x, s.z, w)) { wall = true; break; }
     if (!wall) for (const w of run.covers) if (segHitsRect(s.px, s.pz, s.x, s.z, w)) { wall = true; break; }
     if (wall) { s.dead = true; continue; }
-    const u = hitUnit(run.units, s.x, s.z, s.r, { x: s.px, z: s.pz }, run);
+    const u = hitUnit(run.units, s.x, s.z, s.r, { x: s.px, z: s.pz }, squadOrigin(run));
     if (u) { s.dead = true; damageUnit(run, u, s.dmg, 'shot', ev, s.x, s.z); }
   }
 }
@@ -486,7 +637,7 @@ function contacts(run, ev, dt) {
     if (e.dead) continue;
     const d = run.enemyDefs[e.kind];
     if (!d.touchDmg) continue;
-    const hits = overlappingUnits(run.units, e.x, e.z, e.r, { x: e.px, z: e.pz }, run);
+    const hits = overlappingUnits(run.units, e.x, e.z, e.r, { x: e.px, z: e.pz }, squadOrigin(run));
     if (!hits.length) continue;
     const u = frontmostUnit(hits);
     e.touched = true; e.dead = true;
@@ -496,12 +647,14 @@ function contacts(run, ev, dt) {
   const E = run.enemyDefs.elite;
   for (const bo of run.bosses) {
     if (bo.dead) continue;
+    //  아레나 보스(r3.17)는 접촉 상수를 아레나 설정에서(돌진 경로에 선 유닛도 이 타이머 접촉으로 맞는다). 도로 정예는 종전 표
+    const T = bo.arena ? run.arena.boss : E;
     bo.touchT = Math.max(0, bo.touchT - dt);
     if (bo.touchT <= 0) {
-      const hits = overlappingUnits(run.units, bo.x, bo.z, bo.r, null, run);
+      const hits = overlappingUnits(run.units, bo.x, bo.z, bo.r, null, squadOrigin(run));
       if (hits.length) {
-        bo.touchT = E.touchEvery;
-        damageUnit(run, frontmostUnit(hits), E.touchDmg, 'boss', ev, bo.x, bo.z);
+        bo.touchT = T.touchEvery;
+        damageUnit(run, frontmostUnit(hits), T.touchDmg, 'boss', ev, bo.x, bo.z);
         ev.push({ type: 'touch', kind: 'elite', x: bo.x, z: bo.z });
       }
     }
@@ -515,7 +668,7 @@ function pruneDeadUnits(run, ev) {
   for (let i = 0; i < units.length; i++) {
     const u = units[i];
     if (u.hp > 0) units[w++] = u;
-    else { lost++; ev.push({ type: 'unitLost', id: u.id, x: run.x + u.dx, z: run.z - u.dy }); }
+    else { lost++; ev.push({ type: 'unitLost', id: u.id, x: run.x + u.dx, z: squadZ(run) - u.dy }); }
   }
   if (lost) { units.length = w; layoutUnits(units); }
 }
@@ -530,7 +683,8 @@ function applyRewards(run, ev) {
   for (const row of run.gateRows) passGateRow(row, run, ev);
   for (const s of run.supplies) passSupply(s, run, ev);
   for (const s of run.supplies) if (s.kind === 'chain' && s.pads.length) takePads(s, run, ev);
-  const c = clampCenter(run, run.walls);
+  //  광장(r3.17)에서도 같은 폭(squadOpts)을 쓴다 — 여기서 빼먹으면 매 STEP 도로 폭(80~400)으로 되돌아간다
+  const c = clampCenter(run, run.walls, squadOpts(run));
   compressUnits(run.units, c.dxLo, c.dxHi);
 }
 
@@ -563,8 +717,11 @@ function cleanup(run, ev) {
     run.enemies.length = 0;
     run.eshots.length = 0;
   }
-  run.bullets = run.bullets.filter((b) => !b.dead && b.z <= ahead);
-  run.eshots = run.eshots.filter((s) => !s.dead && s.z >= behind && s.x > -40 && s.x < 520);
+  //  탄 정리(r3.17): 아래·옆으로 조준된 탄이 영원히 남지 않게 behind·x 범위를 더한다. 도로 탄은 출발 z ≥ run.z − 159 에서 +z 로만 가고
+  //   카메라 3.2px/STEP < 최저 탄속 8.7px/STEP 이라 behind 에 결코 걸리지 않고, 산탄포 x 드리프트(±104)도 −40~520 안이다. 위로 나는 적탄(광장 사격)도 ahead 로 정리
+  run.bullets = run.bullets.filter((b) => !b.dead && b.z <= ahead && b.z >= behind && b.x > -40 && b.x < 520);
+  //   ⚠️적탄의 ahead 정리는 **위로 나는 탄(vz < 0)** 에만 — 도로 저격수는 화면 밖 위(z ≤ run.z + 760)에서 아래로 쏘므로 종전 조건 그대로 둬야 한다
+  run.eshots = run.eshots.filter((s) => !s.dead && s.z >= behind && (s.vz >= 0 || s.z <= ahead) && s.x > -40 && s.x < 520);
   if (run.units.length > run.peak) run.peak = run.units.length;
 }
 

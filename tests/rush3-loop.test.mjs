@@ -83,7 +83,7 @@ test('V3-DETERMINISM: 같은 STEP 입력열을 30/60/120Hz dt 열에 얹어도 S
 test('V3-INPUT: 마우스 = 호버 절대 x, 터치 = 드래그 상대 이동(댄 위치로 튀지 않음), snapshot 이 dragDx 를 소비', () => {
   const inp = createInput();
   inp.onPointerMove(300, 'mouse');
-  assert.deepEqual(inp.snapshot(), { pointerX: 300, dragDx: 0, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: 300, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
   // 터치 시작: 절대 위치 무시(pointerX null), 이동량만 누적
   inp.onPointerDown(400, 'touch');
   let s = inp.snapshot();
@@ -93,7 +93,7 @@ test('V3-INPUT: 마우스 = 호버 절대 x, 터치 = 드래그 상대 이동(�
   inp.onPointerMove(420, 'touch');
   inp.onPointerMove(410, 'touch');
   s = inp.snapshot();
-  assert.deepEqual(s, { pointerX: null, dragDx: 10, keyDir: 0 });
+  assert.deepEqual(s, { pointerX: null, dragDx: 10, keyDir: 0, dragDy: 0, keyDirY: 0 });
   assert.equal(inp.snapshot().dragDx, 0, '스냅샷이 dragDx 를 소비');
   inp.onPointerMove(450, 'touch');
   inp.onPointerUp();
@@ -121,50 +121,52 @@ test('V3-INPUT: pointercancel/blur(reset) → dragging=false·dragDx=0·keyDir=0
   inp.onPointerCancel();
   assert.equal(inp.state.dragging, false);
   assert.equal(inp.state.dragDx, 0);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
   inp.onPointerMove(330, 'mouse');
   inp.reset();
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
   // 드래그 중 마우스 이벤트가 섞여도 절대 x 로 튀지 않고 dragDx 에도 누적되지 않는다
   inp.onPointerDown(100, 'touch');
   inp.onPointerMove(150, 'mouse');
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
   inp.onPointerMove(110, 'touch');
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 10, keyDir: 0 }, '마우스 혼입 뒤 손가락 이동은 손가락 이동량만');
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 10, keyDir: 0, dragDy: 0, keyDirY: 0 }, '마우스 혼입 뒤 손가락 이동은 손가락 이동량만');
   inp.onPointerDown(300, 'mouse');
   inp.onPointerMove(120, 'touch');
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 10, keyDir: 0 }, '드래그 중 마우스 down 도 lastX 를 덮어쓰지 않는다');
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 10, keyDir: 0, dragDy: 0, keyDirY: 0 }, '드래그 중 마우스 down 도 lastX 를 덮어쓰지 않는다');
 });
 
 test('V3-INPUT: 두 손가락 — 둘째 손가락의 down/move/up 은 첫 손가락 드래그에 섞이지 않는다', () => {
   const inp = createInput();
   inp.onPointerDown(100, 'touch', 1);
   inp.onPointerMove(110, 'touch', 1);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 10, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 10, keyDir: 0, dragDy: 0, keyDirY: 0 });
   // 둘째 손가락 down(멀리) → 첫 손가락 move: 첫 손가락 이동량만 누적(두 손가락 거리만큼 점프 없음)
   inp.onPointerDown(300, 'touch', 2);
   assert.equal(inp.state.pointerId, 1, '드래그 주인은 첫 손가락 그대로');
   inp.onPointerMove(120, 'touch', 1);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 10, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 10, keyDir: 0, dragDy: 0, keyDirY: 0 });
   // 둘째 손가락 move 는 무시
   inp.onPointerMove(350, 'touch', 2);
   inp.onPointerMove(340, 'touch', 2);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
   // 둘째 손가락 up 은 드래그를 끝내지 않는다 → 첫 손가락 이동 계속 반영
   inp.onPointerUp(2);
   assert.equal(inp.state.dragging, true);
   inp.onPointerMove(125, 'touch', 1);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 5, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 5, keyDir: 0, dragDy: 0, keyDirY: 0 });
   // 첫 손가락 up → 드래그 종료. 이후 둘째 손가락이 새로 down 하면 그 손가락이 새 드래그(댄 위치로 튀지 않음)
   inp.onPointerUp(1);
   assert.equal(inp.state.dragging, false);
   assert.equal(inp.state.pointerId, null);
   inp.onPointerDown(300, 'touch', 2);
   inp.onPointerMove(290, 'touch', 2);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: -10, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: -10, keyDir: 0, dragDy: 0, keyDirY: 0 });
   // 드래그 중 pointercancel 은 손가락과 무관하게 reset
   inp.onPointerCancel();
-  assert.deepEqual(inp.state, { pointerX: null, dragDx: 0, keyDir: 0, dragging: false, pointerId: null, lastX: null, left: false, right: false, device: null });
+  //  r3.17 재기준: 세로 입력 칸(dragDy·lastY·up·down·keyDirY)이 state 에 늘었다 — reset 은 그것들도 지운다
+  assert.deepEqual(inp.state, { pointerX: null, dragDx: 0, keyDir: 0, dragging: false, pointerId: null, lastX: null, left: false, right: false, device: null,
+                                dragDy: 0, lastY: null, up: false, down: false, keyDirY: 0 });
 });
 
 test('V3-INPUT-SWITCH: 마지막으로 쓴 장치가 이긴다 — 마우스→키·키 해제 뒤 복귀 없음·키→마우스 재개', () => {
@@ -188,14 +190,14 @@ test('V3-INPUT-SWITCH: 마지막으로 쓴 장치가 이긴다 — 마우스→�
   const xKey = run.x;
   assert.ok(xKey > 300, '키로 오른쪽으로 갔다: ' + xKey);
   inp.onKey('ArrowRight', false);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 }, '키를 놓아도 pointerX 는 null 그대로');
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 }, '키를 놓아도 pointerX 는 null 그대로');
   for (let i = 0; i < 60; i++) stepRun(run, inp.snapshot(), STEP);
   assert.ok(run.x >= xKey - 1e-9, '옛 마우스 위치(240)로 되돌아가지 않는다: ' + run.x);
 
   //  (3) 마우스를 다시 움직이면 마우스가 이긴다(눌린 키는 해제)
   inp.onKey('ArrowRight', true);
   inp.onPointerMove(160, 'mouse');
-  assert.deepEqual(inp.snapshot(), { pointerX: 160, dragDx: 0, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: 160, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
   assert.equal(inp.state.device, 'mouse');
   for (let i = 0; i < 180; i++) stepRun(run, inp.snapshot(), STEP);
   assert.ok(Math.abs(run.x - 160) < 2, '마우스 위치를 다시 따라간다: ' + run.x);
@@ -207,24 +209,24 @@ test('V3-INPUT-SWITCH: 터치↔키 — 드래그가 시작되면 마우스·키
   inp.onKey('ArrowRight', true);
   assert.equal(inp.snapshot().keyDir, 1);
   inp.onPointerDown(200, 'touch', 1);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 }, '드래그 시작이 키 방향을 지운다');
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 }, '드래그 시작이 키 방향을 지운다');
   assert.equal(inp.state.device, 'touch');
   //  드래그 중 키는 방향에 반영하지 않는다(아는 키라 셸에는 true 로 알린다)
   assert.equal(inp.onKey('ArrowLeft', true), true);
   inp.onPointerMove(260, 'touch', 1);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 60, keyDir: 0 }, '드래그 중에는 이동량만');
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 60, keyDir: 0, dragDy: 0, keyDirY: 0 }, '드래그 중에는 이동량만');
   //  드래그가 끝난 뒤 다시 누르면 키가 듣는다
   inp.onPointerUp(1);
   inp.onKey('ArrowLeft', true);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: -1 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: -1, dragDy: 0, keyDirY: 0 });
   assert.equal(inp.state.device, 'key');
   //  마우스 → 터치: 마우스 목표 해제
   inp.onPointerMove(300, 'mouse');
   assert.equal(inp.snapshot().pointerX, 300);
   inp.onPointerDown(50, 'touch', 2);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
   inp.onPointerMove(70, 'touch', 2);
-  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 20, keyDir: 0 });
+  assert.deepEqual(inp.snapshot(), { pointerX: null, dragDx: 20, keyDir: 0, dragDy: 0, keyDirY: 0 });
 });
 
 test('V3-SHELL: main.js 는 DOM 없이 import 되고 hitButton 은 사각형 안·disabled 를 구분한다', () => {

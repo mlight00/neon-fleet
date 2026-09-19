@@ -279,7 +279,8 @@ test('V3-BONUS B-6: 회귀(보너스 없음) — 1~3 은 won 이 처음 true 인
     if (id === 8) continue;
     const r = playPolicy(id, 'planBoss', 14400, 'normal');
     assert.equal(r.events.bonusStart, undefined, 'S' + id);
-    assert.equal(r.run.phase, 'main'); assert.equal(r.run.bonus, null);
+    //  r3.17 재기준: 아레나 스테이지(10·11·24)는 본전투가 'arena' 단계에서 끝난다 — 보너스 단계가 아니면 된다
+    assert.ok(r.run.phase === 'main' || r.run.phase === 'arena', 'S' + id + ' phase ' + r.run.phase); assert.equal(r.run.bonus, null);
     if (r.run.won) assert.equal(r.run.mainResult.survivors, r.run.units.length, 'S' + id);
   }
 });

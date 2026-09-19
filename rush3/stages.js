@@ -325,8 +325,12 @@ function applyLottery(d, stage, seed) {
 //  정예 정의 정규화(r3.16 복수 정예): `elites` 배열 우선, 없으면 단수 `elite` 를 배열 1개로. 원소마다 새 객체(구조 공유 금지).
 //   z = 원소 z ?? 정의 eliteZ · hp = round(hp × eliteHp 배수) · summon 은 불리언으로 · skin/x/role/patrol 은 정의에 있을 때만(단수 정의 = 종전 키 집합 그대로).
 //   ⚠️hp 는 **원값**을 받는다 — 여기서 한 번만 배수를 곱하므로 호출부(아레나 등 파생 정의)가 미리 곱하면 이중 배수가 된다
+//   아레나(r3.17): 정의에 elite/elites 가 없고 arena 가 있으면 arena.boss 에서 원값 { z: arena.z, hp, summon: !!summon, skin } 을 **파생**한다 —
+//   한 정의에서 두 표현이 갈라지지 않게 hp·skin·summon 은 arena.boss 에만 적는다. 파생 원소는 단수 정의와 키 집합이 같다(아레나 표지는 stage.arena 하나)
 function makeElites(d, mult) {
-  const defs = d.elites ?? (d.elite ? [d.elite] : []);
+  const defs = d.elites ?? (d.elite ? [d.elite] : d.arena
+    ? [{ z: d.arena.z, hp: d.arena.boss.hp, summon: !!d.arena.boss.summon, ...(d.arena.boss.skin ? { skin: d.arena.boss.skin } : {}) }]
+    : []);
   return defs.map((e) => ({
     z: e.z ?? d.eliteZ, hp: Math.round(e.hp * mult.eliteHp), summon: !!e.summon,
     ...(e.skin ? { skin: e.skin } : {}),
@@ -341,15 +345,37 @@ function makeElites(d, mult) {
 //  적 hp·적탄·접촉·정예 발사 빈도는 createRun 이 stage.difficulty 를 읽어 run.enemyDefs 로 만든다. 게이트·통·벽·시작 병력·무기는 난이도와 무관.
 //  difficulty 생략 = normal = 종전과 완전히 같은 객체(difficulty 필드만 추가).
 //  랜덤 길(3-9)은 '재도전 동일 배치' 원칙의 명시적 예외 — lotterySeed 가 판마다 달라 우측 통로만 바뀐다(셸이 시계로 만든다).
+/** 아레나 정의 정규화(r3.17): 코스의 `arena: { z, w?, depth?, boss: {...} }` 를 BAL3.arena 기본값과 병합한 사본으로(호출마다 새 객체).
+ *  boss 는 { ...BAL3.arena.boss, ...정의 boss, dash/shock 는 칸별 병합, summon/shoot 는 정의에 있을 때만 객체 아니면 null }.
+ *  hp 는 여기 두지 않는다 — 진실은 makeElites 가 파생한 stage.elite.hp(난이도 배수 자리도 그쪽). 난이도 배수(접촉·주기)는 createRun 이 한 번 적용한다 */
+function makeArena(a) {
+  const A = BAL3.arena, B = A.boss, b = a.boss ?? {};
+  return {
+    z: a.z, w: [...(a.w ?? A.w)], depth: [...(a.depth ?? A.depth)],
+    boss: {
+      r: b.r ?? B.r, spawnAhead: b.spawnAhead ?? B.spawnAhead, speed: b.speed ?? B.speed,
+      touchEvery: b.touchEvery ?? B.touchEvery, touchDmg: b.touchDmg ?? B.touchDmg,
+      ...(b.skin ? { skin: b.skin } : {}),
+      dash: { ...B.dash, ...(b.dash ?? {}) },
+      shock: { ...B.shock, ...(b.shock ?? {}) },
+      summon: b.summon ? { ...b.summon } : null,
+      shoot: b.shoot ? { ...b.shoot } : null,
+    },
+  };
+}
+
 export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } = {}) {
   const d = def(id);
   const mult = difficultyMult(difficulty);
+  //  빌드 시점 정합성 guard(r3.17): 아레나 정의는 elite/elites 와 함께 쓸 수 없다(보스가 둘로 갈라진다). eliteZ 는 arena.z 와 같아야 한다(stageMeta 가 eliteZ 를 읽는다)
+  if (d.arena && (d.elite || d.elites)) throw new Error('stage ' + id + ': arena 와 elite/elites 를 함께 정의할 수 없다');
+  if (d.arena && d.eliteZ != null && d.eliteZ !== d.arena.z) throw new Error('stage ' + id + ': eliteZ(' + d.eliteZ + ')가 arena.z(' + d.arena.z + ')와 다르다');
   const walls = d.walls.map((w, i) => makeWall(i + 1, w));
   //  스폰 좌표 보정·랜덤 길은 진짜 벽만 본다(차폐물은 이동을 막지 않는다)
   const solid = walls.filter((w) => w.kind !== 'cover');
   const stage = {
     id, version: d.version ?? 1, difficulty,
-    title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ,
+    title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ ?? d.arena?.z ?? null,
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
@@ -372,6 +398,8 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
       targets: d.bonus.targets.map((t, i) => ({ id: 't' + (i + 1), dz: t.dz, x0: t.x0, x1: t.x1, period: t.period, phase: t.phase ?? 0,
                                                 hp: t.hp, max: t.hp, value: t.value, respawn: t.respawn ?? BAL3.bonus.respawn, r: BAL3.bonus.targetR })),
     } : null,
+    //  아레나(r3.17): 정의의 arena 를 BAL3.arena 기본값과 병합한 사본. 없는 스테이지는 null(아레나 표지는 이 칸 하나 — stage.elite 는 순수 모양 유지)
+    arena: d.arena ? makeArena(d.arena) : null,
   };
   //  stage.elite = 첫 원소의 별칭(같은 객체 — verdict·기존 읽기용). 정예 없는 스테이지는 null
   stage.elite = stage.elites[0] ?? null;
@@ -390,6 +418,16 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     for (const row of stage.gateRows) if (row.z > endZ) throw new Error('stage ' + id + ': 보너스 스테이지의 게이트 ' + row.id + '(z ' + row.z + ')가 보너스 구간(z > ' + endZ + ')에 있다');
     for (const s of stage.supplies) if (s.z + s.r > endZ) throw new Error('stage ' + id + ': 보너스 스테이지의 통 ' + s.id + '(z ' + s.z + ')가 보너스 구간(z > ' + endZ + ')에 있다');
     for (const sp of stage.spawns) if (sp.z > endZ) throw new Error('stage ' + id + ': 보너스 스테이지의 스폰(z ' + sp.z + ')이 보너스 구간(z > ' + endZ + ')에 있다');
+  }
+  //  아레나 스테이지 불변식 guard(r3.17): 광장에서는 run.z 가 멈추므로 게이트·통·벽·스폰이 전부 arena.z − 800 앞에 끝나야 한다 —
+  //   스폰은 발동 z + 760 에 놓이므로 arena.z − 800 이면 진입 순간 z ≤ arena.z − 40(부대 뒤)이고, 정지 저격수라도 정지된 광장 위에 남지 않는다.
+  //   (V3-ARENA A-1 이 10·11·24 에서 같은 조건을 실측한다)
+  if (stage.arena) {
+    const endZ = stage.arena.z - 800;
+    for (const row of stage.gateRows) if (row.z > endZ) throw new Error('stage ' + id + ': 아레나 스테이지의 게이트 ' + row.id + '(z ' + row.z + ')가 광장 앞 여유(z > ' + endZ + ')에 있다');
+    for (const s of stage.supplies) if (s.z + s.r > endZ) throw new Error('stage ' + id + ': 아레나 스테이지의 통 ' + s.id + '(z ' + s.z + ')가 광장 앞 여유(z > ' + endZ + ')에 있다');
+    for (const w of stage.walls) if (w.z1 > endZ) throw new Error('stage ' + id + ': 아레나 스테이지의 벽 ' + w.id + '(z1 ' + w.z1 + ')가 광장 앞 여유(z > ' + endZ + ')에 있다');
+    for (const sp of stage.spawns) if (sp.z > endZ) throw new Error('stage ' + id + ': 아레나 스테이지의 스폰(z ' + sp.z + ')이 광장 앞 여유(z > ' + endZ + ')에 있다');
   }
   return stage;
 }

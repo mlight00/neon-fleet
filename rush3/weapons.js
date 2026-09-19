@@ -41,10 +41,17 @@ export function fanAngles(id) {
 
 // 아군 탄 생성. z 는 트랙 좌표, pz = z(스윕 시작). 모든 탄 gateHit 1.
 //  vx(부채꼴)·range/z0(사거리)·pierce/hit(관통)은 해당 무기일 때만 붙는다 — 기존 3종 Mk I 탄은 종전 모양 그대로
-export function makeBullet(weaponId, x, z, ownerId, mk = 1, vx = 0) {
+//  angle(r3.17 아레나 자동 조준, 라디안·0 = +z 정면·양수 = +x): 있으면 vz = s.vz·cos, vx = s.vz·sin, aimed true, x0 = x(사거리는 직선 거리로).
+//   null 이면 종전 탄과 바이트 단위로 같다(도로 탄 무변화)
+export function makeBullet(weaponId, x, z, ownerId, mk = 1, vx = 0, angle = null) {
   const s = weaponStats(weaponId, mk);
   const b = { x, z, pz: z, vz: s.vz, dmg: s.dmg, w: s.w, kind: s.id, gateHit: 1, ownerId, dead: false };
-  if (vx) b.vx = vx;
+  if (angle !== null && angle !== undefined) {
+    b.vz = s.vz * Math.cos(angle);
+    b.vx = s.vz * Math.sin(angle);
+    b.aimed = true;
+    b.x0 = x;
+  } else if (vx) b.vx = vx;
   if (s.range) { b.range = s.range; b.z0 = z; }
   if (s.pierce) { b.pierce = s.pierce; b.hit = []; }
   return b;
