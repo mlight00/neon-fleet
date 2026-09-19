@@ -8,6 +8,8 @@ import { WEAPONS } from './weapons.js';
 import { gateColor, gateLabel } from './gates.js';
 
 const W = BAL3.view.w, H = BAL3.view.h, LINE_Y = BAL3.view.LINE_Y;
+//  병력 수 글(부대 중심 마커 옆, 수정 라운드 2): 마커에서 COUNT_DX 떨어져 쓰고, 마커 x 가 COUNT_FLIP_X 를 넘으면 왼쪽에 쓴다(세 자리 26px ≈ 46px 가 화면 밖으로 안 나가게)
+export const COUNT_DX = 14, COUNT_FLIP_X = W - 70;
 const ROAD0 = BAL3.road.x0, ROAD1 = BAL3.road.x1;
 const C = BAL3.colors;
 const FX = BAL3.fx;
@@ -936,17 +938,17 @@ export function createRenderer3(ctx, sprites) {
     if (rl) { ctx.textAlign = 'center'; outlinedText(rl, x, y + r + 36 * k, fs(12, k), C.hud, 'bold', 4); }
   }
 
-  //  부대: 실제 units 배열 — 히어로(units[0], M01) + 병사(SOLDIER). 그림자·행진 바운스·발밑 병력 수·중심 마커
-  //   원근(r3.20): 병사마다 부대 중심 + (dx, dz) 로 각각 투영한다 — 앞줄(d 큰 쪽)은 작게, 뒷줄은 크게(s 상한 1.5 — 검수 반영 2026-09-20, 처음 1.9). 아레나 ay 는 d 오프셋(−ay)
-  //   발밑 숫자는 H − 14 로 클램프(뒷줄이 아래로 내려갔을 때)
+  //  부대: 실제 units 배열 — 히어로(units[0], M01) + 병사(SOLDIER). 그림자·행진 바운스·병력 수·중심 마커
+  //   원근(r3.20): 병사마다 부대 중심 + (dx, dz) 로 각각 투영한다 — 앞줄(d 큰 쪽)은 작게, 뒷줄(d < 0)은 부대 줄 배율 near 그대로·간격은 평면(수정 라운드 2
+  //   2026-09-20 — 처음엔 뒷줄이 자라 s 1.9 → 1.5 상한, 그래도 59/40명부터 뒷줄이 화면 아래로 넘쳐 project.js 뒤쪽 갈래를 바꿨다). 아레나 ay 는 d 오프셋(−ay)
+  //   병력 수는 종전 '가장 뒷줄 아래(H − 14 클램프)' 에서 **부대 중심 마커 옆**으로 옮겼다(수정 라운드 2): 뒷줄이 화면 밖일 때 병사 위에 겹치던 것을 없앤다.
+  //   마커 위 전방 ±45° 는 대형이 비어 있어 병사와 겹치지 않는다. 마커가 화면 오른쪽 끝에 가까우면 왼쪽에 쓴다(COUNT_FLIP_X)
   function drawSquad(run, fx, now) {
     const S = BAL3.squad;
     const units = run.units;
     if (!units.length) return;
     const ay = run.ay || 0;
     const order = units.map((u, i) => ({ u, i })).sort((a, b) => a.u.dy - b.u.dy || a.i - b.i);
-    let maxDy = 0;
-    for (const u of units) if (u.dy > maxDy) maxDy = u.dy;
     for (const { u, i } of order) {
       const hero = i === 0;
       const q = pj(run.x + u.dx, -(ay + u.dy));
@@ -1005,10 +1007,12 @@ export function createRenderer3(ctx, sprites) {
     ctx.setLineDash([4, 8]);
     ctx.beginPath(); ctx.moveTo(sq.x, my - 10); ctx.lineTo(sq.x, my - 120); ctx.stroke();
     ctx.setLineDash([]);
-    //  발밑 병력 수(피격 중 빨강): 가장 뒷줄의 투영점 아래
-    const rear = pj(run.x, -(ay + maxDy));
-    ctx.textAlign = 'center';
-    outlinedText(String(units.length), sq.x, Math.min(H - 14, rear.y + 34 * rear.s), 26, fx.hurtT > 0 ? C.heroHurt : C.hero, 'bold', 6);
+    //  병력 수(피격 중 빨강): 부대 중심 마커(삼각) 옆. 오른쪽 기본, 마커가 COUNT_FLIP_X 를 넘으면 왼쪽
+    const right = sq.x <= COUNT_FLIP_X;
+    ctx.textAlign = right ? 'left' : 'right';
+    ctx.textBaseline = 'middle';
+    outlinedText(String(units.length), sq.x + (right ? COUNT_DX : -COUNT_DX), my - 3, 26, fx.hurtT > 0 ? C.heroHurt : C.hero, 'bold', 6);
+    ctx.textBaseline = 'alphabetic';
   }
 
   //  착지 충격 링(r3.17 아레나, 셸 fx.shocks — 셸이 투영해 둔 화면 좌표·반지름): 반지름 r·(0.5 + 0.9k) 로 퍼지며 (1 − k) 로 옅어진다. 새 그림 없음

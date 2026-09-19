@@ -4,11 +4,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeProjector, projectorFor, projectorMode, PERSPECTIVE } from '../rush3/project.js';
-import { createRenderer3, HUD_ROW } from '../rush3/render.js';
+import { createRenderer3, HUD_ROW, COUNT_DX, COUNT_FLIP_X } from '../rush3/render.js';
 import { buildStage } from '../rush3/stages.js';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 import { BAL3 } from '../rush3/balance.js';
 import { gateLabel } from '../rush3/gates.js';
+import { formation } from '../rush3/squad.js';
 const LINE_Y = BAL3.view.LINE_Y, CX = BAL3.road.center;
 
 function recCtx() {
@@ -64,18 +65,25 @@ test('V3-PROJECT 식: s(0)=near · y(0)=LINE_Y · d 가 커지면 s·y 단조 �
       assert.ok(Math.abs((P.project(CX + 100, d).x - CX) + (P.project(CX - 100, d).x - CX)) < 1e-9);
       //  x 는 배율만큼 모인다
       assert.ok(Math.abs(P.project(80, d).x - (CX + (80 - CX) * s)) < 1e-9);
-      //  s 상한(뒤쪽) = max(PERSPECTIVE.sMax, near) — 검수 반영 2026-09-20: 1.9 → 1.5, 가까이(near 1.8)는 near 가 상한
-      assert.ok(s <= P.sMax + 1e-12);
+      //  뒤쪽(d < 0)은 부대 줄 배율 near 그대로 — 자라지 않는다(수정 라운드 2 2026-09-20: 처음 상한 1.9 → 라운드 1 에서 1.5 → 라운드 2 에서 뒤쪽 갈래 자체를 바꿈)
+      assert.ok(s <= c.near + 1e-12);
     }
     //  위 끝 d 700 이 화면 위 근처(−50~−70): 앞이 보이는 거리는 종전(평면 640 → y 0)과 비슷하다
     const yTop = P.y(700);
     assert.ok(yTop < -40 && yTop > -80, mode + ': y(700) = ' + yTop.toFixed(1));
     //  역함수
     for (const d of [-120, -20, 0, 100, 400, 700]) assert.ok(Math.abs(P.dOf(P.y(d)) - d) < 1e-6, mode + ': dOf(y(d)) = d @' + d);
-    //  뒤쪽 확장: s 가 상한에 닿은 뒤로는 상한 그대로, y 는 계속 내려간다(직선)
-    assert.equal(P.sMax, Math.max(PERSPECTIVE.sMax, c.near), mode + ': 뒤쪽 상한 = max(1.5, near)');
-    assert.equal(P.s(-600), P.sMax);
-    assert.ok(P.y(-600) > P.y(-300));
+    //  뒤쪽 갈래(수정 라운드 2): s = near 고정 · y = LINE_Y − d(기울기 1 = 평면 간격) · 역함수. 150명 뒷줄(dy 159)이 평면과 같은 y 799
+    for (const d of [-1, -20, -100, -159, -300, -600]) {
+      assert.equal(P.s(d), c.near, mode + ': 뒤쪽 배율 = near @' + d);
+      assert.equal(P.y(d), LINE_Y - d, mode + ': 뒤쪽 y = LINE_Y − d @' + d);
+      assert.equal(P.dOf(LINE_Y - d), d, mode + ': 뒤쪽 역함수 @' + d);
+      assert.equal(P.project(80, d).x, CX + (80 - CX) * c.near, mode + ': 뒤쪽 x 는 near 배 @' + d);
+    }
+    assert.equal(P.y(-159), 799, mode + ': 150명 뒷줄 y 799 (평면과 같다)');
+    //  앞쪽 첫 점부터는 원근식: 기울기 near(0+) vs 1(0−) 로 꺾이지만 값은 잇닿는다
+    assert.ok(Math.abs(P.y(1e-9) - LINE_Y) < 1e-6 && Math.abs(P.y(-1e-9) - LINE_Y) < 1e-6, mode + ': d 0 에서 y 연속');
+    assert.ok(Math.abs(P.s(1e-9) - c.near) < 1e-9, mode + ': d 0 에서 s 연속');
   }
   //  표준 vs 가까이: 부대는 더 크고(1.45 → 1.8) 위 끝 배율은 더 작다(0.72 → 0.6) — "앞은 그대로 보이고 부대만 더 크다"
   assert.equal(PERSPECTIVE.standard.near, 1.45); assert.equal(PERSPECTIVE.standard.far, 0.72); assert.equal(PERSPECTIVE.standard.depth, 700);
@@ -184,4 +192,65 @@ test('V3-PROJECT 렌더: 부대(히어로)는 부대 줄 배율(near)로 그려�
   //  같은 입력열 두 판 = 같은 결과(투영은 셸·렌더 값이라 규칙에 없다)
   const a = runS2(600, 150), b = runS2(600, 150);
   assert.deepEqual({ x: a.x, z: a.z, u: a.units.length }, { x: b.x, z: b.z, u: b.units.length });
+});
+
+//  수정 라운드 2(2026-09-20, 대항 검수 Important): 뒷줄 넘침은 150명의 예외가 아니라 보통 상황이었다 — 뒷줄 병사 밑변이 H(800)를 넘는 최소 인원이
+//   표준 59명·가까이 40명(평면 143명). 뒤쪽 갈래를 '배율 near·간격 평면' 으로 바꾼 뒤의 문턱을 숫자로 잠근다(formation() + 투영기, 병사 22·s, 아레나 ay 0).
+test('V3-PROJECT 뒷줄 문턱: 뒷줄 병사 밑변이 화면(800)을 넘는 최소 인원 = 표준 142 · 가까이 142 · 평면 143 (종전 59 · 40 · 143)', () => {
+  const H = BAL3.view.h, soldier = BAL3.squad.soldierSize;
+  const threshold = (mode) => {
+    const P = projectorFor(mode);
+    for (let n = 2; n <= BAL3.squad.unitCap; n++) {
+      let maxDy = 0;
+      for (const u of formation(n)) if (u.dy > maxDy) maxDy = u.dy;
+      const q = P.project(CX, -maxDy);
+      if (q.y + soldier * q.s / 2 > H) return { n, maxDy, y: q.y, s: q.s };
+    }
+    return null;
+  };
+  const std = threshold('standard'), close = threshold('close'), flat = threshold('flat');
+  assert.deepEqual({ n: std.n, maxDy: std.maxDy, y: std.y, s: std.s }, { n: 142, maxDy: 145, y: 785, s: 1.45 }, '표준: ' + JSON.stringify(std));
+  assert.deepEqual({ n: close.n, maxDy: close.maxDy, y: close.y, s: close.s }, { n: 142, maxDy: 145, y: 785, s: 1.8 }, '가까이: ' + JSON.stringify(close));
+  assert.deepEqual({ n: flat.n, maxDy: flat.maxDy, y: flat.y }, { n: 143, maxDy: 153, y: 793 }, '평면: ' + JSON.stringify(flat));
+  //  무입력 봇이 8스테이지부터 닿는 60~100명은 세 모드 모두 화면 안(뒷줄 y = 640 + maxDy)
+  for (const n of [59, 64, 78, 97, 120]) {
+    let maxDy = 0;
+    for (const u of formation(n)) if (u.dy > maxDy) maxDy = u.dy;
+    for (const mode of ['standard', 'close', 'flat']) {
+      const q = projectorFor(mode).project(CX, -maxDy);
+      assert.ok(q.y + soldier * q.s / 2 <= H, mode + ' ' + n + '명 뒷줄 밑변 ' + (q.y + soldier * q.s / 2).toFixed(1) + ' ≤ 800');
+      assert.equal(q.y, LINE_Y + maxDy, mode + ' ' + n + '명 뒷줄 y = 평면');
+    }
+  }
+});
+
+//  병력 수 글은 종전 '가장 뒷줄 아래(H − 14 클램프)' 에서 부대 중심 마커 옆으로(수정 라운드 2): 뒷줄이 화면 밖일 때 병사 위에 겹치지 않는다.
+//   마커 = 부대 중심 투영점 위(y − 히어로 반높이·s − 14·s), 글은 마커 오른쪽 COUNT_DX, 마커가 COUNT_FLIP_X 를 넘으면 왼쪽
+test('V3-PROJECT 렌더: 병력 수는 부대 중심 마커 옆(히어로 머리 위, 병사와 겹치지 않는 전방 빈 부채꼴) · 오른쪽 끝에서는 왼쪽에', () => {
+  const S = BAL3.squad;
+  const countOp = (ops, run) => ops.find((o) => o.op === 'fillText' && o.args[0] === String(run.units.length) && o.fill === BAL3.colors.hero);
+  for (const [mode, view] of [['standard', {}], ['close', { zoom: true }], ['flat', { flat: true }]]) {
+    const P = projectorFor(mode);
+    const run = runS2(120, 180);
+    const op = countOp(drawWith(run, view), run);
+    assert.ok(op, mode + ': 병력 수를 그린다');
+    const sq = P.project(run.x, 0);
+    const my = sq.y - S.heroSize * sq.s / 2 - 14 * sq.s;
+    assert.ok(Math.abs(op.args[1] - (sq.x + COUNT_DX)) < 1e-9 && Math.abs(op.args[2] - (my - 3)) < 1e-9, mode + ': 마커 오른쪽 ' + op.args.slice(1));
+    assert.ok(op.args[2] < LINE_Y - S.heroSize * sq.s / 2, mode + ': 히어로 머리 위');
+    assert.ok(fontPx(op) === 26, '26px');
+    //  화면 아래 끝(H − 14)에 매달리지 않는다
+    assert.ok(op.args[2] < BAL3.view.h - 100, mode + ': 화면 아래 끝이 아님');
+  }
+  //  오른쪽 끝: 트랙 x 400(도로 오른쪽 끝)은 표준 화면 472 > COUNT_FLIP_X(410) → 왼쪽에 쓴다
+  const runR = runS2(200, 400);
+  assert.ok(runR.x > 340, '부대가 오른쪽으로 갔다: ' + runR.x);
+  const P = projectorFor('standard');
+  const sqR = P.project(runR.x, 0);
+  assert.ok(sqR.x > COUNT_FLIP_X, '마커 화면 x ' + sqR.x.toFixed(1) + ' > ' + COUNT_FLIP_X);
+  const opR = countOp(drawWith(runR), runR);
+  assert.ok(opR && Math.abs(opR.args[1] - (sqR.x - COUNT_DX)) < 1e-9, '오른쪽 끝에서는 마커 왼쪽: ' + (opR && opR.args[1]));
+  //  같은 프레임 flat(x 400 → 화면 400 < 410)은 오른쪽
+  const opF = countOp(drawWith(runR, { flat: true }), runR);
+  assert.ok(opF && Math.abs(opF.args[1] - (runR.x + COUNT_DX)) < 1e-9, 'flat 은 오른쪽');
 });

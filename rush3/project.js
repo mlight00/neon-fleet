@@ -3,12 +3,18 @@
 //  여기의 project(x, d) 로 바꾼다 — 충돌·사거리·게이트 칸 x 범위는 트랙 좌표 그대로다. d = z − run.z(부대 기준선 앞 거리).
 //
 //  식(이사 소감 2026-09-19 "확대 모드는 캐릭터는 잘 보이는데 앞이 안 보여 답답하다 — 라스트워는 적의 생동감도 내 캐릭터 변화도 다 잘 보였다"):
+//   앞쪽(d ≥ 0)
 //   배율   s(d) = near / (1 + d / D)                         부대 줄(d 0)은 near 배, 멀수록 작아진다
 //   화면 y y(d) = LINE_Y − near·D·ln(1 + d / D)              배율의 적분 — 물체 간 간격이 배율과 같이 줄어 자연스럽다
 //   화면 x x'   = 240 + (x − 240)·s(d)                        가운데로 모인다(도로가 사다리꼴)
 //   D    = depth / (near / far − 1)                          far = 화면 위 끝(d = depth)에서의 배율에서 역산
-//  뒤쪽(d < 0, 부대 뒤 대형·시체)은 같은 식으로 확장하되 s 상한 sMax(1.5 — 검수 반영 2026-09-20, 처음엔 1.9: 150명 부대의 뒷줄이 1.88배로
-//   화면 아래를 덮어 발밑 숫자와 겹쳤다. 모드의 near 가 더 크면 near 가 상한 — 가까이 1.8). 상한에 닿은 뒤로는 y 도 그 배율로 직선(적분 일관).
+//   뒤쪽(d < 0, 부대 뒤 대형·시체·지나간 게이트) — 수정 라운드 2(2026-09-20)
+//   배율   s(d) = near                                       부대 줄 배율 고정(자라지 않는다)
+//   화면 y y(d) = LINE_Y − d                                 기울기 1 = 평면 간격. 뒷줄이 평면과 같은 자리에 머문다
+//   처음(라운드 0·1)엔 앞쪽 식을 d < 0 으로 이어 쓰고 s 상한(1.9 → 1.5)만 두었는데, y 가 배율의 적분이라 near > 1 인 한 뒷줄 간격이 near 배 이상이 되어
+//   뒷줄 병사 밑변이 화면(H 800)을 넘는 최소 인원이 표준 59명·가까이 40명(평면 143명)이었다 — 무입력 봇도 8스테이지부터 닿는 보통 상황.
+//   그래서 뒤쪽은 배율만 near 로 키우고 간격은 평면 그대로 둔다: 150명 뒷줄(dy 159)이 평면과 같은 y 799 에 머물고 앞줄만 커진다.
+//   d = 0 에서 y 기울기가 near(앞) → 1(뒤)로 꺾이지만 부대 줄 자체(s = near, y = LINE_Y)는 이어진다.
 //  평면(flat: near === far)은 종전 변환과 항등 — 검사·캡처 대조용(개발 주소 ?flat=1).
 import { BAL3 } from './balance.js';
 
@@ -19,35 +25,18 @@ export const PERSPECTIVE = Object.freeze({
   standard: Object.freeze({ near: 1.45, far: 0.72, depth: 700 }),
   close:    Object.freeze({ near: 1.8,  far: 0.6,  depth: 700 }),
   flat:     Object.freeze({ near: 1,    far: 1,    depth: 700 }),
-  sMax: 1.5,
   //  가독성 하한(01 §11 "멀리 있는 물체도 선택에 필요한 큰 실루엣·숫자"): 게이트 값·통 내구·표지 글 최소 15px, 게이트 칸 높이 최소 18px
   minFont: 15, minGateH: 18,
 });
 
-export function makeProjector({ near, far, depth, sMax: sMaxIn = PERSPECTIVE.sMax, lineY = LINE_Y, cx = CX } = PERSPECTIVE.standard) {
+export function makeProjector({ near, far, depth, lineY = LINE_Y, cx = CX } = PERSPECTIVE.standard) {
   const flat = near === far;
   const D = flat ? Infinity : depth / (near / far - 1);
-  //  뒤쪽 상한은 near 아래로 내려가지 않는다(가까이 near 1.8 > 1.5): 상한 < near 면 d > 0 에서 걸려 s(0) = near 가 깨진다 → 가까이의 뒤쪽은 near 그대로(자라지 않음)
-  const sMax = Math.max(sMaxIn, near);
-  //  s 상한이 걸리는 d(뒤쪽): near / (1 + dCap / D) = sMax → dCap = D·(near / sMax − 1). 그 뒤로 y 는 sMax 기울기의 직선
-  const dCap = flat ? -Infinity : D * (near / sMax - 1);
-  const yCap = flat ? Infinity : lineY - near * D * Math.log(1 + dCap / D);
-  const s = (d) => {
-    if (flat) return near;
-    if (d <= dCap) return sMax;
-    return near / (1 + d / D);
-  };
-  const y = (d) => {
-    if (flat) return lineY - d;
-    if (d <= dCap) return yCap + sMax * (dCap - d);
-    return lineY - near * D * Math.log(1 + d / D);
-  };
-  //  y 의 역함수(배경 조각·화면 아래 끝의 d 계산용)
-  const dOf = (sy) => {
-    if (flat) return lineY - sy;
-    if (sy >= yCap) return dCap - (sy - yCap) / sMax;
-    return D * (Math.exp((lineY - sy) / (near * D)) - 1);
-  };
+  //  뒤쪽(d < 0)은 배율 near 고정·기울기 1 직선(위 머리말). flat 은 near = 1 이라 두 갈래가 같은 식이다
+  const s = (d) => (flat || d < 0) ? near : near / (1 + d / D);
+  const y = (d) => (flat || d < 0) ? lineY - d : lineY - near * D * Math.log(1 + d / D);
+  //  y 의 역함수(배경 조각·화면 아래 끝의 d 계산용). 부대 줄 아래(sy > lineY)는 뒤쪽 = 평면 간격
+  const dOf = (sy) => (flat || sy > lineY) ? lineY - sy : D * (Math.exp((lineY - sy) / (near * D)) - 1);
   const project = (x, d) => {
     const k = s(d);
     return { x: cx + (x - cx) * k, y: y(d), s: k };
@@ -55,7 +44,7 @@ export function makeProjector({ near, far, depth, sMax: sMaxIn = PERSPECTIVE.sMa
   //  부대 줄(d 0, s = near)의 역투영: 화면 x → 트랙 x. 마우스 절대 위치(pointerX)와 터치·펜 드래그(검수 반영 2026-09-20 — 선형이라
   //   이동량도 1/near 로 줄어 손가락과 부대가 1:1 로 붙는다)가 쓴다
   const unproject = (sx, d = 0) => cx + (sx - cx) / s(d);
-  return Object.freeze({ near, far, depth, D, flat, sMax, lineY, cx, s, y, dOf, project, unproject });
+  return Object.freeze({ near, far, depth, D, flat, lineY, cx, s, y, dOf, project, unproject });
 }
 
 //  모드별 인스턴스(한 번만 만든다). 렌더(그리기)와 셸(연출 좌표·마우스 역투영)이 같은 것을 쓴다
