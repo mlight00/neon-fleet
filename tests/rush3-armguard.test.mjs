@@ -226,7 +226,8 @@ const fxLike = () => ({ parts: [], floaters: [], pops: [], gateFlash: {}, gateOp
                         shutterT: 0, shutterText: null, lotOpen: 0, lotSeen: false, lotSame: false, shocks: [] });
 function drawRun(run) {
   const { ctx, ops } = recCtx();
-  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true });
+  //  r3.20 원근 투영: 이 검사는 장치의 '무엇을 어디에(트랙 좌표 기준)' 를 잠그므로 평면 변환(flat = 항등)으로 그린다 — 원근 기하는 V3-PROJECT 가 따로 잠근다
+  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true, flat: true });
   return ops;
 }
 test('V3-ARMGUARD AG-8: 렌더 — 보호막 중 보스에 하늘색 점선 링(r+16, dash [10,7])과 "보호막" 글자, 해제 뒤엔 없음. 활성 전 통엔 점선 링(dash [4,4])·자물쇠·회색 내구, 활성 뒤엔 주황', () => {

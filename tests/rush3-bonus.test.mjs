@@ -529,7 +529,8 @@ const textOps = (ops) => ops.filter((o) => o.op === 'fillText');
 const textOf = (ops, text) => textOps(ops).find((o) => o.args[0] === text);
 function drawRun(run, fx = fxLike()) {
   const { ctx, ops } = recCtx();
-  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx, hud: { distM: 10 }, buttons: [], saveOk: true });
+  //  r3.20 원근 투영: 이 검사는 장치의 '무엇을 어디에(트랙 좌표 기준)' 를 잠그므로 평면 변환(flat = 항등)으로 그린다 — 원근 기하는 V3-PROJECT 가 따로 잠근다
+  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx, hud: { distM: 10 }, buttons: [], saveOk: true, flat: true });
   return ops;
 }
 function drawResult(run, result) {

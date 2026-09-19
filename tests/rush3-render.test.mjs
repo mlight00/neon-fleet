@@ -11,6 +11,9 @@ import { gateLabel } from '../rush3/gates.js';
 import { GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
          isFixedGateRow, HUD_BTN } from '../rush3/main.js';
 import { hashSeed } from '../rush/rng.js';
+import { projectorFor, PERSPECTIVE } from '../rush3/project.js';
+//  r3.20: 기본 그리기는 표준 원근이다 — 좌표 기대값은 같은 투영기로 계산한다
+const PJ = projectorFor('standard');
 
 //  호출 기록 ctx: 호출마다 { op, args, alpha, fill } 을 순서대로 남긴다(save/restore 로 상태도 되돌린다)
 function recCtx() {
@@ -99,8 +102,10 @@ test('V3-RENDER-SHUTTER: 열리는 동안 회색 판이 위로 걷힌다(남는 
   const clip = ops.find((o) => o.op === 'rect');
   assert.ok(clip, '걷히는 동안 판을 잘라 그린다');
   const [, ry, , rh] = clip.args;
-  const vis = 58;
-  const cellTop = 640 - (run.gateRows[0].z - run.z) - vis / 2;
+  //  r3.20 원근: 칸 높이 = 58·s(d)(하한 18), 칸 중심 y = 투영 y(d)
+  const d = run.gateRows[0].z - run.z;
+  const vis = Math.max(PERSPECTIVE.minGateH, 58 * PJ.s(d));
+  const cellTop = PJ.y(d) - vis / 2;
   assert.ok(Math.abs(ry - cellTop) < 0.01, '남은 판의 위쪽 모서리 = 칸 위쪽 모서리(아래로 걷히면 이 값이 내려간다)');
   assert.ok(Math.abs(rh - vis * 0.5) < 0.01, '절반만큼 남는다: ' + rh);
 });
@@ -395,8 +400,8 @@ test('V3-RENDER-SHEET: 동작 시트 유무에 따라 시트 칸 / 폴백이 갈
   assert.equal(byKey.e_grunt_hit.args[1] / 10, ((0.5 - 0.25) * 24) % 6, '피격 칸 번호(24fps, 열 6)');
   assert.equal(byKey.e_grunt_death.args[1] / 10, 0, '사망 0.5초 = 6번째 칸 → 2행 첫 열');
   assert.equal(byKey.e_grunt_death.args[2] / 20, 1, '사망 6번째 칸은 2행');
-  //  사망 칸의 그리기 높이 = h × (fh/refH)
-  assert.equal(byKey.e_grunt_death.args[8], 33 * (20 / 20));
+  //  사망 칸의 그리기 높이 = h × 그 자리 배율 s(d 150) × (fh/refH)(r3.20 원근)
+  assert.equal(byKey.e_grunt_death.args[8], 33 * PJ.s(150) * (20 / 20));
   //  3) 시트 없음: drawImage 자체가 없다(폴백 도형)
   r = recCtx();
   createRenderer3(r.ctx, null).draw(view(makeFxLike({ heroFire: 0.3, enemyHit: { 900: 0.25 }, corpses: [{ x: 200, z: run.z + 150, t: 0.5, h: 33 }] }), 1));

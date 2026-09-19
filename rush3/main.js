@@ -8,6 +8,7 @@ import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
 import { createRenderer3, isTrapGateRow, HUD_ROW, ZOOM } from './render.js';
+import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
@@ -260,10 +261,15 @@ export function boot(canvas, deps = {}) {
   const dateNow = deps.dateNow ?? (() => Date.now());
   const raf = deps.raf ?? ((fn) => (win && win.requestAnimationFrame ? win.requestAnimationFrame(fn) : setTimeout(() => fn(nowFn()), 16)));
   const save = deps.save ?? createSave3(deps.storage);
-  //  확대 보기(화면 전용). 저장에 기억하고, 출격 중·일시정지·결과 화면에서 Z 키 또는 HUD '확대' 칩으로 토글
+  //  '가까이' 토글(r3.20, 화면 전용 — 원근 강도: 꺼짐 표준 near 1.45 / 켜짐 near 1.8). 저장 필드 zoom 을 그대로 재사용(뜻만 바뀜).
+  //   출격 중·일시정지·결과 화면에서 Z 키 또는 HUD '가까이' 칩으로 토글
   let zoom = save.get().zoom === true;
   function setZoom(on) { zoom = !!on; save.patch({ zoom }); return zoom; }
-  const zoomButton = () => ({ id: 'zoom', ...ZOOM.chip, label: zoom ? '확대 ●' : '확대 ○', small: true, primary: zoom });
+  const zoomButton = () => ({ id: 'zoom', ...ZOOM.chip, label: zoom ? ZOOM.label.on : ZOOM.label.off, small: true, primary: zoom });
+  //  개발 대조용 평면 변환(계획서 §4-6 "같은 스테이지를 두 방식으로 그리는 비교"): rush3.html?flat=1 → 종전 y = LINE_Y − d 로 그린다
+  const flat = (() => { try { return !!(win && win.location && new URLSearchParams(win.location.search).get('flat')); } catch { return false; } })();
+  //  이번 프레임의 투영기 — 렌더(그리기)와 셸(연출 좌표·마우스 역투영)이 같은 것을 쓴다(project.js 의 모드별 단일 인스턴스)
+  const proj = () => projectorFor(projectorMode({ flat, zoom }));
   const au = deps.audio ?? createAudio3({});
   const input = deps.input ?? createInput();
   au.setMuted(!!save.get().mute);
@@ -294,7 +300,10 @@ export function boot(canvas, deps = {}) {
   }
 
   function nowSec() { return nowFn() / 1000; }
-  function sy(z) { return LINE_Y - (z - run.z); }
+  //  연출(파편·플로터·팝·충격 링)은 **만드는 시점에 투영한 화면 좌표**를 들고 있다(r3.20). 규칙 좌표 (x, z) → 화면 { x, y, s }
+  function sp(x, z) { return proj().project(x, z - run.z); }
+  //  부대 중심의 화면점(아레나에서는 ay 만큼 앞 — combat: 부대 중심 z = run.z − run.ay)
+  function squadPt() { return sp(run.x, run.z - (run.ay || 0)); }
   //  저장의 lastStage 는 형식만 검사되므로(문자열·범위 밖 숫자 가능) 실제 스테이지 id 로만 쓴다
   //  격리 시제품(r3.11): rush3.html?stage=proto3 — 타이틀 기본 선택이 그 시제품이 되고, 그 판은 기록에 남기지 않는다
   function devStageId() {
@@ -452,6 +461,10 @@ export function boot(canvas, deps = {}) {
 
   //  연출 이벤트 소비(프레임 1회, drainEvents). 규칙 상태는 읽기만 한다
   const rowById = (id) => run.gateRows.find((r) => r.id === id) ?? null;
+  //  규칙 좌표에서 연출을 만드는 세 도우미(r3.20): 파편(반지름도 그 자리 배율) · 물체 위 글(dy 는 화면 px) · 부대 위 글(부대 중심 투영점 기준)
+  const burstAt = (x, z, r, big, color) => { const q = sp(x, z); spawnBurst(fx, q.x, q.y, r * q.s, big, color); };
+  const floaterAt = (x, z, dy, text, color, big = false) => { const q = sp(x, z); floater(fx, q.x, q.y + dy, text, color, big); };
+  const floaterSquad = (dy, text, color, big = false) => { const q = squadPt(); floater(fx, q.x, q.y + dy, text, color, big); };
   //  '?' 상자가 아직 덮고 있는 랜덤 길 물체인가(통로 확정선 전) — 계약서 3-9 '확정 전에 내용이 새지 않는다'.
   //  ⚠️확정선 전에도 비행 중인 탄은 막힌다(gateBlock). 그 막힘에 함정 전용 표현(붉은 스파크·trapHit)을 쓰면
   //   플레이어가 통로를 고르기 전에 '이번 판은 함정'임을 소리·색으로 알아낸다 — 공개 전에는 종전 셔터 표현으로 되돌린다.
@@ -472,23 +485,23 @@ export function boot(canvas, deps = {}) {
         case 'enemyHit': if (ev.kind === 'grunt' && ev.hp > 0) fx.enemyHit[ev.id] = sheetSec('e_grunt_hit'); break;
         case 'supplyHit': fx.sfx.push(['crateHit']); break;
         case 'supplyOpen': {
-          const y = sy(ev.z);
-          spawnBurst(fx, ev.x, y, 30, false, C.gold);
+          const q = sp(ev.x, ev.z), y = q.y;
+          spawnBurst(fx, q.x, y, 30 * q.s, false, C.gold);
           fx.sfx.push(['crateBreak']);
           const s = run.supplies.find((c) => c.id === ev.id);
           //  캡슐(r3.14)은 깨지는 연출(스파크 + crateBreak)을 그대로 쓰고 팝 문구만 '구출!'
           const text = !s ? '보급' : s.kind === 'soldier' ? '+' + (s.payload.n ?? 0) + '명' : s.kind === 'weapon' ? (WEAPONS[s.payload.weapon]?.name ?? '무기') : s.kind === 'capsule' ? '구출!' : '증원 설비';
-          fx.pops.push({ x: ev.x, y, x0: ev.x, y0: y, t: 0, life: FX.rewardPopSec + 0.3, text, color: C.gold });
+          fx.pops.push({ x: q.x, y, x0: q.x, y0: y, t: 0, life: FX.rewardPopSec + 0.3, text, color: C.gold });
           break;
         }
         //  캡슐은 capsuleMissed 가 '캡슐 놓침'을 띄우므로 '놓침'을 겹쳐 그리지 않는다(supplySkipped 의 '다른 길'은 그대로)
-        case 'supplyMissed': if (ev.kind !== 'capsule') floater(fx, ev.x, sy(ev.z) - 20, '놓침', C.gateZero); break;
+        case 'supplyMissed': if (ev.kind !== 'capsule') floaterAt(ev.x, ev.z, -20, '놓침', C.gateZero); break;
         //  구출 캡슐(r3.14): 합류 플로터·효과음은 같은 STEP 의 joinMany 가 이미 낸다 — 여기서는 목표 달성 글 하나만 더 띄운다.
         //   ⚠️캡슐 자리(ev.z)가 아니라 부대 위에 띄운다 — 병력이 많으면 캡슐이 화면 위 끝에 들어오자마자 열려 그 자리 글은 화면 밖이다(2026-09-19 캡처 실측)
-        case 'capsuleRescue': floater(fx, run.x, LINE_Y - 130, '구출 성공!', C.gold, true); break;
-        case 'capsuleMissed': floater(fx, ev.x, sy(ev.z) - 20, '캡슐 놓침', C.gateZero); break;
+        case 'capsuleRescue': floaterSquad(-130, '구출 성공!', C.gold, true); break;
+        case 'capsuleMissed': floaterAt(ev.x, ev.z, -20, '캡슐 놓침', C.gateZero); break;
         //  구조적으로 얻을 수 없던 대안 — '놓침'이 아니라 '다른 길'로 알린다(흐려지며 뒤로 빠진다)
-        case 'supplySkipped': floater(fx, ev.x, sy(ev.z) - 20, '다른 길', C.wall); break;
+        case 'supplySkipped': floaterAt(ev.x, ev.z, -20, '다른 길', C.wall); break;
         case 'supplyBlock': break;
         //  셔터 열림: 0.25초 걷히는 연출(판이 위로) + 효과음 1회 + 짧은 글(행 종류에 따라 '지금 쏘면 +1' / '쏴도 그대로예요')
         case 'gateArm': {
@@ -505,10 +518,10 @@ export function boot(canvas, deps = {}) {
         //  ⚠️함정 행(붉은 봉쇄 장치)은 셔터가 아니다 — 둔탁한 차단음 + 붉은 스파크로 '이 장치에는 사격이 안 먹힌다'를 알린다(이사 결정 ③).
         //   단 **'?' 상자가 걷힌 뒤부터**다(trapShown) — 공개 전에는 함정도 꽝 게이트도 똑같이 gateClang + 회색이어야 내용이 새지 않는다
         //  차폐물 흡수(r3.11): 셔터와 같은 회색 스파크 + 금속 튕김 — '여기서는 안 뚫린다'
-        case 'coverHit': spawnBurst(fx, ev.x, sy(ev.z), 5, false, C.wall); fx.sfx.push(['gateClang']); break;
+        case 'coverHit': burstAt(ev.x, ev.z, 5, false, C.wall); fx.sfx.push(['gateClang']); break;
         case 'gateBlock': {
           const trap = trapShown(ev.id);
-          spawnBurst(fx, ev.x, sy(ev.z), 6, false, trap ? C.warn : C.wall);
+          burstAt(ev.x, ev.z, 6, false, trap ? C.warn : C.wall);
           fx.sfx.push([trap ? 'trapHit' : 'gateClang']);
           break;
         }
@@ -516,7 +529,7 @@ export function boot(canvas, deps = {}) {
         case 'gateHit': {
           const hitRow = rowById(ev.id);
           if (trapShown(ev.id)) {
-            spawnBurst(fx, ev.x, sy(hitRow ? hitRow.z : run.z), 6, false, C.warn);
+            burstAt(ev.x, hitRow ? hitRow.z : run.z, 6, false, C.warn);
             fx.sfx.push(['trapHit']);
             break;
           }
@@ -524,36 +537,36 @@ export function boot(canvas, deps = {}) {
           fx.sfx.push(['gateTick']);
           break;
         }
-        case 'gateFlip': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateFlip']); floater(fx, ev.x, sy(run.gateRows.find((r) => r.id === ev.id)?.z ?? run.z) - 40, '반전!', C.gatePos, true); break;
+        case 'gateFlip': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateFlip']); floaterAt(ev.x, run.gateRows.find((r) => r.id === ev.id)?.z ?? run.z, -40, '반전!', C.gatePos, true); break;
         case 'gatePass': {
-          if (ev.idx < 0) { floater(fx, run.x, LINE_Y - 90, '우회', C.gateZero); break; }
+          if (ev.idx < 0) { floaterSquad(-90, '우회', C.gateZero); break; }
           const txt = ev.value > 0 ? '+' + ev.applied : ev.value < 0 ? '−' + (-ev.applied) : '0';
-          floater(fx, run.x, LINE_Y - 90, txt, ev.value > 0 ? C.gatePos : ev.value < 0 ? C.gateNeg : C.gateZero, true);
+          floaterSquad(-90, txt, ev.value > 0 ? C.gatePos : ev.value < 0 ? C.gateNeg : C.gateZero, true);
           if (ev.value < 0 && ev.applied < 0) { fx.shakeT = FX.shakeDur; fx.hurtT = FX.hurtFlashDur; fx.sfx.push(['hurt']); }
           else if (ev.value > 0) fx.sfx.push(['gateFlip']);
           break;
         }
         case 'joinMany':
           if (ev.n >= FX.joinManyAt) fx.sfx.push(['joinMany']);
-          floater(fx, run.x, LINE_Y - 90, '+' + ev.n + '명 합류', C.gold, ev.n >= FX.joinManyAt);
+          floaterSquad(-90, '+' + ev.n + '명 합류', C.gold, ev.n >= FX.joinManyAt);
           break;
-        case 'padTake': floater(fx, ev.x, LINE_Y - 70, '+1', C.chainPad); break;
-        case 'chainOn': floater(fx, ev.x, sy(ev.z) - 40, '증원 설비 가동!', C.chainPad, true); break;
-        case 'weaponSwap': fx.sfx.push(['weaponSwap']); floater(fx, run.x, LINE_Y - 110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' 장착!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
+        case 'padTake': floaterAt(ev.x, run.z, -70, '+1', C.chainPad); break;
+        case 'chainOn': floaterAt(ev.x, ev.z, -40, '증원 설비 가동!', C.chainPad, true); break;
+        case 'weaponSwap': fx.sfx.push(['weaponSwap']); floaterSquad(-110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' 장착!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
         //  r3.10 강화: 같은 무기 통 → Mk 상승 표시
-        case 'weaponMk': fx.sfx.push(['weaponSwap']); floater(fx, run.x, LINE_Y - 110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' ' + MK_LABEL[ev.mk] + ' 강화!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
+        case 'weaponMk': fx.sfx.push(['weaponSwap']); floaterSquad(-110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' ' + MK_LABEL[ev.mk] + ' 강화!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
         //  전격포 연쇄: 맞은 쪽에 작은 청보라 스파크
-        case 'arc': spawnBurst(fx, ev.tx, sy(ev.tz), 8, false, WEAPONS.arc.color); break;
+        case 'arc': burstAt(ev.tx, ev.tz, 8, false, WEAPONS.arc.color); break;
         case 'weaponSame':
           //  랜덤 길 무기 통이 동급이라 교체되지 않은 경우 — 결과 한 줄이 '획득'이라 거짓말하지 않게 표식을 남긴다
           if (run.lottery && run.lottery.kind === 'weapon' && run.z >= run.lottery.revealZ) fx.lotSame = true;
-          floater(fx, run.x, LINE_Y - 90, '같은 무기', C.gateZero);
+          floaterSquad(-90, '같은 무기', C.gateZero);
           break;
-        case 'hurt': fx.shakeT = FX.shakeDur; fx.hurtT = FX.hurtFlashDur; fx.sfx.push(['hurt']); floater(fx, ev.x, sy(ev.z) - 10, '−' + ev.n, C.heroHurt); break;
-        case 'unitLost': spawnBurst(fx, ev.x, sy(ev.z), 9, false, C.heroHurt); break;
-        case 'kill': spawnBurst(fx, ev.x, sy(ev.z), BAL3.enemies[ev.kind]?.r ?? 14, false); fx.sfx.push(['kill']); addCorpse(fx, ev); break;
-        case 'touch': fx.shakeT = FX.shakeDur; spawnBurst(fx, ev.x, sy(ev.z), 12, false); addCorpse(fx, ev); break;
-        case 'blast': spawnBurst(fx, ev.x, sy(ev.z), ev.r, false, C.bulletHeavy); break;
+        case 'hurt': fx.shakeT = FX.shakeDur; fx.hurtT = FX.hurtFlashDur; fx.sfx.push(['hurt']); floaterAt(ev.x, ev.z, -10, '−' + ev.n, C.heroHurt); break;
+        case 'unitLost': burstAt(ev.x, ev.z, 9, false, C.heroHurt); break;
+        case 'kill': burstAt(ev.x, ev.z, BAL3.enemies[ev.kind]?.r ?? 14, false); fx.sfx.push(['kill']); addCorpse(fx, ev); break;
+        case 'touch': fx.shakeT = FX.shakeDur; burstAt(ev.x, ev.z, 12, false); addCorpse(fx, ev); break;
+        case 'blast': burstAt(ev.x, ev.z, ev.r, false, C.bulletHeavy); break;
         //  정예 등장(r3.16 복수 정예): 2~3체가 같은 프레임에 나오므로 index 0 에서만 배너·효과음·BGM(소리가 겹치지 않게). 문구는 체 수를 붙인다
         case 'elite':
           if ((ev.index ?? 0) > 0) break;
@@ -561,7 +574,7 @@ export function boot(canvas, deps = {}) {
           fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]);
           break;
         //  정예 처치: 파편·흔들림은 매번, 효과음은 마지막(left 0)이면 승리음, 아니면 처치음. 남은 목표 배너는 bossesLeft 가 세운다
-        case 'bossKill': spawnBurst(fx, ev.x, sy(ev.z), ev.r, true); fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']); break;
+        case 'bossKill': burstAt(ev.x, ev.z, ev.r, true); fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']); break;
         case 'bossesLeft':
           if (ev.left > 0) { fx.bossBannerText = '정예 ' + (ev.index + 1) + ' 격파 — 남은 목표 ' + ev.left; fx.bossBannerT = FX.bossKillBannerSec; }
           break;
@@ -575,8 +588,8 @@ export function boot(canvas, deps = {}) {
           if (run.elite) au.bgmPlay(BGM.stage[Math.max(0, Math.min(2, run.stageId - 1))]);
           break;
         case 'bonusTargetHit': fx.sfx.push(['crateHit']); break;
-        case 'bonusHit': spawnBurst(fx, ev.x, sy(ev.z), BAL3.bonus.targetR, false, C.bonusBox); floater(fx, ev.x, sy(ev.z) - 30, '+' + ev.value, C.gold); fx.sfx.push(['crateBreak']); break;
-        case 'bonusTier': floater(fx, run.x, LINE_Y - 130, '보상 단계 ' + ev.tier + '!', C.gold, true); fx.sfx.push(['weaponSwap']); break;
+        case 'bonusHit': burstAt(ev.x, ev.z, BAL3.bonus.targetR, false, C.bonusBox); floaterAt(ev.x, ev.z, -30, '+' + ev.value, C.gold); fx.sfx.push(['crateBreak']); break;
+        case 'bonusTier': floaterSquad(-130, '보상 단계 ' + ev.tier + '!', C.gold, true); fx.sfx.push(['weaponSwap']); break;
         case 'bonusEnd': fx.sfx.push(['gateFlip']); break;
         case 'bonusRespawn': break;
         //  아레나(r3.17): 광장 열림 연출 + 안내 배너(판마다 진입 시 1회). 정예 배너·효과음·BGM 은 같은 STEP 의 elite 이벤트가 맡는다
@@ -585,10 +598,10 @@ export function boot(canvas, deps = {}) {
         case 'bossDashWarn': fx.sfx.push(['lotWarn']); break;
         case 'bossDash': fx.sfx.push(['gateClang']); break;
         //  보호막(r3.18): 흡수된 탄마다 회색 스파크(차폐물 흡수와 같은 표현), 효과음은 프레임당 1회. 해제는 반전음 + 보스 위 글자
-        case 'bossGuard': spawnBurst(fx, ev.x, sy(ev.z), 4, false, C.wall); if (!guardSfx) { guardSfx = true; fx.sfx.push(['gateClang']); } break;
-        case 'bossGuardOff': fx.sfx.push(['gateFlip']); floater(fx, ev.x, sy(ev.z) - 70, '보호막 해제!', C.gatePos, true); break;
-        //  착지 충격: 확장 링 + 흔들림. hits > 0 이면 hurt 이벤트가 따로 나므로 피격 플래시·hurt 음은 그쪽이 맡는다
-        case 'bossShock': fx.shocks.push({ x: ev.x, y: sy(ev.z), r: ev.r, t: 0, life: FX.shockRingSec }); fx.shakeT = FX.shakeDur; break;
+        case 'bossGuard': burstAt(ev.x, ev.z, 4, false, C.wall); if (!guardSfx) { guardSfx = true; fx.sfx.push(['gateClang']); } break;
+        case 'bossGuardOff': fx.sfx.push(['gateFlip']); floaterAt(ev.x, ev.z, -70, '보호막 해제!', C.gatePos, true); break;
+        //  착지 충격: 확장 링(화면 좌표·반지름 × 그 자리 배율) + 흔들림. hits > 0 이면 hurt 이벤트가 따로 나므로 피격 플래시·hurt 음은 그쪽이 맡는다
+        case 'bossShock': { const q = sp(ev.x, ev.z); fx.shocks.push({ x: q.x, y: q.y, r: ev.r * q.s, t: 0, life: FX.shockRingSec }); fx.shakeT = FX.shakeDur; break; }
         case 'lose': fx.sfx.push(['lose']); break;
         default: break;
       }
@@ -653,8 +666,9 @@ export function boot(canvas, deps = {}) {
       if (p.t <= FX.rewardPopSec) { p.x = p.x0; p.y = ry; }
       else {
         const k = Math.min(1, (p.t - FX.rewardPopSec) / 0.3);
-        p.x = p.x0 + (run.x - p.x0) * k;
-        p.y = ry + (LINE_Y - ry) * k;
+        const q = squadPt();   // 부대 중심의 화면점(원근)
+        p.x = p.x0 + (q.x - p.x0) * k;
+        p.y = ry + (q.y - ry) * k;
       }
     }
     fx.pops = fx.pops.filter((p) => p.t < p.life);
@@ -690,6 +704,7 @@ export function boot(canvas, deps = {}) {
       v.fx = paused ? { ...fx, gateFlash: { ...fx.gateFlash }, gateOpen: { ...fx.gateOpen }, shakeT: 0, hurtT: 0 } : fx;
       v.hud = { distM: Math.max(0, Math.round((run.length - run.z) / 10)) };
       v.zoom = zoom;
+      v.flat = flat;
       if (state === 'run') {
         v.buttons = [{ ...HUD_BTN }, zoomButton()];
       } else if (state === 'paused') {
@@ -761,6 +776,8 @@ export function boot(canvas, deps = {}) {
 
   //  앱 전환·창 이탈·포인터 취소: 입력 해제 + 자동 일시정지
   const autoPause = () => { input.reset(); pause(); };
+  //  마우스 절대 위치(pointerX)는 화면 x 다 — 부대 줄(d 0, 배율 near)의 역투영으로 트랙 x 를 구한다(r3.20). 터치·펜 드래그는 상대 이동이라 그대로
+  const trackX = (sx, pointerType) => (pointerType === 'mouse' || pointerType === undefined || pointerType === null) ? proj().unproject(sx) : sx;
 
   canvas.addEventListener('pointerdown', (e) => {
     au.unlock();
@@ -768,14 +785,14 @@ export function boot(canvas, deps = {}) {
     const [x, y] = toLogical(e);
     if (onPress(x, y)) return;
     //  y(r3.17 아레나 세로 입력)는 뒤에 붙는 선택 인자 — 도로에서는 규칙이 읽지 않는다
-    if (state === 'run') input.onPointerDown(x, e.pointerType, e.pointerId, y);
+    if (state === 'run') input.onPointerDown(trackX(x, e.pointerType), e.pointerType, e.pointerId, y);
   });
   //  r3.18 대항 검수 반영: 출격 중(state 'run')에만 넘긴다. 정지 화면에서 ⏸ → [계속하기]로 마우스를 옮긴 만큼 dragDy 가 쌓여
   //   재개 첫 STEP 에 부대가 광장 아래로 튀던 문제(tay −242 → +40). pause() 의 input.reset() 뒤 정지 중 이동은 버리고, 재개 뒤 첫 이동은 lastY 기준만 잡는다
   canvas.addEventListener('pointermove', (e) => {
     if (state !== 'run') return;
     const [x, y] = toLogical(e);
-    input.onPointerMove(x, e.pointerType, e.pointerId, y);
+    input.onPointerMove(trackX(x, e.pointerType), e.pointerType, e.pointerId, y);
   });
   if (win) {
     //  pointerId 를 넘겨 드래그 중인 손가락의 up 만 드래그를 끝낸다
@@ -842,7 +859,7 @@ export function boot(canvas, deps = {}) {
     //  r3.18: bossGuard(보호막 남아 있는가) · supplyArmed(피격 활성 구간에 든 통 id 목록 — armZ 가 있는 통만)
     bossGuard: !!(run && run.boss && run.boss.guard),
     supplyArmed: run ? run.supplies.filter((s) => s.armZ != null && !s.opened && s.z - run.z <= s.armZ).map((s) => s.id) : [],
-    zoom,
+    zoom, flat, perspective: projectorMode({ flat, zoom }),
   });
   if (win) win.__rush3Dbg = dbg;
 

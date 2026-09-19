@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ZOOM } from '../rush3/render.js';
+import { projectorFor } from '../rush3/project.js';
 import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine, DIFF_TOGGLE, normDifficulty,
          emptyLotteryOutcome, GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
          isFixedGateRow, TITLE_GRID } from '../rush3/main.js';
@@ -500,18 +501,20 @@ test('V3-INPUT-SWITCH: 브라우저 자동반복 keydown 은 마우스 목표를
   assert.equal(app.input.state.pointerX, null);
   assert.equal(app.input.state.keyDir, 1);
   //  키를 누른 채 마우스를 움직이면 마우스가 이긴다
+  //  r3.20 원근: 마우스 절대 x(화면 160)는 부대 줄(배율 near)의 역투영으로 트랙 x 가 된다(중앙 240 은 그대로)
+  const mx = projectorFor('standard').unproject(160);
   canvas.fire('pointermove', { clientX: 80, clientY: 200, pointerType: 'mouse', pointerId: 1 });
-  assert.equal(app.input.state.pointerX, 160);
+  assert.equal(app.input.state.pointerX, mx);
   assert.equal(app.input.state.keyDir, 0);
   //  ★ 그 뒤 브라우저 자동반복 keydown 이 계속 와도 마우스 목표를 지우지 않는다(가드가 없으면 여기서 null 이 된다)
   let prevented = 0;
   for (let i = 0; i < 30; i++) win.fire('keydown', { code: 'ArrowRight', repeat: true, preventDefault() { prevented++; } });
-  assert.equal(app.input.state.pointerX, 160, '자동반복이 마우스 목표를 지우면 안 된다');
+  assert.equal(app.input.state.pointerX, mx, '자동반복이 마우스 목표를 지우면 안 된다');
   assert.equal(app.input.state.keyDir, 0);
   assert.equal(prevented, 30, '조향 키의 브라우저 기본 동작은 자동반복에서도 계속 막는다');
   //  3초 뒤 부대는 마우스 위치를 따라가 있다(계약서 6장 (3))
   frames(180);
-  assert.ok(Math.abs(app.getRun().x - 160) < 2, 'x=' + app.getRun().x);
+  assert.ok(Math.abs(app.getRun().x - mx) < 2, 'x=' + app.getRun().x + ' 기대(화면 160 의 역투영)=' + mx.toFixed(1));
   //  ESC 의 자동반복은 일시정지를 다시 뒤집지 않는다
   win.fire('keydown', { code: 'Escape' });
   assert.equal(app.getState(), 'paused');
@@ -1023,7 +1026,8 @@ test('V3-SHELL-RESULT-LAYOUT: 랜덤 길이 없는 판(대조군)은 부연이 �
   assert.equal(buttonBoxOf(ops, '스테이지 선택').top, 620, '기본 자리');
 });
 
-test('V3-ZOOM 셸: 확대 보기는 출격 중 Z 키·HUD 칩으로 켜고 끄며 저장에 기억되고, 타이틀에서는 Z 가 무시된다', async () => {
+//  r3.20: 확대 보기 → '가까이' 토글(원근 강도). 저장 필드 zoom 은 그대로, 칩 글자만 '가까이 ○/●'
+test('V3-ZOOM 셸: 가까이 토글은 출격 중 Z 키·HUD 칩으로 켜고 끄며 저장(zoom)에 기억되고, 타이틀에서는 Z 가 무시된다', async () => {
   const { app, canvas, win, frames, save, texts } = await bootFake();
   frames(2);
   assert.equal(app.getZoom(), false, '저장 없는 첫 부팅 = 꺼짐');
@@ -1035,11 +1039,14 @@ test('V3-ZOOM 셸: 확대 보기는 출격 중 Z 키·HUD 칩으로 켜고 끄�
   assert.equal(app.getZoom(), true, 'Z 로 켜짐');
   assert.equal(save.get().zoom, true, '저장에 기억');
   frames(1);
-  assert.ok(texts.includes('확대 ●'), 'HUD 칩이 켜짐 표시: ' + JSON.stringify(texts.filter((t) => t.startsWith('확대'))));
+  assert.ok(texts.includes(ZOOM.label.on), 'HUD 칩이 켜짐 표시: ' + JSON.stringify(texts.filter((t) => t.startsWith('가까이'))));
+  assert.equal(ZOOM.label.on, '가까이 ●'); assert.equal(ZOOM.label.off, '가까이 ○');
+  assert.equal(app.dbg().perspective, 'close', '켜짐 = 가까이 투영');
   //  HUD 칩 클릭(논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율) → 꺼짐
   canvas.fire('pointerdown', { clientX: (ZOOM.chip.x + ZOOM.chip.w / 2) / 2, clientY: (ZOOM.chip.y + ZOOM.chip.h / 2) / 2, pointerType: 'mouse' });
   assert.equal(app.getZoom(), false, '칩 클릭으로 꺼짐');
   assert.equal(save.get().zoom, false);
+  assert.equal(app.dbg().perspective, 'standard', '꺼짐 = 표준 원근');
   assert.equal(app.getState(), 'run', '칩 클릭은 조향·일시정지가 아니다');
   //  다시 켜고 일시정지해도 켜진 채 — 재부팅 시 저장값으로 시작
   win.fire('keydown', { code: 'KeyZ' });

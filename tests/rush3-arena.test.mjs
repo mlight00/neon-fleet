@@ -482,11 +482,14 @@ function makeFxLike(o = {}) {
 }
 function drawRun(run, fxOver = {}, now = Math.PI / 9) {
   const { ctx, ops } = recCtx();
-  createRenderer3(ctx, null).draw({ state: 'run', now, run, fx: makeFxLike(fxOver), hud: { distM: 0 }, buttons: [], saveOk: true });
+  //  r3.20 원근 투영: 이 검사는 장치의 '무엇을 어디에(트랙 좌표 기준)' 를 잠그므로 평면 변환(flat = 항등)으로 그린다 — 원근 기하는 V3-PROJECT 가 따로 잠근다
+  createRenderer3(ctx, null).draw({ state: 'run', now, run, fx: makeFxLike(fxOver), hud: { distM: 0 }, buttons: [], saveOk: true, flat: true });
   return ops;
 }
 const texts = (ops) => ops.filter((o) => o.op === 'fillText').map((o) => o.args[0]);
 const hasRect = (ops, a) => ops.some((o) => o.op === 'fillRect' && o.args.length === 4 && o.args.every((v, i) => v === a[i]));
+//  r3.20: 도로·광장 바닥은 fillRect 가 아니라 다각형(사다리꼴)이다 — 왼쪽 가장자리 첫 점 moveTo(x, −10) 으로 폭을 읽는다(flat 이라 x 는 전 구간 같다)
+const roadLeft = (ops, x) => ops.some((o) => o.op === 'moveTo' && o.args[0] === x && o.args[1] === -10);
 
 test('V3-ARENA A-12: 렌더 — 광장 바닥 40~440·히어로 y = LINE_Y + ay·예고 원(dashTx, sy(dashTz), shock.r)·충격 링·안내 배너·HUD 아레나 전투!, 옛 fx 꼴에도 throw 없음, 도로는 80~400 그대로', () => {
   const run = createRun(synthArena({ startUnits: 5 }));
@@ -494,8 +497,8 @@ test('V3-ARENA A-12: 렌더 — 광장 바닥 40~440·히어로 y = LINE_Y + ay�
   play(run, 60, at(240, { dragDy: -10000 }));
   assert.ok(run.ay < -100);
   const ops = drawRun(run);
-  assert.ok(hasRect(ops, [40, 0, 400, 800]), '광장 바닥 40~440');
-  assert.ok(!hasRect(ops, [80, 0, 320, 800]), '도로 폭은 그리지 않는다');
+  assert.ok(roadLeft(ops, 40), '광장 바닥 40~440');
+  assert.ok(!roadLeft(ops, 80), '도로 폭은 그리지 않는다');
   assert.ok(ops.some((o) => o.op === 'ellipse'), '광장 타원');
   //  히어로 폴백(그림 없음): moveTo(px, py − 23), now = π/9 → bob ≈ 0
   const heroY = LINE_Y + run.ay - SQ.heroSize / 2;
@@ -519,12 +522,12 @@ test('V3-ARENA A-12: 렌더 — 광장 바닥 40~440·히어로 y = LINE_Y + ay�
   assert.ok(texts(opsB).includes(ARENA_GUIDE_TEXT[0]) && texts(opsB).includes(ARENA_GUIDE_TEXT[1]));
   //  열리는 중(arenaOpen = 0.3 → k 0.5): 도로 폭 60~420
   const opsO = drawRun(run, { arenaOpen: 0.3 });
-  assert.ok(hasRect(opsO, [60, 0, 360, 800]), '열리는 중 보간');
+  assert.ok(roadLeft(opsO, 60), '열리는 중 보간');
   //  도로: 80~400, 아레나 전투 문구 없음
   const road = createRun(buildStage(1));
   play(road, 60, at(240));
   const opsR = drawRun(road);
-  assert.ok(hasRect(opsR, [80, 0, 320, 800]) && !hasRect(opsR, [40, 0, 400, 800]));
+  assert.ok(roadLeft(opsR, 80) && !roadLeft(opsR, 40));
   assert.ok(!texts(opsR).includes('아레나 전투!'));
 });
 
