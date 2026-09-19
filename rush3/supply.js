@@ -10,6 +10,7 @@
 //   moveT = 화면 진입(obj.z - run.z <= ENTER_Z)부터 센 자기 시계(초, null = 아직 진입 전), prevX = 직전 STEP 의 x(탄 캡슐 스윕용).
 // 유닛 증감은 squad.js 의 addUnits/removeUnits 를 직접 호출한다(콜백 주입 없음).
 import { addUnits } from './squad.js';
+import { triWave } from './motion.js';
 
 export const SUPPLY_R = 30;
 export const PAD_START = 60;
@@ -40,14 +41,13 @@ export function makeSupply(def) {
 }
 
 /** 차량 통의 x(r3.13). 삼각파 왕복: x0 → x1 → x0 가 period 초. homeX 가 x0 이면 오른쪽으로, x1 이면 왼쪽으로 먼저 간다.
- *  (x0·x1 사이의 homeX 는 그 자리에서 오른쪽으로 출발 — 점프 없음.) 난수·시계 없음, t 만의 함수. */
+ *  (x0·x1 사이의 homeX 는 그 자리에서 오른쪽으로 출발 — 점프 없음.) 난수·시계 없음, t 만의 함수.
+ *  공식은 motion.triWave 한 곳(보너스 표적 bonus.targetX 와 공용) — 여기서는 homeX → 출발 위상 u0 변환만 한다 */
 export function vehicleX(move, homeX, t) {
   const span = move.x1 - move.x0;
   if (!(span > 0) || !(move.period > 0)) return homeX;
   const u0 = homeX >= move.x1 ? 0.5 : Math.max(0, (homeX - move.x0) / span) / 2;
-  let u = (u0 + t / move.period) % 1;
-  if (u < 0) u += 1;
-  return move.x0 + span * (u < 0.5 ? 2 * u : 2 - 2 * u);
+  return triWave(move.x0, move.x1, move.period, u0, t);
 }
 
 /** 차량 통 한 STEP(r3.13, combat 3-c 단계). 반환 = 이번 STEP 에 x 가 갱신됐는가.

@@ -965,8 +965,9 @@ export function createRenderer3(ctx, sprites) {
       ctx.textAlign = 'center';
       outlinedText('정예 ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
     }
-    //  보너스전 진행 막대(r3.15): 정예 HP 막대 자리(y 76, 300×16)를 재사용 — 다음 단계 문턱까지 score/next(만렙이면 가득) + 아래 글
-    if (bo && !run.boss) {
+    //  보너스전 진행 막대(r3.15): 정예 HP 막대 자리(y 76, 300×16)를 재사용 — 다음 단계 문턱까지 score/next(만렙이면 가득) + 아래 글.
+    //   run·paused 상태에서만(검수 반영): 결과 화면은 run 장면 위에 덮이는 규약이라 이 글(y111)이 '작전 성공!' 바로 위에 비쳐 겹쳐 읽혔다
+    if (bo && !run.boss && (view.state === 'run' || view.state === 'paused')) {
       const tiers = (run.bonusDef && run.bonusDef.tiers) || [];
       const next = tiers[bo.tier] ?? null;
       const prev = bo.tier > 0 ? tiers[bo.tier - 1] : 0;

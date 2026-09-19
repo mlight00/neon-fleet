@@ -6,10 +6,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
-import { buildStage, stageVersion, STAGE_IDS, MAX_DY } from '../rush3/stages.js';
+import { buildStage, stageVersion, STAGE_IDS, MAX_DY, DEFS } from '../rush3/stages.js';
 import { COURSE_IDS } from '../rush3/courses.js';
 import { makeBullet, WEAPONS } from '../rush3/weapons.js';
 import { targetX, tierOf, makeTarget } from '../rush3/bonus.js';
+import { vehicleX } from '../rush3/supply.js';
+import { triWave } from '../rush3/motion.js';
 import { BAL3 } from '../rush3/balance.js';
 import { createSave3, KEY3 } from '../rush3/save.js';
 import { createRenderer3, HUD_ROW } from '../rush3/render.js';
@@ -52,13 +54,15 @@ function enterBonus(run, input = NONE, max = 6000) {
 const snapTargets = (run) => run.bonusTargets.map((t) => [t.x, t.z, t.alive, t.hp]);
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-BONUS B-1: 형식 — buildStage(8).bonus { sec 20, tiers = BAL3, 표적 3(t1~t3) 도로 안·탄 정리선 안·period>0 }, 결정적·참조 비공유, version 2, 1~3 은 null, 보너스 구간(eliteZ 뒤)에 게이트·통·스폰 없음', () => {
+test('V3-BONUS B-1: 형식 — buildStage(8).bonus { sec 20, tiers = BAL3, 표적 4(t1~t4) 도로 안·탄 정리선 안·period>0 }, 결정적·참조 비공유, version 2, 1~3 은 null, 보너스 구간(eliteZ 뒤)에 게이트·통·스폰 없음(빌드 guard 가 throw), 표적 삼각파 = 차량 통 vehicleX 와 같은 공식', () => {
   const a = buildStage(8), b = buildStage(8);
   assert.ok(a.bonus, 'S8 에 bonus');
   assert.equal(a.bonus.sec, 20);
   assert.deepEqual(a.bonus.tiers, [...BAL3.bonus.tiers]);
-  assert.equal(a.bonus.targets.length, 3);
-  assert.deepEqual(a.bonus.targets.map((t) => t.id), ['t1', 't2', 't3']);
+  assert.equal(a.bonus.targets.length, 4, '검수 반영: 표적 4개(기관총 50명 이상에서 셋이 동시에 죽어 있는 프레임 완화)');
+  assert.deepEqual(a.bonus.targets.map((t) => t.id), ['t1', 't2', 't3', 't4']);
+  assert.deepEqual(a.bonus.targets.map((t) => t.dz), [240, 320, 400, 480], '화면 y 400/320/240/160 으로 80px 간격');
+  assert.equal(new Set(a.bonus.targets.map((t) => t.phase)).size, 4, '출발 위상이 전부 다르다(동시에 같은 끝에 몰리지 않게)');
   const reach = BAL3.view.LINE_Y + BAL3.cull.bulletAhead;
   for (const t of a.bonus.targets) {
     assert.equal(t.r, R);
@@ -75,10 +79,32 @@ test('V3-BONUS B-1: 형식 — buildStage(8).bonus { sec 20, tiers = BAL3, 표�
   assert.notEqual(a.bonus, b.bonus); assert.notEqual(a.bonus.targets, b.bonus.targets); assert.notEqual(a.bonus.targets[0], b.bonus.targets[0]); assert.notEqual(a.bonus.tiers, b.bonus.tiers);
   assert.equal(stageVersion(8), 2);
   for (const id of STAGE_IDS) assert.equal(buildStage(id).bonus, null, 'S' + id);
-  //  보너스 구간 불변식: 게이트·통·스폰 z 가 전부 eliteZ 이하(stepBonus 는 셔터·보상·스폰을 부르지 않는다)
+  //  보너스 구간 불변식: 게이트·통·스폰 z 가 전부 eliteZ 이하(stepBonus 는 셔터·보상·스폰을 부르지 않는다).
+  //   검수 반영으로 buildStage 가 같은 조건을 빌드 시점 guard 로 잠갔다(아래 DEFS[999]) — 이 S8 루프는 실측 대조군으로 그대로 둔다
   for (const row of a.gateRows) assert.ok(row.z <= a.eliteZ, row.id);
   for (const s of a.supplies) assert.ok(s.z + s.r <= a.eliteZ, s.id);
   for (const sp of a.spawns) assert.ok(sp.z <= a.eliteZ, '스폰 z' + sp.z);
+  //  빌드 시점 guard: 보너스 스테이지에 eliteZ 뒤 게이트·통·스폰이 하나라도 있으면 throw(DEFS 는 def() 조회의 첫 자리 — 임시 정의를 넣었다 뺀다).
+  //   eliteZ 가 없는(정예 없는) 보너스 스테이지는 length 가 경계. 보너스가 없는 스테이지는 뒤에 무엇이 있어도 guard 밖(종전 규칙)
+  const okDef = () => ({ version: 1, title: '검사', startUnits: 1, startWeapon: 'rifle', length: 3000, eliteZ: 2600,
+    gates: [{ z: 1000, maxValue: 15, cells: [[80, 240, 1], [240, 400, 1]] }], supplies: [{ z: 1400, x: 120, kind: 'soldier', durability: 2, n: 1 }],
+    walls: [], spawns: [{ z: 1800, kind: 'grunt', n: 1, xs: [240] }], elite: { z: 2600, hp: 10, summon: false },
+    bonus: { sec: 5, targets: [{ dz: 300, x0: 200, x1: 280, period: 2, hp: 3, value: 1 }] } });
+  try {
+    DEFS[999] = okDef();
+    assert.doesNotThrow(() => buildStage(999), '경계 안이면 정상 빌드');
+    DEFS[999] = { ...okDef(), gates: [{ z: 2700, maxValue: 15, cells: [[80, 240, 1], [240, 400, 1]] }] };
+    assert.throws(() => buildStage(999), /보너스 스테이지의 게이트 g1/);
+    DEFS[999] = { ...okDef(), supplies: [{ z: 2580, x: 120, kind: 'soldier', durability: 2, n: 1 }] };
+    assert.throws(() => buildStage(999), /보너스 스테이지의 통 c1/, '통은 반지름까지 본다(z + r > eliteZ)');
+    DEFS[999] = { ...okDef(), spawns: [{ z: 2601, kind: 'grunt', n: 1, xs: [240] }] };
+    assert.throws(() => buildStage(999), /보너스 스테이지의 스폰/);
+    DEFS[999] = { ...okDef(), eliteZ: null, elite: null, spawns: [{ z: 3001, kind: 'grunt', n: 1, xs: [240] }] };
+    assert.throws(() => buildStage(999), /z > 3000/, '정예 없는 보너스 스테이지는 length 가 경계');
+    DEFS[999] = { ...okDef(), bonus: undefined, spawns: [{ z: 2900, kind: 'grunt', n: 1, xs: [240] }] };
+    assert.doesNotThrow(() => buildStage(999), '보너스가 없으면 guard 밖');
+  } finally { delete DEFS[999]; }
+  assert.throws(() => buildStage(999), /unknown stage/);
   //  본전투는 근사 시절 그대로(C-2·C-3 유지)
   assert.equal(a.length, 7800); assert.equal(a.eliteZ, 7400); assert.equal(a.gateRows.length, 3); assert.equal(a.elite.summon, true);
   //  순수 헬퍼
@@ -87,15 +113,27 @@ test('V3-BONUS B-1: 형식 — buildStage(8).bonus { sec 20, tiers = BAL3, 표�
   assert.equal(targetX(t, 0.5), 200); assert.equal(targetX(t, 1), 300); assert.equal(targetX(t, 1.5), 200); assert.equal(targetX(t, 2), 100);
   assert.equal(targetX(makeTarget(tdef('t2', { x0: 100, x1: 300, period: 2, phase: 0.5 })), 0), 300, '위상 0.5 = 반대 끝에서 출발');
   assert.equal(targetX(makeTarget(tdef('t3', { x0: 150, x1: 150, period: 0 })), 3), 150, 'period 0 → x0');
+  //  삼각파는 motion.triWave 한 곳(검수 반영): 표적 targetX(phase 0 / 0.5) 와 차량 통 vehicleX(homeX x0 / x1) 가 같은 t 에 같은 x
+  const mv = { x0: 100, x1: 300, period: 2 };
+  const t0 = makeTarget(tdef('t1', { ...mv, phase: 0 })), t5 = makeTarget(tdef('t2', { ...mv, phase: 0.5 }));
+  for (let i = 0; i <= 240; i++) {
+    const tt = i * STEP;
+    assert.equal(targetX(t0, tt), vehicleX(mv, 100, tt), 'phase 0 ↔ homeX x0 @' + tt);
+    assert.equal(targetX(t5, tt), vehicleX(mv, 300, tt), 'phase 0.5 ↔ homeX x1 @' + tt);
+    assert.equal(targetX(t0, tt), triWave(100, 300, 2, 0, tt));
+  }
+  assert.equal(triWave(100, 300, 0, 0, 7), 100, 'period 0 → x0');
+  assert.equal(triWave(100, 300, 2, 0.25, 0), 200, 'u0 0.25 = 가운데에서 오른쪽으로');
   assert.deepEqual([0, 9, 10, 24, 25, 50, 999].map((s) => tierOf(s, [10, 25, 50])), [0, 0, 1, 1, 2, 3, 3]);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 test('V3-BONUS B-2: 승리 확정 — 정예 격파 STEP 에 won·wonAt·mainResult 확정, over 는 아님, phase bonus·bonus {t 0, sec, score 0, tier 0, hits 0}, 같은 STEP 이벤트 win 1·bonusStart 1, 진입 시 적·적탄 0', () => {
   const bonus = { sec: 5, tiers: [10, 25, 50], targets: [tdef('t1'), tdef('t2', { dz: 400, x0: 120, x1: 360, period: 3 })] };
-  const run = createRun(mkStage({ startUnits: 10, elite: { z: 500, hp: 3 }, bonus }));
+  const stage = mkStage({ startUnits: 10, elite: { z: 500, hp: 3 }, bonus });
+  const run = createRun(stage);
   assert.equal(run.phase, 'main'); assert.equal(run.bonus, null); assert.deepEqual(run.bonusTargets, []); assert.equal(run.mainResult, null);
-  assert.equal(run.bonusDef, run.bonusDef, 'bonusDef 보유'); assert.equal(run.bonusDef.sec, 5);
+  assert.equal(run.bonusDef, stage.bonus, 'bonusDef = createRun 에 넘긴 stage.bonus 그 참조'); assert.equal(run.bonusDef.sec, 5);
   const ev = enterBonus(run, bossOr(240));
   assert.equal(count(ev, 'bossKill'), 1); assert.equal(count(ev, 'win'), 1); assert.equal(count(ev, 'bonusStart'), 1);
   const st = ev.find((e) => e.type === 'bonusStart');
@@ -386,6 +424,26 @@ test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결�
   assert.ok(h.texts.includes('보너스 ' + r2.bonus.score + '점 · 단계 ' + r2.bonus.tier + (better ? ' · 신기록' : '')), '신기록 표기는 앞 판보다 높을 때만: ' + r.bonus.score + ' → ' + r2.bonus.score);
   assert.equal(h.save.getStage(8, 2).bestBonus, Math.max(r.bonus.score, r2.bonus.score));
   assert.equal(h.save.getStage(8, 2).attempts, 2);
+  //  검수 반영(Important): 세 번째 판 — 보너스 20초 창에서 ⏸→[스테이지 선택](= toTitle, finishRun 을 거치지 않는 경로)으로 나가도
+  //   승리 확정 프레임에 commitMain 이 쓴 cleared·bestSurvivors·bestTime 은 남는다. bestBonus 는 보너스가 끝나야(over) 쓰므로 앞 판 값 그대로
+  const before = h.save.getStage(8, 2);
+  h.app.startRun(8);
+  h.frames(1);
+  driveUntil(h, 'planBoss', () => run().phase === 'bonus', 9000);
+  const r3 = run();
+  assert.equal(r3.won, true); assert.equal(r3.over, false); assert.equal(h.app.getState(), 'run');
+  const expSurv = Math.max(before.bestSurvivors, r3.mainResult.survivors), expTime = Math.min(before.bestTime, r3.wonAt);
+  const atWin = h.save.getStage(8, 2);
+  assert.deepEqual(atWin, { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus }, '승리 확정 프레임에 본전투 기록이 이미 저장돼 있다(bestBonus 는 아직)');
+  assert.deepEqual(r3.mainRecord, { isBest: r3.mainResult.survivors > before.bestSurvivors, survivors: r3.mainResult.survivors, time: r3.wonAt }, '판당 1회 표식');
+  driveUntil(h, 'planBoss', () => run().bonus.t >= 3, 600);
+  assert.ok(run().bonus.t >= 3 && run().bonus.score > 0, '보너스 진행 중 점수 ' + run().bonus.score);
+  h.app.pause();
+  assert.equal(h.app.getState(), 'paused');
+  h.app.toTitle();
+  assert.equal(h.app.getState(), 'title'); assert.equal(h.app.getRun(), null);
+  assert.deepEqual(h.save.getStage(8, 2), { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus }, '나가도 확정된 승리·기록은 그대로, 미완 보너스 점수는 기록에 들어가지 않는다');
+  assert.equal(h.app.dbg().state, 'title');
   //  보너스가 없는 판(1)은 dbg 가 종전 꼴
   h.app.startRun(1);
   assert.equal(h.app.dbg().bonus, null); assert.equal(h.app.dbg().phase, 'main'); assert.deepEqual(h.app.dbg().targets, []);
@@ -488,7 +546,7 @@ test('V3-BONUS B-11: 렌더 — 표적 노란 상자·리본·"+값"·내구 숫
   const ops = drawRun(run);
   const t1 = run.bonusTargets[0];
   //  roundRect 는 render 안의 경로 헬퍼(ctx 메서드가 아니다) — 기록되는 것은 fill 과 경로 시작 moveTo(x + 6, y)
-  assert.equal(ops.filter((o) => o.op === 'fill' && o.fill === C.bonusBox).length, 3, '노란 상자 3개');
+  assert.equal(ops.filter((o) => o.op === 'fill' && o.fill === C.bonusBox).length, 4, '노란 상자 4개');
   assert.ok(ops.some((o) => o.op === 'moveTo' && o.args[0] === t1.x - R + 6), '상자 경로가 표적 x 에서 시작');
   assert.ok(ops.some((o) => o.op === 'fillRect' && o.fill === C.bonusRibbon), '리본');
   assert.ok(textOf(ops, '+2') && textOf(ops, '+3') && textOf(ops, '+5'), "'+값' 소자");
@@ -502,7 +560,7 @@ test('V3-BONUS B-11: 렌더 — 표적 노란 상자·리본·"+값"·내구 숫
   //  죽은 표적은 그리지 않는다
   t1.alive = false;
   const ops2 = drawRun(run);
-  assert.equal(ops2.filter((o) => o.op === 'fill' && o.fill === C.bonusBox).length, 2, '나머지 표적 2개만 그린다');
+  assert.equal(ops2.filter((o) => o.op === 'fill' && o.fill === C.bonusBox).length, 3, '나머지 표적 3개만 그린다');
   assert.equal(ops2.some((o) => o.op === 'moveTo' && o.args[0] === t1.x - R + 6), false);
   t1.alive = true;
   //  만렙: '최고 단계'
@@ -526,6 +584,15 @@ test('V3-BONUS B-11: 렌더 — 표적 노란 상자·리본·"+값"·내구 숫
   const line = '보너스 207점 · 단계 3 · 신기록';
   const r1 = drawResult(run, { bonus: { score: 207, tier: 3, hits: 69, isBestBonus: true }, bonusLine: line });
   assert.ok(textOf(r1, line) && textOf(r1, line).args[2] === 212 && textOf(r1, line).fill === C.gold);
+  //  검수 반영: 진행 막대·'다음 단계까지 N점'(y111) 은 run·paused 에서만 — 결과 화면은 run 장면 위에 덮이는 규약이라 그 글이 '작전 성공!' 바로 위에 비쳐 겹쳐 읽혔다
+  assert.ok(textOf(r1, '작전 성공!'), '결과 화면이 그려졌다');
+  assert.equal(textOf(r1, '다음 단계까지 ' + BAL3.bonus.tiers[0] + '점'), undefined, '결과 화면엔 진행 막대 글이 없다');
+  {
+    const { ctx: pc, ops: pops } = recCtx();
+    createRenderer3(pc, null).draw({ state: 'paused', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true });
+    assert.ok(textOf(pops, '다음 단계까지 ' + BAL3.bonus.tiers[0] + '점'), '일시 정지 중에는 진행 막대 글이 그대로');
+    assert.ok(textOf(pops, '일시 정지'));
+  }
   const r2 = drawResult(run, { lottery: '오른쪽 랜덤 길은 이번 판엔 병사 8 이었습니다', bonusLine: line });
   assert.equal(textOf(r2, line).args[2], 230);
   const r3 = drawResult(run, { lottery: '오른쪽 랜덤 길은 이번 판엔 병사 8 이었습니다', objective: { kind: 'capsule', done: true, missed: false, n: 3 }, objectiveLine: '구출 성공 · +3명', bonusLine: line });

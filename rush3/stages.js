@@ -362,5 +362,14 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   }
   applyLottery(d, stage, lotterySeed);
   stage.spawns.sort((a, b) => a.z - b.z);
+  //  보너스 스테이지 불변식 guard(r3.15 검수 반영, 같은 계열의 빌드 시점 데이터 오류): stepBonus 는 셔터·통 이동·스폰·접촉을 부르지 않으므로
+  //   게이트·통·스폰 z 가 전부 eliteZ(없으면 length) 이하여야 한다 — 보너스 구간(그 뒤)에 물체를 두면 조용히 멈춘 물체가 생긴다.
+  //   랜덤 길·정렬 뒤에 검사한다(추첨으로 붙는 통·게이트까지 본다). V3-BONUS B-1 의 S8 루프는 같은 조건의 실측 대조군
+  if (stage.bonus) {
+    const endZ = stage.eliteZ ?? stage.length;
+    for (const row of stage.gateRows) if (row.z > endZ) throw new Error('stage ' + id + ': 보너스 스테이지의 게이트 ' + row.id + '(z ' + row.z + ')가 보너스 구간(z > ' + endZ + ')에 있다');
+    for (const s of stage.supplies) if (s.z + s.r > endZ) throw new Error('stage ' + id + ': 보너스 스테이지의 통 ' + s.id + '(z ' + s.z + ')가 보너스 구간(z > ' + endZ + ')에 있다');
+    for (const sp of stage.spawns) if (sp.z > endZ) throw new Error('stage ' + id + ': 보너스 스테이지의 스폰(z ' + sp.z + ')이 보너스 구간(z > ' + endZ + ')에 있다');
+  }
   return stage;
 }

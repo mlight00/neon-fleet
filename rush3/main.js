@@ -355,6 +355,9 @@ export function boot(canvas, deps = {}) {
     au.bgmResume();
   }
   function toTitle() {
+    //  r3.15 검수 반영: 승리가 확정됐는데 결과 화면 전(보너스 20초 창·여운)에 ⏸→[스테이지 선택]으로 나가면 finishRun 을 거치지 않는다.
+    //   본전투 기록은 'win' 프레임에 commitMain 이 이미 썼고(판당 1회), 여기서는 안전망으로 한 번 더 부른다(표식이 있으면 즉시 반환)
+    if (run && run.won && !run.over) commitMain(run);
     state = 'title';
     loop.stop(nowSec());
     run = null;
@@ -376,25 +379,44 @@ export function boot(canvas, deps = {}) {
     } catch { return {}; }
   }
 
-  function finishRun() {
+  //  본전투 기록 확정 저장(r3.15 검수 반영): cleared·bestSurvivors·bestTime(·rescued)을 승리가 **확정되는 프레임('win' 이벤트)에 즉시** 쓴다.
+  //   종전엔 결과 화면 직전 finishRun 에서만 썼는데, 보너스전이 생기면서 승리 확정 뒤 ⏸→[스테이지 선택]으로 나갈 수 있는 20초 창이 생겼고
+  //   그 경로는 finishRun 없이 run = null 이라 확정된 승리가 통째로 지워졌다 — 01 §5-9 '본전투 완료는 이 시점에 확정한다'.
+  //   판당 1회(run.mainRecord 가 표식 = 셸 전용 칸, devWeapon·lotteryOutcome 과 같은 계열). 신기록 판정(isBest)은 쓰기 전 기록과 비교해 표식에 남기고
+  //   finishRun 은 그 표식을 읽어 결과 화면에 쓴다(쓴 뒤 다시 비교하면 자기 기록과 같아져 '신기록!' 이 사라진다). devWeapon 판은 종전대로 저장하지 않는다
+  function commitMain(run) {
+    if (run.mainRecord) return run.mainRecord;
     const id = run.stageId, ver = run.stageVersion, diff = run.difficulty;
     const cur = save.getStage(id, ver, diff);
+    //  생존·시간은 **본전투 확정값**(run.mainResult·wonAt — 보너스 구간은 기록에 섞지 않는다). 없으면(옛 run·검사가 won 만 세운 판) 지금 run 값
+    const mr = run.mainResult;
+    const survivors = mr ? mr.survivors : run.units.length;
+    const time = run.wonAt ?? run.time;
+    //  best = 성공 판의 최다 생존·최단 시간(각각 독립)
+    const isBest = survivors > (cur.bestSurvivors || 0);
+    const patch = { cleared: true, bestSurvivors: Math.max(cur.bestSurvivors || 0, survivors), bestTime: cur.bestTime > 0 ? Math.min(cur.bestTime, time) : time };
+    //  구출 기록(r3.14): true 일 때만 쓴다(희소 필드 — false 는 절대 쓰지 않는다). 본전투 안에서 정해지므로 승리 확정과 함께 쓴다
+    if (run.objective && run.objective.done) patch.rescued = true;
+    if (!run.devWeapon) save.updateStage(id, patch, ver, diff);
+    run.mainRecord = { isBest, survivors, time };
+    return run.mainRecord;
+  }
+
+  function finishRun() {
+    const id = run.stageId, ver = run.stageVersion, diff = run.difficulty;
     const won = !!run.won;
-    //  생존·최고·처치·시간은 **본전투 확정값**(r3.15 run.mainResult — 보너스 구간은 기록에 섞지 않는다). 없으면(패배·옛 run) 종전 run 값
+    //  승리 판의 본전투 기록은 'win' 프레임에 commitMain 이 이미 썼다(표식이 없으면 — 검사가 won/over 만 세운 판 — 여기서 쓴다). 패배 판은 cleared 유지·rescued 만
+    const rec = won ? commitMain(run) : null;
+    const cur = save.getStage(id, ver, diff);
     const mr = run.mainResult;
     const survivors = mr ? mr.survivors : run.units.length;
     const peak = mr ? mr.peak : run.peak, kills = mr ? mr.kills : run.kills;
     const time = won ? run.wonAt ?? run.time : run.time;
-    //  best = 성공 판의 최다 생존·최단 시간(각각 독립)
-    const isBest = won && survivors > (cur.bestSurvivors || 0);
+    const isBest = !!rec && rec.isBest;
     const patch = { cleared: cur.cleared || won };
-    if (won) {
-      patch.bestSurvivors = Math.max(cur.bestSurvivors || 0, survivors);
-      patch.bestTime = cur.bestTime > 0 ? Math.min(cur.bestTime, time) : time;
-    }
-    //  구출 기록(r3.14): true 일 때만 쓴다(희소 필드 — false 는 절대 쓰지 않는다). 승패와 무관하게 구출했으면 남는다
+    //  구출 기록(r3.14): 승패와 무관하게 구출했으면 남는다(승리 판은 commitMain 이 이미 썼다 — OR 병합이라 다시 써도 같다)
     if (run.objective && run.objective.done) patch.rescued = true;
-    //  보너스 점수(r3.15): 보너스가 있던 판만(희소 필드 bestBonus, 병합은 max). 신기록 여부는 생존 신기록과 별개
+    //  보너스 점수(r3.15): 보너스가 있던 판만(희소 필드 bestBonus, 병합은 max). 신기록 여부는 생존 신기록과 별개 — 여기서만 쓴다(보너스는 over 에서 끝난다)
     const bo = run.bonus;
     const isBestBonus = !!bo && bo.score > (cur.bestBonus || 0);
     if (bo) patch.bestBonus = Math.max(cur.bestBonus || 0, bo.score);
@@ -521,12 +543,14 @@ export function boot(canvas, deps = {}) {
         case 'blast': spawnBurst(fx, ev.x, sy(ev.z), ev.r, false, C.bulletHeavy); break;
         case 'elite': fx.eliteT = FX.eliteBannerSec; fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]); break;
         case 'bossKill': spawnBurst(fx, ev.x, sy(ev.z), ev.r, true); fx.shakeT = FX.shakeDur; fx.sfx.push(['win']); break;
-        case 'win': break;
-        //  보너스전(r3.15): 시작 배너(슬롯 A) + 합류음 재사용, 보스 BGM 을 스테이지 BGM 으로 되돌린다(승리는 이미 확정 — 결과 화면은 over 로만)
+        //  승리 확정 프레임(r3.15 검수 반영): 본전투 기록을 지금 쓴다 — 보너스전·여운 중 나가도 확정된 승리가 남는다
+        case 'win': commitMain(run); break;
+        //  보너스전(r3.15): 시작 배너(슬롯 A) + 합류음 재사용. 정예가 있던 판만 보스 BGM 을 스테이지 BGM 으로 되돌린다
+        //   (정예 없는 스테이지에 bonus 를 붙이면 스테이지 BGM 이 이미 흐르고 있어 다시 틀면 처음부터 재시작된다). 승리는 이미 확정 — 결과 화면은 over 로만
         case 'bonusStart':
           fx.bonusT = BAL3.bonus.bannerSec; fx.bonusText = '보너스전! ' + ev.sec + '초';
           fx.sfx.push(['joinMany']);
-          au.bgmPlay(BGM.stage[Math.max(0, Math.min(2, run.stageId - 1))]);
+          if (run.elite) au.bgmPlay(BGM.stage[Math.max(0, Math.min(2, run.stageId - 1))]);
           break;
         case 'bonusTargetHit': fx.sfx.push(['crateHit']); break;
         case 'bonusHit': spawnBurst(fx, ev.x, sy(ev.z), BAL3.bonus.targetR, false, C.bonusBox); floater(fx, ev.x, sy(ev.z) - 30, '+' + ev.value, C.gold); fx.sfx.push(['crateBreak']); break;

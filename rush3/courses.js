@@ -25,7 +25,7 @@ const mv = (x0, x1, period) => ({ move: { x0, x1, period } });
 //   target(dz, x0, x1, period, hp, value, o) — dz = 부대 앞 고정 거리(px, 탄 정리선 650 미만이어야 닿는다), x0~x1 = 옆으로 왕복(px, 반지름 22 포함 도로 안),
 //   period = 왕복 1회 초, hp = 내구(직격만), value = 파괴 점수, o.phase = 0~1 위상, o.respawn = 재등장까지 초(생략 = BAL3.bonus.respawn).
 //   ⚠️사거리 무기(산탄포 range 420)는 전진 중이라 닿는 거리가 range × (vz − scroll) / vz − 대형 깊이 ≈ 200 px 뿐이다 — 그 무기가 나오는 스테이지는 dz 를 그 안에 둔다
-//   보너스 스테이지 불변식: 게이트·통·스폰 z 가 전부 eliteZ 이하(보너스 구간엔 피해원·보상이 없다 — V3-BONUS B-1 이 잠근다)
+//   보너스 스테이지 불변식: 게이트·통·스폰 z 가 전부 eliteZ(없으면 length) 이하(보너스 구간엔 피해원·보상이 없다 — buildStage 가 빌드 시점에 throw 로 잠근다, V3-BONUS B-1)
 const bonus = (sec, targets, o = {}) => ({ sec, targets, ...o });
 const target = (dz, x0, x1, period, hp, value, o = {}) => ({ dz, x0, x1, period, hp, value, phase: o.phase ?? 0, ...(o.respawn != null ? { respawn: o.respawn } : {}) });
 const wall = (z0, z1, L, R) => ({ z0, z1, signs: { L, R } });
@@ -82,15 +82,16 @@ export function makeCourses({ coverZFor }) {
     elite: { z: 8600, hp: 280, summon: false } };
   //  8 남은 군단(r3.15 보너스전 실제 장치 — 짧은 본전투 + 소환형 정예를 깨면 승리가 **그 자리에서 확정**되고, 살려 온 군단으로 20초 표적전.
   //   더 많은 병사·강한 무기를 살렸을수록 점수가 오른다. version 2, 근사 시절 기록은 1 칸에 보존)(BG1)
-  //   본전투(길이 7800·정예 7400·게이트·통·스폰)는 근사 시절 그대로. 표적 3개: 가까운 것(y400)은 느리고 값이 작고, 먼 것(y160)은 단단하고 값이 크다.
-  //   내구 12/20/32·재등장 0.5/0.5/0.8 은 봇 실측(2026-09-19)으로 점수가 병력·무기에 비례하게 잡은 값(내구 6/10/16·재등장 1.5 는 30 처치에서 포화했다)
+  //   본전투(길이 7800·정예 7400·게이트·통·스폰)는 근사 시절 그대로. 표적 4개(y400·y320·y240·y160, 위상 0/.75/.5/.25): 가까운 것은 느리고 값이 작고, 먼 것은 단단하고 값이 크다.
+  //   내구 12/16/20/32·재등장 0.5/0.5/0.5/0.8 은 봇 실측(2026-09-19)으로 점수가 병력·무기에 비례하게 잡은 값(내구 6/10/16·재등장 1.5 는 30 처치에서 포화했다).
+  //   넷째 표적(dz 320, 140~340)은 검수 반영 — 표적 3개일 때 기관총 50명 이상이면 셋이 동시에 죽어 '맞힐 게 없는' 프레임이 실제로 보였다(캡처 shot-4)
   C[8] = { version: 2, title: '남은 군단', bg: 1, startUnits: 3, startWeapon: 'rifle', length: 7800, eliteZ: 7400,
     gates: [g2(1300, 3, -5), g3(3600, 4, 6, -12, { max: 24 }), g2(5600, -10, -10, { max: 20, hint: '양쪽 다 음수: 쏴서 0 까지 올리거나 병력을 아끼세요' })],
     supplies: [soldier(2200, 150, 5, 10), soldier(2200, 330, 5, 10), weapon(4500, 240, 'auto', 12), soldier(6500, 240, 8, 20)],
     walls: [],
     spawns: [wave(1800, 'grunt', [140, 340]), mass(3000, 'grunt', 10, 2), wave(4200, 'rusher', [120, 240, 360], HOUND), mass(6200, 'grunt', 16, 2)],
     elite: { z: 7400, hp: 260, summon: true },
-    bonus: bonus(20, [target(240, 120, 360, 4.0, 12, 2), target(400, 200, 280, 2.2, 20, 3, { phase: 0.5 }), target(480, 105, 375, 6.0, 32, 5, { phase: 0.25, respawn: 0.8 })]) };
+    bonus: bonus(20, [target(240, 120, 360, 4.0, 12, 2), target(320, 140, 340, 3.0, 16, 3, { phase: 0.75 }), target(400, 200, 280, 2.2, 20, 3, { phase: 0.5 }), target(480, 105, 375, 6.0, 32, 5, { phase: 0.25, respawn: 0.8 })]) };
   //  9 둘을 동시에(근사: 정예 B2 그림 + 소환 — 복수 정예는 다음 회차)(BG2)
   C[9] = { version: 1, title: '갠트리', bg: 2, startUnits: 5, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
     gates: [g3(1600, -4, 3, -6), g2(4200, -14, 4, { max: 24 }), g3(7000, 5, -12, -3, { max: 24 })],

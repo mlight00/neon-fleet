@@ -7,6 +7,7 @@
 //   hp/max = 내구(직격만 유효), value = 파괴 시 점수, respawn = 파괴 뒤 재등장까지 초
 //  run.bonus = { t, sec, score, tier, hits } · run.bonusDef = { sec, tiers, targets }(buildStage 사본)
 //  이벤트: bonusStart · bonusTargetHit · bonusHit · bonusRespawn · bonusTier · bonusEnd(모두 셸 연출용, 규칙은 읽지 않는다)
+import { triWave } from './motion.js';
 
 // 표적 런타임 생성(빌드 정의 → 판 상태). 호출마다 새 객체
 export function makeTarget(def, runZ = 0) {
@@ -20,14 +21,10 @@ export function makeTarget(def, runZ = 0) {
   return t;
 }
 
-/** 표적의 x(삼각파 왕복): u = (time/period + phase) mod 1, tri = u < 0.5 ? 2u : 2 − 2u, x = x0 + (x1 − x0)·tri.
- *  time 만의 함수 — 같은 STEP 수면 같은 x(결정성). period ≤ 0 이면 x0 에 선다 */
+/** 표적의 x(삼각파 왕복) = motion.triWave(x0, x1, period, phase, time) — 차량 통(supply.vehicleX)과 같은 공식 한 곳.
+ *  time 만의 함수 — 같은 STEP 수면 같은 x(결정성). period ≤ 0 이면 x0 에 선다. phase = 출발 위상 u0(0.5 = x1 에서 출발) */
 export function targetX(t, time) {
-  const span = t.x1 - t.x0;
-  if (!(t.period > 0)) return t.x0;
-  let u = (time / t.period + (t.phase || 0)) % 1;
-  if (u < 0) u += 1;
-  return t.x0 + span * (u < 0.5 ? 2 * u : 2 - 2 * u);
+  return triWave(t.x0, t.x1, t.period, t.phase || 0, time);
 }
 
 // 점수가 넘은 단계 수 = score ≥ tiers[k] 인 k 의 개수(tiers 는 오름차순)
