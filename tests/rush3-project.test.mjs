@@ -196,11 +196,12 @@ test('V3-PROJECT 렌더: 부대(히어로)는 부대 줄 배율(near)로 그려�
 
 //  수정 라운드 2(2026-09-20, 대항 검수 Important): 뒷줄 넘침은 150명의 예외가 아니라 보통 상황이었다 — 뒷줄 병사 밑변이 H(800)를 넘는 최소 인원이
 //   표준 59명·가까이 40명(평면 143명). 뒤쪽 갈래를 '배율 near·간격 평면' 으로 바꾼 뒤의 문턱을 숫자로 잠근다(formation() + 투영기, 병사 22·s, 아레나 ay 0).
-test('V3-PROJECT 뒷줄 문턱: 뒷줄 병사 밑변이 화면(800)을 넘는 최소 인원 = 표준 142 · 가까이 142 · 평면 143 (종전 59 · 40 · 143)', () => {
+test('V3-PROJECT 뒷줄 문턱: 부대 상한(100, r3.21) 안에서는 어느 인원도 뒷줄이 화면을 넘지 않는다 — 넘기 시작하는 인원은 표준 142 · 가까이 142 · 평면 143 으로 상한 밖', () => {
   const H = BAL3.view.h, soldier = BAL3.squad.soldierSize;
   const threshold = (mode) => {
     const P = projectorFor(mode);
-    for (let n = 2; n <= BAL3.squad.unitCap; n++) {
+    //  ⚠️상한(unitCap)이 아니라 200 까지 훑는다 — r3.21 에서 상한이 100 으로 내려가 문턱(142)이 상한 밖으로 나갔다
+    for (let n = 2; n <= 200; n++) {
       let maxDy = 0;
       for (const u of formation(n)) if (u.dy > maxDy) maxDy = u.dy;
       const q = P.project(CX, -maxDy);
@@ -212,6 +213,9 @@ test('V3-PROJECT 뒷줄 문턱: 뒷줄 병사 밑변이 화면(800)을 넘는 �
   assert.deepEqual({ n: std.n, maxDy: std.maxDy, y: std.y, s: std.s }, { n: 142, maxDy: 145, y: 785, s: 1.45 }, '표준: ' + JSON.stringify(std));
   assert.deepEqual({ n: close.n, maxDy: close.maxDy, y: close.y, s: close.s }, { n: 142, maxDy: 145, y: 785, s: 1.8 }, '가까이: ' + JSON.stringify(close));
   assert.deepEqual({ n: flat.n, maxDy: flat.maxDy, y: flat.y }, { n: 143, maxDy: 153, y: 793 }, '평면: ' + JSON.stringify(flat));
+  //  r3.21 부대 상한 100: 문턱(142·142·143)이 상한 밖이므로 **실제 플레이에서는 넘는 일이 없다**
+  assert.ok(std.n > BAL3.squad.unitCap && close.n > BAL3.squad.unitCap && flat.n > BAL3.squad.unitCap,
+            '문턱이 부대 상한 ' + BAL3.squad.unitCap + ' 밖: ' + [std.n, close.n, flat.n].join('/'));
   //  무입력 봇이 8스테이지부터 닿는 60~100명은 세 모드 모두 화면 안(뒷줄 y = 640 + maxDy)
   for (const n of [59, 64, 78, 97, 120]) {
     let maxDy = 0;
