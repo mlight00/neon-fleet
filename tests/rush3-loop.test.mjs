@@ -1,5 +1,6 @@
 // rush3-loop — 셸 묶음(계약서 8장 V3-DETERMINISM·V3-INPUT + boot 스모크). DOM 없이 main.js 를 import 한다.
 import { test } from 'node:test';
+import { pickInput } from './lib/rush3-policies.mjs';
 import assert from 'node:assert/strict';
 import { ZOOM } from '../rush3/render.js';
 import { projectorFor } from '../rush3/project.js';
@@ -277,8 +278,13 @@ function fakeStorage() {
   const m = new Map();
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, map: m };
 }
-// 봇(V3-SIM 과 같은 규칙): 가장 가까운 통/발판/게이트 최대값 칸으로 pointerX
+// 봇: 셸 흐름(결과·저장·다음 작전)을 보는 검사라 **이기는 봇**이 필요하다. 새 사용자 기본 난이도가 지옥이고(r3.3 후속),
+//  r3.22 지옥 강화로 지옥 S1 은 단순 조준 봇이 못 깬다 → 게이트 칸을 예상 최종값으로 고르는 evLead 의 pointerX 를 쓴다
 function botX(run) {
+  return pickInput('evLead', run).pointerX;
+}
+// 종전 단순 조준 봇(가장 가까운 통/발판/게이트 최대값 칸) — 보통 난이도 판에서 쓰는 곳이 남아 있으면 이 이름으로
+function botXSimple(run) {
   let best = null, bz = Infinity;
   for (const s of run.supplies) {
     if (s.missed) continue;

@@ -60,6 +60,13 @@ export const DEFS = {
       //  회피 통로 무리: 1열 가운데 166px · 2열 208px 이 비어 있다(필요 폭 = 2 × 반폭 53 + 10 = 116)
       { z: 5300, kind: 'grunt', n: 6, xs: [94, 136, 330, 372, 115, 351], dz: [0, 0, 0, 0, 40, 40], corridorHw: 53 },
     ],
+    //  r3.22 지옥 전용(이사 소감 2026-09-22 "지옥도 아직 너무 쉽다"): 학습판이라 잡졸뿐이어서 지옥에서도 손실 0 으로 흘렀다
+    //   → 저격수 2(원거리에서 병력을 깎는다) + 돌격체 2(부대에 닿는다). 보통·어려움은 이 줄을 읽지 않는다
+    brutalSpawns: [
+      { z: 2600, kind: 'shooter', n: 2, xs: [160, 320], corridorHw: null },
+      { z: 4600, kind: 'shooter', n: 3, xs: [130, 240, 350], corridorHw: null },
+      { z: 6300, kind: 'rusher', n: 3, xs: [140, 240, 340], corridorHw: null },
+    ],
     elite: { z: 7200, hp: 120, summon: false },
   },
   2: {
@@ -398,7 +405,8 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g, mult.gateCapMul ?? 1)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
-    spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, hpMult, hpMul)),
+    //  r3.22 지옥 전용 추가 배치: 정의의 brutalSpawns 는 지옥에서만 spawns 에 합친다(뒤에서 z 순 정렬). 보통·어려움은 불변
+    spawns: (difficulty === 'brutal' && d.brutalSpawns ? d.spawns.concat(d.brutalSpawns) : d.spawns).map(sp => makeSpawn(id, sp, solid, hpMult, hpMul)),
     //  정예(r3.16 복수 정예): 정의 `elites: [...]`(1~3체) 또는 단수 `elite`(배열 1개로 정규화). 원소 z 는 정의의 eliteZ(전원 같은 z 에서 함께 등장).
     //   난이도 배수 eliteHp 는 원소마다 반올림 적용(종전과 같은 자리). role/x/patrol 은 정의에 있을 때만 싣는다 — 단수 정의의 원소는
     //   종전 stage.elite 와 **키 집합까지 같은 모양**({ z, hp, summon(, skin) })이라 C-2·C-6·STG·DIFF 의 읽기가 그대로 통과한다.
