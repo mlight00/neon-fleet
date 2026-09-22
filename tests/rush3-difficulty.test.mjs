@@ -92,7 +92,7 @@ test('V3-DIFF DIFF-3: enemyDefsFor — hp(반올림)·접촉·적탄 dmg·정예
   for (const d of DIFFS) {
     const e = rows[d];
     assert.deepEqual([e.grunt.r, e.grunt.vz, e.grunt.track, e.rusher.accel, e.rusher.maxVz, e.shooter.aimTime, e.shooter.shot.vz, e.elite.fan, e.elite.fanDeg, e.elite.r, e.elite.summonN],
-                     [14, 60, 0, 260, 420, 0.5, 260, 3, 18, 48, 2], d + ': 배수 대상이 아닌 필드는 그대로');
+                     [14, 24, 0, 260, 420, 0.5, 260, 3, 18, 48, 2], d + ': 배수 대상이 아닌 필드는 그대로(vz 는 r3.27 에서 60 → 24, 난이도 배수 대상이 아님)');
     assert.ok(Object.isFrozen(e) && Object.isFrozen(e.elite) && Object.isFrozen(e.elite.shot));
   }
   assert.equal(rows.hard.elite.hp, undefined, '정예 hp 는 스테이지 값(buildStage)이라 표에 없다');

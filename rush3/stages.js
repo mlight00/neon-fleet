@@ -404,6 +404,8 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   const hpMult = diffHp ? mult : { ...mult, enemyHp: 1, eliteHp: 1 };
   const stage = {
     id, version: d.version ?? 1, difficulty, enemyHpMul: hpMul, difficultyHp: diffHp,
+    //  r3.27 보스 페이즈 적용 여부(1·2번 학습 구간 제외 — balance.bossPhases.from)
+    bossPhases: id >= BAL3.bossPhases.from,
     title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ ?? d.arena?.z ?? null,
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g, mult.gateCapMul ?? 1)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),

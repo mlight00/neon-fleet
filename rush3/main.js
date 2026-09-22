@@ -804,6 +804,14 @@ export function boot(canvas, deps = {}) {
         //  보호막(r3.18): 흡수된 탄마다 회색 스파크(차폐물 흡수와 같은 표현), 효과음은 프레임당 1회. 해제는 반전음 + 보스 위 글자
         case 'bossGuard': burstAt(ev.x, ev.z, 4, false, C.wall); if (!guardSfx) { guardSfx = true; fx.sfx.push(['gateClang']); } break;
         case 'bossGuardOff': fx.sfx.push(['gateFlip']); floaterAt(ev.x, ev.z, -70, '보호막 해제!', C.gatePos, true); break;
+        //  보스 페이즈(r3.27): 체력이 절반·1/5 아래로 떨어져 보스가 빨라진 순간. 붉은 글 + 흔들림 + 피격 번쩍임 한 번(무슨 일이 일어났는지 보이게)
+        case 'bossPhase': {
+          fx.sfx.push(['elite']);
+          floaterAt(ev.x, ev.z, -70, ev.phase >= 2 ? '보스 광분!' : '보스 각성!', C.gateNeg, true);
+          fx.shakeT = FX.shakeDur;
+          fx.hit[ev.id] = { t: 0, fa: 0, dir: -1, role: 'elite', n: 1, dmgF: null };   // 피격과 같은 번쩍임 한 번
+          break;
+        }
         //  착지 충격: 확장 링(화면 좌표·반지름 × 그 자리 배율) + 흔들림. hits > 0 이면 hurt 이벤트가 따로 나므로 피격 플래시·hurt 음은 그쪽이 맡는다
         case 'bossShock': { const q = sp(ev.x, ev.z); fx.shocks.push({ x: q.x, y: q.y, r: ev.r * q.s, t: 0, life: FX.shockRingSec }); fx.shakeT = FX.shakeDur; break; }
         case 'lose': fx.sfx.push(['lose']); break;

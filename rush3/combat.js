@@ -79,6 +79,8 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
   const run = {
     stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null, bg: stage.bg ?? 1,
     difficulty: diff, enemyDefs: enemyDefsFor(diff, stage.enemyHpMul ?? 1, stage.difficultyHp ?? true),
+    //  r3.27 보스 페이즈 적용 여부(stage.bossPhases — 합성 스테이지는 켬)
+    bossPhases: stage.bossPhases ?? true,
     z: 0, prevZ: 0, x: ROAD.startX, tx: ROAD.startX,
     units: [], nextUnitId: 1,
     weapon, weaponMk,
@@ -244,7 +246,7 @@ export function makeBoss(run, def, index) {
                state: 'descend', dir: index % 2 === 0 ? 1 : -1, shootT: E.shootEvery, touchT: 0, spawnT: E.summonEvery,
                shoot: !!rd.shoot, summon: rd.summon == null ? !!def.summon : !!rd.summon,
                laneLo, laneHi, holdAhead: rd.holdAhead, descendSpeed: E.descendSpeed * rd.descendMul, patrolSpeed: E.patrolSpeed * rd.patrolMul,
-               dead: false, reaped: false };
+               phase: 0, dead: false, reaped: false };
   if (def.skin) bo.skin = def.skin;
   return bo;
 }
@@ -497,10 +499,11 @@ function moveEnemies(run, ev, dt) {
  *  소환 적은 e.chase = true(양축 추격), x 는 bo.x + 균등 오프셋(n 2 = ±dx, n 3 = −dx/0/+dx)을 광장 안으로 클램프. 사격은 fireAt(360° 지원) 재사용 */
 function arenaBossAct(run, bo, ev, dt) {
   const A = run.arena, B = A.boss, D = B.dash;
+  const ph = updateBossPhase(run, bo, ev);   // r3.27 페이즈: 추격이 빨라지고 돌진 간격이 줄어든다
   bo.px = bo.x; bo.pz = bo.z;
   const tx = run.x, tz = squadZ(run);
   if (bo.state === 'chase') {
-    const dx = tx - bo.x, dz = tz - bo.z, dist = Math.hypot(dx, dz), mv = B.speed * dt;
+    const dx = tx - bo.x, dz = tz - bo.z, dist = Math.hypot(dx, dz), mv = B.speed * ph.speed * dt;
     if (dist > 1e-9) { const k = Math.min(1, mv / dist); bo.x += dx * k; bo.z += dz * k; }
     bo.dashT -= dt;
     if (bo.dashT <= 0) {
@@ -522,7 +525,7 @@ function arenaBossAct(run, bo, ev, dt) {
     if (bo.dashLeft <= 1e-9) { bo.dashLeft = 0; arenaShock(run, bo, ev); bo.state = 'recover'; bo.recoverT = D.recover; }
   } else {
     bo.recoverT -= dt;
-    if (bo.recoverT <= 0) { bo.state = 'chase'; bo.dashT = D.every; }
+    if (bo.recoverT <= 0) { bo.state = 'chase'; bo.dashT = D.every * ph.dashEvery; }
   }
   bo.x = clampNum(bo.x, A.w[0] + bo.r, A.w[1] - bo.r);
   bo.z = clampNum(bo.z, run.z + A.bossZ[0], run.z + A.bossZ[1]);
@@ -530,7 +533,7 @@ function arenaBossAct(run, bo, ev, dt) {
     const SM = B.summon;
     bo.spawnT -= dt;
     if (bo.spawnT <= 0) {
-      bo.spawnT += SM.every;
+      bo.spawnT += SM.every * ph.rate;
       const r = run.enemyDefs[SM.kind].r;
       for (let k = 0; k < SM.n; k++) {
         const off = SM.n > 1 ? (k / (SM.n - 1) * 2 - 1) * SM.dx : 0;
@@ -544,7 +547,7 @@ function arenaBossAct(run, bo, ev, dt) {
     const SH = B.shoot;
     bo.shootT -= dt;
     if (bo.shootT <= 0) {
-      bo.shootT += SH.every;
+      bo.shootT += SH.every * ph.rate;
       fireAt(run, bo.x, bo.z, tx, tz, run.enemyDefs.elite.shot, SH.fan, SH.fanDeg * DEG, ev);
     }
   }
@@ -578,27 +581,48 @@ function shooterAct(run, e, d, ev, dt) {
 // 정예: descend(descendSpeed, run.z + holdAhead 까지) → hold(차선 [laneLo, laneHi] 안에서 patrolSpeed 로 왕복). shoot 이면 shootEvery 마다 부채꼴 3발,
 //  summon 이면 summonEvery 마다 잡졸 2 소환. 정지 거리·속도·차선·행동 유무는 보스 객체(makeBoss 가 역할 표에서 채운 것)에서 읽는다 —
 //  단수 정예는 종전 값(150/s · 420 · 60/s · 도로 전체 · 사격 + 정의 summon)과 같다. shoot 이 없는 보스는 shootT 를 건드리지 않는다(결정적)
+//  보스 페이즈(r3.27): 남은 체력 비율로 단계를 정하고, 올라간 STEP 에 이벤트 bossPhase 를 한 번 낸다(셸이 연출).
+//   단계는 되돌아가지 않는다(bo.phase 는 최댓값 유지 — 회복이 없으므로 실제로도 내려갈 일은 없다).
+//   보스 종류에 상관없이 이 한 곳에서만 계산한다 — 도로 정예와 아레나 보스가 서로 다른 기준을 갖지 않게
+export function bossPhaseOf(hp, max, P = BAL3.bossPhases) {
+  const ratio = max > 0 ? hp / max : 1;
+  let p = 0;
+  for (const at of P.at) if (ratio <= at) p++;
+  return p;
+}
+function updateBossPhase(run, bo, ev) {
+  const P = BAL3.bossPhases;
+  if (run.bossPhases === false) return { rate: 1, speed: 1, dashEvery: 1 };
+  const p = Math.max(bo.phase ?? 0, bossPhaseOf(bo.hp, bo.max, P));
+  if (p !== (bo.phase ?? 0)) {
+    bo.phase = p;
+    ev.push({ type: 'bossPhase', id: bo.id, phase: p, x: bo.x, z: bo.z, skin: bo.skin ?? null, r: bo.r });
+  }
+  return { rate: P.rate[p] ?? 1, speed: P.speed[p] ?? 1, dashEvery: P.dashEvery[p] ?? 1 };
+}
+
 function bossAct(run, bo, ev, dt) {
   const E = run.enemyDefs.elite;
+  const ph = updateBossPhase(run, bo, ev);
   bo.px = bo.x; bo.pz = bo.z;
   if (bo.state === 'descend') {
     bo.z -= bo.descendSpeed * dt;
     if (bo.z <= run.z + bo.holdAhead) { bo.z = run.z + bo.holdAhead; bo.state = 'hold'; }
   } else {
-    bo.x += bo.dir * bo.patrolSpeed * dt;
+    bo.x += bo.dir * bo.patrolSpeed * ph.speed * dt;
     if (bo.x <= bo.laneLo) { bo.x = bo.laneLo; bo.dir = 1; } else if (bo.x >= bo.laneHi) { bo.x = bo.laneHi; bo.dir = -1; }
   }
   if (bo.shoot) {
     bo.shootT -= dt;
     if (bo.shootT <= 0) {
-      bo.shootT += E.shootEvery;
+      bo.shootT += E.shootEvery * ph.rate;
       fireAt(run, bo.x, bo.z, run.x, run.z, E.shot, E.fan, E.fanDeg * DEG, ev);
     }
   }
   if (bo.summon) {
     bo.spawnT -= dt;
     if (bo.spawnT <= 0) {
-      bo.spawnT += E.summonEvery;
+      bo.spawnT += E.summonEvery * ph.rate;
       const r = run.enemyDefs[E.summonKind].r;
       for (let k = 0; k < E.summonN; k++) {
         const side = k % 2 === 0 ? -1 : 1;
