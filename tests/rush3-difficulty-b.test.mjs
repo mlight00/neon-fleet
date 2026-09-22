@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BAL3, enemyHpMulFor, difficultyHpFor, difficultyMult } from '../rush3/balance.js';
-import { buildStage, ALL_STAGE_IDS, STAGE_IDS, MAX_DY } from '../rush3/stages.js';
+import { buildStage, ALL_STAGE_IDS, STAGE_IDS, MAX_DY, DEFS } from '../rush3/stages.js';
 import { COURSE_IDS, gainFor } from '../rush3/courses.js';
 import { createRun, stepRun, drainEvents, enemyDefsFor, STEP } from '../rush3/combat.js';
 import { SQUAD_DEFAULTS, formation } from '../rush3/squad.js';
@@ -16,6 +16,14 @@ import { projectorFor } from '../rush3/project.js';
 import { playPolicy } from './lib/rush3-policies.mjs';
 
 const DIFFS = ['normal', 'hard', 'brutal'];
+
+//  정의에 체력을 직접 적은 스폰의 hp(1~3 = stages.DEFS 의 spawns·지옥이면 brutalSpawns). 4~24 는 스킨 hp 로 표현되므로 여기서 다루지 않는다
+function explicitHp(id, d, sp) {
+  if (!DEFS[id]) return undefined;
+  const defs = DEFS[id].spawns.concat(d === 'brutal' ? (DEFS[id].brutalSpawns ?? []) : []);
+  return defs.find((x) => x.z === sp.z && x.kind === sp.kind && x.hp != null)?.hp;
+}
+
 //  courses.js 의 역할 근사 스킨 → 정의 hp(ARMOR 10 · POD 14 · MAGNET 9 · CART 20). 나머지 스킨·무스킨은 표 hp
 const SKIN_HP = { E3_wallguard: 10, E9_spawnpod: 14, E10_magnethead: 9, E7_cartyard: 20 };
 const at = (x) => ({ pointerX: x, dragDx: 0, keyDir: 0 });
@@ -68,7 +76,8 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 3난이도 모든 스폰의 hp = roun
       const eh = st.difficultyHp ? m.enemyHp : 1, bh = st.difficultyHp ? m.eliteHp : 1;
       assert.ok(st.spawns.length > 0);
       for (const sp of st.spawns) {
-        const defHp = SKIN_HP[sp.skin] ?? BAL3.enemies[sp.kind].hp;
+        //  정의에 체력을 직접 적은 스폰(r3.25 지옥 1번 단단한 잡졸 등)이 먼저 — 없으면 스킨 체력 → 표 체력
+        const defHp = explicitHp(id, d, sp) ?? SKIN_HP[sp.skin] ?? BAL3.enemies[sp.kind].hp;
         assert.ok(Number.isInteger(sp.hp) && sp.hp > 0, `S${id} ${d} 스폰 hp 정수`);
         assert.equal(sp.hp, Math.round(defHp * mul * eh), `S${id} ${d} ${sp.kind}${sp.skin ? '(' + sp.skin + ')' : ''} z${sp.z} hp`);
       }
