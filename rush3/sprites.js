@@ -23,6 +23,17 @@ export const SPRITE_KEYS3 = {
   bullet_scatter: 'BULLET_scatter', bullet_sniper: 'BULLET_sniper', bullet_arc: 'BULLET_arc',
 };
 
+//  적 그림 파일 목록(정지 그림 기준) — 3상태 그림(r3.26)의 키를 이 목록에서 만든다
+export const ENEMY_ART3 = Object.freeze(['E1_scrapbit', 'E2_ramhound', 'E3_wallguard', 'E4_needleeye', 'E5_wheeler', 'E6_signaler',
+  'E7_cartyard', 'E8_manholejumper', 'E9_spawnpod', 'E10_magnethead', 'B1_grader', 'B2_gantrywidow', 'B3_railleviathan', 'B4_smelter', 'B5_crownbreaker']);
+//  3상태 그림(2026-09-23 Gemini, 이미지프롬프트 v7): 맞는 순간 `hit:` · 크게 부서진 모습 `dmg:` · 파괴 조각 `dead:`.
+//   아직 그리지 못한 적은 파일이 없고, 없는 그림은 조용히 폴백된다(종전 정지 그림 + 코드 연출) — 키는 15종 전부 미리 둔다
+for (const base of ENEMY_ART3) {
+  SPRITE_KEYS3['hit:' + base] = base + '_hit';
+  SPRITE_KEYS3['dmg:' + base] = base + '_dmg';
+  SPRITE_KEYS3['dead:' + base] = base + '_dead';
+}
+
 //  동작 시트(2026-09-18 에테르AI 파일럿, newmode/v3/research/sprite-pilot-20260918): 칸은 열 우선, 같은 크기.
 //  refH = 몸통 기준 높이(px) — 렌더는 칸 높이가 아니라 이 값으로 배율을 잡아 걷기·사격·피격·사망 사이에서 몸 크기가 같게 보인다.
 //  fps·frames 로 재생 길이가 정해진다(셸 fx 타이머가 이 값을 읽는다). loop=false 는 마지막 칸에 머문다.

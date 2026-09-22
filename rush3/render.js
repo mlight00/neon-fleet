@@ -16,6 +16,12 @@ const FX = BAL3.fx;
 const FONT = 'system-ui, sans-serif';
 const ENEMY_FALLBACK = C.enemy;
 const ENEMY_SPRITE = { grunt: 'e_grunt', rusher: 'e_rusher', shooter: 'e_shooter' };
+//  r3.26 3상태 그림: 적 → 그림 파일 이름(skin 이 있으면 그 파일). 이 이름에 'hit:'·'dmg:'·'dead:' 를 붙인 키가 3상태 그림이다
+const ENEMY_ART_BASE = Object.freeze({ grunt: 'E1_scrapbit', rusher: 'E5_wheeler', shooter: 'E6_signaler', elite: 'B1_grader' });
+export function artBase3(kind, skin) { return skin || ENEMY_ART_BASE[kind] || null; }
+//  손상 그림으로 바꾸는 문턱 = 남은 체력이 스폰 체력의 절반 이하일 때(여러 발 맞는 적만 — 한두 방에 죽는 적은 볼 틈이 없다)
+export const DMG_ART_AT = 0.5;
+export function wantsDmgArt(hp, hpMax) { return (hpMax ?? 0) > 2 && hp > 0 && hp <= hpMax * DMG_ART_AT; }
 const ENEMY_LABEL = { grunt: '잡졸', rusher: '돌격체', shooter: '저격수' };
 //  사격 개시선 옆 안내(계약서 6장 N2-⑤). ⚠️선을 넘는 주체는 **게이트**다 — 플레이어가 넘는다는 뜻으로 읽히면
 //   벽의 통로 확정선과 헷갈린다(2026-09-17 2차 검수 N2-④).
@@ -880,7 +886,13 @@ export function createRenderer3(ctx, sprites) {
     //  피격 중인 잡졸(셸 fx.enemyHit[id] 남은 초)은 피격 시트를 한 번 재생한다
     const hitLeft = fx && fx.enemyHit ? (fx.enemyHit[e.id] ?? 0) : 0;
     const hitSh = e.kind === 'grunt' && hitLeft > 0 ? sheet('e_grunt_hit') : null;
-    const key = e.skin ? 'skin:' + e.skin : ENEMY_SPRITE[e.kind];
+    //  r3.26 3상태 그림: 맞는 동안 'hit:' · 체력 절반 이하이면 'dmg:'. 없는 그림은 정지 그림으로 조용히 되돌아간다
+    //   (잡졸은 피격 시트가 있으면 시트가 먼저 — 12칸 동작이 한 장보다 낫다)
+    const artB = artBase3(e.kind, e.skin);
+    const baseKey = e.skin ? 'skin:' + e.skin : ENEMY_SPRITE[e.kind];
+    let key = baseKey;
+    if (artB && !hitSh && hitLeft > 0 && get('hit:' + artB)) key = 'hit:' + artB;
+    else if (artB && wantsDmgArt(e.hp, e.hpMax ?? e.hp) && get('dmg:' + artB)) key = 'dmg:' + artB;
     const hitFrame = hitSh ? sheetFrameAt(hitSh, hitSh.frames / hitSh.fps - hitLeft) : 0;
     if (hitSh) drawSheetFrame(hitSh, hitFrame, x, y, h);
     else drawImgCentered(key, x, y, h, () => enemyShape(e.kind, x, y, r, false));
@@ -922,8 +934,7 @@ export function createRenderer3(ctx, sprites) {
       if (offscreen(d, 80)) continue;
       const q = pj(c.x, d);
       const role = c.role ?? 'grunt';
-      if (role === 'grunt') {
-        if (!sh) continue;
+      if (role === 'grunt' && sh) {
         const total = sh.frames / sh.fps + FX.corpseLingerSec;
         ctx.globalAlpha = Math.max(0, Math.min(1, (total - c.t) / FX.corpseFadeSec));
         drawSheetFrame(sh, sheetFrameAt(sh, c.t), q.x, q.y, c.h * q.s);
@@ -932,6 +943,21 @@ export function createRenderer3(ctx, sprites) {
       const life = c.life || 0.8;
       const fade = Math.max(0, Math.min(1, (life - c.t) / FX.corpseFadeSec));
       const r = (c.r || 16) * q.s;
+      //  r3.26 파괴 그림: 'dead:<그림>' 이 있으면 조각이 흩어진 그 그림을 짧게 키우며 흐린다(없으면 아래 도형 잔해)
+      const deadB = artBase3(c.kind, c.skin);
+      const deadIm = deadB ? get('dead:' + deadB) : null;
+      if (deadIm) {
+        const u = Math.min(1, c.t / Math.max(0.01, life));
+        const hh = (c.h || r * 2.4) * q.s * (1 + 0.28 * u);
+        ctx.globalAlpha = 0.5 * fade;
+        ctx.fillStyle = 'rgba(25,22,24,1)';
+        ctx.beginPath(); ctx.ellipse(q.x, q.y + r * 0.6, r * 1.05, r * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = fade;
+        const w = hh * (deadIm.width / deadIm.height);
+        ctx.drawImage(deadIm, q.x - w / 2, q.y - hh / 2, w, hh);
+        ctx.globalAlpha = 1;
+        continue;
+      }
       //  그을음(바닥 타원) — 모든 비잡졸 공통, 역할마다 색·크기
       ctx.globalAlpha = 0.55 * fade;
       ctx.fillStyle = role === 'ring' || role === 'shooter' ? 'rgba(90,20,60,1)' : 'rgba(25,22,24,1)';

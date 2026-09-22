@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>3상태 그림 확인 — rush3</title>
+<!--
+  r3.26 3상태 그림(맞는 순간 hit: · 부서진 모습 dmg: · 파괴 조각 dead:)이 **게임 렌더 경로 그대로** 나오는지 눈으로 보는 판.
+  검사는 그림 없이 돌기 때문에 그림 교체는 검사로 증명되지 않는다(계약서 §8 주의 그대로) — 이 판의 캡처가 증거다.
+  window.__ST.shot(mode) 로 그린다: 'base'(성한 적) · 'hit'(맞는 순간) · 'dmg'(체력 절반 이하) · 'dead'(파괴 잔해)
+-->
+<style>body{margin:0;background:#0a0d14}canvas{display:block}</style>
+<canvas id="c" width="480" height="800"></canvas>
+<script type="module">
+import { buildStage } from '../../../../rush3/stages.js';
+import { createRun } from '../../../../rush3/combat.js';
+import { createRenderer3 } from '../../../../rush3/render.js';
+import { loadSprites3 } from '../../../../rush3/sprites.js';
+
+const ctx = document.getElementById('c').getContext('2d');
+const sprites = await loadSprites3('../../../../assets/rush/', '../../../../assets/rush3/');
+const R = createRenderer3(ctx, sprites);
+
+//  적 네 종(잡졸 E1 · 돌격체 E5 · 저격수 E6 · 돌격체 스킨 E2)을 같은 거리에 나란히 세운다
+function scene(mode) {
+  const stage = buildStage(1, { difficulty: 'brutal' });
+  const run = createRun(stage);
+  run.z = 0;
+  const mk = (id, kind, skin, x, hp, hpMax) => ({ id, kind, skin, x, z: 260, r: 18, hp, hpMax, aimT: 0, dead: false });
+  run.enemies = [
+    mk(101, 'grunt', null, 80, mode === 'dmg' ? 4 : 10, 10),
+    mk(102, 'rusher', null, 180, mode === 'dmg' ? 4 : 10, 10),
+    mk(103, 'shooter', null, 290, mode === 'dmg' ? 4 : 10, 10),
+    mk(104, 'rusher', 'E2_ramhound', 395, mode === 'dmg' ? 4 : 10, 10),
+  ];
+  const fx = { hit: {}, enemyHit: {}, corpses: [], parts: [], shakeT: 0, hurtT: 0,
+               recruits: [], shocks: [], floaters: [], pops: [], banners: [] };
+  //  fa(번쩍임 경과)를 flashSec 밖에 둬 흰 번쩍임을 끄고 **피격 그림 자체**가 보이게 한다
+  if (mode === 'hit') for (const e of run.enemies) { fx.hit[e.id] = { t: 0.02, fa: 0.6, dmg: 3, weapon: 'rifle' }; fx.enemyHit[e.id] = 0.2; }
+  if (mode === 'dead') {
+    run.enemies = [];
+    const c = (id, kind, skin, x) => ({ id, kind, skin, x, z: 260, r: 18, h: 43, t: 0.15, life: 0.9, role: kind === 'grunt' ? 'grunt' : kind });
+    fx.corpses = [c(201, 'grunt', null, 80), c(202, 'rusher', null, 180), c(203, 'shooter', null, 290), c(204, 'rusher', 'E2_ramhound', 395)];
+  }
+  return { state: 'run', run, fx, now: 1.0, zoom: false, flat: false, buttons: [],
+           hud: { distM: Math.max(0, Math.round((run.length - run.z) / 10)) } };
+}
+window.__ST = {
+  shot(mode) { R.draw(scene(mode)); return document.getElementById('c').toDataURL('image/png'); },
+  keys: ['hit:E1_scrapbit', 'dmg:E1_scrapbit', 'dead:E1_scrapbit', 'hit:E5_wheeler', 'dmg:E5_wheeler', 'dead:E5_wheeler',
+         'hit:E6_signaler', 'dmg:E6_signaler', 'dead:E6_signaler', 'hit:E2_ramhound', 'dmg:E2_ramhound', 'dead:E2_ramhound']
+    .map((k) => k + '=' + (sprites.get(k) ? 'o' : 'x')).join(' '),
+};
+document.title = 'ready';
+</script>

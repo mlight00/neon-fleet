@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { createSave3, KEY3, BAK3, recordKey, BASE_DIFFICULTY } from '../rush3/save.js';
 import { STAGE_IDS, buildStage, stageVersion } from '../rush3/stages.js';
 import { createRun } from '../rush3/combat.js';
-import { SPRITE_KEYS3, loadSprites3 } from '../rush3/sprites.js';
+import { SPRITE_KEYS3, ENEMY_ART3, loadSprites3 } from '../rush3/sprites.js';
 import { createAudio3, SFX_NAMES3, SFX_FILES3 } from '../rush3/audio.js';
 
 const memStorage = (init = {}) => { const m = new Map(Object.entries(init)); return {
@@ -225,13 +225,18 @@ test('V3-SAVE: storage 미주입(Node) → 메모리 저장으로 진행', () =>
   runsFine(s);
 });
 
-test('V3-SPRITES: 키 목록 39개 고정(기본 11 + 배경 4·5 + 역할 근사 그림 11 + 장치 그림 9 + 발사체 6)·Node 에서 loadSprites3 는 전부 null 폴백', async () => {
+test('V3-SPRITES: 키 목록 39개 + 3상태 45개 고정(기본 11 + 배경 4·5 + 역할 근사 그림 11 + 장치 그림 9 + 발사체 6 + 적 15종 × hit·dmg·dead)·Node 에서 loadSprites3 는 전부 null 폴백', async () => {
+  //  r3.26: 적 15종 3상태(hit:·dmg:·dead:)는 ENEMY_ART3 순서대로 뒤에 붙는다 — 아직 없는 파일도 키는 둔다(없으면 조용히 폴백)
+  const states = ENEMY_ART3.flatMap((b) => ['hit:' + b, 'dmg:' + b, 'dead:' + b]);
+  assert.equal(states.length, 45, '3상태 키 45개');
+  assert.equal(SPRITE_KEYS3['hit:E1_scrapbit'], 'E1_scrapbit_hit');
+  assert.equal(SPRITE_KEYS3['dead:B5_crownbreaker'], 'B5_crownbreaker_dead');
   assert.deepEqual(Object.keys(SPRITE_KEYS3), ['m1', 'soldier', 'supply', 'gate', 'bg1', 'bg2', 'bg3', 'bg4', 'bg5',
     'skin:E2_ramhound', 'skin:E3_wallguard', 'skin:E4_needleeye', 'skin:E7_cartyard', 'skin:E8_manholejumper', 'skin:E9_spawnpod', 'skin:E10_magnethead',
     'skin:B2_gantrywidow', 'skin:B3_railleviathan', 'skin:B4_smelter', 'skin:B5_crownbreaker',
     'e_grunt', 'e_rusher', 'e_shooter', 'elite',
     'vehicle', 'capsule', 'bonus_gift', 'bonus_coin', 'soldiers_1', 'soldiers_2', 'soldiers_3', 'arena1', 'arena2',
-    'bullet_rifle', 'bullet_auto', 'bullet_heavy', 'bullet_scatter', 'bullet_sniper', 'bullet_arc']);
+    'bullet_rifle', 'bullet_auto', 'bullet_heavy', 'bullet_scatter', 'bullet_sniper', 'bullet_arc', ...states]);
   assert.equal(SPRITE_KEYS3.m1, 'M01');
   assert.equal(SPRITE_KEYS3.elite, 'B1_grader');
   const sp = await loadSprites3('assets/rush/');
