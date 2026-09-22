@@ -42,6 +42,8 @@ export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY, hpMul = 1, difficu
     if (d.touchDmg) e.touchDmg = Math.round(d.touchDmg * m.touchDmg);
     if (d.shot) e.shot = Object.freeze({ ...d.shot, dmg: Math.round(d.shot.dmg * m.eshotDmg) });
     if (kind === 'elite') { e.shootEvery = d.shootEvery / m.eliteFireRate; e.summonEvery = d.summonEvery / (m.eliteSummonRate ?? 1); }
+    //  r3.22 지옥 강화 손잡이: 저격수 발사 주기 ÷ shooterFireRate(기본 1 = 불변)
+    if (kind === 'shooter' && (m.shooterFireRate ?? 1) !== 1) e.shootEvery = d.shootEvery / m.shooterFireRate;
     out[kind] = Object.freeze(e);
   }
   return Object.freeze(out);

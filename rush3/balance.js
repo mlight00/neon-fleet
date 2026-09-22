@@ -132,11 +132,11 @@ export const BAL3 = deepFreeze({
     //   이사 실기(지옥, 24까지 조작 없이 클리어) "일반 적 체력이 낮아 한두 방에 다 파괴된다" — 체력 배수를 되살린다(hard 1.5/1.25 · brutal 2/1.5).
     //   빈도 배수(waves·waveGap·spawnCount·eliteSummonRate)와 적탄·접촉 피해 배수는 r3.9 그대로 둔다. 스테이지 구간 배율(enemyHpByStage)은 여기에 곱해진다.
     //   ⚠️1~3 기준 코스(enemyHpByStage difficultyHp: false)에서는 enemyHp·eliteHp 가 ×1 로 읽힌다(stages.buildStage·combat.createRun) — 대항 검수 반영.
-    normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    eliteSummonRate: 1 },
+    normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1 },
     //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다: hard 2/360·brutal 2/360 만 성공 경로 잠금(SD-7)·정예전 도달(SD-8)·단조성(SD-5)을 전부 지킨다.
     //   brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반). 지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
-    hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1.5, eshotDmg: 2, touchDmg: 2, eliteHp: 1.25, spawnCount: 1.4, waves: 2, waveGap: 360, eliteFireRate: 1.25, eliteSummonRate: 1.5 },
-    brutal: { id: 'brutal', label: '지옥',   short: '지옥',   enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  eliteSummonRate: 2 },
+    hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1.5, eshotDmg: 2, touchDmg: 2, eliteHp: 1.25, spawnCount: 1.4, waves: 2, waveGap: 360, eliteFireRate: 1.25, shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1.5 },
+    brutal: { id: 'brutal', label: '지옥',   short: '지옥',   enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2 },
   },
   //  적 체력 스테이지 배율(r3.21, 이사 결정 2026-09-20 B안 ①): 스테이지 번호 구간별 배수. 잡졸·돌격체·저격수(스폰 정의 hp 명시 포함)와
   //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).
@@ -241,6 +241,9 @@ export function enemyHpMulFor(stageId) {
   return hpRowFor(stageId)?.mul ?? 1;
 }
 // 난이도 체력 배수(enemyHp·eliteHp)를 적용하는 스테이지인가(r3.21 대항 검수 반영). 표의 difficultyHp: false 구간(1~3)만 false, 그 밖은 true. 데이터 접근만.
-export function difficultyHpFor(stageId) {
-  return hpRowFor(stageId)?.difficultyHp !== false;
+//  difficultyHp 행 값: 생략·true = 모든 난이도에 적용 · false = 전부 ×1 · **배열 = 그 난이도에서만 적용**(r3.22 지옥 강화 — 1~3 은 지옥만)
+export function difficultyHpFor(stageId, difficulty) {
+  const v = hpRowFor(stageId)?.difficultyHp;
+  if (Array.isArray(v)) return difficulty != null && v.includes(difficulty);
+  return v !== false;
 }

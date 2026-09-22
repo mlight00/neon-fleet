@@ -190,8 +190,15 @@ export function stageMeta(id) {
 
 // 게이트 행: 계약서 3-2 필드 전부 초기값 포함. cells 항목 = [x0, x1, value] 또는 [x0, x1, value, maxValue](칸별 상한)
 //  armZ 미지정 = BAL3.gate.armZ(340), 명시적 null = 항상 열림(학습용 행)
-function makeRow(idx, g) {
-  const cells = g.cells.map(([x0, x1, value, maxValue]) => ({ x0, x1, value, maxValue: maxValue ?? g.maxValue, flashT: 0 }));
+//  capMul(r3.22 지옥 강화 손잡이) = 난이도 gateCapMul — 칸 상한(쏴서 올릴 수 있는 최대)에 곱한다. 1 = 불변.
+//   양수 칸은 초기 값 아래로 내려가지 않고, 음수 칸의 상한은 1 이상. 결과 정수(반올림)
+function capFor(value, max, capMul) {
+  if (capMul === 1 || max == null) return max;
+  const m = Math.round(max * capMul);
+  return value > 0 ? Math.max(value, m) : Math.max(1, m);
+}
+function makeRow(idx, g, capMul = 1) {
+  const cells = g.cells.map(([x0, x1, value, maxValue]) => ({ x0, x1, value, maxValue: capFor(value, maxValue ?? g.maxValue, capMul), flashT: 0 }));
   const armZ = g.armZ === undefined ? BAL3.gate.armZ : g.armZ;
   return { id: 'g' + idx, z: g.z, h: BAL3.gate.h, cells, passed: false, bypass: !!g.bypass,
            armZ, armed: armZ == null, hint: g.hint ?? null };
@@ -383,12 +390,12 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   const hpMul = enemyHpMulFor(id);
   //  난이도 체력 배수 적용 여부(r3.21 대항 검수 반영): 1~3 기준 코스(difficultyHp: false)는 enemyHp·eliteHp 를 ×1 로 읽는다 — 세 난이도의 적·정예 체력이
   //   r3.9 와 같다(hard S2 성공 경로 보존). 빈도(waves·spawnCount)·적탄·접촉 배수는 그대로. stage.difficultyHp 로 createRun 에 흘러 소환 잡졸 hp 도 같은 규칙
-  const diffHp = difficultyHpFor(id);
+  const diffHp = difficultyHpFor(id, difficulty);
   const hpMult = diffHp ? mult : { ...mult, enemyHp: 1, eliteHp: 1 };
   const stage = {
     id, version: d.version ?? 1, difficulty, enemyHpMul: hpMul, difficultyHp: diffHp,
     title: d.title, startUnits: d.startUnits, startWeapon: d.startWeapon, length: d.length, eliteZ: d.eliteZ ?? d.arena?.z ?? null,
-    gateRows: d.gates.map((g, i) => makeRow(i + 1, g)),
+    gateRows: d.gates.map((g, i) => makeRow(i + 1, g, mult.gateCapMul ?? 1)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
     spawns: d.spawns.map(sp => makeSpawn(id, sp, solid, hpMult, hpMul)),
