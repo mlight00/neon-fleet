@@ -464,7 +464,8 @@ test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — a
   h.texts.length = 0; h.audio.played.length = 0;
   driveUntil(h, 'aim', () => run().objective.done, 6000);
   assert.equal(run().objective.done, true, '캡슐 구출');
-  h.frames(2);
+  //  r3.24 손맛: '+n명 합류' 는 병사들이 캡슐 자리에서 부대로 **날아와 도착하는 순간**(BAL3.fx.joinFly.sec 0.5초 + 줄지어 출발) 뜬다 — 2프레임 → 45프레임(0.75초)
+  h.frames(45);
   //  r3.21: 캡슐 n 3 → 2 라 셸 규칙(main.js joinMany 효과음은 ev.n >= FX.joinManyAt 3)에 걸리지 않는다 — 구출 성공에 소리가 없는 것은 사용자 체감 퇴행이라
   //   규칙으로 잠그지 않고 기록만 남긴다(검수 반영). 다음 회차 main.js joinManyAt 3 → 2 또는 캡슐 전용 효과음을 넣은 뒤 '효과음 있음' 단언으로 되돌린다. 보고서 difficulty-b-20260920 §6
   t.diagnostic(`CAPSULE SHELL-2 joinMany 효과음 ${h.audio.played.includes('joinMany') ? '있음' : '없음(n 2 < joinManyAt 3 — main.js 미수정)'}`);

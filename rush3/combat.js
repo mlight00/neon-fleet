@@ -394,11 +394,17 @@ function hitEnemy(run, e, b, ev) {
   if (b.pierce) { b.hit.push(e.id ?? 'boss'); if (b.hit.length >= b.pierce) b.dead = true; }
   else b.dead = true;
   e.hp -= b.dmg;
-  ev.push({ type: 'enemyHit', id: e.id, kind: e.kind, hp: e.hp, x: e.x, z: e.z });
+  ev.push({ type: 'enemyHit', id: e.id, kind: e.kind, hp: e.hp, x: e.x, z: e.z, ...hitLook(e), dmg: b.dmg, weapon: b.kind, bx: b.x });
   if (e.hp <= 0) e.dead = true;
   const w = WEAPONS[b.kind];
   if (w && w.blastR) blast(run, e, w.blastR, w.blastDmg, ev);
   if (w && w.chain) chainArc(run, e, w.chain, w.chainR, w.chainDmg, ev);
+}
+
+// 연출용 겉모습(r3.24 손맛): 셸이 적 종류별 피격·사망 반응을 고르는 데 쓰는 필드만 이벤트에 **덧붙인다**(값 계산·판정 불변).
+//  skin = 역할 그림(장갑체·카트 등) · r = 반지름 · hpMax = 스폰 체력(보스는 max) — 없으면 null
+function hitLook(t) {
+  return { skin: t.skin ?? null, r: t.r, hpMax: t.hpMax ?? t.max ?? null };
 }
 
 // 전격포 연쇄(r3.10): 직격한 적에서 chainR 안(원 겹침 기준)의 다른 !dead 적·보스 중 가까운 순 n 체에 dmg. 벽 너머 제외.
@@ -417,7 +423,7 @@ function chainArc(run, from, n, r, dmg, ev) {
   cand.sort((a, b) => a.d - b.d || a.id - b.id);
   for (const { t } of cand.slice(0, n)) {
     t.hp -= dmg;
-    ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, arc: true });
+    ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, arc: true, ...hitLook(t), dmg, weapon: 'arc' });
     ev.push({ type: 'arc', x: from.x, z: from.z, tx: t.x, tz: t.z });
     if (t.hp <= 0) t.dead = true;
   }
@@ -442,7 +448,7 @@ function blast(run, center, r, dmg, ev) {
     if (d > r + t.r) continue;
     if (wallBetween(run.walls.concat(run.covers), center.x, center.z, t.x, t.z)) continue;
     t.hp -= dmg;
-    ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, blast: true });
+    ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, blast: true, ...hitLook(t), dmg, weapon: 'heavy' });
     if (t.hp <= 0) t.dead = true;
   }
 }
@@ -656,7 +662,7 @@ function contacts(run, ev, dt) {
     const u = frontmostUnit(hits);
     e.touched = true; e.dead = true;
     damageUnit(run, u, d.touchDmg, 'touch', ev, e.x, e.z);
-    ev.push({ type: 'touch', id: e.id, kind: e.kind, x: e.x, z: e.z });
+    ev.push({ type: 'touch', id: e.id, kind: e.kind, x: e.x, z: e.z, skin: e.skin ?? null, r: e.r });
   }
   const E = run.enemyDefs.elite;
   for (const bo of run.bosses) {
@@ -707,7 +713,7 @@ function cleanup(run, ev) {
   const behind = run.z - BAL3.cull.enemyBehind, ahead = run.z + LINE_Y + BAL3.cull.bulletAhead;
   run.enemies = run.enemies.filter((e) => {
     if (e.dead) {
-      if (!e.touched) { run.kills++; ev.push({ type: 'kill', id: e.id, kind: e.kind, x: e.x, z: e.z }); }
+      if (!e.touched) { run.kills++; ev.push({ type: 'kill', id: e.id, kind: e.kind, x: e.x, z: e.z, skin: e.skin ?? null, r: e.r }); }
       return false;
     }
     return e.z >= behind;
@@ -722,7 +728,7 @@ function cleanup(run, ev) {
     bo.reaped = true;
     run.kills++;
     const left = run.bosses.filter((b) => !b.reaped).length;
-    ev.push({ type: 'bossKill', id: bo.id, index: bo.index, role: bo.role, left, total, x: bo.x, z: bo.z, r: bo.r });
+    ev.push({ type: 'bossKill', id: bo.id, index: bo.index, role: bo.role, left, total, x: bo.x, z: bo.z, r: bo.r, skin: bo.skin ?? null });
     ev.push({ type: 'bossesLeft', left, total, index: bo.index });
   }
   run.boss = run.bosses.find((b) => !b.dead) ?? null;

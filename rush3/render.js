@@ -62,6 +62,17 @@ export const BULLET_LEN = Object.freeze({ rifle: 24, auto: 26, heavy: 34, scatte
 //  ⚠️원근에서는 그리는 y 가 곧 화면 y 다(균일 확대 변환 없음) — 되돌릴 배율이 없다
 export const HP_TAG_MIN_Y = ZOOM.chip.y + ZOOM.chip.h + 18;
 
+//  손맛(r3.24): 적 종류 → 피격·사망 반응 역할. skin(역할 그림)이 우선이고 없으면 kind. 정예·아레나 보스 = 'elite'.
+//   셸(main.js)과 렌더가 같은 함수를 쓴다 — 셸이 만든 반응과 그리는 반응이 갈라지지 않게 판정식은 여기 한 곳
+export function hitRole(kind, skin) {
+  if (kind === 'elite') return 'elite';
+  const bySkin = skin ? FX.hitRoleBySkin[skin] : null;
+  if (bySkin) return bySkin;
+  return kind === 'rusher' || kind === 'shooter' ? kind : 'grunt';
+}
+//  피격 번쩍임 색(검사 V3-HITFEEL 이 이 값으로 그리기 호출을 찾는다)
+export const HIT_FLASH_FILL = '#FFFFFF';
+
 export function bulletAngle(b) {
   const vx = b.vx || 0, vz = b.vz || 1;
   return vx === 0 ? 0 : Math.atan2(vx, vz);
@@ -89,11 +100,36 @@ export function createRenderer3(ctx, sprites) {
   }
   //  시트의 한 칸을 (x, y) 중심에 그린다. bodyH = 몸통 높이(px). 배율은 칸 높이가 아니라 refH 기준 —
   //  칸이 큰 시트(사격 섬광·사망 파편)와 작은 시트 사이에서 몸 크기가 같게 보인다
-  function drawSheetFrame(sh, frame, x, y, bodyH) {
+  function drawSheetFrame(sh, frame, x, y, bodyH, alt = null) {
     const f = Math.max(0, Math.min(sh.frames - 1, Math.floor(frame)));
     const sx = (f % sh.cols) * sh.fw, sy0 = Math.floor(f / sh.cols) * sh.fh;
     const k = bodyH / sh.refH, dw = sh.fw * k, dh = sh.fh * k;
-    ctx.drawImage(sh.img, sx, sy0, sh.fw, sh.fh, x - dw / 2, y - dh / 2, dw, dh);
+    //  alt = 같은 시트의 흰 실루엣(whiteOf) — 원본 대비 축척 a.k 로 같은 칸을 잘라 같은 자리에 찍는다
+    if (alt) ctx.drawImage(alt.c, sx * alt.k, sy0 * alt.k, sh.fw * alt.k, sh.fh * alt.k, x - dw / 2, y - dh / 2, dw, dh);
+    else ctx.drawImage(sh.img, sx, sy0, sh.fw, sh.fh, x - dw / 2, y - dh / 2, dw, dh);
+  }
+  //  피격 번쩍임용 흰 실루엣(r3.24): 그림 모양 그대로 흰색으로 칠한 사본을 그림마다 한 번만 만든다(작업 캔버스에 그림 → source-in 흰 채움).
+  //   ⚠️본 캔버스에서 source-atop 을 쓰면 배경이 불투명이라 도로까지 하얘진다 — 그래서 사본을 만든다. 긴 변 maxPx 로 줄여 메모리를 아낀다.
+  //   DOM 이 없는 환경(Node 검사)·그림이 아직 없으면 null → 호출부가 도형 폴백에 흰 채움으로 번쩍인다
+  const whiteCache = new Map();
+  function whiteOf(img, maxPx = 256) {
+    if (!img || typeof document === 'undefined' || !document.createElement || !(img.width > 0)) return null;
+    const hit = whiteCache.get(img);
+    if (hit !== undefined) return hit;
+    let out = null;
+    try {
+      const k = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0, c.width, c.height);
+      g.globalCompositeOperation = 'source-in';
+      g.fillStyle = HIT_FLASH_FILL;
+      g.fillRect(0, 0, c.width, c.height);
+      out = { c, k };
+    } catch { out = null; }
+    whiteCache.set(img, out);
+    return out;
   }
   //  경과 시간 t(초) → 칸 번호. loop 면 순환, 아니면 마지막 칸에 머문다
   function sheetFrameAt(sh, t) {
@@ -771,13 +807,63 @@ export function createRenderer3(ctx, sprites) {
     ctx.globalAlpha = 1;
   }
 
+  //  적 도형 폴백(상자/원/마름모). white = 피격 번쩍임(흰 채움만, 테두리·눈 없음)
+  function enemyShape(kind, x, y, r, white) {
+    ctx.fillStyle = white ? HIT_FLASH_FILL : (ENEMY_FALLBACK[kind] ?? '#B3402F');
+    if (kind === 'shooter') {
+      ctx.fillRect(x - r * 1.1, y - r, r * 2.2, r * 2);
+      if (!white) { ctx.strokeStyle = C.warn; ctx.lineWidth = 3; ctx.strokeRect(x - r * 1.1, y - r, r * 2.2, r * 2); }
+    } else if (kind === 'rusher') {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      if (!white) { ctx.strokeStyle = C.warn; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); }
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y);
+      ctx.lineTo(x, y + r);
+      ctx.lineTo(x - r, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (white) return;
+    ctx.fillStyle = C.eshot;
+    ctx.beginPath(); ctx.arc(x, y, Math.max(3, r * 0.28), 0, Math.PI * 2); ctx.fill();
+  }
+
+  //  피격 자세(r3.24): 셸 fx.hit[id] 의 경과 초 t 로 넉백(위로 밀렸다 복귀)·흔들림·스쿼시·번쩍임·HP 튐을 계산한다. 반응 중이 아니면 null.
+  //   세기는 역할표(BAL3.fx.hitRoles)에서 — 장갑체는 거의 안 밀리고(무겁다) 돌격체는 크게 밀리며 흔들린다. k = 그 자리 원근 배율
+  function hitPose(fx, id, role, k) {
+    const h = fx && fx.hit ? fx.hit[id] : null;
+    if (!h) return null;
+    const H = FX.hit, R = FX.hitRoles[role] ?? FX.hitRoles.grunt;
+    const t = h.t;
+    const kb = t < H.knockSec ? Math.sin(Math.PI * t / H.knockSec) : 0;
+    const sq = t < H.squashSec ? Math.sin(Math.PI * t / H.squashSec) : 0;
+    const shake = R.shake && t < H.knockSec ? Math.sin(t * 95 + (h.n || 0) * 1.7) * R.shake * k * (1 - t / H.knockSec) : 0;
+    return {
+      dx: shake, dy: (h.dir ?? -1) * R.knock * k * kb,
+      sx: 1 + R.squash * sq, sy: 1 - R.squash * sq,
+      //  번쩍임은 fa(번쩍임 경과 초 — 연사 중에는 쉼을 두고 다시 켜진다)로. 옛 꼴(fa 없음)은 t
+      flash: (h.fa ?? t) < H.flashSec ? R.flash * (1 - 0.4 * (h.fa ?? t) / H.flashSec) : 0,
+      pop: t < H.hpPopSec ? Math.sin(Math.PI * t / H.hpPopSec) : 0,
+    };
+  }
+  //  자세 적용: 발밑(ax, ay)을 기준점으로 밀고·눌러 그린다(호출부가 save/restore)
+  function poseAt(hr, ax, ay) {
+    ctx.translate(ax + hr.dx, ay + hr.dy);
+    if (hr.sx !== 1 || hr.sy !== 1) ctx.scale(hr.sx, hr.sy);
+    ctx.translate(-ax, -ay);
+  }
+
   //  적: 스프라이트 폴백(상자/원/마름모) + HP 태그. 저격 예고선은 부대 쪽으로(부대 중심 = (run.x, d −ay) 투영)
   function drawEnemy(e, run, fx) {
     const d = e.z - run.z;
     if (offscreen(d, 80)) return;
     const q = pj(e.x, d), x = q.x, y = q.y, k = q.s;
     const r = e.r * k;
-    if (e.kind === 'shooter' && e.aimT > 0) {
+    //  저격 예고선 — 맞는 순간(넉백 동안)은 끊긴다(r3.24 저격수 특색: '조준이 흔들렸다')
+    const aimCut = !!(fx && fx.hit && fx.hit[e.id] && fx.hit[e.id].t < FX.hit.knockSec);
+    if (e.kind === 'shooter' && e.aimT > 0 && !aimCut) {
       const sq = pj(run.x, -(run.ay || 0));
       ctx.globalAlpha = 0.55;
       ctx.strokeStyle = C.eshot; ctx.lineWidth = 2;
@@ -788,32 +874,28 @@ export function createRenderer3(ctx, sprites) {
     }
     const h = r * 2.4;
     shadow(x, y + h * 0.4, r * 0.95);
+    //  피격 반응(r3.24 손맛, 셸 fx.hit[id]): 넉백·흔들림·스쿼시는 **그림에만** 건다(그림자·HP 숫자·규칙 위치는 그대로)
+    const hr = hitPose(fx, e.id, hitRole(e.kind, e.skin), k);
+    if (hr) { ctx.save(); poseAt(hr, x, y + h * 0.4); }
     //  피격 중인 잡졸(셸 fx.enemyHit[id] 남은 초)은 피격 시트를 한 번 재생한다
     const hitLeft = fx && fx.enemyHit ? (fx.enemyHit[e.id] ?? 0) : 0;
     const hitSh = e.kind === 'grunt' && hitLeft > 0 ? sheet('e_grunt_hit') : null;
-    if (hitSh) drawSheetFrame(hitSh, sheetFrameAt(hitSh, hitSh.frames / hitSh.fps - hitLeft), x, y, h);
-    else drawImgCentered(e.skin ? 'skin:' + e.skin : ENEMY_SPRITE[e.kind], x, y, h, () => {
-      ctx.fillStyle = ENEMY_FALLBACK[e.kind] ?? '#B3402F';
-      if (e.kind === 'shooter') {
-        ctx.fillRect(x - r * 1.1, y - r, r * 2.2, r * 2);
-        ctx.strokeStyle = C.warn; ctx.lineWidth = 3;
-        ctx.strokeRect(x - r * 1.1, y - r, r * 2.2, r * 2);
-      } else if (e.kind === 'rusher') {
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = C.warn; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(x, y - r);
-        ctx.lineTo(x + r, y);
-        ctx.lineTo(x, y + r);
-        ctx.lineTo(x - r, y);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.fillStyle = C.eshot;
-      ctx.beginPath(); ctx.arc(x, y, Math.max(3, r * 0.28), 0, Math.PI * 2); ctx.fill();
-    });
+    const key = e.skin ? 'skin:' + e.skin : ENEMY_SPRITE[e.kind];
+    const hitFrame = hitSh ? sheetFrameAt(hitSh, hitSh.frames / hitSh.fps - hitLeft) : 0;
+    if (hitSh) drawSheetFrame(hitSh, hitFrame, x, y, h);
+    else drawImgCentered(key, x, y, h, () => enemyShape(e.kind, x, y, r, false));
+    //  흰색 번쩍임: 그림 모양의 흰 실루엣(없으면 도형에 흰 채움)을 반응 불투명도로 덮는다
+    if (hr && hr.flash > 0) {
+      ctx.globalAlpha = hr.flash;
+      const im = hitSh ? null : get(key);
+      const wsh = hitSh ? whiteOf(hitSh.img, 1024) : null;
+      const wim = im ? whiteOf(im) : null;
+      if (wsh) drawSheetFrame(hitSh, hitFrame, x, y, h, wsh);
+      else if (wim) ctx.drawImage(wim.c, x - h * (im.width / im.height) / 2, y - h / 2, h * (im.width / im.height), h);
+      else enemyShape(e.kind, x, y, r, true);
+      ctx.globalAlpha = 1;
+    }
+    if (hr) ctx.restore();
     //  체력 숫자(r3.21 B안 ③ × r3.20 원근 화해): **스폰 체력(hpMax)이 2 를 넘는 적만** 남은 체력 정수를 보여 준다
     //   (체력 1~2 잡졸 = 1~3 스테이지는 숫자 없음 — 이사 결정 "한두 방에 죽는지 몇 방 맞는지 보이게").
     //   자리는 종전 HP 태그 그대로 **적 아래**(투영 x·배율 k, 글자 12px 하한) — 머리 위에 두면 화면 위로 들어오는 동안
@@ -824,30 +906,72 @@ export function createRenderer3(ctx, sprites) {
     //    클램프가 아니라 생략인 이유: 끌어내리면 숫자가 다른 적 그림 위에 얹힌다(B안 대항 검수 ① 처방 그대로, 판정만 투영 y 로 재유도)
     if ((e.hpMax ?? e.hp) > 2 && e.z >= run.z) {
       const ty = y + r + 16 * k;
-      if (ty >= HP_TAG_MIN_Y) drawHpTag(x, ty, e.hp, k);
+      if (ty >= HP_TAG_MIN_Y) drawHpTag(x, ty, e.hp, k, hr ? hr.pop : 0);
     }
   }
 
   //  쓰러진 잡졸(셸 fx.corpses — 규칙의 enemies 에는 이미 없다): 사망 시트를 한 번 재생하고 corpseLingerSec 머문 뒤 흐려진다
+  //  r3.24: 잡졸(역할 grunt·옛 꼴 role 없음)만 사망 시트, 나머지는 역할별 도형 잔해를 짧게(c.life 초, 마지막 corpseFadeSec 에 흐려진다)
+  //   tumble(돌격체) = 제 그림이 앞(아래)으로 굴러 넘어지며 미끄러진다 · ring(저격수) = 마젠타 그을음 · plates(장갑체) = 장갑판 조각 + 그을음 · boom(카트) = 큰 그을음
   function drawCorpses(fx, runZ) {
     const list = fx && fx.corpses;
     if (!list || !list.length) return;
     const sh = sheet('e_grunt_death');
-    if (!sh) return;
-    const total = sh.frames / sh.fps + FX.corpseLingerSec;
     for (const c of list) {
       const d = c.z - runZ;
       if (offscreen(d, 80)) continue;
       const q = pj(c.x, d);
-      ctx.globalAlpha = Math.max(0, Math.min(1, (total - c.t) / FX.corpseFadeSec));
-      drawSheetFrame(sh, sheetFrameAt(sh, c.t), q.x, q.y, c.h * q.s);
+      const role = c.role ?? 'grunt';
+      if (role === 'grunt') {
+        if (!sh) continue;
+        const total = sh.frames / sh.fps + FX.corpseLingerSec;
+        ctx.globalAlpha = Math.max(0, Math.min(1, (total - c.t) / FX.corpseFadeSec));
+        drawSheetFrame(sh, sheetFrameAt(sh, c.t), q.x, q.y, c.h * q.s);
+        continue;
+      }
+      const life = c.life || 0.8;
+      const fade = Math.max(0, Math.min(1, (life - c.t) / FX.corpseFadeSec));
+      const r = (c.r || 16) * q.s;
+      //  그을음(바닥 타원) — 모든 비잡졸 공통, 역할마다 색·크기
+      ctx.globalAlpha = 0.55 * fade;
+      ctx.fillStyle = role === 'ring' || role === 'shooter' ? 'rgba(90,20,60,1)' : 'rgba(25,22,24,1)';
+      const sr = role === 'cart' ? r * 1.7 : role === 'armor' ? r * 1.25 : r * 1.05;
+      ctx.beginPath(); ctx.ellipse(q.x, q.y + r * 0.6, sr, sr * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+      if (role === 'rusher') {
+        //  앞으로 굴러 넘어짐: 0.35초에 걸쳐 100° 기울며 아래로 미끄러진 뒤 머문다
+        const u = Math.min(1, c.t / 0.35);
+        const ang = u * 1.75 * (c.id % 2 ? 1 : -1), slide = u * 18 * q.s;
+        const hh = c.h * q.s;
+        ctx.globalAlpha = fade;
+        ctx.save();
+        ctx.translate(q.x, q.y + slide + hh * 0.2);
+        ctx.rotate(ang);
+        drawImgCentered(c.skin ? 'skin:' + c.skin : ENEMY_SPRITE[c.kind], 0, -hh * 0.2, hh, () => {
+          ctx.fillStyle = ENEMY_FALLBACK[c.kind] ?? '#3A3A3A';
+          ctx.beginPath(); ctx.arc(0, -hh * 0.2, r, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.restore();
+      } else if (role === 'armor') {
+        //  장갑판 조각 4장이 흩어져 누워 있다(자리는 id 로 결정)
+        ctx.globalAlpha = fade;
+        ctx.fillStyle = '#8E97A3';
+        for (let i = 0; i < 4; i++) {
+          const a = i * 1.57 + (c.id % 5) * 0.4;
+          ctx.save();
+          ctx.translate(q.x + Math.cos(a) * r * 0.9, q.y + r * 0.5 + Math.sin(a) * r * 0.3);
+          ctx.rotate(a);
+          ctx.fillRect(-r * 0.3, -r * 0.12, r * 0.6, r * 0.24);
+          ctx.restore();
+        }
+      }
     }
     ctx.globalAlpha = 1;
   }
 
-  function drawHpTag(x, y, hp, k = 1) {
+  //  pop(0~1, r3.24) = 맞은 순간 숫자가 커졌다 작아지는 정도(최대 +45%)이고 그동안 흰색으로 번쩍인다
+  function drawHpTag(x, y, hp, k = 1, pop = 0) {
     ctx.textAlign = 'center';
-    outlinedText(String(Math.max(0, Math.ceil(hp))), x, y, fs(16, k, 12), C.bulletHeavy, 'bold', 4);
+    outlinedText(String(Math.max(0, Math.ceil(hp))), x, y, fs(16, k, 12) * (1 + 0.45 * pop), pop > 0.5 ? HIT_FLASH_FILL : C.bulletHeavy, 'bold', 4);
   }
 
   //  보너스전 표적(r3.15): 노란 선물 상자(roundRect) + 붉은 리본(세로·가로 띠 + 매듭 원 2개) + 그림자 + 위 '+value' 금색 소자 + 아래 내구 숫자(통과 같은 자리 규약).
@@ -883,8 +1007,10 @@ export function createRenderer3(ctx, sprites) {
   //  정예: 스프라이트(skin 우선 → 'elite' 키 → 폴백 원) + 발밑 HP 숫자. 막대는 HUD 에서.
   //   r3.16 복수 정예: 역할이 'elite' 가 아니면 HP 숫자 아래 역할 이름('포격'·'소환'·'장갑') 한 줄. 장갑형 폴백 원은 테두리를 두껍게(새 그림 없이 도형으로만)
   //   r3.17 아레나: 예고(warn)·돌진(dash) 중이면 목표 지점에 붉은 원(반지름 = 충격 r × 그 자리 배율, 깜빡임)과 보스→목표 점선을 **보스보다 먼저** 그린다. shockR 은 run.arena.boss.shock.r
-  function drawBoss(b, runZ, now, shockR = null) {
+  function drawBoss(b, runZ, now, shockR = null, fx = null) {
     const q = pj(b.x, b.z - runZ), x = q.x, y = q.y, k = q.s;
+    //  피격 반응(r3.24): 짧은 번쩍임·작은 흔들림·HP 숫자 튐(정예는 무겁다 — 넉백 작게)
+    const hr = hitPose(fx, b.id, 'elite', k);
     const r = b.r * k;
     const role = b.role ?? 'elite';
     if (b.arena && (b.state === 'warn' || b.state === 'dash') && b.dashTx != null) {
@@ -902,7 +1028,9 @@ export function createRenderer3(ctx, sprites) {
       ctx.restore();
     }
     shadow(x, y + r * 1.05, r * 1.15);
-    drawImgCentered(b.skin ? 'skin:' + b.skin : 'elite', x, y, r * 2.6, () => {
+    const bkey = b.skin ? 'skin:' + b.skin : 'elite';
+    if (hr) { ctx.save(); poseAt(hr, x, y + r * 1.05); }
+    drawImgCentered(bkey, x, y, r * 2.6, () => {
       ctx.fillStyle = ENEMY_FALLBACK.elite;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = C.warn; ctx.lineWidth = role === 'tank' ? 9 : 6;
@@ -910,6 +1038,14 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = C.eshot;
       ctx.beginPath(); ctx.arc(x, y, r * 0.35, 0, Math.PI * 2); ctx.fill();
     });
+    if (hr && hr.flash > 0) {
+      ctx.globalAlpha = hr.flash;
+      const im = get(bkey), wim = im ? whiteOf(im, 320) : null;
+      if (wim) { const bh = r * 2.6, bw = bh * (im.width / im.height); ctx.drawImage(wim.c, x - bw / 2, y - bh / 2, bw, bh); }
+      else { ctx.fillStyle = HIT_FLASH_FILL; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    }
+    if (hr) ctx.restore();
     if (b.state === 'descend' || b.state === 'warn') {
       ctx.globalAlpha = 0.5 + Math.sin(now * 12) * 0.3;
       ctx.strokeStyle = C.warn; ctx.lineWidth = 3;
@@ -928,7 +1064,7 @@ export function createRenderer3(ctx, sprites) {
       ctx.textAlign = 'center';
       outlinedText('보호막', x, y - r - 22 * k, fs(14, k), C.gatePos, 'bold', 4);
     }
-    drawHpTag(x, y + r + 20 * k, b.hp, k);
+    drawHpTag(x, y + r + 20 * k, b.hp, k, hr ? hr.pop : 0);
     const rl = role !== 'elite' ? (BAL3.elites?.roles?.[role]?.label ?? null) : null;
     if (rl) { ctx.textAlign = 'center'; outlinedText(rl, x, y + r + 36 * k, fs(12, k), C.hud, 'bold', 4); }
   }
@@ -1013,9 +1149,10 @@ export function createRenderer3(ctx, sprites) {
   //  착지 충격 링(r3.17 아레나, 셸 fx.shocks — 셸이 투영해 둔 화면 좌표·반지름): 반지름 r·(0.5 + 0.9k) 로 퍼지며 (1 − k) 로 옅어진다. 새 그림 없음
   function drawShocks(list) {
     for (const s of list) {
+      if (s.t < 0) continue;   // r3.24: 한 박자 늦게 퍼지는 링(t 음수 = 대기)
       const k = Math.max(0, Math.min(1, s.t / (s.life || 0.45)));
       ctx.globalAlpha = 1 - k;
-      ctx.strokeStyle = C.warn;
+      ctx.strokeStyle = s.color ?? C.warn;
       ctx.lineWidth = 2 + 6 * (1 - k);
       ctx.beginPath(); ctx.arc(s.x, s.y, s.r * (0.5 + 0.9 * k), 0, Math.PI * 2); ctx.stroke();
     }
@@ -1084,6 +1221,42 @@ export function createRenderer3(ctx, sprites) {
         ctx.globalAlpha = k * 0.85;
         ctx.fillStyle = p.big ? '#FFD9A0' : '#FFE9C8';
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.2 - k * 0.5), 0, Math.PI * 2); ctx.fill();
+      } else if (p.shape === 'line') {
+        //  가는 선(저격 은백·금속 스파크): 진행 방향으로 늘어진 짧은 선
+        ctx.globalAlpha = k;
+        ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(1, p.r);
+        const L = 0.045;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * L, p.y - p.vy * L); ctx.stroke();
+      } else if (p.shape === 'bolt') {
+        //  번개 조각(전격 청보라): 세 마디 지그재그
+        ctx.globalAlpha = k;
+        ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(1.2, p.r * 0.8);
+        const ux = p.vx * 0.03, uy = p.vy * 0.03;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - ux * 0.5 + uy * 0.5, p.y - uy * 0.5 - ux * 0.5);
+        ctx.lineTo(p.x - ux + -uy * 0.3, p.y - uy + ux * 0.3);
+        ctx.stroke();
+      } else if (p.shape === 'plate') {
+        //  장갑판 조각: 돌며 날아가는 납작한 판
+        ctx.globalAlpha = k;
+        ctx.fillStyle = p.color;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((p.rot || 0) + p.t * 9);
+        ctx.fillRect(-p.r, -p.r * 0.4, p.r * 2, p.r * 0.8);
+        ctx.restore();
+      } else if (p.shape === 'smoke') {
+        //  연기·먼지: 커지며 옅어지는 덩이
+        ctx.globalAlpha = k * 0.7;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.6 - k * 0.8), 0, Math.PI * 2); ctx.fill();
+      } else if (p.shape === 'star') {
+        //  반짝임(합류·게이트 양수): 네 갈래 별
+        ctx.globalAlpha = k;
+        ctx.fillStyle = p.color;
+        const a = p.r * (0.6 + k), b2 = a * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - a); ctx.lineTo(p.x + b2, p.y - b2); ctx.lineTo(p.x + a, p.y); ctx.lineTo(p.x + b2, p.y + b2);
+        ctx.lineTo(p.x, p.y + a); ctx.lineTo(p.x - b2, p.y + b2); ctx.lineTo(p.x - a, p.y); ctx.lineTo(p.x - b2, p.y - b2);
+        ctx.closePath(); ctx.fill();
       } else {
         ctx.globalAlpha = k;
         ctx.fillStyle = p.color ?? (p.big ? C.bulletHeavy : C.gateNeg);
@@ -1093,11 +1266,41 @@ export function createRenderer3(ctx, sprites) {
     ctx.globalAlpha = 1;
   }
 
+  //  부대로 날아가는 병사(r3.24 합류 연출, 셸 fx.recruits — 셸이 매 프레임 투영해 둔 화면점 sx/sy/s): 병사 그림(없으면 삼각) + 금색 테
+  function drawRecruits(list) {
+    if (!list || !list.length) return;
+    const S = BAL3.squad;
+    const walk = sheet('soldier_walk');
+    for (const p of list) {
+      if (p.t < 0) continue;
+      //  실제 병사보다 조금 크게(1.3배) — 먼 통에서 출발하면 원근 배율이 작아 캡처에서 점처럼 보였다
+      const size = S.soldierSize * (p.s || 1) * 1.3;
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = 'rgba(246,200,74,0.35)';
+      ctx.beginPath(); ctx.arc(p.sx, p.sy, size * 0.55, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      if (walk) drawSheetFrame(walk, sheetFrameAt(walk, p.t * 1.6 + p.i * 0.13), p.sx, p.sy, size);
+      else drawImgCentered('soldier', p.sx, p.sy, size, () => {
+        ctx.fillStyle = C.soldier;
+        ctx.beginPath();
+        ctx.moveTo(p.sx, p.sy - size / 2);
+        ctx.lineTo(p.sx - size / 3, p.sy + size / 2);
+        ctx.lineTo(p.sx + size / 3, p.sy + size / 2);
+        ctx.closePath();
+        ctx.fill();
+      });
+    }
+  }
+
   function drawFloaters(floaters) {
     ctx.textAlign = 'center';
     for (const f of floaters) {
+      //  '-n' 은 HUD 띠(HP 숫자와 같은 문턱)에 들어오면 그리지 않는다 — 먼 곳에서 맞는 적의 숫자가 제목·칩 위에 겹친다(캡처 실측)
+      if (f.dmg && f.y < HP_TAG_MIN_Y) continue;
       ctx.globalAlpha = Math.max(0, 1 - f.t / f.life);
-      outlinedText(f.text, f.x, f.y, f.big ? 34 : 22, f.color, 'bold', 5);
+      //  '-n'(r3.24 피격 숫자): 작은 글자(px) — 숫자가 묶여 커질 때(pop 0 → 0.12초) 잠깐 부푼다
+      const px = f.px ? f.px * (f.pop !== undefined && f.pop < 0.12 ? 1.35 - f.pop * 2.9 : 1) : (f.big ? 34 : 22);
+      outlinedText(f.text, f.x, f.y, px, f.color, 'bold', f.px ? 4 : 5);
     }
     ctx.globalAlpha = 1;
   }
@@ -1229,18 +1432,26 @@ export function createRenderer3(ctx, sprites) {
     //  정예 HP 막대. r3.16 복수 정예: 보스가 둘 이상이면 300px 를 gap 6 으로 등분해 칸마다 '역할 hp/max'(격파된 칸은 회색 '격파'). 단수는 종전 그리기 그대로
     if (run.boss) {
       const bosses = run.bosses ?? [run.boss];
+      //  r3.24: 보스가 맞는 동안 막대가 좌우로 떨린다(떨림은 캔버스 이동으로만 — 막대 좌표는 그대로)
+      const bfx = view.fx && view.fx.hit;
+      const barShake = (b) => { const h = bfx ? bfx[b.id] : null; return h && h.t < FX.hit.knockSec ? Math.sin(h.t * 110) * 3 * (1 - h.t / FX.hit.knockSec) : 0; };
       if (bosses.length <= 1) {
+        const bs = barShake(run.boss);
+        if (bs) { ctx.save(); ctx.translate(bs, 0); }
         ctx.fillStyle = 'rgba(20,35,58,0.85)';
         roundRect(90, 76, 300, 16, 8); ctx.fill();
         ctx.fillStyle = C.eshot;
         roundRect(90, 76, 300 * Math.max(0, run.boss.hp / run.boss.max), 16, 8); ctx.fill();
         ctx.textAlign = 'center';
         outlinedText('정예 ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
+        if (bs) ctx.restore();
       } else {
         const n = bosses.length, gap = 6, segW = (300 - gap * (n - 1)) / n, fs = n >= 3 ? 12 : 13;
         ctx.textAlign = 'center';
         for (let i = 0; i < n; i++) {
           const b = bosses[i], x = 90 + i * (segW + gap);
+          const bs = b.dead ? 0 : barShake(b);
+          if (bs) { ctx.save(); ctx.translate(bs, 0); }
           ctx.fillStyle = 'rgba(20,35,58,0.85)';
           roundRect(x, 76, segW, 16, 8); ctx.fill();
           if (!b.dead) {
@@ -1249,6 +1460,7 @@ export function createRenderer3(ctx, sprites) {
           }
           const label = BAL3.elites?.roles?.[b.role ?? 'elite']?.label ?? '정예';
           outlinedText(b.dead ? '격파' : label + ' ' + Math.max(0, Math.ceil(b.hp)) + '/' + b.max, x + segW / 2, 111, fs, b.dead ? C.gateZero : C.hud, 'bold', 4);
+          if (bs) ctx.restore();
         }
       }
     }
@@ -1569,10 +1781,11 @@ export function createRenderer3(ctx, sprites) {
     for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, fx);
     //  보스(r3.16 복수 정예): 살아 있는 것만, 먼 것(z 큰 것)을 먼저 그려 가까운 것이 위에 오게. 죽은 보스는 배열에 남아 있으므로 반드시 거른다
     const shockR = run.arena && run.arena.boss && run.arena.boss.shock ? run.arena.boss.shock.r : null;
-    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, run.z, now, shockR);
+    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, run.z, now, shockR, fx);
     drawBullets(run);
     drawEshots(run);
     drawSquad(run, fx, now);
+    drawRecruits(fx.recruits);
     drawShocks(fx.shocks ?? []);
     drawParts(fx.parts);
     drawFloaters(fx.floaters);

@@ -7,7 +7,7 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW, ZOOM } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, ZOOM, hitRole } from './render.js';
 import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
 import { createAudio3 } from './audio.js';
@@ -117,6 +117,173 @@ function spawnBurst(fx, x, y, r, big, color) {
     fx.parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: 0, life: big ? 0.7 : 0.42, r: big ? 7 : 4, big: !!big, color });
   }
   fx.parts.push({ x, y, vx: 0, vy: 0, t: 0, life: big ? 0.5 : 0.3, r: r * (big ? 1.6 : 1.2), flash: true, big: !!big });
+  trimParts(fx);
+}
+
+//  ── 손맛(r3.24) ─────────────────────────────────────────────────────────────────────────────────────────────
+//  이사 관찰(2026-09-23, 라스트워 30초): "여러 대 맞아야 터지는 애들은 숫자도 차감되지만 피탄될 때마다 반응이 그래픽으로 표현되어 손맛이 있다"
+//   · "각 적들마다 특색 있는 반응과 병사 획득 시 이벤트도 그래픽으로". 전부 **셸 연출**이다 — 규칙 run 은 읽기만 하고 쓰지 않는다.
+//  좌표 규약(r3.20): 파편·링·글은 만드는 시점에 투영한 화면 좌표, 부대로 날아가는 병사는 매 프레임 다시 투영한다(부대가 움직이므로).
+//  sp(x, z) = 규칙 좌표 → 화면 { x, y, s } (셸의 투영기). 아래 함수들은 fx 만 고친다 — 검사 V3-HITFEEL 이 그대로 부른다
+export { hitRole };
+const FXH = FX.hit;
+
+/** 파편 상한(BAL3.fx.partsCap): 넘치면 **오래된 것부터** 버린다(배열 앞이 오래된 것) */
+export function trimParts(fx) {
+  const cap = FX.partsCap;
+  if (fx.parts.length > cap) fx.parts.splice(0, fx.parts.length - cap);
+}
+
+//  결정적 흩뿌림(전역 난수 금지): 카운터 burstSeed 로 각도·속도를 돌린다
+function jit(fx, i, m) { return ((fx.burstSeed * 7 + i * 13) % m) / m; }
+
+/** 피격 스파크: 명중점(화면)에서 쏜 쪽(아래)으로 튀는 무기색 파편 + 금속 역할이면 흰·노랑 스파크를 더한다 */
+export function hitSparks(fx, x, y, s, weapon, role) {
+  const W0 = FX.hitSparks[weapon] ?? FX.hitSparks.rifle;
+  const R = FX.hitRoles[role] ?? FX.hitRoles.grunt;
+  fx.burstSeed++;
+  const n = W0.n + (R.sparks || 0);
+  for (let i = 0; i < n; i++) {
+    const metal = R.metal && i >= W0.n;
+    //  아래(+y) 기준 ±75° 부채꼴 — 탄이 아래에서 올라와 맞았으니 파편은 쏜 쪽으로 튄다
+    const a = Math.PI / 2 + (jit(fx, i, 11) - 0.5) * 2.6;
+    const v = (metal ? W0.sp * 1.25 : W0.sp) * (0.55 + jit(fx, i + 3, 7) * 0.8) * s;
+    fx.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: metal ? 0.22 : 0.26,
+                    r: (metal ? 1.6 : W0.r) * s, color: metal ? (i % 2 ? '#FFFFFF' : '#FFE070') : W0.color, shape: metal ? 'line' : W0.shape });
+  }
+  trimParts(fx);
+}
+
+/** 적 1기 피격(enemyHit 이벤트) → 피격 상태 fx.hit[id] + 스파크 + (여러 대 맞는 적만) '-n' 숫자. 반환 = 역할 */
+export function onEnemyHit(fx, ev, sp) {
+  const role = hitRole(ev.kind, ev.skin);
+  const q = sp(ev.bx ?? ev.x, ev.z);
+  //  명중점: 몸 중심보다 조금 아래(탄이 들어온 쪽)
+  const r = (ev.r ?? 14) * q.s;
+  hitSparks(fx, q.x, q.y + r * 0.35, q.s, ev.weapon ?? 'rifle', role);
+  const prev = fx.hit[ev.id];
+  //  죽는 탄이면 피격 상태는 만들지 않는다(사망 연출 kill·bossKill 이 이어받는다) — '-n' 은 마지막 한 방도 보여 준다
+  //  fa = 번쩍임 경과 초. 직전 번쩍임이 켜짐 + 쉼(flashSec + flashGap)을 다 채웠을 때만 새로 켠다(연사에도 깜빡임으로 보이게)
+  const fa = prev && prev.fa < FXH.flashSec + FXH.flashGap ? prev.fa : 0;
+  const h = ev.hp > 0 ? { t: 0, fa, dir: -1, role, n: prev ? prev.n + 1 : 1, dmgF: prev ? prev.dmgF : null } : null;
+  if (h) fx.hit[ev.id] = h; else delete fx.hit[ev.id];
+  const hpMax = ev.hpMax ?? 0;
+  if (hpMax >= FXH.dmgFloatMinHp && ev.dmg > 0) {
+    const f = prev ? prev.dmgF : null;
+    if (f && f.t < FXH.dmgMergeSec && fx.floaters.includes(f)) { f.n += ev.dmg; f.text = '-' + f.n; f.pop = 0; }
+    else {
+      const nf = { x: q.x + (((prev ? prev.n : 0) % 3) - 1) * 10 * q.s, y: q.y - r * 1.1, text: '-' + ev.dmg, n: ev.dmg, color: '#FFFFFF',
+                   t: 0, life: FXH.dmgFloatSec, big: false, px: Math.max(13, 16 * q.s), dmg: true, pop: 0 };
+      fx.floaters.push(nf);
+      if (h) h.dmgF = nf;
+      //  '-n' 글자 상한 — 오래된 것부터 뺀다(장갑체 무리가 한꺼번에 맞아도 글자가 화면을 덮지 않게)
+      const dm = fx.floaters.filter((o) => o.dmg);
+      if (dm.length > FXH.dmgFloatCap) { const drop = new Set(dm.slice(0, dm.length - FXH.dmgFloatCap)); fx.floaters = fx.floaters.filter((o) => !drop.has(o)); }
+    }
+  }
+  return role;
+}
+
+/** 적 사망(kill·touch) → 종류별 연출(파편·링·흔들림) + 잔해. 잡졸만 사망 시트, 나머지는 도형 잔해(render.drawCorpses) */
+export function onEnemyDeath(fx, ev, sp) {
+  const role = hitRole(ev.kind, ev.skin);
+  const q = sp(ev.x, ev.z);
+  const r = (ev.r ?? BAL3.enemies[ev.kind]?.r ?? 14) * q.s;
+  delete fx.hit[ev.id];
+  if (role === 'grunt') {
+    spawnBurst(fx, q.x, q.y, r, false);
+  } else if (role === 'rusher') {
+    spawnBurst(fx, q.x, q.y, r, false, '#5A5550');
+    //  먼지: 느리게 퍼지며 커지는 회색 덩이
+    for (let i = 0; i < 4; i++) fx.parts.push({ x: q.x + (i - 1.5) * r * 0.5, y: q.y + r * 0.6, vx: (i - 1.5) * 26 * q.s, vy: -14 * q.s, t: 0, life: 0.6, r: r * 0.45, color: 'rgba(170,160,140,0.8)', shape: 'smoke' });
+  } else if (role === 'shooter') {
+    spawnBurst(fx, q.x, q.y, r, false, C.eshot);
+    //  마젠타 에너지 폭발 링 두 겹(바깥 진한 링 + 한 박자 늦은 밝은 링)
+    fx.shocks.push({ x: q.x, y: q.y, r: r * 1.6, t: 0, life: 0.4, color: C.eshot });
+    fx.shocks.push({ x: q.x, y: q.y, r: r * 1.0, t: -0.08, life: 0.4, color: '#FFB8E0' });
+  } else if (role === 'armor') {
+    fx.burstSeed++;
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + fx.burstSeed * 0.9;
+      const v = (110 + (i % 3) * 45) * q.s;
+      fx.parts.push({ x: q.x, y: q.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60 * q.s, t: 0, life: 0.7, r: r * 0.32, color: i % 2 ? '#8E97A3' : '#C9D0DA', shape: 'plate', rot: a });
+    }
+    for (let i = 0; i < 3; i++) fx.parts.push({ x: q.x + (i - 1) * r * 0.4, y: q.y, vx: 0, vy: -30 * q.s, t: 0, life: 0.9, r: r * 0.55, color: 'rgba(60,60,66,0.7)', shape: 'smoke' });
+    fx.parts.push({ x: q.x, y: q.y, vx: 0, vy: 0, t: 0, life: 0.25, r: r * 1.3, flash: true, big: false });
+  } else if (role === 'cart') {
+    spawnBurst(fx, q.x, q.y, r * 1.2, true);
+    fx.shocks.push({ x: q.x, y: q.y, r: r * 2.2, t: 0, life: 0.5, color: C.bulletHeavy });
+    for (let i = 0; i < 3; i++) fx.parts.push({ x: q.x + (i - 1) * r * 0.5, y: q.y - r * 0.2, vx: (i - 1) * 20 * q.s, vy: -40 * q.s, t: 0, life: 1.0, r: r * 0.6, color: 'rgba(50,48,52,0.7)', shape: 'smoke' });
+    //  화면 흔들림 약하게(흔들림 세기 = shakeT / shakeDur 비례)
+    fx.shakeT = Math.max(fx.shakeT, FX.shakeDur * 0.5);
+  }
+  addCorpse(fx, ev, role);
+  trimParts(fx);
+  return role;
+}
+
+/** 정예·아레나 보스 사망 → 다단 폭발 예약(span 초에 n 번, 반지름 안 자리를 돌아가며). 실제 폭발은 tickHitFx 가 시간에 맞춰 터뜨린다 */
+export function onBossDeath(fx, ev) {
+  const M = FX.bossMultiBoom;
+  delete fx.hit[ev.id];
+  for (let i = 1; i <= M.n; i++) {
+    const a = i * 2.4;
+    fx.booms.push({ x: ev.x + Math.cos(a) * ev.r * 0.6, z: ev.z + Math.sin(a) * ev.r * 0.5, r: ev.r * (0.5 + 0.12 * (i % 3)), at: (i / M.n) * M.span, t: 0, done: false });
+  }
+}
+
+/** 병사 합류(이사 ②): 통 자리(규칙 좌표 x, z)에서 병사 n 명이 튀어나와 부대로 날아간다. 그림은 최대 joinFly.max 명, 다 도착하면 부대 위 반짝임 + label */
+export function onJoin(fx, x, z, n, label) {
+  const J = FX.joinFly;
+  const k = Math.max(1, Math.min(n, J.max));
+  const g = { n, label, left: k };
+  for (let i = 0; i < k; i++) fx.recruits.push({ x0: x, z0: z, i, k, t: -i * 0.035, life: J.sec, g, sx: 0, sy: 0, s: 1, done: false });
+}
+
+/** 매 프레임: 피격 상태·다단 폭발·날아가는 병사. sp = 투영, squad = 부대 중심 화면점 함수, burstAt = 규칙 좌표 폭발 */
+export function tickHitFx(fx, dt, { sp, squad, burstAt }) {
+  const life = Math.max(FXH.flashSec, FXH.knockSec, FXH.squashSec, FXH.hpPopSec);
+  for (const k of Object.keys(fx.hit)) {
+    const h = fx.hit[k];
+    h.t += dt;
+    h.fa = (h.fa ?? h.t - dt) + dt;
+    //  반응이 끝나도 '-n' 이 아직 떠 있으면 묶음 대상으로 남긴다(글자 수명까지)
+    if (h.t >= life && (!h.dmgF || h.t >= FXH.dmgFloatSec)) delete fx.hit[k];
+  }
+  for (const b of fx.booms) {
+    b.t += dt;
+    if (!b.done && b.t >= b.at) {
+      b.done = true;
+      burstAt(b.x, b.z, b.r, true);
+      const q = sp(b.x, b.z);
+      fx.shocks.push({ x: q.x, y: q.y, r: b.r * 1.5 * q.s, t: 0, life: 0.35, color: C.bulletHeavy });
+      fx.shakeT = Math.max(fx.shakeT, FX.shakeDur * 0.6);
+    }
+  }
+  fx.booms = fx.booms.filter((b) => !b.done);
+  const J = FX.joinFly;
+  const sq = squad ? squad() : null;
+  for (const p of fx.recruits) {
+    p.t += dt;
+    if (p.t < 0 || !sq) continue;
+    const u = Math.min(1, p.t / p.life);
+    const a = sp(p.x0, p.z0);
+    //  대형 안 자리로 흩어져 들어간다(한 점에 모이지 않게)
+    const tx = sq.x + ((p.i % 5) - 2) * 9 * sq.s, ty = sq.y + (Math.floor(p.i / 5) - 0.5) * 8 * sq.s;
+    const e = u * u * (3 - 2 * u);
+    p.sx = a.x + (tx - a.x) * e;
+    p.sy = a.y + (ty - a.y) * e - Math.sin(Math.PI * u) * J.hop * sq.s;
+    p.s = a.s + (sq.s - a.s) * e;
+    if (u >= 1 && !p.done) {
+      p.done = true;
+      //  도착 반짝임(금색 별 조각) — 한 명마다 작게
+      for (let j = 0; j < 3; j++) { const an = -Math.PI / 2 + (j - 1) * 0.9; fx.parts.push({ x: tx, y: ty - 10 * sq.s, vx: Math.cos(an) * 90 * sq.s, vy: Math.sin(an) * 90 * sq.s, t: 0, life: J.sparkleSec, r: 3.2 * sq.s, color: C.gold, shape: 'star' }); }
+      p.g.left--;
+      if (p.g.left === 0 && p.g.label) floater(fx, sq.x, sq.y - 90, p.g.label, C.gold, true);
+    }
+  }
+  fx.recruits = fx.recruits.filter((p) => !p.done);
+  trimParts(fx);
 }
 
 //  게이트 피격 플래시(초): 규칙의 cell.flashT 는 감소되지 않으므로(계약서 4장 STEP 순서에 없음) 연출 타이머는 셸이 갖는다
@@ -124,7 +291,7 @@ const GATE_FLASH_SEC = BAL3.gate.flashT;
 //  무기 강화 단계 표기(HUD·플로터 공용, render.MK_LABEL 과 같은 값)
 const MK_LABEL = ['', 'I', 'II', 'III'];
 
-function makeFx() {
+export function makeFx() {
   //  gateFlash: { 'rowId:idx': 남은 초 } · gateOpen: { rowId: 남은 초 }(셔터가 걷히는 연출) — 렌더가 이것만 읽는다
   //  gateTip: { rowId: { text, t } } 짧은 안내 글 · gateTipSeen: 닫힘 안내를 이미 띄운 행 · shutterT/shutterText = 첫 조우 배너
   //  lotOpen = 랜덤 길 '?' 상자가 걷히는 연출 타이머 · lotSeen = 공개 효과음 1회 · lotSame = 랜덤 길 무기가 동급이라 교체 안 된 판
@@ -143,14 +310,21 @@ function makeFx() {
            //  아레나(r3.17): arenaOpen = 광장 열림 연출 남은 초 · arenaT/arenaText = '드래그로 피하세요' 배너 · shocks = 착지 충격 링 [{ x, y, r, t, life }](화면 좌표)
            arenaOpen: 0, arenaT: 0, arenaText: null, shocks: [],
            //  동작 시트 타이머(6장): heroFire = 사격 시트 남은 초 · heroWalk = 마지막 사격 뒤 걸은 초 · enemyHit = { id: 피격 시트 남은 초 } · corpses = 쓰러진 잡졸
-           heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [] };
+           heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [],
+           //  손맛(r3.24): hit = { 적 id: { t 경과 초, dir, role, n 연속 피격 수, dmgF 떠 있는 '-n' } } · booms = 보스 다단 폭발 예약(규칙 좌표) ·
+           //   recruits = 부대로 날아가는 병사(규칙 좌표 출발점 + 이번 프레임 화면점 sx/sy/s)
+           hit: {}, booms: [], recruits: [] };
 }
 
-//  쓰러진 잡졸 등록(kill·touch 공통). 규칙은 이미 enemies 에서 뺐으므로 위치만 셸이 기억한다
-function addCorpse(fx, ev) {
-  if (ev.kind !== 'grunt') return;
+//  쓰러진 적 등록(kill·touch 공통). 규칙은 이미 enemies 에서 뺐으므로 위치만 셸이 기억한다.
+//  r3.24: 잡졸만이 아니라 모든 적 — kind·skin·r·역할(role)과 머무는 시간(life)을 싣는다. 잡졸 = 사망 시트 + 머묾, 나머지 = 역할별 deathSec
+export function addCorpse(fx, ev, role = hitRole(ev.kind, ev.skin)) {
+  if (ev.kind === 'elite') return;
   delete fx.enemyHit[ev.id];
-  fx.corpses.push({ x: ev.x, z: ev.z, t: 0, h: BAL3.enemies.grunt.r * 2.4 });
+  const R = FX.hitRoles[role] ?? FX.hitRoles.grunt;
+  const r = ev.r ?? BAL3.enemies[ev.kind]?.r ?? BAL3.enemies.grunt.r;
+  const life = role === 'grunt' ? sheetSec('e_grunt_death') + FX.corpseLingerSec : R.deathSec;
+  fx.corpses.push({ x: ev.x, z: ev.z, t: 0, h: r * 2.4, kind: ev.kind, skin: ev.skin ?? null, r, role, life, id: ev.id ?? 0 });
   if (fx.corpses.length > FX.corpseCap) fx.corpses.shift();
 }
 
@@ -466,6 +640,12 @@ export function boot(canvas, deps = {}) {
   const burstAt = (x, z, r, big, color) => { const q = sp(x, z); spawnBurst(fx, q.x, q.y, r * q.s, big, color); };
   const floaterAt = (x, z, dy, text, color, big = false) => { const q = sp(x, z); floater(fx, q.x, q.y + dy, text, color, big); };
   const floaterSquad = (dy, text, color, big = false) => { const q = squadPt(); floater(fx, q.x, q.y + dy, text, color, big); };
+  //  부대 위 반짝임(r3.24): 게이트 양수 통과 — 합류 도착과 같은 별 조각이 위로 튄다
+  const squadSparkle = (color) => {
+    const q = squadPt();
+    for (let j = 0; j < 6; j++) { const an = -Math.PI / 2 + (j - 2.5) * 0.45; fx.parts.push({ x: q.x, y: q.y - 30 * q.s, vx: Math.cos(an) * 120 * q.s, vy: Math.sin(an) * 120 * q.s, t: 0, life: FX.joinFly.sparkleSec, r: 3.4 * q.s, color, shape: 'star' }); }
+    trimParts(fx);
+  };
   //  '?' 상자가 아직 덮고 있는 랜덤 길 물체인가(통로 확정선 전) — 계약서 3-9 '확정 전에 내용이 새지 않는다'.
   //  ⚠️확정선 전에도 비행 중인 탄은 막힌다(gateBlock). 그 막힘에 함정 전용 표현(붉은 스파크·trapHit)을 쓰면
   //   플레이어가 통로를 고르기 전에 '이번 판은 함정'임을 소리·색으로 알아낸다 — 공개 전에는 종전 셔터 표현으로 되돌린다.
@@ -482,8 +662,12 @@ export function boot(canvas, deps = {}) {
           //  히어로 사격 시트: 걷기가 heroWalkMinSec 이상 이어진 뒤 오는 발사에 1회(연속 사격이라 매번 재생하면 걷기가 안 보인다)
           if (fx.heroFire <= 0 && fx.heroWalk >= FX.heroWalkMinSec) fx.heroFire = sheetSec('m1_fire');
           break;
-        //  잡졸 피격(살아남은 경우만 — 죽으면 사망 시트가 대신한다)
-        case 'enemyHit': if (ev.kind === 'grunt' && ev.hp > 0) fx.enemyHit[ev.id] = sheetSec('e_grunt_hit'); break;
+        //  피격(r3.24 손맛): 모든 적 — 피격 상태(번쩍임·넉백·스쿼시·HP 튐)·무기별 스파크·'-n'.
+        //   잡졸 피격 시트(e_grunt_hit)는 종전대로 **그림이 잡졸(E1)인 잡졸**에만 겹친다(살아남은 경우만 — 죽으면 사망 시트가 대신한다)
+        case 'enemyHit':
+          onEnemyHit(fx, ev, sp);
+          if (ev.kind === 'grunt' && !ev.skin && ev.hp > 0) fx.enemyHit[ev.id] = sheetSec('e_grunt_hit');
+          break;
         case 'supplyHit': fx.sfx.push(['crateHit']); break;
         case 'supplyOpen': {
           const q = sp(ev.x, ev.z), y = q.y;
@@ -543,15 +727,19 @@ export function boot(canvas, deps = {}) {
           if (ev.idx < 0) { floaterSquad(-90, '우회', C.gateZero); break; }
           const txt = ev.value > 0 ? '+' + ev.applied : ev.value < 0 ? '−' + (-ev.applied) : '0';
           floaterSquad(-90, txt, ev.value > 0 ? C.gatePos : ev.value < 0 ? C.gateNeg : C.gateZero, true);
+          //  양수 통과(r3.24): 병사 합류와 같은 꼴 — 부대 위 반짝임
+          if (ev.value > 0 && ev.applied > 0) squadSparkle(C.gatePos);
           if (ev.value < 0 && ev.applied < 0) { fx.shakeT = FX.shakeDur; fx.hurtT = FX.hurtFlashDur; fx.sfx.push(['hurt']); }
           else if (ev.value > 0) fx.sfx.push(['gateFlip']);
           break;
         }
+        //  병사 합류(r3.24 이사 ②): 통 자리에서 병사들이 튀어나와 부대로 날아가고, **다 도착하는 순간** 부대 위에 '+n명 합류'(크게)와 반짝임
         case 'joinMany':
           if (ev.n >= FX.joinManyAt) fx.sfx.push(['joinMany']);
-          floaterSquad(-90, '+' + ev.n + '명 합류', C.gold, ev.n >= FX.joinManyAt);
+          onJoin(fx, ev.x, ev.z, ev.n, '+' + ev.n + '명 합류');
           break;
-        case 'padTake': floaterAt(ev.x, run.z, -70, '+1', C.chainPad); break;
+        //  발판(연속 증원): 발판 자리 '+1' 은 종전대로, 병사 한 명이 발판에서 부대로 뛰어든다
+        case 'padTake': floaterAt(ev.x, run.z, -70, '+1', C.chainPad); onJoin(fx, ev.x, ev.z ?? run.z, 1, null); break;
         case 'chainOn': floaterAt(ev.x, ev.z, -40, '증원 설비 가동!', C.chainPad, true); break;
         case 'weaponSwap': fx.sfx.push(['weaponSwap']); floaterSquad(-110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' 장착!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
         //  r3.10 강화: 같은 무기 통 → Mk 상승 표시
@@ -565,9 +753,23 @@ export function boot(canvas, deps = {}) {
           break;
         case 'hurt': fx.shakeT = FX.shakeDur; fx.hurtT = FX.hurtFlashDur; fx.sfx.push(['hurt']); floaterAt(ev.x, ev.z, -10, '−' + ev.n, C.heroHurt); break;
         case 'unitLost': burstAt(ev.x, ev.z, 9, false, C.heroHurt); break;
-        case 'kill': burstAt(ev.x, ev.z, BAL3.enemies[ev.kind]?.r ?? 14, false); fx.sfx.push(['kill']); addCorpse(fx, ev); break;
-        case 'touch': fx.shakeT = FX.shakeDur; burstAt(ev.x, ev.z, 12, false); addCorpse(fx, ev); break;
-        case 'blast': burstAt(ev.x, ev.z, ev.r, false, C.bulletHeavy); break;
+        //  사망(r3.24): 종류별 연출(잡졸 파편 · 돌격체 굴러 넘어짐+먼지 · 저격수 마젠타 링 · 장갑체 장갑판+연기 · 카트 큰 폭발+약한 흔들림) + 잔해
+        case 'kill': onEnemyDeath(fx, ev, sp); fx.sfx.push(['kill']); break;
+        case 'touch':
+          fx.shakeT = FX.shakeDur;
+          if (ev.kind === 'elite') burstAt(ev.x, ev.z, 12, false);
+          else onEnemyDeath(fx, ev, sp);
+          break;
+        //  중화기 폭발(r3.24 재조정): 종전 흰 섬광 원(spawnBurst flash)이 맞는 적을 통째로 덮어 피격 반응이 안 보였다(S21 카트 캡처) —
+        //   섬광 대신 폭발 반경의 주황 링 + 주황 파편 몇 개. 적 그림 위 번쩍임·스파크는 enemyHit 이 맡는다
+        case 'blast': {
+          const q = sp(ev.x, ev.z);
+          fx.shocks.push({ x: q.x, y: q.y, r: ev.r * q.s, t: 0, life: 0.22, color: C.bulletHeavy });
+          fx.burstSeed++;
+          for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2 + fx.burstSeed * 0.7; const v = 150 * q.s; fx.parts.push({ x: q.x, y: q.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.28, r: 3.4 * q.s, color: C.bulletHeavy }); }
+          trimParts(fx);
+          break;
+        }
         //  정예 등장(r3.16 복수 정예): 2~3체가 같은 프레임에 나오므로 index 0 에서만 배너·효과음·BGM(소리가 겹치지 않게). 문구는 체 수를 붙인다
         case 'elite':
           if ((ev.index ?? 0) > 0) break;
@@ -575,7 +777,8 @@ export function boot(canvas, deps = {}) {
           fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]);
           break;
         //  정예 처치: 파편·흔들림은 매번, 효과음은 마지막(left 0)이면 승리음, 아니면 처치음. 남은 목표 배너는 bossesLeft 가 세운다
-        case 'bossKill': burstAt(ev.x, ev.z, ev.r, true); fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']); break;
+        //  r3.24: 처치 순간 큰 폭발 + 0.6초에 걸친 다단 폭발(onBossDeath 예약 → tickHitFx)
+        case 'bossKill': burstAt(ev.x, ev.z, ev.r, true); onBossDeath(fx, ev); fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']); break;
         case 'bossesLeft':
           if (ev.left > 0) { fx.bossBannerText = '정예 ' + (ev.index + 1) + ' 격파 — 남은 목표 ' + ev.left; fx.bossBannerT = FX.bossKillBannerSec; }
           break;
@@ -637,9 +840,11 @@ export function boot(canvas, deps = {}) {
       fx.enemyHit[k] -= dt;
       if (fx.enemyHit[k] <= 0) delete fx.enemyHit[k];
     }
+    //  잔해는 저마다 머무는 시간(life, r3.24)이 있다. 옛 꼴(life 없음 = 잡졸)은 사망 시트 + 머묾
     const corpseSec = sheetSec('e_grunt_death') + FX.corpseLingerSec;
     for (const c of fx.corpses) c.t += dt;
-    fx.corpses = fx.corpses.filter((c) => c.t < corpseSec);
+    fx.corpses = fx.corpses.filter((c) => c.t < (c.life ?? corpseSec));
+    tickHitFx(fx, dt, { sp, squad: squadPt, burstAt });
     //  셔터 짧은 안내 글(행 단위): 다 지나면 칸 위에서 사라진다
     for (const k of Object.keys(fx.gateTip)) {
       fx.gateTip[k].t -= dt;
@@ -657,7 +862,7 @@ export function boot(canvas, deps = {}) {
     }
     for (const p of fx.parts) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     fx.parts = fx.parts.filter((p) => p.t < p.life);
-    for (const f of fx.floaters) { f.t += dt; f.y -= 44 * dt; }
+    for (const f of fx.floaters) { f.t += dt; f.y -= (f.dmg ? 60 : 44) * dt; if (f.pop !== undefined) f.pop += dt; }
     fx.floaters = fx.floaters.filter((f) => f.t < f.life);
     //  보상 팝: 0.5초 떠오른 뒤 부대로 흡수
     for (const p of fx.pops) {
@@ -865,6 +1070,11 @@ export function boot(canvas, deps = {}) {
     bossGuard: !!(run && run.boss && run.boss.guard),
     supplyArmed: run ? run.supplies.filter((s) => s.armZ != null && !s.opened && s.z - run.z <= s.armZ).map((s) => s.id) : [],
     zoom, flat, perspective: projectorMode({ flat, zoom }),
+    //  손맛(r3.24) 관찰: 지금 피격 반응 중인 적의 역할 목록 · 날아가는 병사 수 · 잔해 역할 목록 · 파편 수 — 캡처 스크립트가 '맞는 순간'을 잡는다
+    hitRoles: Object.values(fx.hit).filter((h) => h.t < FX.hit.knockSec).map((h) => h.role),
+    //  화면 안(부대 앞 거리 d 80~520)에서 반응 중인 적만 — 먼 곳(화면 위 밖)에서 맞기 시작하는 적을 캡처가 기다리지 않게
+    hitSeen: run ? run.enemies.concat(run.bosses).filter((e) => !e.dead && fx.hit[e.id] && fx.hit[e.id].t < FX.hit.knockSec && e.z - run.z > 80 && e.z - run.z < 520).map((e) => fx.hit[e.id].role) : [],
+    recruits: fx.recruits.length, corpseRoles: fx.corpses.map((c) => c.role ?? 'grunt'), parts: fx.parts.length, booms: fx.booms.length,
   });
   if (win) win.__rush3Dbg = dbg;
 

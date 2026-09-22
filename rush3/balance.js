@@ -193,7 +193,48 @@ export const BAL3 = deepFreeze({
         //  동작 시트(6장, 2026-09-18 파일럿): 히어로는 걷기 heroWalkMinSec 뒤 발사 이벤트에 사격 시트 1회,
         //  쓰러진 잡졸은 사망 시트 뒤 corpseLingerSec 머물다 corpseFadeSec 동안 흐려진다(최대 corpseCap 구)
         //  heroFireAlways(이사 결정 9/18): 출격 중엔 사격 시트만 계속 재생(걷기 시트 미사용). false 면 heroFire 타이머로 걷기↔사격 교대
-        heroFireAlways: true, heroWalkMinSec: 0.2, corpseLingerSec: 0.6, corpseFadeSec: 0.3, corpseCap: 40 },
+        heroFireAlways: true, heroWalkMinSec: 0.2, corpseLingerSec: 0.6, corpseFadeSec: 0.3, corpseCap: 40,
+        //  손맛(r3.24, 이사 관찰 2026-09-23 "여러 대 맞아야 터지는 애들은 피탄될 때마다 반응이 그래픽으로"): 셸·렌더 전용 연출 상수. 규칙은 읽지 않는다.
+        //   partsCap = 화면 파편 상한(넘으면 오래된 것부터 버린다 — 적 수십 기가 한꺼번에 맞아도 프레임이 버티게)
+        partsCap: 240,
+        hit: {
+          //  공통 피격 반응 길이(초): 흰색 번쩍임 · 넉백(위로 밀렸다 복귀) · 스쿼시(가로 퍼짐·세로 눌림) · HP 숫자 튐 · '-n' 떠오름
+          flashSec: 0.08, knockSec: 0.14, squashSec: 0.16, hpPopSec: 0.2, dmgFloatSec: 0.55,
+          //  번쩍임 쉼(초): 연사로 매 프레임 맞아도 번쩍임은 flashSec 켜짐 → 최소 flashGap 꺼짐으로 깜빡인다(늘 하얗게 떠서 그림이 안 보이던 것 — 캡처 실측)
+          flashGap: 0.07,
+          //  '-n' 은 스폰 체력이 이 값 이상인 적에만(한두 방에 죽는 적은 생략 — 화면이 어지럽지 않게). HP 태그(r3.21 hpMax > 2)와 같은 문턱
+          dmgFloatMinHp: 3,
+          //  같은 적이 연사로 맞을 때 '-n' 을 묶는 간격(초): 이 안에 또 맞으면 떠 있는 '-n' 의 숫자를 키운다(글자 수십 개가 겹치지 않게) ·
+          //   dmgFloatCap = 화면에 동시에 뜨는 '-n' 최대 수(넘으면 오래된 것부터)
+          dmgMergeSec: 0.25, dmgFloatCap: 24,
+        },
+        //  적 종류별 반응(역할 = skin 우선, 없으면 kind). knock = 넉백 px(배율 전) · squash = 최대 변형률 · shake = 좌우 흔들림 px ·
+        //   sparks = 피격 파편 수 가산 · metal = 흰·노랑 금속 스파크를 섞는다 · flash = 번쩍임 불투명도 · death = 사망 연출 종류 · deathSec = 잔해 머무는 초
+        hitRoles: {
+          grunt:   { knock: 5,   squash: 0.18, shake: 0,   sparks: 0, metal: false, flash: 0.9,  death: 'sheet',  deathSec: 0 },
+          rusher:  { knock: 11,  squash: 0.2,  shake: 3.5, sparks: 1, metal: false, flash: 0.9,  death: 'tumble', deathSec: 0.9 },
+          shooter: { knock: 4,   squash: 0.12, shake: 0,   sparks: 1, metal: false, flash: 0.95, death: 'ring',   deathSec: 0.55 },
+          armor:   { knock: 1.5, squash: 0.06, shake: 0,   sparks: 3, metal: true,  flash: 0.8,  death: 'plates', deathSec: 1.1 },
+          cart:    { knock: 0,   squash: 0.05, shake: 3,   sparks: 2, metal: true,  flash: 0.75, death: 'boom',   deathSec: 1.0 },
+          elite:   { knock: 3,   squash: 0.05, shake: 2,   sparks: 1, metal: true,  flash: 0.55, death: 'multi',  deathSec: 0 },
+        },
+        //  skin → 역할(그림이 역할을 뜻한다, courses.js 의 ARMOR·CART·JUMPER·HOUND·POD·MAGNET)
+        hitRoleBySkin: { E3_wallguard: 'armor', E7_cartyard: 'cart', E2_ramhound: 'rusher', E8_manholejumper: 'rusher',
+                         E4_needleeye: 'shooter', E9_spawnpod: 'shooter', E10_magnethead: 'shooter' },
+        //  무기별 피격 스파크: n = 개수 · r = 크기 · sp = 속도 · shape(dot 점 · line 가는 선 · bolt 번개 조각) · color
+        hitSparks: {
+          rifle:   { n: 3, r: 2.6, sp: 140, shape: 'dot',  color: '#F6C84A' },
+          auto:    { n: 3, r: 2.2, sp: 150, shape: 'dot',  color: '#35E5FF' },
+          heavy:   { n: 5, r: 4.2, sp: 170, shape: 'dot',  color: '#FF9A4A' },
+          scatter: { n: 6, r: 1.6, sp: 120, shape: 'dot',  color: '#B6FF4A' },
+          sniper:  { n: 3, r: 1.2, sp: 260, shape: 'line', color: '#EEF4FF' },
+          arc:     { n: 4, r: 2.0, sp: 160, shape: 'bolt', color: '#9E86FF' },
+        },
+        //  정예·아레나 보스 사망 = 다단 폭발(span 초에 걸쳐 n 번, 자리는 반지름 안에서 돌아가며)
+        bossMultiBoom: { n: 4, span: 0.6 },
+        //  병사 합류 연출(이사 ②): 통 자리에서 병사 실루엣이 튀어나와 부대로 날아간다(sec 초, 최대 max 명까지만 그리고 나머지는 숫자로) ·
+        //   hop = 튀어오르는 높이(px) · 도착 순간 부대 위 반짝임 sparkleSec
+        joinFly: { sec: 0.5, max: 10, hop: 70, sparkleSec: 0.35 } },
   // 색(기존 값 이식 + v3 게이트 색)
   colors: {
     outline: '#14233A', hero: '#F3F1E8', heroHurt: '#FF4A4A', soldier: '#DFE6F5', hud: '#FFFFFF', gold: '#F6C84A',
