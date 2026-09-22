@@ -155,28 +155,15 @@ export function createRenderer3(ctx, sprites) {
     ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y);
     ctx.closePath();
   }
-  //  배경 그림·도로를 세로로 나누는 조각 수. 설계는 16이었으나 16이면 조각 사이 가로 배율 차이가 옆 건물 윤곽에 계단으로 보여 32로(캡처 대조 _cmp_strips_16_vs_32.png).
-  //   비용 = 조각당 drawImage 1~3(가장자리 메움 포함) — 헤드리스 Chromium 실측 16/32 모두 55~60fps(perspective-20260920/fps_log.txt)
+  //  배경 그림·도로를 세로로 나누는 조각 수. 배경 그림은 조각마다 **세로만** 원근으로 샘플링한다(먼 곳 행이 위로 몰린다).
+  //   ⚠️가로 배율은 걸지 않는다(2026-09-22 이사 지적 "우측 배경이 계단현상"): 조각마다 가운데 배율 하나로 폭을 줄이면 조각 경계마다
+  //   가장자리가 (Δs/조각수)·(W/2) ≈ 5.6px 씩 점프해 세로선(기둥·창틀)이 톱니로 끊겼고, 그 빈 자리를 메우던 거울상이 위쪽 대칭 복제로 보였다.
+  //   조각 수로 1px 아래까지 줄이려면 약 180조각(프레임 저하). 가로로 좁아지는 원근감은 도로 사다리꼴·차선·물체 크기가 담당한다
   const BG_STRIPS = 32;
-  //  ARENA 그림의 검은 테두리 폭(논리 px) — 조각을 그릴 때 이만큼 잘라 낸다(2026-09-20 캡처 실측: 원근에서 좁아진 조각 안쪽으로 검은 계단선이 들어왔다)
+  //  ARENA 그림의 검은 테두리 폭(논리 px) — 전폭으로 그릴 때도 화면 가장자리에 검은 띠가 보이지 않게 잘라 낸다
   const ARENA_CROP = 16;
-  //  멀어서 조각이 화면보다 좁을 때(s < 1) 양옆 빈 자리 메우기(검수 반영 2026-09-20): 처음엔 그림 가장자리 8px 기둥을 빈 폭으로 늘렸는데
-  //   위 모서리에서 8배 가까이 늘어나 세로 줄무늬 스미어로 보였다. 지금은 조각과 **같은 배율로 가장자리를 거울상**으로 이어 붙인다
-  //   (scale(−1, 1) 한 블록 안에서 조각마다 drawImage 2회 — 늘림이 없어 스미어가 없고, 이음매의 픽셀이 같아 경계선도 없다). 옆 땅 단색을
-  //   두면 쐐기로 드러나므로 쓰지 않는다. 조각 사이 계단(옆 건물 윤곽)은 조각 수의 문제라 그대로다 — 실기기 관찰 뒤 조정
-  function mirrorEdges(im, ipx, c0, segs) {
-    ctx.save();
-    ctx.scale(-1, 1);
-    for (const g of segs) {
-      if (g.gap <= 0) continue;
-      const ew = (g.gap + 1) / g.sm * ipx;                 // 빈 폭(+1 겹침)을 조각 배율 그대로 덮는 그림 폭
-      ctx.drawImage(im, c0, g.sy, ew, g.sh, -(g.gap + 1), g.dy, g.gap + 1, g.dh);
-      ctx.drawImage(im, im.width - c0 - ew, g.sy, ew, g.sh, -W, g.dy, g.gap + 1, g.dh);
-    }
-    ctx.restore();
-  }
 
-  //  배경: 옆 땅 + BG 타일(있으면, 세로 16조각·조각마다 가로 배율 s) + 도로(사다리꼴) + 차선(세계 좌표의 대시를 투영) + 도로 경계.
+  //  배경: 옆 땅 + BG 타일(있으면, 세로 32조각·가로 전폭) + 도로(사다리꼴) + 차선(세계 좌표의 대시를 투영) + 도로 경계.
   //  도로와 물체는 같은 속도로 흐른다(세계 고정): 그림 v = (LINE_Y − z) mod h 라 평면에서는 종전 타일 스크롤과 같은 그림이 나온다.
   //  아레나(r3.17): 셋째 인자 arena = { w, depth, k }(k 0 → 1 = 열리는 정도). k > 0 이면 도로 x 를 80~400 에서 w0~w1 로 보간하고
   //   차선 대시는 (1 − k) 로 사라지며, 그 위에 광장 그림(ARENA1/2, 조각마다 가로 배율) 또는 어두운 타원 바닥을 덧그린다. run.z 가 멈추므로 스크롤은 자동 정지
@@ -191,24 +178,19 @@ export function createRenderer3(ctx, sprites) {
     if (im) {
       const h = Math.round(im.height * (W / im.width));   // 타일 한 장의 세계 길이(px)
       const ipp = im.width / W;                            // 논리 px 당 그림 px
-      const segs = [];
       for (let i = 0; i < BG_STRIPS; i++) {
         const ya = (H * i) / BG_STRIPS, yb = (H * (i + 1)) / BG_STRIPS;
         const da = P.dOf(ya), db = P.dOf(yb);              // da > db(위쪽이 멀다)
-        const sm = P.s((da + db) / 2);
-        //  이 조각이 덮는 세계 구간 [db, da] → 그림 v 구간 [LINE_Y − da − scroll, +(da − db)). 타일 경계를 넘으면 두 번에 나눠 그린다
+        //  이 조각이 덮는 세계 구간 [db, da] → 그림 v 구간 [LINE_Y − da − scroll, +(da − db)). 타일 경계를 넘으면 두 번에 나눠 그린다.
+        //   가로는 전폭(0~W) — 조각 경계에서 가장자리가 끊기지 않는다(위 BG_STRIPS 주석)
         let u = ((LINE_Y - da - scroll) % h + h) % h, left = da - db, dy = ya;
-        const gap = Math.max(0, (W - W * sm) / 2);
         while (left > 1e-6) {
           const seg = Math.min(left, h - u);
           const dh = (yb - ya) * seg / (da - db);
-          ctx.drawImage(im, 0, u * ipp, im.width, seg * ipp, W / 2 - (W / 2) * sm, dy, W * sm, dh);
-          if (gap > 0) segs.push({ sy: u * ipp, sh: seg * ipp, dy, dh, sm, gap });
+          ctx.drawImage(im, 0, u * ipp, im.width, seg * ipp, 0, dy, W, dh);
           u = (u + seg) % h; left -= seg; dy += dh;
         }
       }
-      //  멀어서 화면보다 좁은 조각(sm < 1)의 양옆은 같은 배율의 거울상으로 잇는다(원근일 때만 — flat 은 gap 0)
-      if (segs.length) mirrorEdges(im, ipp, 0, segs);
     }
     //  도로: 화면 위 −10 부터 아래 H+10 까지 BG_STRIPS 등분 점으로 양 가장자리를 잇는 다각형(멀수록 좁아진다 = 사다리꼴)
     const yT = -10, yB = H + 10;
@@ -224,22 +206,14 @@ export function createRenderer3(ctx, sprites) {
     ctx.closePath();
     ctx.fill();
     ctx.globalAlpha = 1;
-    //  광장 그림(2026-09-19 Gemini ARENA1=산업지대·ARENA2=적 공장): 있으면 열림 정도 k 만큼 겹쳐 그린다(조각마다 가로 배율). 없으면 종전 어두운 타원
+    //  광장 그림(2026-09-19 Gemini ARENA1=산업지대·ARENA2=적 공장): 있으면 열림 정도 k 만큼 겹쳐 그린다(세로만 조각, 가로 전폭). 없으면 종전 어두운 타원
     const arenaIm = k > 0 ? get(stageIdx >= 4 ? 'arena2' : 'arena1') : null;
     if (arenaIm) {
       ctx.globalAlpha = k;
-      const ipa = arenaIm.width / W, c0 = ARENA_CROP * ipa;
-      const segs = [];
-      for (let i = 0; i < BG_STRIPS; i++) {
-        const ya = (H * i) / BG_STRIPS, yb = (H * (i + 1)) / BG_STRIPS;
-        const sm = P.s(P.dOf((ya + yb) / 2));
-        const sy0 = arenaIm.height * i / BG_STRIPS, sh = arenaIm.height / BG_STRIPS, gap = Math.max(0, (W - W * sm) / 2);
-        //  그림 자체의 검은 테두리(16px)는 잘라 낸다 — 평면에선 화면 밖이지만 원근에선 좁아진 조각 안쪽으로 들어와 검은 계단선이 된다(2026-09-20 캡처 실측)
-        ctx.drawImage(arenaIm, c0, sy0, arenaIm.width - 2 * c0, sh, W / 2 - (W / 2) * sm, ya, W * sm, yb - ya);
-        if (gap > 0) segs.push({ sy: sy0, sh, dy: ya, dh: yb - ya, sm, gap });
-      }
-      //  BG 조각과 같은 규칙: 화면보다 좁은 조각의 양옆은 같은 배율의 거울상(테두리 크롭 안쪽부터)
-      if (segs.length) mirrorEdges(arenaIm, ipa, c0, segs);
+      //  한 장을 전폭으로 편다(광장은 run.z 가 멈추므로 세로 원근 샘플링도 없다 — 조각으로 나눌 이유가 없다).
+      //   그림의 검은 테두리(ARENA_CROP)만 잘라 내 화면 가장자리에 검은 띠가 보이지 않게 한다
+      const c0 = ARENA_CROP * (arenaIm.width / W);
+      ctx.drawImage(arenaIm, c0, 0, arenaIm.width - 2 * c0, arenaIm.height, 0, 0, W, H);
       ctx.globalAlpha = 1;
     }
     if (k > 0 && !arenaIm) {
