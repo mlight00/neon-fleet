@@ -24,15 +24,26 @@ def unchecker(path, tol=14):
     #  ⚠️적은 **숯검정**이라 '중립색' 만으로 배경을 잡으면 몸체까지 배경 덩어리에 이어 붙어 통째로 지워진다(2026-09-23 실측).
     #   그래서 배경 후보 = 중립색 **이면서 체커 두 색(A·B) 근처** 인 화소로 좁힌다.
     neutral = neutral & nearAB
-    lab, n = ndi.label(neutral, structure=np.ones((3, 3)))
+    #  ⚠️체커가 **어두운** 판(예: 141/55, 2026-09-24 E10 재생성)에서는 몸체의 짙은 회색 면이 체커 색과 같아,
+    #   윤곽선의 가는 틈으로 바깥 배경과 이어지면 통째로 지워졌다. 배경 후보를 2px 깎아 **가는 다리를 끊은 뒤**
+    #   테두리에 닿는 덩어리만 고르고, 다시 2px 되돌린다(후보 안에서만) — 넓은 바깥 배경은 그대로 잡히고 몸 안은 안 새어 든다
+    core = ndi.binary_erosion(neutral, iterations=2, border_value=1)   # 화면 밖은 배경으로 본다(테두리가 깎이지 않게)
+    lab, n = ndi.label(core, structure=np.ones((3, 3)))
     border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))); border.discard(0)
-    bg = np.isin(lab, list(border))
+    bg = ndi.binary_dilation(np.isin(lab, list(border)), iterations=3) & neutral
+    lab, n = ndi.label(neutral, structure=np.ones((3, 3)))
     idx = np.arange(1, n + 1)
     sizes = ndi.sum(neutral, lab, index=idx); frac = ndi.sum(nearAB & neutral, lab, index=idx) / np.maximum(sizes, 1)
     objs = ndi.find_objects(lab)
+    #  갇힌 체커 조각(pocket) = 두 색 A·B 가 **둘 다** 섞여 있는 덩어리만(체커는 두 색이 번갈아 나온다).
+    #   한 색뿐인 덩어리는 몸체의 면이다 — 어두운 체커(141/55)에서 E10 의 짙은 줄무늬가 통째로 지워진 원인(2026-09-24)
+    nearA = np.abs(v - A) <= 12; nearB = np.abs(v - B) <= 12
+    fa = ndi.sum(nearA & neutral, lab, index=idx) / np.maximum(sizes, 1)
+    fb = ndi.sum(nearB & neutral, lab, index=idx) / np.maximum(sizes, 1)
     pockets = []
     for i in range(n):
         if (i + 1) in border or sizes[i] < 200 or frac[i] < 0.9: continue
+        if fa[i] < 0.15 or fb[i] < 0.15: continue
         sl = objs[i]; bb = (sl[0].stop - sl[0].start) * (sl[1].stop - sl[1].start)
         if bb > 0.25 * H * W: continue
         pockets.append(i + 1)
