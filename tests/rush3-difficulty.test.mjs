@@ -92,7 +92,7 @@ test('V3-DIFF DIFF-3: enemyDefsFor — hp(반올림)·접촉·적탄 dmg·정예
   for (const d of DIFFS) {
     const e = rows[d];
     assert.deepEqual([e.grunt.r, e.grunt.vz, e.grunt.track, e.rusher.accel, e.rusher.maxVz, e.shooter.aimTime, e.shooter.shot.vz, e.elite.fan, e.elite.fanDeg, e.elite.r, e.elite.summonN],
-                     [14, 24, 0, 260, 420, 0.5, 260, 3, 18, 48, 2], d + ': 배수 대상이 아닌 필드는 그대로(vz 는 r3.27 에서 60 → 24, 난이도 배수 대상이 아님)');
+                     [14, 24, 0, 180, 290, 0.5, 260, 3, 18, 48, 2], d + ': 배수 대상이 아닌 필드는 그대로(vz 는 r3.27 에서 60 → 24 · 돌격체 가속/최대는 r3.31 에서 260/420 → 180/290, 난이도 배수 대상이 아님)');
     assert.ok(Object.isFrozen(e) && Object.isFrozen(e.elite) && Object.isFrozen(e.elite.shot));
   }
   assert.equal(rows.hard.elite.hp, undefined, '정예 hp 는 스테이지 값(buildStage)이라 표에 없다');
@@ -329,7 +329,8 @@ test('V3-SIM-DIFF SD-7 성공 경로: planBoss 가 hard S1·S2·S3 와 brutal S1
   assert.equal(BR('hard', 2).run.units.length, 4, 'hard S2 planBoss 생존 병력 = r3.9 실측 4명');
   assert.equal(BR('hard', 3).run.units.length, 70, 'hard S3 planBoss 생존 병력 = r3.9 실측 70명');
   //  r3.30(확정 칸 통과): 상한에 닿은 게이트에 헛발로 흡수되던 탄이 뒤의 적을 맞히게 되어 21 → 24명(최대 29 그대로, 여전히 손실 있음)
-  assert.equal(b1.run.units.length, 24, 'brutal S1 evLead 생존 병력 = r3.30 실측 24명(최대 29명)');
+  //  r3.31(적 크기 체력 비례·돌격체 감속·중화기 조정): 24 → 26명(최대 29 그대로, 여전히 손실 있음)
+  assert.equal(b1.run.units.length, 26, 'brutal S1 evLead 생존 병력 = r3.31 실측 26명(최대 29명)');
 });
 
 test('V3-SIM-DIFF SD-8 기록: brutal S2·S3 는 실패를 허용하고 결과만 남긴다 — 다만 지더라도 정예전에서만 진다', (t) => {

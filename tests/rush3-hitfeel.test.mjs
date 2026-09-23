@@ -3,7 +3,7 @@
 //  ⚠️검사는 그림 없이 돈다(Node) — 흰 실루엣(작업 캔버스) 경로는 캡처(research/hitfeel-20260923)로만 확인된다. 여기서는 도형 폴백의 흰 채움을 본다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
+import { createRun, stepRun, drainEvents, STEP, sizeByHp } from '../rush3/combat.js';
 import { makeBullet } from '../rush3/weapons.js';
 import { buildStage } from '../rush3/stages.js';
 import { BAL3 } from '../rush3/balance.js';
@@ -175,9 +175,11 @@ test('V3-HITFEEL HF-8: combat 이벤트 페이로드 — enemyHit 에 무기·�
   const hits = ev.filter((e) => e.type === 'enemyHit');
   assert.equal(hits.length, 3, '3발에 죽는다(체력 3 · 판정 불변)');
   assert.deepEqual(hits.map((h) => h.hp), [2, 1, 0]);
-  for (const h of hits) assert.deepEqual([h.weapon, h.dmg, h.hpMax, h.skin, h.r], ['rifle', 1, 3, 'E3_wallguard', 14]);
+  //  r3.31: 반지름은 체력 비례로 커진다(표 체력 2 → 3 = 1.5배 → r 14 × sizeByHp)
+  const r3 = 14 * sizeByHp(2, 3);
+  for (const h of hits) assert.deepEqual([h.weapon, h.dmg, h.hpMax, h.skin, h.r], ['rifle', 1, 3, 'E3_wallguard', r3]);
   const k = ev.find((e) => e.type === 'kill');
-  assert.deepEqual([k.skin, k.r, k.kind], ['E3_wallguard', 14, 'grunt']);
+  assert.deepEqual([k.skin, k.r, k.kind], ['E3_wallguard', r3, 'grunt']);
   assert.equal(run.kills, 1);
 });
 

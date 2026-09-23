@@ -14,6 +14,9 @@ const SQ = BAL3.squad, ROAD = BAL3.road, EN = BAL3.enemies, LINE_Y = BAL3.view.L
 const ELITES = BAL3.elites;
 //  아레나(r3.17) 보스 z 허용 범위(run.z 기준). 파일 상단 상수 — stepRun 이후는 run.arena 만 읽는다
 const ARENA_BOSS_Z = BAL3.arena.bossZ;
+//  체력 비례 크기(r3.31) 표. 파일 상단 상수 — stepRun 이후 소스가 BAL3 를 직접 읽지 않는 규약(DIFF-6)을 지킨다
+const SIZE_BY_HP = BAL3.sizeByHp;
+const HP_BASE = Object.freeze(Object.fromEntries(Object.entries(BAL3.enemies).filter(([, d]) => d.hp != null).map(([k, d]) => [k, d.hp])));
 const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
 const DEG = Math.PI / 180;
 
@@ -79,6 +82,8 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
   const run = {
     stageId: stage.id, stageVersion: stage.version ?? 1, title: stage.title ?? '', length: stage.length, eliteZ: stage.eliteZ ?? null, bg: stage.bg ?? 1,
     difficulty: diff, enemyDefs: enemyDefsFor(diff, stage.enemyHpMul ?? 1, stage.difficultyHp ?? true),
+    //  r3.31 표 체력(배수 전) — 스폰 크기(sizeByHp)의 기준. stepRun 이후 소스는 BAL3.enemies 를 읽지 않으므로(DIFF-6) 생성 시점에 싣는다
+    hpBase: HP_BASE,
     //  r3.27 보스 페이즈 적용 여부(stage.bossPhases — 합성 스테이지는 켬)
     bossPhases: stage.bossPhases ?? true,
     z: 0, prevZ: 0, x: ROAD.startX, tx: ROAD.startX,
@@ -288,10 +293,17 @@ function moveSupplies(run, dt) {
 
 // 적 1기 생성. hp 는 스폰 정의값(stages.makeSpawn 이 구간·난이도 배율까지 박아 항상 명시) — 없으면(소환) run.enemyDefs 의 같은 배율 표.
 //  hpMax(r3.21) = 스폰 시점 체력. render 가 '체력 3 이상인 적'에만 남은 체력 숫자를 그리는 기준(규칙은 읽지 않는다)
+//  체력 비례 크기 배율(r3.31). baseHp = 표 체력(run.hpBase[kind]). 표 체력이 없는 종류(정예)는 1
+export function sizeByHp(baseHp, hp, S = SIZE_BY_HP) {
+  if (!baseHp || !(hp > baseHp)) return 1;
+  return Math.min(S.cap, 1 + S.k * Math.log2(hp / baseHp));
+}
 function spawnEnemy(run, kind, x, z, hp, skin) {
   const d = run.enemyDefs[kind];
   const h = hp ?? d.hp;
-  const e = { id: run.nextEnemyId++, kind, x, z, px: x, pz: z, vz: d.vz, hp: h, hpMax: h, r: d.r, dead: false, touched: false };
+  //  r3.31 크기 = 체력 비례(이사 지시 "체력이 올라간 적들은 비례해서 크기도 키워주자"): 표 체력(run.hpBase[kind]) 대비 배수 m 의 로그로 키운다.
+  //   판정 반지름 r 도 같이 커진다(그림만 키우면 맞은 것처럼 보이는 탄이 빗나간다). 상한 BAL3.sizeByHp.cap
+  const e = { id: run.nextEnemyId++, kind, x, z, px: x, pz: z, vz: d.vz, hp: h, hpMax: h, r: d.r * sizeByHp(run.hpBase ? run.hpBase[kind] : null, h), dead: false, touched: false };
   if (skin) e.skin = skin;
   if (kind === 'shooter') { e.shootT = d.shootEvery; e.aimT = 0; }
   run.enemies.push(e);
@@ -400,8 +412,9 @@ function hitEnemy(run, e, b, ev) {
   ev.push({ type: 'enemyHit', id: e.id, kind: e.kind, hp: e.hp, x: e.x, z: e.z, ...hitLook(e), dmg: b.dmg, weapon: b.kind, bx: b.x });
   if (e.hp <= 0) e.dead = true;
   const w = WEAPONS[b.kind];
+  if (w && w.stunSec) stun(e, w.stunSec, ev);
   if (w && w.blastR) blast(run, e, w.blastR, w.blastDmg, ev);
-  if (w && w.chain) chainArc(run, e, w.chain, w.chainR, w.chainDmg, ev);
+  if (w && w.chain) chainArc(run, e, w.chain, w.chainR, w.chainDmg, ev, w.stunSec);
 }
 
 // 연출용 겉모습(r3.24 손맛): 셸이 적 종류별 피격·사망 반응을 고르는 데 쓰는 필드만 이벤트에 **덧붙인다**(값 계산·판정 불변).
@@ -413,7 +426,14 @@ function hitLook(t) {
 // 전격포 연쇄(r3.10): 직격한 적에서 chainR 안(원 겹침 기준)의 다른 !dead 적·보스 중 가까운 순 n 체에 dmg. 벽 너머 제외.
 //  같은 거리면 id 순 — 결정성. 보스(r3.16 복수 정예)는 id 가 문자열('b1')이라 정렬 열쇠를 MAX_SAFE_INTEGER − index 로 둔다(적 뒤·index 순).
 //  이벤트 arc {x,z,tx,tz} 는 연출 전용
-function chainArc(run, from, n, r, dmg, ev) {
+//  전격 기절(r3.31): 일반 적만(보스 kind 'elite' 제외). 남은 시간은 긴 쪽으로 — 연속으로 맞으면 계속 묶인다
+function stun(t, sec, ev) {
+  if (!sec || t.kind === 'elite' || t.dead) return;
+  const was = t.stunT > 0;
+  t.stunT = Math.max(t.stunT || 0, sec);
+  if (!was) ev.push({ type: 'stun', id: t.id, x: t.x, z: t.z, sec });
+}
+function chainArc(run, from, n, r, dmg, ev, stunSec = 0) {
   const pool = run.enemies.concat(run.bosses);
   const cand = [];
   for (const t of pool) {
@@ -429,6 +449,7 @@ function chainArc(run, from, n, r, dmg, ev) {
     ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, arc: true, ...hitLook(t), dmg, weapon: 'arc' });
     ev.push({ type: 'arc', x: from.x, z: from.z, tx: t.x, tz: t.z });
     if (t.hp <= 0) t.dead = true;
+    else stun(t, stunSec, ev);
   }
 }
 
@@ -473,6 +494,8 @@ function moveEnemies(run, ev, dt) {
     if (e.dead) continue;
     const d = run.enemyDefs[e.kind];
     e.px = e.x; e.pz = e.z;
+    //  기절(r3.31 전격): 이동·가속·저격 예고/발사 전부 멈춘다(타이머도 흐르지 않는다)
+    if (e.stunT > 0) { e.stunT = Math.max(0, e.stunT - dt); continue; }
     if (e.chase) {
       const dx = run.x - e.x, dz = squadZ(run) - e.z, dist = Math.hypot(dx, dz), mv = d.vz * dt;
       if (dist > 1e-9) { const k = Math.min(1, mv / dist); e.x += dx * k; e.z += dz * k; }

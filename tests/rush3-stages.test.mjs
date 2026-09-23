@@ -145,7 +145,7 @@ test('V3-STAGES: buildStage 두 번은 deepEqual 이고 참조는 다르다(구�
 test('V3-STAGES: 무기 rank 순서 rifle<auto<heavy, makeBullet gateHit 1', () => {
   assert.ok(weaponRank('rifle') < weaponRank('auto') && weaponRank('auto') < weaponRank('heavy'));
   assert.equal(weaponRank('nope'), 0);
-  assert.deepEqual([WEAPONS.rifle.interval, WEAPONS.auto.interval, WEAPONS.heavy.interval], [0.5, 0.25, 0.6]);
+  assert.deepEqual([WEAPONS.rifle.interval, WEAPONS.auto.interval, WEAPONS.heavy.interval], [0.5, 0.25, 0.8]);   // r3.31 중화기 0.6 → 0.8
   assert.deepEqual([WEAPONS.rifle.dmg, WEAPONS.auto.dmg, WEAPONS.heavy.dmg], [1, 1, 3]);
   const b = makeBullet('heavy', 123, 456, 7);
   assert.deepEqual(b, { x: 123, z: 456, pz: 456, vz: 650, dmg: 3, w: 8, kind: 'heavy', gateHit: 1, ownerId: 7, dead: false });

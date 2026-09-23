@@ -21,7 +21,7 @@ function mkStage(o = {}) {
     gateRows: (o.gates || []).map((g, i) => ({ id: g.id ?? 'g' + (i + 1), z: g.z, h: 24, maxValue: g.maxValue ?? 15, bypass: !!g.bypass, armZ: g.armZ === undefined ? null : g.armZ, cells: g.cells })),
     supplies: (o.supplies || []).map((s, i) => ({ id: s.id ?? 'c' + (i + 1), z: s.z, x: s.x, r: 30, kind: s.kind, durability: s.durability, maxDurability: s.durability, payload: s.payload, coverZ: s.coverZ ?? null, pairId: s.pairId ?? null })),
     walls: (o.walls || []).map((w, i) => ({ id: 'w' + (i + 1), z0: w.z0, z1: w.z1, x0: 228, x1: 252 })),
-    spawns: (o.spawns || []).map((s) => ({ z: s.z, kind: s.kind, n: s.xs.length, xs: s.xs, zs: s.zs, corridorHw: s.corridorHw ?? null })),
+    spawns: (o.spawns || []).map((s) => ({ z: s.z, kind: s.kind, n: s.xs.length, xs: s.xs, zs: s.zs, corridorHw: s.corridorHw ?? null, ...(s.hp != null ? { hp: s.hp } : {}) })),
     elite: o.elite ? { z: o.elite.z, hp: o.elite.hp, summon: !!o.elite.summon } : null,
   };
 }
@@ -428,10 +428,12 @@ test('V3-CHAIN: 실제 사격으로 활성(chainOn)·발판 추가(padAdd)·통�
 // heavy 폭발 실험대: 잡졸 3기(x 196 · 220 · 262, 같은 z)에 x 220 직격탄 1발. 벽(228~252) z 구간은 1800~3000.
 // 220↔262 거리 42 = 폭발 반경 28 + 잡졸 r 14(사거리 경계 안) 이므로 제외 여부는 오직 벽 판정에 달린다.
 // 스폰(3단계)과 탄 이동(5단계)이 같은 STEP 이라 폭발 시점 좌표 = 스폰 좌표 그대로.
+//  r3.31: 중화기 폭발이 반경 28 → 22 · 피해 2 → 1 로 줄었다. 실험대는 **값이 아니라 규칙**(직격 적 제외·반경 안만·벽 너머 제외)을 보도록
+//   잡졸 체력을 1(= 폭발 피해)로 두고, 오른쪽 잡졸은 벽(228~252) 바로 너머이면서 반경 안(22 + 14 = 36 ≥ 거리 34)인 x 254 에 둔다
 function heavyBlastRun(walls, ez) {
   const run = createRun(mkStage({
     startWeapon: 'heavy', startUnits: 1, walls,
-    spawns: [{ z: 0, kind: 'grunt', xs: [196, 220, 262], zs: [ez, ez, ez] }],
+    spawns: [{ z: 0, kind: 'grunt', xs: [196, 220, 254], zs: [ez, ez, ez], hp: 1 }],
   }));
   holdFire(run);
   run.z = run.prevZ = ez - 400;
@@ -440,7 +442,7 @@ function heavyBlastRun(walls, ez) {
 }
 const enemyHits = (ev) => ev.filter((e) => e.type === 'enemyHit').map((e) => [e.id, e.hp, !!e.blast]);
 
-test('V3-HEAVY: heavy 는 적 직격 시에만 폭발 — 통 명중은 폭발 없음·직격 적은 직격 3만·반경 안 잡졸은 폭발 2', () => {
+test('V3-HEAVY: heavy 는 적 직격 시에만 폭발 — 통 명중은 폭발 없음·직격 적은 직격 3만·반경 안 잡졸은 폭발 피해', () => {
   const run = createRun(mkStage({
     startWeapon: 'heavy', startUnits: 1,
     spawns: [{ z: 0, kind: 'grunt', xs: [220], zs: [2400] }],
@@ -453,29 +455,29 @@ test('V3-HEAVY: heavy 는 적 직격 시에만 폭발 — 통 명중은 폭발 �
   assert.equal(run.supplies[0].durability, 7);
   assert.equal(count(ev, 'blast'), 0, '통 명중은 폭발 없음');
   assert.equal(run.enemies.length, 1, '잡졸은 아직 무사');
-  // 벽 없는 실험대: 직격 id 2 는 3 만(폭발 제외), 양옆 id 1·3 은 폭발 2 로 hp 0
+  // 벽 없는 실험대: 직격 id 2 는 3 만(폭발 제외), 양옆 id 1·3 은 폭발 피해 1 로 hp 0
   const b = heavyBlastRun([], 2400);
   assert.equal(count(b.ev, 'blast'), 1);
-  assert.deepEqual(enemyHits(b.ev), [[2, -1, false], [1, 0, true], [3, 0, true]], '직격 적은 직격 3만, 반경 안 잡졸은 폭발 2');
+  assert.deepEqual(enemyHits(b.ev), [[2, -2, false], [1, 0, true], [3, 0, true]], '직격 적은 직격 3만, 반경 안 잡졸은 폭발 피해');
   assert.equal(b.run.kills, 3, '직격·폭발로 죽은 적 모두 kills');
   assert.deepEqual(b.run.enemies, []);
 });
 
 test('V3-HEAVY: 벽 반대편 잡졸은 폭발 제외 — 같은 배치를 벽 없이 돌리면 죽고, 벽 z 구간 밖이면 벽이 있어도 죽는다', () => {
   const WALL = [{ z0: 1800, z1: 3000 }];
-  // (a) 벽 z 구간 안(2400): x 262 는 폭발 사거리 안(거리 42)이지만 벽 228~252 가 사이에 껴 제외 — hp 그대로
+  // (a) 벽 z 구간 안(2400): x 254 는 폭발 사거리 안(거리 34)이지만 벽 228~252 가 사이에 껴 제외 — hp 그대로
   const a = heavyBlastRun(WALL, 2400);
   assert.equal(count(a.ev, 'blast'), 1);
-  assert.deepEqual(enemyHits(a.ev), [[2, -1, false], [1, 0, true]], '반대편 id 3 은 enemyHit 없음');
-  assert.deepEqual(a.run.enemies.map((e) => [e.id, e.hp]), [[3, 2]], '벽 반대편 잡졸 hp 그대로');
+  assert.deepEqual(enemyHits(a.ev), [[2, -2, false], [1, 0, true]], '반대편 id 3 은 enemyHit 없음');
+  assert.deepEqual(a.run.enemies.map((e) => [e.id, e.hp]), [[3, 1]], '벽 반대편 잡졸 hp 그대로');
   assert.equal(a.run.kills, 2);
-  // (b) 같은 배치, 벽 없음: id 3 도 폭발 2 로 hp 0
+  // (b) 같은 배치, 벽 없음: id 3 도 폭발로 hp 0
   const b = heavyBlastRun([], 2400);
-  assert.deepEqual(enemyHits(b.ev), [[2, -1, false], [1, 0, true], [3, 0, true]]);
+  assert.deepEqual(enemyHits(b.ev), [[2, -2, false], [1, 0, true], [3, 0, true]]);
   assert.deepEqual(b.run.enemies, []);
   // (c) 벽은 있지만 폭발이 벽 z 구간 밖(1700 < 1800): 벽 사이 판정이 꺼져 id 3 도 죽는다
   const c = heavyBlastRun(WALL, 1700);
-  assert.deepEqual(enemyHits(c.ev), [[2, -1, false], [1, 0, true], [3, 0, true]], '벽 z 구간 밖에서는 wallBetween 미적용');
+  assert.deepEqual(enemyHits(c.ev), [[2, -2, false], [1, 0, true], [3, 0, true]], '벽 z 구간 밖에서는 wallBetween 미적용');
   assert.deepEqual(c.run.enemies, []);
   assert.equal(c.run.kills, 3);
 });

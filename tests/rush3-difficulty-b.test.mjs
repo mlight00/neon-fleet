@@ -375,7 +375,9 @@ test('V3-DIFFB DB-9b: 체력 숫자는 지나친 적·HUD 띠에서 생략하고
   //  ① 지나친 적(dz < 0)은 어느 모드에서도 생략 — 종전에는 부대 발밑 병력 수 옆에 숫자가 떴다
   assert.equal(hpTexts(mk(-60)).length, 0, '지나친 적');
   assert.equal(hpTexts(mk(-60), true).length, 0, '지나친 적(가까이)');
-  const tagY = (P, dz) => { const q = P.project(240, dz); return q.y + 14 * q.s + 16 * q.s; };
+  //  r3.31: 적 반지름은 체력 비례로 커진다(체력 40 → r 14 × sizeByHp) — 숫자 자리는 **실제 반지름**으로 구한다
+  const R = mk(0).enemies[0].r;
+  const tagY = (P, dz) => { const q = P.project(240, dz); return q.y + R * q.s + 16 * q.s; };
   for (const [mode, zoom] of [['standard', false], ['close', true]]) {
     const P = projectorFor(mode);
     //  임계 dz: 숫자 y 가 HP_TAG_MIN_Y 아래로 내려오는 첫 거리(1px 단위로 찾는다 — 매핑이 바뀌면 이 값도 같이 움직인다)

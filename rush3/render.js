@@ -880,7 +880,8 @@ export function createRenderer3(ctx, sprites) {
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
-    const h = r * 2.4;
+    //  그림 배율(r3.31 FX.artScale): 바리케이드·신호등처럼 같은 r 에서 작아 보이는 그림만 키운다(판정 r 은 그대로)
+    const h = r * 2.4 * ((FX.artScale && FX.artScale[artBase3(e.kind, e.skin)]) || 1);
     shadow(x, y + h * 0.4, r * 0.95);
     //  피격 반응(r3.24 손맛, 셸 fx.hit[id]): 넉백·흔들림·스쿼시는 **그림에만** 건다(그림자·HP 숫자·규칙 위치는 그대로)
     const hr = hitPose(fx, e.id, hitRole(e.kind, e.skin), k);
@@ -910,6 +911,20 @@ export function createRenderer3(ctx, sprites) {
       ctx.globalAlpha = 1;
     }
     if (hr) ctx.restore();
+    //  전격 기절(r3.31): 멈춘 동안 청보라 고리 + 번개 조각 3개(시간에 따라 돌아간다). 규칙 e.stunT 를 그대로 읽는다
+    if (e.stunT > 0) {
+      const t = run.time || 0, a = Math.min(1, e.stunT / 0.25);
+      ctx.save();
+      ctx.globalAlpha = 0.85 * a;
+      ctx.strokeStyle = FX.stunColor || '#9FB4FF';
+      ctx.lineWidth = Math.max(2, 2.5 * k);
+      ctx.beginPath(); ctx.ellipse(x, y, r * 1.25, r * 0.9, 0, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < 3; i++) {
+        const ang = t * 6 + i * 2.09, rx = x + Math.cos(ang) * r * 1.25, ry = y + Math.sin(ang) * r * 0.9;
+        ctx.beginPath(); ctx.moveTo(rx - 4 * k, ry - 5 * k); ctx.lineTo(rx + 2 * k, ry - 1 * k); ctx.lineTo(rx - 2 * k, ry + 1 * k); ctx.lineTo(rx + 4 * k, ry + 5 * k); ctx.stroke();
+      }
+      ctx.restore();
+    }
     //  체력 숫자(r3.21 B안 ③ × r3.20 원근 화해): **스폰 체력(hpMax)이 2 를 넘는 적만** 남은 체력 정수를 보여 준다
     //   (체력 1~2 잡졸 = 1~3 스테이지는 숫자 없음 — 이사 결정 "한두 방에 죽는지 몇 방 맞는지 보이게").
     //   자리는 종전 HP 태그 그대로 **적 아래**(투영 x·배율 k, 글자 12px 하한) — 머리 위에 두면 화면 위로 들어오는 동안

@@ -41,14 +41,19 @@ export const BAL3 = deepFreeze({
   weapons: {
     rifle: { id: 'rifle', rank: 1, interval: 0.5,  dmg: 1, vz: 700, w: 4, color: '#F6C84A', name: '소총', gateHit: 1 },
     auto:  { id: 'auto',  rank: 2, interval: 0.25, dmg: 1, vz: 800, w: 5, color: '#35E5FF', name: '기관총', gateHit: 1 },
-    // heavy: 적 직격 시 반경 28 폭발(폭발 dmg 2, 직격 적은 3만, 벽 반대편 제외). 통·게이트·벽 명중 시 폭발 없음
-    heavy: { id: 'heavy', rank: 3, interval: 0.6,  dmg: 3, vz: 650, w: 8, color: '#FF9A4A', name: '중화기', gateHit: 1, blastR: 28, blastDmg: 2 },
+    // heavy: 적 직격 시 반경 22 폭발(폭발 dmg 1, 직격 적은 3만, 벽 반대편 제외). 통·게이트·벽 명중 시 폭발 없음
+    //  r3.31(이사 소감 2026-09-23 "중화기를 고르면 후반부는 모두 쉽게 클리어된다"): 발사 간격 0.6 → 0.8 · 폭발 반경 28 → 22 · 폭발 피해 2 → 1.
+    //   실측(어려움 13~24, evLead, 시작 무기만 바꿈): 종전 12판 중 11승·생존 합 665·보스전 평균 6.5초로 전 무기 중 1위 →
+    //   10승·471·10.8초(기관총 11승·573·9.6초 아래, 저격·전격·산탄 위). 후보 4안 스윕에서 골랐다(간격 0.9 는 8승으로 과함)
+    heavy: { id: 'heavy', rank: 3, interval: 0.8,  dmg: 3, vz: 650, w: 8, color: '#FF9A4A', name: '중화기', gateHit: 1, blastR: 22, blastDmg: 1 },
     //  r3.10(2026-09-19 이사 결정 A) 신규 3종(이미지프롬프트_v5 §5). 같은 순위끼리는 교체 없음.
     //   scatter: 발사마다 fan 발을 ±spreadDeg 부채꼴로, 사거리 range px 뒤 소멸(근거리·게이트 특화 — 3발 모두 gateHit 1)
     //   sniper : 관통 pierce 체(같은 적은 다시 안 맞음), dmg 3 · arc: 직격 시 chainR 안 적 chain 체에 chainDmg 연쇄(벽 너머 제외)
     scatter: { id: 'scatter', rank: 2, interval: 0.55, dmg: 1, vz: 520, w: 4, color: '#B6FF4A', name: '산탄포', gateHit: 1, fan: 3, spreadDeg: 14, range: 420 },
     sniper:  { id: 'sniper',  rank: 3, interval: 0.9,  dmg: 3, vz: 900, w: 4, color: '#DDEBFF', name: '저격총', gateHit: 1, pierce: 2 },
-    arc:     { id: 'arc',     rank: 3, interval: 0.7,  dmg: 1, vz: 750, w: 5, color: '#7F9BFF', name: '전격포', gateHit: 1, chain: 2, chainR: 90, chainDmg: 1 },
+    //  stunSec(r3.31, 이사 지시 2026-09-23 "전격무기는 맞은 적들이 잠시 동안 못 움직이도록"): 직격·연쇄로 맞은 **일반 적**은 그동안 멈춘다
+    //   (이동·가속·저격 예고/발사 모두 정지). 정예·아레나 보스는 제외 — 보스를 묶으면 보스전이 사라진다
+    arc:     { id: 'arc',     rank: 3, interval: 0.7,  dmg: 1, vz: 750, w: 5, color: '#7F9BFF', name: '전격포', gateHit: 1, chain: 2, chainR: 90, chainDmg: 1, stunSec: 0.8 },
   },
   //  무기 강화 Mk I~III(r3.10): 같은 무기 통을 다시 먹으면 한 단계. 같은 무기 안에서 발사 간격·탄 폭·피해가 한 단계씩(그림 3단계와 1:1)
   weaponMk: Object.freeze([
@@ -75,7 +80,8 @@ export const BAL3 = deepFreeze({
     grunt:   { hp: 2, r: 14, vz: 24, track: 0, touchDmg: 1 },
     // 돌격체: 스폰 x 직진, 가속 260/s², 최대 420. 접촉 유닛 hp −2
     //  r3.27: 처음 속도만 90 → 45(멀리서는 천천히 다가온다) — 가속·최대는 그대로라 가까이서 달려드는 위협은 유지
-    rusher:  { hp: 4, r: 18, vz: 45, accel: 260, maxVz: 420, touchDmg: 2 },
+    //  r3.31(이사 지시 "달려나오는 자동차는 속도를 더 낮춰주자"): 가속 260 → 180 · 최대 420 → 290
+    rusher:  { hp: 4, r: 18, vz: 45, accel: 180, maxVz: 290, touchDmg: 2 },
     // 저격수: 도로 고정(vz 0). 1.6s 마다 예고 0.5s 후 탄 1발(적탄 vz 260, dmg 1, r 5). 접촉 없음
     shooter: { hp: 6, r: 22, vz: 0, shootEvery: 1.6, aimTime: 0.5, shot: { vz: 260, dmg: 1, r: 5 }, touchDmg: 0 },
     // 정예: hp 는 스테이지 고정(stages.js). 스폰 z = run.z + 760, run.z + 420 까지 150/s 하강 후 좌우 60px/s 왕복
@@ -94,6 +100,8 @@ export const BAL3 = deepFreeze({
   //   gunner   = 사격만(부채꼴 3발) · summoner = 소환만(잡졸 2/4초) · tank = 사격·소환 없음, 체력 큼, 느리게 내려와 더 가까이(360) 정지, 순찰 절반
   //  laneHw = 정의에 x 가 있을 때 순찰 반폭(px). 2체 x160/320 이면 원 r48 이 겹치지 않는 최대값(160+32+48 = 240 = 320−32−48).
   //  holdAhead 460 은 화면 y 180(그림 반높이 62 → 위 118)이라 HUD 정예 막대 글(y 111)과 겹치지 않는다. 360 은 y 280.
+  //  체력 비례 크기(r3.31): r = 표 r × min(cap, 1 + k·log2(체력 ÷ 표 체력)). 체력 2배 +10% · 4배 +20% · 12배 +36% · 18배 +42%
+  sizeByHp: { k: 0.1, cap: 1.45 },
   //  보스 페이즈(r3.27, 이사 결정 A 2026-09-23 "보스 체력에 맞춘 페이즈 단계"): 남은 체력 비율이 at 의 값 아래로 내려갈 때마다 한 단계 오른다.
   //   옛 러너(rush/combat.js phase2At·rage)에 있던 장치를 v3 에 처음 들여온 것 — v3 보스는 체력만 크고 끝까지 같은 속도였다.
   //   rate = 사격·소환 **주기** 배수(작을수록 자주) · speed = 순찰/추격 속도 배수 · dashEvery = 아레나 돌진 주기 배수.
@@ -107,7 +115,9 @@ export const BAL3 = deepFreeze({
     roles: {
       elite:    { label: '정예', shoot: true,  summon: null,  holdAhead: 420, descendMul: 1,   patrolMul: 1 },
       gunner:   { label: '포격', shoot: true,  summon: false, holdAhead: 420, descendMul: 1,   patrolMul: 1 },
-      summoner: { label: '소환', shoot: false, summon: true,  holdAhead: 460, descendMul: 1,   patrolMul: 1 },
+      //  r3.31: 소환형 정지 거리 460 → 420. 산탄포(사거리 420)는 460 에 선 보스에 앞줄 몇 명만 닿아, 사격을 안 하는 소환형과
+      //   **끝나지 않는 판**이 났다(지옥 10번 evLead 실측: 4분 뒤 병력 7명·보스 체력 705 그대로). 다른 역할과 같은 420 으로
+      summoner: { label: '소환', shoot: false, summon: true,  holdAhead: 420, descendMul: 1,   patrolMul: 1 },
       tank:     { label: '장갑', shoot: false, summon: false, holdAhead: 360, descendMul: 0.7, patrolMul: 0.5 },
     },
   },
@@ -233,6 +243,11 @@ export const BAL3 = deepFreeze({
         //  skin → 역할(그림이 역할을 뜻한다, courses.js 의 ARMOR·CART·JUMPER·HOUND·POD·MAGNET)
         hitRoleBySkin: { E3_wallguard: 'armor', E7_cartyard: 'cart', E2_ramhound: 'rusher', E8_manholejumper: 'rusher',
                          E4_needleeye: 'shooter', E9_spawnpod: 'shooter', E10_magnethead: 'shooter' },
+        //  그림 배율(r3.31, 이사 지시 "바리케이드 모양 적과 신호등은 좀 더 크기를 키워주자"): **그리기 전용** — 판정 r 은 그대로.
+        //   두 그림은 세로로 길거나(신호등) 납작해서(바리케이드) 같은 r 에서 다른 적보다 작아 보였다
+        artScale: { E3_wallguard: 1.35, E6_signaler: 1.4 },
+        //  전격 기절 표시(r3.31): 멈춘 적 둘레에 청보라 고리 + 번개 조각
+        stunColor: '#9FB4FF',
         //  무기별 피격 스파크: n = 개수 · r = 크기 · sp = 속도 · shape(dot 점 · line 가는 선 · bolt 번개 조각) · color
         hitSparks: {
           rifle:   { n: 3, r: 2.6, sp: 140, shape: 'dot',  color: '#F6C84A' },

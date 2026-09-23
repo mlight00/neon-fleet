@@ -871,9 +871,10 @@ test('V3-SHELL-LOTTERY-OUT: 위험 항목 공개는 중립 경고음이고, 피�
     if (run().lotteryOutcome.passed) lossSfx = audio.played.slice(before).map((p) => p[0]);
   }
   assert.ok(guard < 1200, '확정 손실 게이트를 통과했다');
-  assert.equal(run().lotteryOutcome.applied, -10);
+  //  손실은 '−10 또는 남은 병력 전부' 중 작은 쪽이다(병력이 10명 미만이면 있는 만큼만 잃는다 — r3.31 이후 이 봇은 9명으로 도착)
+  assert.ok(run().lotteryOutcome.applied < 0 && run().lotteryOutcome.applied >= -10, '함정 손실 ' + run().lotteryOutcome.applied);
   assert.ok(lossSfx.includes('hurt'), '실제 손실이 나는 프레임에 피격음: ' + JSON.stringify(lossSfx));
-  assert.equal(lotteryLine(run()), '랜덤 길: 함정 피해 −10명');
+  assert.equal(lotteryLine(run()), '랜덤 길: 함정 피해 −' + (-run().lotteryOutcome.applied) + '명');
 });
 
 //  랜덤 길 추첨이 pick 으로 걸리는 시각(셸의 시드 조립 규칙 그대로) — 검사는 결정적이어야 한다
