@@ -78,20 +78,26 @@ def split3(im, base, names, mingap=12):
         out.append((nm, part.size))
     return out, cuts
 
-JOBS = [("S_E1", "E1_scrapbit"), ("S_E2", "E2_ramhound"), ("S_E5", "E5_wheeler"), ("S_E6", "E6_signaler")]
-tiles = []
-for src, base in JOBS:
-    im, info = unchecker(os.path.join(SRC, src + ".png"))
-    names = [base + s for s in ("_hit", "_dmg", "_dead")]
-    out, cuts = split3(im, base, names)
-    print(src, info, out if out else ("SPLIT FAIL", cuts))
-    if out:
+#  사용법: python tools/states/states_split.py S_E7:E7_cartyard S_E8:E8_manholejumper ...
+#   (인자 없으면 첫 반입 4종). 원본 = newmode/sprites/states/<S_..>.png · 결과 = assets/rush/<그림>_{hit,dmg,dead}.png (높이 512 로 축소)
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    JOBS = [tuple(a.split(":", 1)) for a in args] if args else [("S_E1", "E1_scrapbit"), ("S_E2", "E2_ramhound"), ("S_E5", "E5_wheeler"), ("S_E6", "E6_signaler")]
+    tiles = []
+    for src, base in JOBS:
+        im, info = unchecker(os.path.join(SRC, src + ".png"))
+        names = [base + s for s in ("_hit", "_dmg", "_dead")]
+        out, cuts = split3(im, base, names)
+        print(src, info, out if out else ("SPLIT FAIL", cuts))
+        if not out: continue
         for nm, _ in out:
-            t = Image.open(os.path.join(DST, nm + ".png")).convert("RGBA"); t.thumbnail((200, 200))
-            bg = Image.new("RGBA", t.size, (40, 90, 40, 255)); bg.alpha_composite(t); tiles.append(bg)
-if tiles:
-    W = sum(t.width for t in tiles) + 6 * (len(tiles) - 1); H = max(t.height for t in tiles)
-    m = Image.new("RGB", (W, H), (40, 90, 40)); x = 0
-    for t in tiles: m.paste(t.convert("RGB"), (x, 0)); x += t.width + 6
-    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_preview_states.png")
-    m.save(out); print("preview", out, m.size)
+            p = os.path.join(DST, nm + ".png"); t = Image.open(p).convert("RGBA")
+            if t.height > 512: t = t.resize((round(t.width * 512 / t.height), 512), Image.LANCZOS)
+            t.save(p, optimize=True)
+            v = t.copy(); v.thumbnail((200, 200)); bg = Image.new("RGBA", v.size, (40, 90, 40, 255)); bg.alpha_composite(v); tiles.append(bg)
+    if tiles:
+        W = sum(t.width for t in tiles) + 6 * (len(tiles) - 1); H = max(t.height for t in tiles)
+        m = Image.new("RGB", (W, H), (40, 90, 40)); x = 0
+        for t in tiles: m.paste(t.convert("RGB"), (x, 0)); x += t.width + 6
+        out = os.path.join(SRC, "_preview_last.png")
+        m.save(out); print("preview", out, m.size)
