@@ -554,9 +554,11 @@ export function createRenderer3(ctx, sprites) {
       ctx.textBaseline = 'middle';
       ctx.globalAlpha = base;
       outlinedText(gateLabel(c.value), cx, y, px, flash > 0.5 ? C.gateFlash : col, 'bold', 6);
-      //  확정 손실 칸(상한이 자기 값 = 쏴도 오르지 않는다, 랜덤 길 ⑤): 칸 아래에 '확정' 꼬리표를 붙여 '안 먹히는 이유'를 화면에 남긴다
+      //  확정 칸(값이 상한 = 쏴도 오르지 않는다): 칸 아래에 '확정' 꼬리표를 붙여 '안 먹히는 이유'를 화면에 남긴다.
+      //   r3.30: 함정(음수) 칸만이 아니라 **쏴서 상한까지 올린 칸**에도 붙인다 — 그 칸은 이제 탄을 통과시키므로(gates.isGateCellFixed)
+      //   '왜 총알이 지나가는지'가 화면에 보여야 한다
       //  ⚠️숫자와 겹치지 않게 칸 **바깥**(아래)에 그린다 — 숫자가 38px 라 칸 안에서는 밑줄이 물린다
-      if (c.value < 0 && c.maxValue != null && c.maxValue <= c.value) {
+      if (c.maxValue != null && c.value >= c.maxValue) {
         outlinedText('확정', cx, y + hh / 2 + fs(13, s, 10), fsMin(16, s), col, 'bold', 4);
       }
       ctx.textBaseline = 'alphabetic';

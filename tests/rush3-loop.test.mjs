@@ -928,13 +928,14 @@ test('V3-SHELL-TRAP: 함정 게이트에 막힌 탄은 둔탁한 차단음(trapH
   assert.ok(!shownClosed.includes('gateClang'), '공개 뒤에는 셔터의 금속 튕김을 쓰지 않는다: ' + JSON.stringify(kinds(shownClosed)));
   //  공개된 뒤에도 '가까워지면 열림' 은 뜨지 않는다 — 이 행에서는 지킬 수 없는 약속이다
   assert.equal(tipWhileClosed, 'none', '함정 행에 닫힘 안내를 띄우지 않는다: ' + tipWhileClosed);
-  //  열린 뒤 맞는 탄도 같은 차단음(값이 그대로라 숫자음·흰 플래시를 쓰지 않는다)
+  //  r3.30(이사 지시 "수치가 확정된 게이트는 총알을 통과시키자"): 열린 뒤 함정 칸은 값 = 상한인 **확정 칸**이라 탄이 통과한다 —
+  //   차단음도 숫자음도 흰 플래시도 없다(탄이 칸에 닿지 않는다). 막힘 소리는 셔터가 닫힌 동안(위 ①)에만 난다
   const from2 = audio.played.length;
   let guard = 0;
   while (!run().lotteryOutcome.passed && guard++ < 1200) { app.input.state.pointerX = 330; frames(1); }
   assert.ok(guard < 1200, '함정 게이트를 통과했다');
   const heard2 = audio.played.slice(from2).map((p) => p[0]);
-  assert.ok(heard2.includes('trapHit'), '열린 뒤에도 차단음: ' + JSON.stringify(kinds(heard2)));
+  assert.ok(!heard2.includes('trapHit'), '열린 뒤에는 탄이 통과하므로 차단음이 없다: ' + JSON.stringify(kinds(heard2)));
   assert.ok(!heard2.includes('gateTick'), '값이 안 오르는 칸에 숫자 증가음을 내지 않는다: ' + JSON.stringify(kinds(heard2)));
   assert.deepEqual(app.getFx().gateFlash, {}, '값이 안 오르므로 흰 플래시도 없다');
   assert.equal(rowId, run().lottery.rowId);

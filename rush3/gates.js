@@ -62,6 +62,13 @@ export function sweepContactGate(row, cell, bullet) {
   return Math.max(row.z - half, zlo);
 }
 
+// 확정 칸(r3.30, 이사 지시 2026-09-23 "파괴되어서 수치가 확정된 게이트는 총알을 통과시키자"): 셔터가 열려 있고 값이 상한에 닿아
+//  더 쏴도 오르지 않는 칸. 탄을 흡수하지 않고 **통과**시켜 뒤의 적을 맞히게 한다(쏘아 봐야 헛발이던 탄을 돌려준다).
+//  ⚠️닫힌 셔터(armed false)는 여전히 흡수한다 — 함정 칸(값 = 상한)도 열리기 전에는 막고, 열린 뒤에는 통과
+export function isGateCellFixed(row, cell) {
+  return !!row.armed && cell.value >= cell.maxValue;
+}
+
 // 겹침 여부만(기존 계약 유지). 판정은 sweepContactGate 하나로 모았다.
 export function sweepHitsGate(row, cell, bullet) {
   return sweepContactGate(row, cell, bullet) !== null;

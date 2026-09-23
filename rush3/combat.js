@@ -2,7 +2,7 @@
 // 모든 좌표는 트랙 z(클수록 앞). 화면 y 변환은 렌더 몫. 규칙은 STEP = 1/60 단위로만 진행한다.
 import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
 import { WEAPONS, weaponRank, makeBullet, weaponStats, fanAngles, clampMk, MK_MAX } from './weapons.js';
-import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm } from './gates.js';
+import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm, isGateCellFixed } from './gates.js';
 import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward, moveSupply } from './supply.js';
 import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit } from './squad.js';
 import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.js';
@@ -370,7 +370,8 @@ function moveBullets(run, ev, dt) {
     for (const s of run.supplies) consider(sweepContactSupply(s, b), 1, 1, s, null);
     for (const row of run.gateRows) {
       if (row.passed) continue;
-      for (const c of row.cells) consider(sweepContactGate(row, c, b), 2, 2, row, c);
+      //  r3.30 확정 칸(열린 셔터 + 값이 상한)은 후보에서 뺀다 = 탄이 통과해 뒤의 적·통을 맞힌다
+      for (const c of row.cells) if (!isGateCellFixed(row, c)) consider(sweepContactGate(row, c, b), 2, 2, row, c);
     }
     const halfW = b.w / 2;
     //  관통탄(저격총)이 이미 맞힌 적은 후보에서 뺀다(같은 적을 STEP 마다 다시 맞히지 않게)

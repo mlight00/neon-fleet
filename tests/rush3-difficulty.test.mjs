@@ -328,7 +328,8 @@ test('V3-SIM-DIFF SD-7 성공 경로: planBoss 가 hard S1·S2·S3 와 brutal S1
   //  대조점(r3.9 실측 2026-09-19 = r3.21 대항 검수 반영 뒤 2026-09-20 재실측: 어려움 S2 4명 · 어려움 S3 70명 · 지옥 S1 14명 생존)
   assert.equal(BR('hard', 2).run.units.length, 4, 'hard S2 planBoss 생존 병력 = r3.9 실측 4명');
   assert.equal(BR('hard', 3).run.units.length, 70, 'hard S3 planBoss 생존 병력 = r3.9 실측 70명');
-  assert.equal(b1.run.units.length, 21, 'brutal S1 evLead 생존 병력 = r3.22 실측 21명(최대 29명)');
+  //  r3.30(확정 칸 통과): 상한에 닿은 게이트에 헛발로 흡수되던 탄이 뒤의 적을 맞히게 되어 21 → 24명(최대 29 그대로, 여전히 손실 있음)
+  assert.equal(b1.run.units.length, 24, 'brutal S1 evLead 생존 병력 = r3.30 실측 24명(최대 29명)');
 });
 
 test('V3-SIM-DIFF SD-8 기록: brutal S2·S3 는 실패를 허용하고 결과만 남긴다 — 다만 지더라도 정예전에서만 진다', (t) => {
