@@ -14,7 +14,7 @@ import { playPolicy, pickInput, pickX } from './lib/rush3-policies.mjs';
 const ARM = BAL3.supply.armZ;
 const at = (x) => ({ pointerX: x, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
 const ARMED_IDS = { 6: ['c1', 'c2', 'c4'], 7: ['c2'], 12: ['c4'] };
-const ARENA_IDS = [10, 11, 24];
+const ARENA_IDS = [15, 20, 24];
 
 //  합성 아레나(rush3-arena 의 synthArena 와 같은 꼴, guard 만 켠다)
 function synthArena(o = {}) {
@@ -195,7 +195,7 @@ test('V3-ARMGUARD AG-6: 최소 1회 돌진 보장(봇 실측) — 10·11·24 × 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-ARMGUARD AG-7: 결정성 — S6(lead)·S7(x120)·S10(planBoss) 두 판이 이벤트 열·상태까지 같다, 규칙 모듈은 난수·시계 없음', () => {
+test('V3-ARMGUARD AG-7: 결정성 — S6(lead)·S7(x120)·S15(planBoss) 두 판이 이벤트 열·상태까지 같다, 규칙 모듈은 난수·시계 없음', () => {
   const trace = (id, pol) => {
     const run = createRun(buildStage(id));
     const ev = [];
@@ -237,7 +237,7 @@ function drawRun(run) {
   return ops;
 }
 test('V3-ARMGUARD AG-8: 렌더 — 보호막 중 보스에 하늘색 점선 링(r+16, dash [10,7])과 "보호막" 글자, 해제 뒤엔 없음. 활성 전 통엔 점선 링(dash [4,4])·자물쇠·회색 내구, 활성 뒤엔 주황', () => {
-  const run = createRun(buildStage(10));
+  const run = createRun(buildStage(15));
   drive(run, (r) => r.phase === 'arena', (r) => at(pickX('planBoss', r)));
   const bo = run.boss;
   const ops = drawRun(run);

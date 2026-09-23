@@ -57,11 +57,11 @@ const hpSum = (st) => st.elites.reduce((a, e) => a + e.hp, 0);
 
 // ─────────────────────────────────────────────────────────────────────────────
 test('V3-MULTIELITE ME-1: 형식·정규화 — 9 는 2체(gunner·summoner, x 160/320, 합 1320), 23 은 3체(tank patrol 0, 합 5640), 나머지는 단수 모양 그대로·결정적', () => {
-  const s9 = buildStage(9);
+  const s9 = buildStage(10);   // r3.29: 복수 정예 판이 9 → 10
   assert.equal(s9.elites.length, 2);
   assert.deepEqual(s9.elites.map((e) => e.role), ['gunner', 'summoner']);
   assert.deepEqual(s9.elites.map((e) => e.x), [160, 320]);
-  assert.ok(s9.elites.every((e) => e.z === s9.eliteZ && e.z === 9000), '전원 eliteZ');
+  assert.ok(s9.elites.every((e) => e.z === s9.eliteZ && e.z === 8400), '전원 eliteZ');   // r3.29: 10번 코스의 eliteZ
   //  r3.18 대항 검수 반영: 440 → 1320(무입력 도착 156 dps × 8초 안팎)
   assert.equal(hpSum(s9), 1320);
   assert.equal(s9.elite, s9.elites[0], 'stage.elite 는 첫 원소와 같은 객체');
@@ -73,9 +73,9 @@ test('V3-MULTIELITE ME-1: 형식·정규화 — 9 는 2체(gunner·summoner, x 1
   //  r3.18: 940 → 5640(무입력 도착 640 dps × 9초 안팎)
   assert.equal(hpSum(s23), 5640);
   assert.ok(s23.elites.every((e) => e.z === 10200));
-  //  단수 정의 스테이지(9·23 제외 전부): elites 길이 1 이고 stage.elite 가 종전 키 집합 { z, hp, summon(, skin) } 그대로
+  //  단수 정의 스테이지(복수 정예 10·23 제외 전부): elites 길이 1 이고 stage.elite 가 종전 키 집합 { z, hp, summon(, skin) } 그대로
   for (const id of ALL_STAGE_IDS) {
-    if (id === 9 || id === 23) continue;
+    if (id === 10 || id === 23) continue;
     const st = buildStage(id);
     assert.equal(st.elites.length, 1, 'S' + id + ' 단수');
     assert.equal(st.elite, st.elites[0]);
@@ -102,7 +102,7 @@ test('V3-MULTIELITE ME-1: 형식·정규화 — 9 는 2체(gunner·summoner, x 1
 
 // ─────────────────────────────────────────────────────────────────────────────
 test('V3-MULTIELITE ME-2: 동시 등장·z 정지 — S9 정예 2체가 같은 STEP 에 index 0·1 로 나오고, 별칭은 첫 보스, 다음 STEP 부터 run.z 정지, 스폰 x 160/320·760 앞', () => {
-  const run = createRun(buildStage(9));
+  const run = createRun(buildStage(10));
   let spawnEv = null, zAtSpawn = null;
   play(run, 14400, at(240), (r, ev) => {
     if (spawnEv) return;
@@ -116,7 +116,7 @@ test('V3-MULTIELITE ME-2: 동시 등장·z 정지 — S9 정예 2체가 같은 S
   for (const e of spawnEv) { assert.equal(e.z - zAtSpawn, E.spawnAhead); assert.ok(e.hp > 0); }
   assert.deepEqual(spawnEv.map((e) => e.hp), [600, 720]);
   //  다시 굴려 등장 직후 상태를 본다(직접 루프)
-  const run3 = createRun(buildStage(9));
+  const run3 = createRun(buildStage(10));
   for (let i = 0; i < 14400 && !run3.bosses.length; i++) { stepRun(run3, at(240), STEP); drainEvents(run3); }
   assert.equal(run3.bosses.length, 2);
   assert.equal(run3.boss, run3.bosses[0], '별칭 = 첫 보스');
@@ -258,7 +258,7 @@ test('V3-MULTIELITE ME-5: 단수 회귀 — 1~3 은 elites 1·별칭·role elite
 //  r3.18 재기준: '종전 단수 정예의 1.2~1.5배' 기준은 폐기(대항 검수 — 그 값은 무입력 도착 병력에 2~5초 만에 전멸해 순서 선택이 화면에 남지 않았다).
 //   새 기준 = 무입력 도착 병력의 dps × 목표 전투 초. 합은 정확한 값으로, 그리고 등장 → 마지막 격파까지의 **최소 생존 초**를 planBoss 보통에서 잠근다(S9 ≥ 8초, S23 ≥ 6초 — 실측 15.6·10.2초)
 test('V3-MULTIELITE ME-6: C[9]·C[23] planBoss 보통 완주 — won·상한 안, 체력 합 1320·5640, 등장→마지막 격파 최소 생존 초(9: 8초·23: 6초), 코스 버전 2', (t) => {
-  for (const [id, expectSum, minSec] of [[9, 1320, 8], [23, 5640, 6]]) {
+  for (const [id, expectSum, minSec] of [[10, 1320, 8], [23, 5640, 6]]) {   // r3.29: 복수 정예가 9 → 10(보스 분기점)
     const r = playPolicy(id, 'planBoss', 14400, 'normal');
     assert.equal(r.run.won, true, `S${id} planBoss 미완주(남은 보스 ${r.run.bosses.filter((b) => !b.dead).map((b) => b.id + ':' + Math.ceil(b.hp)).join(',')} 병력 ${r.run.units.length})`);
     assert.ok(r.steps < 14400);
@@ -443,7 +443,7 @@ function shellDrive(h, cond, max = 9000) {
 test('V3-MULTIELITE ME-9: 셸 — 2체 등장 프레임에 elite 효과음·보스 BGM 각 1회·배너 "정예 2체 접근!", 첫 처치에 kill 음·배너 "정예 N 격파 — 남은 목표 1", 마지막에 win, 결과·저장(version 2)', async () => {
   const h = await bootFake();
   h.app.setDifficulty('normal');
-  h.app.startRun(9);
+  h.app.startRun(10);   // r3.29: 복수 정예 판
   const run = () => h.app.getRun();
   const dbg = () => h.app.dbg();
   assert.deepEqual(dbg().bosses, []); assert.equal(dbg().bossesLeft, 0);
@@ -479,8 +479,8 @@ test('V3-MULTIELITE ME-9: 셸 — 2체 등장 프레임에 elite 효과음·보�
   assert.equal(run().won, true);
   shellDrive(h, () => h.app.getState() === 'result', 600);
   assert.equal(h.app.getState(), 'result');
-  const rec = h.save.getStage(9, 3);
+  const rec = h.save.getStage(10, 3);
   assert.equal(rec.cleared, true);
-  assert.equal(h.save.getStage(9, 2).cleared, false, 'r3.21 이전 판 기록 칸은 따로');
-  assert.equal(h.save.getStage(9, 1).cleared, false, '단수 정예 시절 기록 칸은 따로');
+  assert.equal(h.save.getStage(10, 2).cleared, false, 'r3.21 이전 판 기록 칸은 따로');
+  assert.equal(h.save.getStage(10, 1).cleared, false, '옛 판 기록 칸은 따로');
 });

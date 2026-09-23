@@ -197,9 +197,10 @@ test('V3-DIFFB DB-4: 획득 숫자 후처리 — gain(4) 0.5 → gain(24) 1.0 �
   assert.deepEqual(s24.gateRows[0].cells.map((c) => [c.value, c.maxValue]), [[-6, 15], [6, 8], [-8, 15]]);
   assert.deepEqual(s24.supplies.filter((s) => s.kind === 'soldier').map((s) => s.payload.n), [8, 9, 8]);
   assert.deepEqual([s24.supplies.find((s) => s.kind === 'chain').payload.pads0, s24.supplies.find((s) => s.kind === 'chain').payload.maxPads], [6, 12]);
-  //  같은 정의 n 이면 스테이지가 뒤일수록 크거나 같다(gain 단조): S8 c1(병사 5) ≤ S10 c2(병사 5) ≤ S23 c2(병사 6)
-  const n = (id, cid) => buildStage(id).supplies.find((s) => s.id === cid).payload.n;
-  assert.ok(n(8, 'c1') <= n(10, 'c2') && n(10, 'c2') <= n(11, 'c1'), `${n(8, 'c1')} ≤ ${n(10, 'c2')} ≤ ${n(11, 'c1')}`);
+  //  같은 정의 n 이면 스테이지가 뒤일수록 크거나 같다(gain 단조). r3.29 로 코스가 자리를 바꿨으므로 통 id 가 아니라
+  //   **그 판의 첫 병사 통**으로 비교한다(id 는 코스마다 다른 내용물을 가리킬 수 있다)
+  const n = (id) => buildStage(id).supplies.find((s) => s.kind === 'soldier').payload.n;
+  assert.ok(n(8) <= n(16) && n(16) <= n(23), `${n(8)} ≤ ${n(16)} ≤ ${n(23)}`);
 });
 
 test('V3-DIFFB DB-5: 게이트 칸 값 차별화 — 3칸 행은 세 값이 서로 다르다(1~24·proto3), 음수 칸 max > 양수 칸 max(같은 행, 1~24 — 격리 시제품 proto3 는 행 상한뿐이라 제외), 양수 칸 max ≥ 값, 1~3 DEFS 칸별 상한 확인', () => {

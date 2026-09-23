@@ -20,7 +20,7 @@ import { createSave3 } from '../rush3/save.js';
 import { pickX, pickInput, botArena } from './lib/rush3-policies.mjs';
 
 const AR = BAL3.arena, SQ = BAL3.squad, LINE_Y = BAL3.view.LINE_Y;
-const ARENA_IDS = [10, 11, 24];
+const ARENA_IDS = [15, 20, 24];
 const NONE = { pointerX: null, dragDx: 0, keyDir: 0 };
 const at = (x, o = {}) => ({ pointerX: x, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0, ...o });
 const count = (ev, type) => ev.filter((e) => e.type === type).length;
@@ -83,7 +83,7 @@ test('V3-ARENA A-1: 형식·파생·불변식 — 10·11·24 정의에 arena 만
     const a = buildStage(id), b = buildStage(id);
     assert.deepEqual(a, b, 'S' + id + ' 결정성');
     assert.notEqual(a.arena, b.arena, '호출마다 새 객체');
-    assert.equal(stageVersion(id), 3); assert.equal(a.version, 3);
+    assert.equal(stageVersion(id), id === 24 ? 3 : 4); assert.equal(a.version, id === 24 ? 3 : 4);   // r3.29: 15·20 은 자리를 옮겨 +1
     //  기본값 병합: w/depth/bossZ 는 BAL3.arena, 정의가 적지 않은 boss 칸(r·spawnAhead·touchEvery·touchDmg·dash.recover)은 BAL3.arena.boss
     assert.deepEqual(a.arena.w, AR.w); assert.deepEqual(a.arena.depth, AR.depth);
     assert.equal(a.arena.boss.r, AR.boss.r); assert.equal(a.arena.boss.spawnAhead, AR.boss.spawnAhead);
@@ -101,12 +101,12 @@ test('V3-ARENA A-1: 형식·파생·불변식 — 10·11·24 정의에 arena 만
     for (const w of a.walls) assert.ok(w.z1 <= endZ, 'S' + id + ' ' + w.id);
     for (const sp of a.spawns) assert.ok(sp.z <= endZ, 'S' + id + ' 스폰 ' + sp.z);
   }
-  //  소환·사격 칸: 10 없음 · 11 소환 · 24 소환 + 사격
-  assert.equal(buildStage(10).arena.boss.summon, null); assert.equal(buildStage(10).arena.boss.shoot, null);
-  assert.deepEqual(buildStage(11).arena.boss.summon, { every: 5, kind: 'grunt', n: 2, dx: 44, dz: -40 }); assert.equal(buildStage(11).arena.boss.shoot, null);
+  //  소환·사격 칸(r3.29 로 광장이 10·11 → 15·20): 15 없음 · 20 소환 · 24 소환 + 사격
+  assert.equal(buildStage(15).arena.boss.summon, null); assert.equal(buildStage(15).arena.boss.shoot, null);
+  assert.deepEqual(buildStage(20).arena.boss.summon, { every: 5, kind: 'grunt', n: 2, dx: 44, dz: -40 }); assert.equal(buildStage(20).arena.boss.shoot, null);
   assert.deepEqual(buildStage(24).arena.boss.shoot, { every: 2.4, fan: 5, fanDeg: 14 }); assert.equal(buildStage(24).arena.boss.summon.n, 3);
   //  아레나 없는 스테이지는 arena null(자기 스테이지 버전만 단정 — 다른 번호의 version 은 보지 않는다)
-  assert.equal(buildStage(1).arena, null); assert.equal(buildStage(9).arena, null); assert.equal(createRun(buildStage(1)).arena, null);
+  assert.equal(buildStage(1).arena, null); assert.equal(buildStage(10).arena, null); assert.equal(createRun(buildStage(1)).arena, null);
   //  guard: elite 와 arena 를 함께 적으면 throw · 광장 앞 여유 안의 스폰도 throw(DEFS 는 def() 조회의 첫 자리 — 임시 정의를 넣었다 뺀다)
   const base = { version: 1, title: '검사', startUnits: 1, startWeapon: 'rifle', length: 3000, eliteZ: 2600, gates: [], supplies: [], walls: [], spawns: [] };
   DEFS[998] = { ...base, elite: { z: 2600, hp: 10, summon: false }, arena: { z: 2600, boss: { hp: 10 } } };
@@ -355,7 +355,7 @@ test('V3-ARENA A-9: 결정성 — 같은 입력열(dragDy·keyDirY 포함) 두 �
   assert.deepEqual(ea, eb);
   assert.equal(a.phase, 'arena');
   assert.ok(ea.some((e) => e.type === 'summon') && ea.some((e) => e.type === 'eshot'), '소환·사격이 실제로 돌았다');
-  const s1 = createRun(buildStage(10)), s2 = createRun(buildStage(10));
+  const s1 = createRun(buildStage(15)), s2 = createRun(buildStage(15));
   play(s1, 3600, script); play(s2, 3600, script);
   assert.deepEqual(pick(s1), pick(s2)); assert.deepEqual(bossPick(s1.boss), bossPick(s2.boss));
 });
@@ -379,14 +379,14 @@ test('V3-ARENA A-10: 봇 — planBoss 가 10·11·24 를 보통에서 완주(예
     assert.equal(r.run.over, true, 'S' + id + ' 끝나지 않음'); assert.ok(r.steps < 14400);
     assert.equal(r.run.won, true, 'S' + id + ' planBoss 미완주(보스 hp ' + (r.run.boss ? Math.ceil(r.run.boss.hp) : 0) + ', 병력 ' + r.run.units.length + ')');
     assert.ok(count(r.events, 'arenaEnter') === 1 && count(r.events, 'bossDashWarn') >= 1 && count(r.events, 'bossShock') >= 1, 'S' + id + ' 아레나가 실제로 돌았다');
-    if (id !== 10) assert.ok(count(r.events, 'summon') >= 1, 'S' + id + ' 소환');
+    if (id !== 15) assert.ok(count(r.events, 'summon') >= 1, 'S' + id + ' 소환');   // 15(옛 10) 광장 보스는 소환이 없다
     t.diagnostic(`ARENA S${id} planBoss won units=${r.run.units.length} peak=${r.run.peak} weapon=${r.run.weapon} steps=${r.steps} arenaSteps=${r.arenaSteps} warn=${count(r.events, 'bossDashWarn')} shock=${count(r.events, 'bossShock')} lossShock=${r.run.lossByShock} lossTouch=${r.run.lossByTouch}`);
   }
   //  가만히 있으면 손해: center 는 광장에서 hits > 0 인 충격을 최소 1회 받는다
-  const c = drive(10, 'center');
+  const c = drive(15, 'center');
   const hitShocks = c.events.filter((e) => e.type === 'bossShock' && e.hits > 0);
   assert.ok(hitShocks.length >= 1, 'center 가 충격을 맞는다');
-  t.diagnostic(`ARENA S10 center won=${c.run.won} units=${c.run.units.length} shocksHit=${hitShocks.length} lossShock=${c.run.lossByShock}`);
+  t.diagnostic(`ARENA S15 center won=${c.run.won} units=${c.run.units.length} shocksHit=${hitShocks.length} lossShock=${c.run.lossByShock}`);
   //  소환 적(chase): 부대가 멈춰 있으면 STEP 마다 d.vz·STEP 씩 다가온다
   const run = createRun(synthArena({ startUnits: 10, hp: 1e9, summon: { every: 1, kind: 'grunt', n: 2, dx: 44, dz: -40 } }));
   enter(run, at(240));
@@ -564,7 +564,7 @@ test('V3-ARENA A-13: 셸 — 진입 프레임에 배너·열림 연출·lotWarn/
   await app.ready;
   const frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
   app.setDifficulty('normal');
-  app.startRun(10);
+  app.startRun(15);
   const run = () => app.getRun(), dbg = () => app.dbg();
   assert.equal(dbg().arena, false); assert.equal(dbg().bossState, null);
   let n = 0;
@@ -594,7 +594,7 @@ test('V3-ARENA A-13: 셸 — 진입 프레임에 배너·열림 연출·lotWarn/
   n = 0;
   while (app.getState() !== 'result' && n < 6000) { const c = botArena(run()) ?? { x: 240, ay: 0 }; app.input.state.pointerX = c.x; if (run().boss) app.input.state.dragDy += c.ay - run().tay; frames(1); n++; }
   assert.equal(app.getState(), 'result');
-  assert.equal(save.getStage(10, 3).cleared, true); assert.equal(save.getStage(10, 2).cleared, false, 'r3.21 이전 판 기록 칸은 따로'); assert.equal(save.getStage(10, 1).cleared, false, '근사 시절 기록 칸은 따로');
+  assert.equal(save.getStage(15, 4).cleared, true); assert.equal(save.getStage(15, 3).cleared, false, '옛 판 기록 칸은 따로'); assert.equal(save.getStage(15, 1).cleared, false, '근사 시절 기록 칸은 따로');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
