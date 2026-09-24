@@ -1,0 +1,13 @@
+{
+  "kind": "v4.1 plan submission for next review (plan + evidence only, no game code change)",
+  "submittedCommit": "bf3b59d",
+  "codeBaseline": "7e6872e (game code identical to b43e4d1; git diff --stat b43e4d1 7e6872e = plan md only)",
+  "gameCodeChangedSinceBaseline": false,
+  "revisedPlan": "newmode/v3/기획_v4.1_검토반영_20260924.md",
+  "revisedPlanSha256": "1BCBC2ED01F46C6D55C1C36EED602316E3B28EB60E83496B92343D1BABF691DE",
+  "originalPlan": "newmode/v3/기획_v4_로그라이크_20260924.md",
+  "originalPlanSha256": "A3843A6E045572DE566115A0F235ACCFB72D4DE758E2800BB77080B9D0BCCAF6",
+  "originalPlanUnchangedSinceReview": true,
+  "evidence": "newmode/v3/review3/evidence/ (A_..G_ scripts + results; rerun with node)",
+  "botNumbersNote": "All bot figures are deterministic single runs of scripted bots, not human success rates or income."
+}
