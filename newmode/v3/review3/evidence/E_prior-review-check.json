@@ -1,0 +1,202 @@
+{
+ "meta": {
+  "script": "E_prior-review-check.mjs",
+  "date": "2026-09-24T07:08:23.848Z",
+  "headNote": "HEAD 7e6872e(코드 = b43e4d1)에서 실행"
+ },
+ "codeEvidence": {
+  "N1_stages": {
+   "첫 갈림길은 왼쪽 +칸으로 통과하세요": [
+    {
+     "line": 82,
+     "text": "hint: '첫 갈림길은 왼쪽 +칸으로 통과하세요. 뒤에서 병력을 모아 큰 게이트에 도전할 수 있어요.' },"
+    }
+   ]
+  },
+  "N1_advice": {
+   "gate: '음수 게이트는 같은 줄의": [
+    {
+     "line": 14,
+     "text": "gate: '음수 게이트는 같은 줄의 + 칸이나 옆 우회로로 피할 수 있습니다. 한 칸 옆으로 붙어 통과해 보세요',"
+    }
+   ]
+  },
+  "N2_render": {
+   "셔터 판(회색 빗금) — 숫자보다 **먼저** 그린다": [
+    {
+     "line": 532,
+     "text": "//  셔터 판(회색 빗금) — 숫자보다 **먼저** 그린다. 열리는 동안 남은 판이 위쪽으로 줄어든다(문이 위로 걷히는 동작)"
+    }
+   ],
+   "잠김 표시(계약서 6장 N2-②)": [
+    {
+     "line": 402,
+     "text": "//  잠김 표시(계약서 6장 N2-②): 숫자를 가리지 않는 칸 모서리의 작은 자물쇠. 색만으로 구분하지 않기 위한 형태 신호다."
+    }
+   ],
+   "const base = row.passed ? 0.32 : 0.92": [
+    {
+     "line": 514,
+     "text": "const base = row.passed ? 0.32 : 0.92;"
+    }
+   ]
+  },
+  "N4_main": {
+   "'랜덤 길: 위험 게이트 무력화 · 손실 0'": [
+    {
+     "line": 393,
+     "text": "return out.applied === 0 ? '랜덤 길: 위험 게이트 무력화 · 손실 0'"
+    }
+   ],
+   "'랜덤 길: 함정 피해 −'": [
+    {
+     "line": 394,
+     "text": ": '랜덤 길: 함정 피해 −' + (-out.applied) + '명';"
+    }
+   ],
+   "export function lotteryLine": [
+    {
+     "line": 414,
+     "text": "export function lotteryLine(run, opts = {}) {"
+    }
+   ]
+  },
+  "tests": {
+   "V3-HINT-N1": [
+    {
+     "line": 87,
+     "text": "// V3-HINT-N1(2026-09-17 2차 검수 N1) — 실패 안내는 **그 판에서 실제로 할 수 있는 행동**이어야 한다."
+    },
+    {
+     "line": 91,
+     "text": "test('V3-HINT-N1: S2 첫 게이트 우측을 골라 전멸한 판의 제안 한 줄이 실행 가능한 다음 행동을 알려준다', () => {"
+    },
+    {
+     "line": 109,
+     "text": "test('V3-HINT-N1: 기본 게이트 문구도 지금 할 수 있는 행동이다(배치에 hint 가 없을 때)', () => {"
+    }
+   ],
+   "V3-RENDER-SHUTTER": [
+    {
+     "line": 65,
+     "text": "test('V3-RENDER-SHUTTER: 닫힌 셔터에서도 칸 숫자·부호가 셔터 위에 같은 불투명도로 그려진다', () => {"
+    },
+    {
+     "line": 83,
+     "text": "test('V3-RENDER-SHUTTER: 잠김은 숫자가 아니라 칸 모서리의 작은 자물쇠로 따로 알린다(색만으로 구분하지 않는다)', () => {"
+    },
+    {
+     "line": 98,
+     "text": "test('V3-RENDER-SHUTTER: 열리는 동안 회색 판이 위로 걷힌다(남는 판이 칸 위쪽)', () => {"
+    },
+    {
+     "line": 113,
+     "text": "test('V3-RENDER-SHUTTER: 개시선 옆 글은 게이트가 선 안으로 온다고 말한다(플레이어가 넘는다고 하지 않는다)', () => {"
+    }
+   ],
+   "LOT-11": [
+    {
+     "line": 534,
+     "text": "// LOT-11(2026-09-17 2차 검수 N4) — 결과 문구는 **추첨 종류의 이름이 아니라 실제 적용 결과**다."
+    },
+    {
+     "line": 537,
+     "text": "test('V3-LOTTERY LOT-11: 풀 5종 각각 실제 결과 문구가 나온다(무력화·함정 피해·발판 수·중복·획득)', (t) => {"
+    },
+    {
+     "line": 564,
+     "text": "test('V3-LOTTERY LOT-11b: 집계는 규칙 계층의 기존 이벤트만 읽는다(랜덤 길 것만 골라 센다)', () => {"
+    }
+   ],
+   "V3-SHELL-LOTTERY-OUT": [
+    {
+     "line": 828,
+     "text": "// V3-SHELL-LOTTERY-OUT(2026-09-17 2차 검수 N4) — 결과 문구가 실제 결과를 읽는 결선."
+    },
+    {
+     "line": 831,
+     "text": "test('V3-SHELL-LOTTERY-OUT: 출격이 집계 칸을 만들고, 랜덤 길이 없는 판은 만들지 않는다', async () => {"
+    },
+    {
+     "line": 839,
+     "text": "test('V3-SHELL-LOTTERY-OUT: 위험 항목 공개는 중립 경고음이고, 피격음은 실제 손실이 날 때만 난다', async () => {"
+    }
+   ],
+   "V3-SHELL-SHUTTER": [
+    {
+     "line": 729,
+     "text": "// V3-SHELL-SHUTTER(2026-09-17 2차 검수 N2) — 셔터 안내·소리의 셸 결선."
+    },
+    {
+     "line": 733,
+     "text": "test('V3-SHELL-SHUTTER: 첫 셔터 조우에 짧은 글 + 초보 배너 1회, 저장 seenShutter 에 기억된다', async () => {"
+    },
+    {
+     "line": 788,
+     "text": "test('V3-SHELL-SHUTTER: 쏴도 오르지 않는 확정 행이 열릴 때는 \"지금 쏘면 +1\" 이 뜨지 않는다', async () => {"
+    },
+    {
+     "line": 801,
+     "text": "test('V3-SHELL-SHUTTER: isFixedGateRow — 확정 손실 행만 참(빈 행·혼합 행·양수 행은 거짓)', () => {"
+    }
+   ]
+  }
+ },
+ "testRun": {
+  "tests": 18,
+  "pass": 18,
+  "fail": 0,
+  "names": [
+   "✔ V3-HINT-N1: S2 첫 게이트 우측을 골라 전멸한 판의 제안 한 줄이 실행 가능한 다음 행동을 알려준다",
+   "✔ V3-HINT-N1: 기본 게이트 문구도 지금 할 수 있는 행동이다(배치에 hint 가 없을 때)",
+   "✔ V3-SHELL-SHUTTER: 첫 셔터 조우에 짧은 글 + 초보 배너 1회, 저장 seenShutter 에 기억된다",
+   "✔ V3-SHELL-SHUTTER: 쏴도 오르지 않는 확정 행이 열릴 때는 \"지금 쏘면 +1\" 이 뜨지 않는다",
+   "✔ V3-SHELL-SHUTTER: isFixedGateRow — 확정 손실 행만 참(빈 행·혼합 행·양수 행은 거짓)",
+   "✔ V3-SHELL-SHUTTER: 항상 열려 있는 S1 첫 게이트는 셔터가 아니다 — 그때는 배너가 뜨지 않는다",
+   "✔ V3-SHELL-LOTTERY-OUT: 출격이 집계 칸을 만들고, 랜덤 길이 없는 판은 만들지 않는다",
+   "✔ V3-SHELL-LOTTERY-OUT: 위험 항목 공개는 중립 경고음이고, 피격음은 실제 손실이 날 때만 난다",
+   "✔ V3-LOTTERY LOT-7: 좌측 통로를 고르면 랜덤 길 통은 skipped(놓침 아님)이고 결과 한 줄이 이번 판 내용을 공개한다",
+   "✔ V3-LOTTERY LOT-7b: 우측 통로를 고르면 결과 한 줄이 실제 결과를 적는다",
+   "✔ V3-LOTTERY LOT-11: 풀 5종 각각 실제 결과 문구가 나온다(무력화·함정 피해·발판 수·중복·획득)",
+   "✔ V3-LOTTERY LOT-11b: 집계는 규칙 계층의 기존 이벤트만 읽는다(랜덤 길 것만 골라 센다)",
+   "✔ V3-RENDER-SHUTTER: 닫힌 셔터에서도 칸 숫자·부호가 셔터 위에 같은 불투명도로 그려진다",
+   "✔ V3-RENDER-SHUTTER: 잠김은 숫자가 아니라 칸 모서리의 작은 자물쇠로 따로 알린다(색만으로 구분하지 않는다)",
+   "✔ V3-RENDER-SHUTTER: 열리는 동안 회색 판이 위로 걷힌다(남는 판이 칸 위쪽)",
+   "✔ V3-RENDER-SHUTTER: 개시선 옆 글은 게이트가 선 안으로 온다고 말한다(플레이어가 넘는다고 하지 않는다)",
+   "✔ V3-RENDER-SHUTTER: 짧은 안내 글과 첫 조우 배너를 fx 가 시키는 대로 칸 위·화면에 그린다",
+   "✔ V3-RENDER-SHUTTER: 확정 −10 행이 열린 화면에 \"확정\" 과 \"지금 쏘면 +1\" 이 함께 뜨지 않는다"
+  ]
+ },
+ "s2AdviceUnderV4Values": {
+  "right_normal": {
+   "won": false,
+   "time": 6.02,
+   "lastBadGateId": "g1",
+   "lossByGate": 2,
+   "lossByTouch": 0,
+   "lossByShot": 0,
+   "peak": 2,
+   "advice": "첫 갈림길은 왼쪽 +칸으로 통과하세요. 뒤에서 병력을 모아 큰 게이트에 도전할 수 있어요."
+  },
+  "right_brutal": {
+   "won": false,
+   "time": 6.02,
+   "lastBadGateId": "g1",
+   "lossByGate": 2,
+   "lossByTouch": 0,
+   "lossByShot": 0,
+   "peak": 2,
+   "advice": "첫 갈림길은 왼쪽 +칸으로 통과하세요. 뒤에서 병력을 모아 큰 게이트에 도전할 수 있어요."
+  },
+  "evLead_brutal": {
+   "won": false,
+   "time": 66.92,
+   "lastBadGateId": null,
+   "lossByGate": 0,
+   "lossByTouch": 6,
+   "lossByShot": 19,
+   "peak": 16,
+   "advice": "저격수는 예고선이 보일 때 옆으로 한 번만 비키면 됩니다"
+  }
+ }
+}

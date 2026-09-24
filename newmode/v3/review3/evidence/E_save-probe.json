@@ -1,0 +1,111 @@
+{
+ "meta": {
+  "script": "E_save-probe.mjs",
+  "date": "2026-09-24T07:06:54.909Z",
+  "note": "현 save.js(수정 없음)를 메모리 storage 로 돌린 결과. 구현 제안이 아니라 현 동작 확인."
+ },
+ "results": {
+  "A_recordKey": {
+   "normal": "2",
+   "brutal": "2:brutal",
+   "v4": "2:v4",
+   "v4rule": "2:v4r1"
+  },
+  "B_newSuffixCell": {
+   "before": {
+    "2": {
+     "cleared": true,
+     "attempts": 3,
+     "bestSurvivors": 40,
+     "bestTime": 50
+    },
+    "2:brutal": {
+     "cleared": true,
+     "attempts": 9,
+     "bestSurvivors": 12,
+     "bestTime": 70
+    }
+   },
+   "returned": {
+    "cleared": true,
+    "attempts": 1,
+    "bestSurvivors": 20,
+    "bestTime": 61
+   },
+   "after": {
+    "2": {
+     "cleared": true,
+     "attempts": 3,
+     "bestSurvivors": 40,
+     "bestTime": 50
+    },
+    "2:brutal": {
+     "cleared": true,
+     "attempts": 9,
+     "bestSurvivors": 12,
+     "bestTime": 70
+    },
+    "2:v4": {
+     "cleared": true,
+     "attempts": 1,
+     "bestSurvivors": 20,
+     "bestTime": 61
+    }
+   },
+   "oldBrutalKept": true,
+   "v4CellWritten": true,
+   "savedV": 3,
+   "bakCreated": false
+  },
+  "C_snapshotFieldInRecord": {
+   "sent": {
+    "cleared": true,
+    "attempts": 1,
+    "bestSurvivors": 20,
+    "bestTime": 61,
+    "survUp": {
+     "power": 1,
+     "rate": 0,
+     "multi": 0
+    },
+    "timeUp": {
+     "power": 1,
+     "rate": 0,
+     "multi": 0
+    },
+    "rule": "v4"
+   },
+   "returned": {
+    "cleared": true,
+    "attempts": 1,
+    "bestSurvivors": 20,
+    "bestTime": 61
+   },
+   "stored": {
+    "cleared": true,
+    "attempts": 1,
+    "bestSurvivors": 20,
+    "bestTime": 61
+   },
+   "snapshotDropped": true
+  },
+  "C2_snapshotOnlyPatch": {
+   "versions": {}
+  },
+  "D_mergeOverwrites": {
+   "afterWorseRun": {
+    "cleared": true,
+    "attempts": 1,
+    "bestSurvivors": 10,
+    "bestTime": 90
+   },
+   "overwritten": true
+  },
+  "E_topLevelCoins": {
+   "returnedHasCoins": false,
+   "storedHasCoins": false,
+   "storedHasUp": false,
+   "v": 3
+  }
+ }
+}

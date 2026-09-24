@@ -1,0 +1,1936 @@
+{
+  "script": "B_gate-removal.mjs",
+  "note": "로봇 = 처음 만든 유닛(id 1). 봇/고정 정책 결과는 정해진 입력으로 한 판씩 돌린 결과이며 사람의 성공률이 아니다.",
+  "formation5": [
+    {
+      "index": 0,
+      "dx": 0,
+      "dy": 0,
+      "role": "로봇 자리(0,0)"
+    },
+    {
+      "index": 1,
+      "dx": 24,
+      "dy": -10,
+      "role": "병사"
+    },
+    {
+      "index": 2,
+      "dx": 24,
+      "dy": 10,
+      "role": "병사"
+    },
+    {
+      "index": 3,
+      "dx": 10,
+      "dy": 24,
+      "role": "병사"
+    },
+    {
+      "index": 4,
+      "dx": -10,
+      "dy": 24,
+      "role": "병사"
+    }
+  ],
+  "gateCases": [
+    {
+      "n": 5,
+      "k": 3,
+      "now": {
+        "removedCount": 3,
+        "removed": [
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)"
+        ],
+        "remainIds": [
+          1,
+          2
+        ],
+        "remainCount": 2,
+        "heroAlive": true,
+        "drawnAsHeroAfter": "id1(원래 로봇)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -3,
+          "applied": -3,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 2,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": true
+    },
+    {
+      "n": 5,
+      "k": 4,
+      "now": {
+        "removedCount": 4,
+        "removed": [
+          "id1(dy 0)",
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)"
+        ],
+        "remainIds": [
+          2
+        ],
+        "remainCount": 1,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "id2(병사가 로봇 그림을 이어받음)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -4,
+          "applied": -4,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 1,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": false
+    },
+    {
+      "n": 5,
+      "k": 5,
+      "now": {
+        "removedCount": 5,
+        "removed": [
+          "id1(dy 0)",
+          "id2(dy -10)",
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)"
+        ],
+        "remainIds": [],
+        "remainCount": 0,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "없음",
+        "lose": true,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -5,
+          "applied": -5,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 0,
+        "heroAlive": false,
+        "lose": true
+      },
+      "same": true
+    },
+    {
+      "n": 5,
+      "k": 6,
+      "now": {
+        "removedCount": 5,
+        "removed": [
+          "id1(dy 0)",
+          "id2(dy -10)",
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)"
+        ],
+        "remainIds": [],
+        "remainCount": 0,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "없음",
+        "lose": true,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -6,
+          "applied": -5,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 0,
+        "heroAlive": false,
+        "lose": true
+      },
+      "same": true
+    },
+    {
+      "n": 1,
+      "k": 9,
+      "now": {
+        "removedCount": 1,
+        "removed": [
+          "id1(dy 0)"
+        ],
+        "remainIds": [],
+        "remainCount": 0,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "없음",
+        "lose": true,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -9,
+          "applied": -1,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 0,
+        "heroAlive": false,
+        "lose": true
+      },
+      "same": true
+    },
+    {
+      "n": 2,
+      "k": 9,
+      "now": {
+        "removedCount": 2,
+        "removed": [
+          "id1(dy 0)",
+          "id2(dy -10)"
+        ],
+        "remainIds": [],
+        "remainCount": 0,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "없음",
+        "lose": true,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -9,
+          "applied": -2,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 0,
+        "heroAlive": false,
+        "lose": true
+      },
+      "same": true
+    },
+    {
+      "n": 3,
+      "k": 2,
+      "now": {
+        "removedCount": 2,
+        "removed": [
+          "id1(dy 0)",
+          "id3(dy 10)"
+        ],
+        "remainIds": [
+          2
+        ],
+        "remainCount": 1,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "id2(병사가 로봇 그림을 이어받음)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -2,
+          "applied": -2,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 1,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": false
+    },
+    {
+      "n": 6,
+      "k": 5,
+      "now": {
+        "removedCount": 5,
+        "removed": [
+          "id1(dy 0)",
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)",
+          "id6(dy 10)"
+        ],
+        "remainIds": [
+          2
+        ],
+        "remainCount": 1,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "id2(병사가 로봇 그림을 이어받음)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -5,
+          "applied": -5,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 1,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": false
+    },
+    {
+      "n": 10,
+      "k": 10,
+      "now": {
+        "removedCount": 10,
+        "removed": [
+          "id1(dy 0)",
+          "id2(dy -10)",
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)",
+          "id6(dy 10)",
+          "id7(dy -10)",
+          "id8(dy -32)",
+          "id9(dy -14)",
+          "id10(dy 7)"
+        ],
+        "remainIds": [],
+        "remainCount": 0,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "없음",
+        "lose": true,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -10,
+          "applied": -10,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 0,
+        "heroAlive": false,
+        "lose": true
+      },
+      "same": true
+    },
+    {
+      "n": 11,
+      "k": 10,
+      "now": {
+        "removedCount": 10,
+        "removed": [
+          "id1(dy 0)",
+          "id2(dy -10)",
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)",
+          "id6(dy 10)",
+          "id7(dy -10)",
+          "id9(dy -14)",
+          "id10(dy 7)",
+          "id11(dy 26)"
+        ],
+        "remainIds": [
+          8
+        ],
+        "remainCount": 1,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "id8(병사가 로봇 그림을 이어받음)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -10,
+          "applied": -10,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 1,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": false
+    },
+    {
+      "n": 12,
+      "k": 10,
+      "now": {
+        "removedCount": 10,
+        "removed": [
+          "id1(dy 0)",
+          "id2(dy -10)",
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)",
+          "id6(dy 10)",
+          "id7(dy -10)",
+          "id10(dy 7)",
+          "id11(dy 26)",
+          "id12(dy 40)"
+        ],
+        "remainIds": [
+          8,
+          9
+        ],
+        "remainCount": 2,
+        "heroAlive": false,
+        "drawnAsHeroAfter": "id8(병사가 로봇 그림을 이어받음)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -10,
+          "applied": -10,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 2,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": false
+    },
+    {
+      "n": 15,
+      "k": 10,
+      "now": {
+        "removedCount": 10,
+        "removed": [
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)",
+          "id6(dy 10)",
+          "id10(dy 7)",
+          "id11(dy 26)",
+          "id12(dy 40)",
+          "id13(dy 45)",
+          "id14(dy 40)",
+          "id15(dy 26)"
+        ],
+        "remainIds": [
+          1,
+          2,
+          7,
+          8,
+          9
+        ],
+        "remainCount": 5,
+        "heroAlive": true,
+        "drawnAsHeroAfter": "id1(원래 로봇)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -10,
+          "applied": -10,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 5,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": true
+    },
+    {
+      "n": 20,
+      "k": 10,
+      "now": {
+        "removedCount": 10,
+        "removed": [
+          "id3(dy 10)",
+          "id4(dy 24)",
+          "id5(dy 24)",
+          "id6(dy 10)",
+          "id11(dy 26)",
+          "id12(dy 40)",
+          "id13(dy 45)",
+          "id14(dy 40)",
+          "id15(dy 26)",
+          "id16(dy 7)"
+        ],
+        "remainIds": [
+          1,
+          2,
+          7,
+          8,
+          9,
+          10,
+          17,
+          18,
+          19,
+          20
+        ],
+        "remainCount": 10,
+        "heroAlive": true,
+        "drawnAsHeroAfter": "id1(원래 로봇)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -10,
+          "applied": -10,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 10,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": true
+    },
+    {
+      "n": 68,
+      "k": 10,
+      "now": {
+        "removedCount": 10,
+        "removed": [
+          "id40(dy 80)",
+          "id41(dy 83)",
+          "id42(dy 80)",
+          "id58(dy 88)",
+          "id59(dy 97)",
+          "id60(dy 101)",
+          "id61(dy 101)",
+          "id62(dy 97)",
+          "id63(dy 88)",
+          "id64(dy 75)"
+        ],
+        "remainIds": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          65,
+          66,
+          67,
+          68
+        ],
+        "remainCount": 58,
+        "heroAlive": true,
+        "drawnAsHeroAfter": "id1(원래 로봇)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -10,
+          "applied": -10,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 58,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": true
+    },
+    {
+      "n": 69,
+      "k": 10,
+      "now": {
+        "removedCount": 10,
+        "removed": [
+          "id40(dy 80)",
+          "id41(dy 83)",
+          "id42(dy 80)",
+          "id58(dy 88)",
+          "id59(dy 97)",
+          "id60(dy 101)",
+          "id61(dy 101)",
+          "id62(dy 97)",
+          "id63(dy 88)",
+          "id64(dy 75)"
+        ],
+        "remainIds": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          65,
+          66,
+          67,
+          68,
+          69
+        ],
+        "remainCount": 59,
+        "heroAlive": true,
+        "drawnAsHeroAfter": "id1(원래 로봇)",
+        "lose": false,
+        "gatePassEvent": {
+          "type": "gatePass",
+          "id": "gTest",
+          "value": -10,
+          "applied": -10,
+          "idx": 0,
+          "x": 160,
+          "z": 1000
+        }
+      },
+      "recommended": {
+        "remainCount": 59,
+        "heroAlive": true,
+        "lose": false
+      },
+      "same": true
+    }
+  ],
+  "heroRemovalThreshold": {
+    "explain": "nowHeroRemovedAtK = 지금 코드(removeUnits back)에서 로봇(id 1)이 처음 빠지는 감소량. 권고 규칙은 n(전원 제거일 때만). gap = 두 규칙이 갈리는 감소량 폭 = 로봇 앞에 선 병사 수",
+    "rows": [
+      {
+        "n": 1,
+        "frontSoldiers": 0,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 1,
+        "recommendedHeroRemovedAtK": 1,
+        "gap": 0
+      },
+      {
+        "n": 2,
+        "frontSoldiers": 1,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 1,
+        "recommendedHeroRemovedAtK": 2,
+        "gap": 1
+      },
+      {
+        "n": 3,
+        "frontSoldiers": 1,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 2,
+        "recommendedHeroRemovedAtK": 3,
+        "gap": 1
+      },
+      {
+        "n": 4,
+        "frontSoldiers": 1,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 3,
+        "recommendedHeroRemovedAtK": 4,
+        "gap": 1
+      },
+      {
+        "n": 5,
+        "frontSoldiers": 1,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 4,
+        "recommendedHeroRemovedAtK": 5,
+        "gap": 1
+      },
+      {
+        "n": 6,
+        "frontSoldiers": 1,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 5,
+        "recommendedHeroRemovedAtK": 6,
+        "gap": 1
+      },
+      {
+        "n": 7,
+        "frontSoldiers": 2,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 5,
+        "recommendedHeroRemovedAtK": 7,
+        "gap": 2
+      },
+      {
+        "n": 8,
+        "frontSoldiers": 3,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 5,
+        "recommendedHeroRemovedAtK": 8,
+        "gap": 3
+      },
+      {
+        "n": 9,
+        "frontSoldiers": 4,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 5,
+        "recommendedHeroRemovedAtK": 9,
+        "gap": 4
+      },
+      {
+        "n": 10,
+        "frontSoldiers": 4,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 6,
+        "recommendedHeroRemovedAtK": 10,
+        "gap": 4
+      },
+      {
+        "n": 11,
+        "frontSoldiers": 4,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 7,
+        "recommendedHeroRemovedAtK": 11,
+        "gap": 4
+      },
+      {
+        "n": 12,
+        "frontSoldiers": 4,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 8,
+        "recommendedHeroRemovedAtK": 12,
+        "gap": 4
+      },
+      {
+        "n": 13,
+        "frontSoldiers": 4,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 9,
+        "recommendedHeroRemovedAtK": 13,
+        "gap": 4
+      },
+      {
+        "n": 14,
+        "frontSoldiers": 4,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 10,
+        "recommendedHeroRemovedAtK": 14,
+        "gap": 4
+      },
+      {
+        "n": 15,
+        "frontSoldiers": 4,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 11,
+        "recommendedHeroRemovedAtK": 15,
+        "gap": 4
+      },
+      {
+        "n": 16,
+        "frontSoldiers": 4,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 12,
+        "recommendedHeroRemovedAtK": 16,
+        "gap": 4
+      },
+      {
+        "n": 17,
+        "frontSoldiers": 5,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 12,
+        "recommendedHeroRemovedAtK": 17,
+        "gap": 5
+      },
+      {
+        "n": 18,
+        "frontSoldiers": 6,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 12,
+        "recommendedHeroRemovedAtK": 18,
+        "gap": 6
+      },
+      {
+        "n": 19,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 12,
+        "recommendedHeroRemovedAtK": 19,
+        "gap": 7
+      },
+      {
+        "n": 20,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 13,
+        "recommendedHeroRemovedAtK": 20,
+        "gap": 7
+      },
+      {
+        "n": 21,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 14,
+        "recommendedHeroRemovedAtK": 21,
+        "gap": 7
+      },
+      {
+        "n": 22,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 15,
+        "recommendedHeroRemovedAtK": 22,
+        "gap": 7
+      },
+      {
+        "n": 23,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 16,
+        "recommendedHeroRemovedAtK": 23,
+        "gap": 7
+      },
+      {
+        "n": 24,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 17,
+        "recommendedHeroRemovedAtK": 24,
+        "gap": 7
+      },
+      {
+        "n": 25,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 18,
+        "recommendedHeroRemovedAtK": 25,
+        "gap": 7
+      },
+      {
+        "n": 26,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 19,
+        "recommendedHeroRemovedAtK": 26,
+        "gap": 7
+      },
+      {
+        "n": 27,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 20,
+        "recommendedHeroRemovedAtK": 27,
+        "gap": 7
+      },
+      {
+        "n": 28,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 21,
+        "recommendedHeroRemovedAtK": 28,
+        "gap": 7
+      },
+      {
+        "n": 29,
+        "frontSoldiers": 7,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 22,
+        "recommendedHeroRemovedAtK": 29,
+        "gap": 7
+      },
+      {
+        "n": 30,
+        "frontSoldiers": 8,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 22,
+        "recommendedHeroRemovedAtK": 30,
+        "gap": 8
+      },
+      {
+        "n": 31,
+        "frontSoldiers": 9,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 22,
+        "recommendedHeroRemovedAtK": 31,
+        "gap": 9
+      },
+      {
+        "n": 32,
+        "frontSoldiers": 10,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 22,
+        "recommendedHeroRemovedAtK": 32,
+        "gap": 10
+      },
+      {
+        "n": 33,
+        "frontSoldiers": 11,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 22,
+        "recommendedHeroRemovedAtK": 33,
+        "gap": 11
+      },
+      {
+        "n": 34,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 0,
+        "nowHeroRemovedAtK": 22,
+        "recommendedHeroRemovedAtK": 34,
+        "gap": 12
+      },
+      {
+        "n": 35,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 23,
+        "recommendedHeroRemovedAtK": 35,
+        "gap": 12
+      },
+      {
+        "n": 36,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 24,
+        "recommendedHeroRemovedAtK": 36,
+        "gap": 12
+      },
+      {
+        "n": 37,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 25,
+        "recommendedHeroRemovedAtK": 37,
+        "gap": 12
+      },
+      {
+        "n": 38,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 26,
+        "recommendedHeroRemovedAtK": 38,
+        "gap": 12
+      },
+      {
+        "n": 39,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 27,
+        "recommendedHeroRemovedAtK": 39,
+        "gap": 12
+      },
+      {
+        "n": 40,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 28,
+        "recommendedHeroRemovedAtK": 40,
+        "gap": 12
+      },
+      {
+        "n": 41,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 29,
+        "recommendedHeroRemovedAtK": 41,
+        "gap": 12
+      },
+      {
+        "n": 42,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 30,
+        "recommendedHeroRemovedAtK": 42,
+        "gap": 12
+      },
+      {
+        "n": 43,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 31,
+        "recommendedHeroRemovedAtK": 43,
+        "gap": 12
+      },
+      {
+        "n": 44,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 32,
+        "recommendedHeroRemovedAtK": 44,
+        "gap": 12
+      },
+      {
+        "n": 45,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 33,
+        "recommendedHeroRemovedAtK": 45,
+        "gap": 12
+      },
+      {
+        "n": 46,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 1,
+        "nowHeroRemovedAtK": 34,
+        "recommendedHeroRemovedAtK": 46,
+        "gap": 12
+      },
+      {
+        "n": 47,
+        "frontSoldiers": 12,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 35,
+        "recommendedHeroRemovedAtK": 47,
+        "gap": 12
+      },
+      {
+        "n": 48,
+        "frontSoldiers": 13,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 35,
+        "recommendedHeroRemovedAtK": 48,
+        "gap": 13
+      },
+      {
+        "n": 49,
+        "frontSoldiers": 14,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 35,
+        "recommendedHeroRemovedAtK": 49,
+        "gap": 14
+      },
+      {
+        "n": 50,
+        "frontSoldiers": 15,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 35,
+        "recommendedHeroRemovedAtK": 50,
+        "gap": 15
+      },
+      {
+        "n": 51,
+        "frontSoldiers": 16,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 35,
+        "recommendedHeroRemovedAtK": 51,
+        "gap": 16
+      },
+      {
+        "n": 52,
+        "frontSoldiers": 17,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 35,
+        "recommendedHeroRemovedAtK": 52,
+        "gap": 17
+      },
+      {
+        "n": 53,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 35,
+        "recommendedHeroRemovedAtK": 53,
+        "gap": 18
+      },
+      {
+        "n": 54,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 36,
+        "recommendedHeroRemovedAtK": 54,
+        "gap": 18
+      },
+      {
+        "n": 55,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 37,
+        "recommendedHeroRemovedAtK": 55,
+        "gap": 18
+      },
+      {
+        "n": 56,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 38,
+        "recommendedHeroRemovedAtK": 56,
+        "gap": 18
+      },
+      {
+        "n": 57,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 39,
+        "recommendedHeroRemovedAtK": 57,
+        "gap": 18
+      },
+      {
+        "n": 58,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 40,
+        "recommendedHeroRemovedAtK": 58,
+        "gap": 18
+      },
+      {
+        "n": 59,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 41,
+        "recommendedHeroRemovedAtK": 59,
+        "gap": 18
+      },
+      {
+        "n": 60,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 42,
+        "recommendedHeroRemovedAtK": 60,
+        "gap": 18
+      },
+      {
+        "n": 61,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 43,
+        "recommendedHeroRemovedAtK": 61,
+        "gap": 18
+      },
+      {
+        "n": 62,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 44,
+        "recommendedHeroRemovedAtK": 62,
+        "gap": 18
+      },
+      {
+        "n": 63,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 45,
+        "recommendedHeroRemovedAtK": 63,
+        "gap": 18
+      },
+      {
+        "n": 64,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 46,
+        "recommendedHeroRemovedAtK": 64,
+        "gap": 18
+      },
+      {
+        "n": 65,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 47,
+        "recommendedHeroRemovedAtK": 65,
+        "gap": 18
+      },
+      {
+        "n": 66,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 48,
+        "recommendedHeroRemovedAtK": 66,
+        "gap": 18
+      },
+      {
+        "n": 67,
+        "frontSoldiers": 18,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 67,
+        "gap": 18
+      },
+      {
+        "n": 68,
+        "frontSoldiers": 19,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 68,
+        "gap": 19
+      },
+      {
+        "n": 69,
+        "frontSoldiers": 20,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 69,
+        "gap": 20
+      },
+      {
+        "n": 70,
+        "frontSoldiers": 21,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 70,
+        "gap": 21
+      },
+      {
+        "n": 71,
+        "frontSoldiers": 22,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 71,
+        "gap": 22
+      },
+      {
+        "n": 72,
+        "frontSoldiers": 23,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 72,
+        "gap": 23
+      },
+      {
+        "n": 73,
+        "frontSoldiers": 24,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 73,
+        "gap": 24
+      },
+      {
+        "n": 74,
+        "frontSoldiers": 25,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 74,
+        "gap": 25
+      },
+      {
+        "n": 75,
+        "frontSoldiers": 26,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 75,
+        "gap": 26
+      },
+      {
+        "n": 76,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 49,
+        "recommendedHeroRemovedAtK": 76,
+        "gap": 27
+      },
+      {
+        "n": 77,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 50,
+        "recommendedHeroRemovedAtK": 77,
+        "gap": 27
+      },
+      {
+        "n": 78,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 51,
+        "recommendedHeroRemovedAtK": 78,
+        "gap": 27
+      },
+      {
+        "n": 79,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 52,
+        "recommendedHeroRemovedAtK": 79,
+        "gap": 27
+      },
+      {
+        "n": 80,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 53,
+        "recommendedHeroRemovedAtK": 80,
+        "gap": 27
+      },
+      {
+        "n": 81,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 54,
+        "recommendedHeroRemovedAtK": 81,
+        "gap": 27
+      },
+      {
+        "n": 82,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 55,
+        "recommendedHeroRemovedAtK": 82,
+        "gap": 27
+      },
+      {
+        "n": 83,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 56,
+        "recommendedHeroRemovedAtK": 83,
+        "gap": 27
+      },
+      {
+        "n": 84,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 57,
+        "recommendedHeroRemovedAtK": 84,
+        "gap": 27
+      },
+      {
+        "n": 85,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 58,
+        "recommendedHeroRemovedAtK": 85,
+        "gap": 27
+      },
+      {
+        "n": 86,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 59,
+        "recommendedHeroRemovedAtK": 86,
+        "gap": 27
+      },
+      {
+        "n": 87,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 60,
+        "recommendedHeroRemovedAtK": 87,
+        "gap": 27
+      },
+      {
+        "n": 88,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 61,
+        "recommendedHeroRemovedAtK": 88,
+        "gap": 27
+      },
+      {
+        "n": 89,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 62,
+        "recommendedHeroRemovedAtK": 89,
+        "gap": 27
+      },
+      {
+        "n": 90,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 63,
+        "recommendedHeroRemovedAtK": 90,
+        "gap": 27
+      },
+      {
+        "n": 91,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 64,
+        "recommendedHeroRemovedAtK": 91,
+        "gap": 27
+      },
+      {
+        "n": 92,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 65,
+        "recommendedHeroRemovedAtK": 92,
+        "gap": 27
+      },
+      {
+        "n": 93,
+        "frontSoldiers": 27,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 66,
+        "recommendedHeroRemovedAtK": 93,
+        "gap": 27
+      },
+      {
+        "n": 94,
+        "frontSoldiers": 28,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 66,
+        "recommendedHeroRemovedAtK": 94,
+        "gap": 28
+      },
+      {
+        "n": 95,
+        "frontSoldiers": 29,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 66,
+        "recommendedHeroRemovedAtK": 95,
+        "gap": 29
+      },
+      {
+        "n": 96,
+        "frontSoldiers": 30,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 66,
+        "recommendedHeroRemovedAtK": 96,
+        "gap": 30
+      },
+      {
+        "n": 97,
+        "frontSoldiers": 31,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 66,
+        "recommendedHeroRemovedAtK": 97,
+        "gap": 31
+      },
+      {
+        "n": 98,
+        "frontSoldiers": 32,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 66,
+        "recommendedHeroRemovedAtK": 98,
+        "gap": 32
+      },
+      {
+        "n": 99,
+        "frontSoldiers": 33,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 66,
+        "recommendedHeroRemovedAtK": 99,
+        "gap": 33
+      },
+      {
+        "n": 100,
+        "frontSoldiers": 34,
+        "dy0Soldiers": 2,
+        "nowHeroRemovedAtK": 66,
+        "recommendedHeroRemovedAtK": 100,
+        "gap": 34
+      }
+    ],
+    "gapAlwaysEqualsFrontSoldiers": true
+  },
+  "stage1Left": [
+    {
+      "stage": 1,
+      "policy": "left",
+      "difficulty": "normal",
+      "lotterySeed": "default",
+      "lottery": null,
+      "startUnits": 1,
+      "win": false,
+      "lose": true,
+      "time": 16.02,
+      "units": 0,
+      "heroLost": {
+        "t": 16.02,
+        "cause": "gate",
+        "unitsLeft": 0
+      },
+      "gates": [
+        {
+          "row": "g1",
+          "value": 0,
+          "applied": 0,
+          "unitsBeforeStep": 1,
+          "unitsAfter": 1,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g2",
+          "value": -4,
+          "applied": -1,
+          "unitsBeforeStep": 1,
+          "unitsAfter": 0,
+          "heroAliveAfter": false,
+          "isLotteryRow": false
+        }
+      ]
+    },
+    {
+      "stage": 1,
+      "policy": "left",
+      "difficulty": "brutal",
+      "lotterySeed": "default",
+      "lottery": null,
+      "startUnits": 1,
+      "win": false,
+      "lose": true,
+      "time": 16.02,
+      "units": 0,
+      "heroLost": {
+        "t": 16.02,
+        "cause": "gate",
+        "unitsLeft": 0
+      },
+      "gates": [
+        {
+          "row": "g1",
+          "value": 0,
+          "applied": 0,
+          "unitsBeforeStep": 1,
+          "unitsAfter": 1,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g2",
+          "value": -4,
+          "applied": -1,
+          "unitsBeforeStep": 1,
+          "unitsAfter": 0,
+          "heroAliveAfter": false,
+          "isLotteryRow": false
+        }
+      ]
+    }
+  ],
+  "trapSeed": 4,
+  "lotteryPool": [
+    {
+      "id": "soldier8",
+      "kind": "soldier",
+      "value": null,
+      "maxValue": null
+    },
+    {
+      "id": "heavy",
+      "kind": "weapon",
+      "value": null,
+      "maxValue": null
+    },
+    {
+      "id": "chain6",
+      "kind": "chain",
+      "value": null,
+      "maxValue": null
+    },
+    {
+      "id": "badGate",
+      "kind": "gate",
+      "value": -15,
+      "maxValue": 0
+    },
+    {
+      "id": "trapGate",
+      "kind": "gate",
+      "value": -10,
+      "maxValue": -10
+    }
+  ],
+  "trapRuns": [
+    {
+      "stage": 3,
+      "policy": "right",
+      "difficulty": "normal",
+      "lotterySeed": 4,
+      "lottery": {
+        "pick": "trapGate",
+        "rowId": "g2"
+      },
+      "startUnits": 3,
+      "win": false,
+      "lose": true,
+      "time": 96.73,
+      "units": 0,
+      "heroLost": {
+        "t": 59.75,
+        "cause": "shot",
+        "unitsLeft": 21
+      },
+      "gates": [
+        {
+          "row": "g1",
+          "value": 23,
+          "applied": 23,
+          "unitsBeforeStep": 10,
+          "unitsAfter": 33,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g2",
+          "value": -10,
+          "applied": -10,
+          "unitsBeforeStep": 33,
+          "unitsAfter": 23,
+          "heroAliveAfter": true,
+          "isLotteryRow": true
+        }
+      ]
+    },
+    {
+      "stage": 3,
+      "policy": "right",
+      "difficulty": "brutal",
+      "lotterySeed": 4,
+      "lottery": {
+        "pick": "trapGate",
+        "rowId": "g2"
+      },
+      "startUnits": 3,
+      "win": false,
+      "lose": true,
+      "time": 67.57,
+      "units": 0,
+      "heroLost": {
+        "t": 59.27,
+        "cause": "shot",
+        "unitsLeft": 14
+      },
+      "gates": [
+        {
+          "row": "g1",
+          "value": 23,
+          "applied": 23,
+          "unitsBeforeStep": 10,
+          "unitsAfter": 33,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g2",
+          "value": -10,
+          "applied": -10,
+          "unitsBeforeStep": 33,
+          "unitsAfter": 23,
+          "heroAliveAfter": true,
+          "isLotteryRow": true
+        }
+      ]
+    },
+    {
+      "stage": 12,
+      "policy": "right",
+      "difficulty": "normal",
+      "lotterySeed": 4,
+      "lottery": {
+        "pick": "trapGate",
+        "rowId": "g5"
+      },
+      "startUnits": 5,
+      "win": true,
+      "lose": false,
+      "time": 58.38,
+      "units": 56,
+      "heroLost": {
+        "t": 56.58,
+        "cause": "shot",
+        "unitsLeft": 57
+      },
+      "gates": [
+        {
+          "row": "g1",
+          "value": 11,
+          "applied": 11,
+          "unitsBeforeStep": 5,
+          "unitsAfter": 16,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g2",
+          "value": 14,
+          "applied": 14,
+          "unitsBeforeStep": 16,
+          "unitsAfter": 30,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g3",
+          "value": 17,
+          "applied": 17,
+          "unitsBeforeStep": 30,
+          "unitsAfter": 47,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g5",
+          "value": -10,
+          "applied": -10,
+          "unitsBeforeStep": 47,
+          "unitsAfter": 37,
+          "heroAliveAfter": true,
+          "isLotteryRow": true
+        },
+        {
+          "row": "g4",
+          "value": 21,
+          "applied": 21,
+          "unitsBeforeStep": 37,
+          "unitsAfter": 58,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        }
+      ]
+    },
+    {
+      "stage": 12,
+      "policy": "right",
+      "difficulty": "brutal",
+      "lotterySeed": 4,
+      "lottery": {
+        "pick": "trapGate",
+        "rowId": "g5"
+      },
+      "startUnits": 5,
+      "win": false,
+      "lose": true,
+      "time": 72.9,
+      "units": 0,
+      "heroLost": {
+        "t": 31.58,
+        "cause": "shot",
+        "unitsLeft": 28
+      },
+      "gates": [
+        {
+          "row": "g1",
+          "value": 11,
+          "applied": 11,
+          "unitsBeforeStep": 5,
+          "unitsAfter": 16,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g2",
+          "value": 14,
+          "applied": 14,
+          "unitsBeforeStep": 16,
+          "unitsAfter": 30,
+          "heroAliveAfter": true,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g3",
+          "value": 17,
+          "applied": 17,
+          "unitsBeforeStep": 26,
+          "unitsAfter": 43,
+          "heroAliveAfter": false,
+          "isLotteryRow": false
+        },
+        {
+          "row": "g5",
+          "value": -10,
+          "applied": -10,
+          "unitsBeforeStep": 43,
+          "unitsAfter": 33,
+          "heroAliveAfter": false,
+          "isLotteryRow": true
+        },
+        {
+          "row": "g4",
+          "value": 21,
+          "applied": 21,
+          "unitsBeforeStep": 33,
+          "unitsAfter": 54,
+          "heroAliveAfter": false,
+          "isLotteryRow": false
+        }
+      ]
+    }
+  ],
+  "trapRowDef": {
+    "id": "g2",
+    "z": 6300,
+    "h": 24,
+    "cells": [
+      {
+        "x0": 252,
+        "x1": 400,
+        "value": -10,
+        "maxValue": -10,
+        "flashT": 0
+      }
+    ],
+    "passed": false,
+    "bypass": true,
+    "armZ": 206,
+    "armed": false,
+    "hint": "랜덤 길의 확정 게이트는 상한이 자기 값이라 쏜 만큼 줄어들지 않습니다"
+  },
+  "trapDirect": [
+    {
+      "n": 1,
+      "remain": 0,
+      "heroAlive": false,
+      "lose": true,
+      "recommendedRemain": 0,
+      "recommendedHeroAlive": false
+    },
+    {
+      "n": 5,
+      "remain": 0,
+      "heroAlive": false,
+      "lose": true,
+      "recommendedRemain": 0,
+      "recommendedHeroAlive": false
+    },
+    {
+      "n": 9,
+      "remain": 0,
+      "heroAlive": false,
+      "lose": true,
+      "recommendedRemain": 0,
+      "recommendedHeroAlive": false
+    },
+    {
+      "n": 10,
+      "remain": 0,
+      "heroAlive": false,
+      "lose": true,
+      "recommendedRemain": 0,
+      "recommendedHeroAlive": false
+    },
+    {
+      "n": 11,
+      "remain": 1,
+      "heroAlive": false,
+      "lose": false,
+      "recommendedRemain": 1,
+      "recommendedHeroAlive": true
+    },
+    {
+      "n": 15,
+      "remain": 5,
+      "heroAlive": true,
+      "lose": false,
+      "recommendedRemain": 5,
+      "recommendedHeroAlive": true
+    },
+    {
+      "n": 30,
+      "remain": 20,
+      "heroAlive": true,
+      "lose": false,
+      "recommendedRemain": 20,
+      "recommendedHeroAlive": true
+    },
+    {
+      "n": 68,
+      "remain": 58,
+      "heroAlive": true,
+      "lose": false,
+      "recommendedRemain": 58,
+      "recommendedHeroAlive": true
+    }
+  ]
+}

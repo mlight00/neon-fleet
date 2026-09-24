@@ -1,0 +1,6789 @@
+{
+  "script": "B_hero-exposure.mjs",
+  "unitHp": 2,
+  "note": "로봇 = createRun 이 처음 만든 유닛(id 1). 봇 결과는 정해진 입력으로 한 판씩 돌린 결과이며 사람의 성공률이 아니다.",
+  "dmgTable": [
+    {
+      "difficulty": "normal",
+      "source": "잡졸 접촉(grunt touch)",
+      "dmg": 1,
+      "scope": "겹친 유닛 중 앞줄 1명, 적 소멸",
+      "hitsToKill": 2
+    },
+    {
+      "difficulty": "normal",
+      "source": "돌격체 접촉(rusher touch)",
+      "dmg": 2,
+      "scope": "겹친 유닛 중 앞줄 1명, 적 소멸",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "normal",
+      "source": "저격수 탄(shooter shot)",
+      "dmg": 1,
+      "scope": "스윕에서 먼저 닿는 1명",
+      "hitsToKill": 2
+    },
+    {
+      "difficulty": "normal",
+      "source": "정예 부채꼴 탄(elite shot ×3)",
+      "dmg": 1,
+      "scope": "탄마다 먼저 닿는 1명(3발)",
+      "hitsToKill": 2
+    },
+    {
+      "difficulty": "normal",
+      "source": "정예 겹침(elite touch, 0.5초마다)",
+      "dmg": 3,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "normal",
+      "source": "광장 보스 S15 착지 충격(r 60)",
+      "dmg": 1,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 2
+    },
+    {
+      "difficulty": "normal",
+      "source": "광장 보스 S15 겹침(0.5초마다)",
+      "dmg": 3,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "normal",
+      "source": "광장 보스 S20 착지 충격(r 80)",
+      "dmg": 2,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "normal",
+      "source": "광장 보스 S20 겹침(0.5초마다)",
+      "dmg": 3,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "normal",
+      "source": "광장 보스 S24 착지 충격(r 90)",
+      "dmg": 2,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "normal",
+      "source": "광장 보스 S24 겹침(0.5초마다)",
+      "dmg": 3,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "normal",
+      "source": "광장 보스 S24 사격(부채꼴 5)",
+      "dmg": 1,
+      "scope": "탄마다 먼저 닿는 1명",
+      "hitsToKill": 2
+    },
+    {
+      "difficulty": "hard",
+      "source": "잡졸 접촉(grunt touch)",
+      "dmg": 2,
+      "scope": "겹친 유닛 중 앞줄 1명, 적 소멸",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "돌격체 접촉(rusher touch)",
+      "dmg": 4,
+      "scope": "겹친 유닛 중 앞줄 1명, 적 소멸",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "저격수 탄(shooter shot)",
+      "dmg": 2,
+      "scope": "스윕에서 먼저 닿는 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "정예 부채꼴 탄(elite shot ×3)",
+      "dmg": 2,
+      "scope": "탄마다 먼저 닿는 1명(3발)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "정예 겹침(elite touch, 0.5초마다)",
+      "dmg": 6,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "광장 보스 S15 착지 충격(r 60)",
+      "dmg": 2,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "광장 보스 S15 겹침(0.5초마다)",
+      "dmg": 6,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "광장 보스 S20 착지 충격(r 80)",
+      "dmg": 4,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "광장 보스 S20 겹침(0.5초마다)",
+      "dmg": 6,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "광장 보스 S24 착지 충격(r 90)",
+      "dmg": 4,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "광장 보스 S24 겹침(0.5초마다)",
+      "dmg": 6,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "hard",
+      "source": "광장 보스 S24 사격(부채꼴 5)",
+      "dmg": 2,
+      "scope": "탄마다 먼저 닿는 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "잡졸 접촉(grunt touch)",
+      "dmg": 3,
+      "scope": "겹친 유닛 중 앞줄 1명, 적 소멸",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "돌격체 접촉(rusher touch)",
+      "dmg": 6,
+      "scope": "겹친 유닛 중 앞줄 1명, 적 소멸",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "저격수 탄(shooter shot)",
+      "dmg": 3,
+      "scope": "스윕에서 먼저 닿는 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "정예 부채꼴 탄(elite shot ×3)",
+      "dmg": 3,
+      "scope": "탄마다 먼저 닿는 1명(3발)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "정예 겹침(elite touch, 0.5초마다)",
+      "dmg": 9,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "광장 보스 S15 착지 충격(r 60)",
+      "dmg": 3,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "광장 보스 S15 겹침(0.5초마다)",
+      "dmg": 9,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "광장 보스 S20 착지 충격(r 80)",
+      "dmg": 6,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "광장 보스 S20 겹침(0.5초마다)",
+      "dmg": 9,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "광장 보스 S24 착지 충격(r 90)",
+      "dmg": 6,
+      "scope": "충격 원과 겹치는 유닛 전부(여러 명 동시)",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "광장 보스 S24 겹침(0.5초마다)",
+      "dmg": 9,
+      "scope": "겹친 유닛 중 앞줄 1명",
+      "hitsToKill": 1
+    },
+    {
+      "difficulty": "brutal",
+      "source": "광장 보스 S24 사격(부채꼴 5)",
+      "dmg": 3,
+      "scope": "탄마다 먼저 닿는 1명",
+      "hitsToKill": 1
+    }
+  ],
+  "runs": [
+    {
+      "stage": 1,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 1,
+      "hurtAll": {},
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 39.33,
+      "units": 35,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {},
+      "expectedIdx0IfUniform": {}
+    },
+    {
+      "stage": 2,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 2,
+      "hurtAll": {
+        "touch": 3,
+        "shot": 7
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 2,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 50.43,
+      "units": 21,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 3,
+        "shot": 7
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.3113354037267081,
+        "shot": 0.5588179936006024
+      }
+    },
+    {
+      "stage": 3,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 3,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 2
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 59.47,
+      "units": 79,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 2
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.02715098147128967,
+        "shot": 0.02531645569620253
+      }
+    },
+    {
+      "stage": 4,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 1
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 41.83,
+      "units": 35,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.02857142857142857
+      }
+    },
+    {
+      "stage": 5,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 2
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 44.27,
+      "units": 35,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 2
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.125
+      }
+    },
+    {
+      "stage": 6,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 7
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 3,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 50.87,
+      "units": 43,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 7
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.17224418093983312
+      }
+    },
+    {
+      "stage": 7,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 4,
+        "shot": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 47.78,
+      "units": 42,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 4,
+        "shot": 4
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.09143763213530655,
+        "shot": 0.09302325581395349
+      }
+    },
+    {
+      "stage": 8,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 3,
+      "hurtAll": {
+        "touch": 3
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 61.25,
+      "units": 48,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 3
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.09375
+      }
+    },
+    {
+      "stage": 9,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 20,
+        "touch": 2
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 57.6,
+        "cause": "shot",
+        "unitsLeft": 53,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 6,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 59.47,
+      "units": 53,
+      "hurtIdx0": {
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "shot": 20,
+        "touch": 2
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.39710463042758326,
+        "touch": 0.0476460578559274
+      }
+    },
+    {
+      "stage": 10,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 14
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 52.97,
+        "cause": "shot",
+        "unitsLeft": 49,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 2,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 5,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 64.07,
+      "units": 47,
+      "hurtIdx0": {
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "shot": 14
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.28074468248837997
+      }
+    },
+    {
+      "stage": 11,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 7,
+        "touch": 1
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 53.92,
+      "units": 64,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 7,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.14751602564102564,
+        "touch": 0.015625
+      }
+    },
+    {
+      "stage": 12,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 56.85,
+      "units": 68,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 4
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.07352941176470588
+      }
+    },
+    {
+      "stage": 13,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 1
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 46.63,
+      "units": 56,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 1
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.08035714285714285,
+        "shot": 0.017857142857142856
+      }
+    },
+    {
+      "stage": 14,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 49.67,
+      "units": 64,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 4
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.06153846153846154
+      }
+    },
+    {
+      "stage": 15,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 5,
+        "shot": 1,
+        "boss": 11
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 3,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 14,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 61.6,
+      "units": 57,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 5,
+        "shot": 1,
+        "boss": 11
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.11072684636807374,
+        "shot": 0.024390243902439025,
+        "boss": 0.17504507529681568
+      }
+    },
+    {
+      "stage": 16,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 3,
+        "shot": 3
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 51.08,
+      "units": 71,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 3,
+        "shot": 3
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.049002347417840375,
+        "shot": 0.056637698531615224
+      }
+    },
+    {
+      "stage": 17,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 8
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 48.83,
+      "units": 74,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 8
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.2059814916957774
+      }
+    },
+    {
+      "stage": 18,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 20,
+        "touch": 1
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 56.98,
+        "cause": "shot",
+        "unitsLeft": 74,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 7,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 58.7,
+      "units": 73,
+      "hurtIdx0": {
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "shot": 20,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.3565687389071799,
+        "touch": 0.012658227848101266
+      }
+    },
+    {
+      "stage": 19,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 10
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 50.37,
+      "units": 75,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 10
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.2264327485380116
+      }
+    },
+    {
+      "stage": 20,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 3,
+        "touch": 9,
+        "boss": 11
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 3,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 13,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 60.75,
+      "units": 71,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 3,
+        "touch": 9,
+        "boss": 11
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.05263157894736842,
+        "touch": 0.10876362593230061,
+        "boss": 0.14309881522875642
+      }
+    },
+    {
+      "stage": 21,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 3,
+        "shot": 1
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 50.97,
+      "units": 89,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 3,
+        "shot": 1
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.07247191011235955,
+        "shot": 0.011235955056179775
+      }
+    },
+    {
+      "stage": 22,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 6,
+        "shot": 5
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 54.5,
+      "units": 99,
+      "hurtIdx0": {
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 6,
+        "shot": 5
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.11822510822510822,
+        "shot": 0.060606060606060615
+      }
+    },
+    {
+      "stage": 23,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 17
+      },
+      "hurtHero": {
+        "touch": 1,
+        "shot": 1
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 58.45,
+        "cause": "shot",
+        "unitsLeft": 99,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 5,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 71.53,
+      "units": 95,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 17
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.059343434343434344,
+        "shot": 0.1898917803445553
+      }
+    },
+    {
+      "stage": 24,
+      "policy": "evLead",
+      "difficulty": "normal",
+      "startUnits": 8,
+      "hurtAll": {
+        "shot": 42,
+        "touch": 16,
+        "boss": 23,
+        "shock": 1
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 68.37,
+        "cause": "shot+shot",
+        "unitsLeft": 79,
+        "phase": "arena"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 6,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 1,
+      "multiShotSteps": 7,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 29,
+        "shot": 14,
+        "shock": 1,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 75.23,
+      "units": 59,
+      "hurtIdx0": {
+        "shot": 6
+      },
+      "hurtTotalByCause": {
+        "shot": 42,
+        "touch": 16,
+        "boss": 23,
+        "shock": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.5291607234947744,
+        "touch": 0.21936234580651987,
+        "boss": 0.28925488325375315,
+        "shock": 0.010869565217391304
+      }
+    },
+    {
+      "stage": 1,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 1,
+      "hurtAll": {},
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 39.67,
+      "units": 20,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {},
+      "expectedIdx0IfUniform": {}
+    },
+    {
+      "stage": 2,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 2,
+      "hurtAll": {
+        "touch": 3,
+        "shot": 7
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 2,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 50.43,
+      "units": 21,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 3,
+        "shot": 7
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.3113354037267081,
+        "shot": 0.5588179936006024
+      }
+    },
+    {
+      "stage": 3,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 3,
+      "hurtAll": {
+        "shot": 4,
+        "touch": 1
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 60.08,
+      "units": 51,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 4,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.0784313725490196,
+        "touch": 0.0196078431372549
+      }
+    },
+    {
+      "stage": 4,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 42.32,
+      "units": 19,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 4
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.21052631578947367
+      }
+    },
+    {
+      "stage": 5,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 3
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 45.32,
+      "units": 17,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 3
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.23926073926073926
+      }
+    },
+    {
+      "stage": 6,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 5,
+        "shot": 9
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 14.55,
+        "cause": "touch",
+        "unitsLeft": 4,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 3,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 53.9,
+      "units": 19,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 5,
+        "shot": 9
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.502020202020202,
+        "shot": 0.4892458418774208
+      }
+    },
+    {
+      "stage": 7,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 49.57,
+      "units": 20,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 4
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.09523809523809523,
+        "shot": 0.19047619047619047
+      }
+    },
+    {
+      "stage": 8,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 3,
+      "hurtAll": {
+        "touch": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 61.72,
+      "units": 33,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 4
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.21045008912655971
+      }
+    },
+    {
+      "stage": 9,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 23,
+        "touch": 2
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 58,
+        "cause": "shot",
+        "unitsLeft": 37,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 8,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 64.35,
+      "units": 34,
+      "hurtIdx0": {
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "shot": 23,
+        "touch": 2
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.6452851035894909,
+        "touch": 0.1037037037037037
+      }
+    },
+    {
+      "stage": 10,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 16
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 53.97,
+        "cause": "shot",
+        "unitsLeft": 42,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 6,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 66.32,
+      "units": 39,
+      "hurtIdx0": {
+        "shot": 6
+      },
+      "hurtTotalByCause": {
+        "shot": 16
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.3785810490007882
+      }
+    },
+    {
+      "stage": 11,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 16,
+        "touch": 4
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 56.1,
+        "cause": "shot",
+        "unitsLeft": 27,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 1,
+      "lossBy": {
+        "touch": 2,
+        "shot": 5,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 57.92,
+      "units": 27,
+      "hurtIdx0": {
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "shot": 16,
+        "touch": 4
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.6527196591156545,
+        "touch": 0.15
+      }
+    },
+    {
+      "stage": 12,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 10,
+        "touch": 1
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 2,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 59.4,
+      "units": 37,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 10,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.2884483971945272,
+        "touch": 0.02631578947368421
+      }
+    },
+    {
+      "stage": 13,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 1,
+        "shot": 2
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 48.03,
+      "units": 28,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 1,
+        "shot": 2
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.1111111111111111,
+        "shot": 0.07142857142857142
+      }
+    },
+    {
+      "stage": 14,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 4,
+        "shot": 3
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 52.1,
+      "units": 32,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 4,
+        "shot": 3
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.11853832442067735,
+        "shot": 0.09090909090909091
+      }
+    },
+    {
+      "stage": 15,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 1,
+        "touch": 4,
+        "boss": 34
+      },
+      "hurtHero": {
+        "boss": 1
+      },
+      "heroHurtWithEscort": 0,
+      "heroLost": {
+        "t": 79.95,
+        "cause": "boss",
+        "unitsLeft": 0,
+        "phase": "arena"
+      },
+      "drawnHeroChanges": 0,
+      "shockSteps": 7,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 36,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 79.95,
+      "units": 0,
+      "hurtIdx0": {
+        "boss": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 1,
+        "touch": 4,
+        "boss": 34
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.041666666666666664,
+        "touch": 0.1285714285714286,
+        "boss": 4.118209990445433
+      }
+    },
+    {
+      "stage": 16,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 2,
+        "touch": 2
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 51.07,
+      "units": 64,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 2,
+        "touch": 2
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.040015243902439025,
+        "touch": 0.03076923076923077
+      }
+    },
+    {
+      "stage": 17,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 12
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 2,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 51.03,
+      "units": 34,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 12
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.4960317460317461
+      }
+    },
+    {
+      "stage": 18,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 29,
+        "touch": 7
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 62.65,
+        "cause": "shot",
+        "unitsLeft": 26,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 2,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 3,
+        "shot": 10,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 70.05,
+      "units": 22,
+      "hurtIdx0": {
+        "shot": 5
+      },
+      "hurtTotalByCause": {
+        "shot": 29,
+        "touch": 7
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 1.153238807255169,
+        "touch": 0.2123494192398367
+      }
+    },
+    {
+      "stage": 19,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 13,
+        "touch": 3
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 2,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 52.87,
+      "units": 35,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 13,
+        "touch": 3
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.505801154939086,
+        "touch": 0.1314655172413793
+      }
+    },
+    {
+      "stage": 20,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 16,
+        "shot": 2,
+        "boss": 20
+      },
+      "hurtHero": {
+        "boss": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 57.92,
+        "cause": "boss",
+        "unitsLeft": 46,
+        "phase": "arena"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 5,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 25,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 67.48,
+      "units": 32,
+      "hurtIdx0": {
+        "boss": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 16,
+        "shot": 2,
+        "boss": 20
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.3676718541573075,
+        "shot": 0.041666666666666664,
+        "boss": 0.4706389020114533
+      }
+    },
+    {
+      "stage": 21,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 3
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 52.55,
+      "units": 46,
+      "hurtIdx0": {
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 3
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.05405405405405406,
+        "shot": 0.06521739130434782
+      }
+    },
+    {
+      "stage": 22,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 5,
+        "shot": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 54.52,
+      "units": 99,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 5,
+        "shot": 4
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.1260795646853602,
+        "shot": 0.04725218284540319
+      }
+    },
+    {
+      "stage": 23,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 4,
+        "shot": 16
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 60.25,
+        "cause": "shot",
+        "unitsLeft": 97,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 5,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 71.67,
+      "units": 95,
+      "hurtIdx0": {
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "touch": 4,
+        "shot": 16
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.11748745082078416,
+        "shot": 0.18741354742459304
+      }
+    },
+    {
+      "stage": 24,
+      "policy": "aimLead",
+      "difficulty": "normal",
+      "startUnits": 8,
+      "hurtAll": {
+        "touch": 18,
+        "shot": 40,
+        "boss": 23,
+        "shock": 1
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 68.37,
+        "cause": "shot+shot",
+        "unitsLeft": 77,
+        "phase": "arena"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 6,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 1,
+      "multiShotSteps": 7,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 29,
+        "shot": 15,
+        "shock": 1,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 75.35,
+      "units": 58,
+      "hurtIdx0": {
+        "shot": 6
+      },
+      "hurtTotalByCause": {
+        "touch": 18,
+        "shot": 40,
+        "boss": 23,
+        "shock": 1
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.2565410934640816,
+        "shot": 0.5105666401677047,
+        "boss": 0.29448347805003516,
+        "shock": 0.01098901098901099
+      }
+    },
+    {
+      "stage": 1,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 1,
+      "hurtAll": {},
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 40,
+      "units": 14,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {},
+      "expectedIdx0IfUniform": {}
+    },
+    {
+      "stage": 2,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 2,
+      "hurtAll": {
+        "shot": 5
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 48.15,
+      "units": 30,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 5
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.346774193548387
+      }
+    },
+    {
+      "stage": 3,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 3,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 2
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 59.47,
+      "units": 79,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 2
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.02715098147128967,
+        "shot": 0.02531645569620253
+      }
+    },
+    {
+      "stage": 4,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 43.77,
+      "units": 28,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 4
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.14285714285714285
+      }
+    },
+    {
+      "stage": 5,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 4,
+        "touch": 1
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 45.17,
+      "units": 18,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 4,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.419047619047619,
+        "touch": 0.07142857142857142
+      }
+    },
+    {
+      "stage": 6,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 7,
+        "touch": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 50.37,
+      "units": 30,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 7,
+        "touch": 4
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.3073005093378608,
+        "touch": 0.1494057724957555
+      }
+    },
+    {
+      "stage": 7,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 1,
+        "shot": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 48.42,
+      "units": 27,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 1,
+        "shot": 4
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.045454545454545456,
+        "shot": 0.14814814814814814
+      }
+    },
+    {
+      "stage": 8,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 3,
+      "hurtAll": {
+        "touch": 4
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 61.7,
+      "units": 33,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 4
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.21045008912655971
+      }
+    },
+    {
+      "stage": 9,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 33,
+        "touch": 1
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 61.6,
+        "cause": "shot",
+        "unitsLeft": 25,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 12,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 70.83,
+      "units": 21,
+      "hurtIdx0": {
+        "shot": 5
+      },
+      "hurtTotalByCause": {
+        "shot": 33,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 1.300305854154998,
+        "touch": 0.05555555555555555
+      }
+    },
+    {
+      "stage": 10,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 17
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 52.97,
+        "cause": "shot",
+        "unitsLeft": 37,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 7,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 76.8,
+      "units": 33,
+      "hurtIdx0": {
+        "shot": 8
+      },
+      "hurtTotalByCause": {
+        "shot": 17
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.4637410783695614
+      }
+    },
+    {
+      "stage": 11,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 14
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 56.12,
+        "cause": "shot",
+        "unitsLeft": 38,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 2,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 4,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 56.47,
+      "units": 38,
+      "hurtIdx0": {
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "shot": 14
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.5676659125188538
+      }
+    },
+    {
+      "stage": 12,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 9,
+        "touch": 1
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 58,
+      "units": 49,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 9,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.21448223733938016,
+        "touch": 0.02564102564102564
+      }
+    },
+    {
+      "stage": 13,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 2
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 47.95,
+      "units": 30,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 2
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.08,
+        "shot": 0.06559139784946236
+      }
+    },
+    {
+      "stage": 14,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 4,
+        "shot": 7
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 54.47,
+        "cause": "shot",
+        "unitsLeft": 17,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 3,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 55.85,
+      "units": 17,
+      "hurtIdx0": {
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "touch": 4,
+        "shot": 7
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.2563492063492063,
+        "shot": 0.3722738218094256
+      }
+    },
+    {
+      "stage": 15,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 6,
+        "shot": 3,
+        "boss": 22
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 5,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 25,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 70.28,
+      "units": 22,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "touch": 6,
+        "shot": 3,
+        "boss": 22
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.24194694194694194,
+        "shot": 0.1324110671936759,
+        "boss": 0.6819126431118249
+      }
+    },
+    {
+      "stage": 16,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 4,
+        "touch": 3
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 2,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 51.27,
+      "units": 58,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 4,
+        "touch": 3
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.0891713747645951,
+        "touch": 0.05
+      }
+    },
+    {
+      "stage": 17,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 10
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 2,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 49.45,
+      "units": 55,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 10
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.23747381650607458
+      }
+    },
+    {
+      "stage": 18,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 22,
+        "touch": 8
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 59.05,
+        "cause": "shot",
+        "unitsLeft": 36,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 2,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 9,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 65.32,
+      "units": 33,
+      "hurtIdx0": {
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "shot": 22,
+        "touch": 8
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.8510598352005134,
+        "touch": 0.1855934762911507
+      }
+    },
+    {
+      "stage": 19,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 9,
+        "touch": 1
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 3,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 50.93,
+      "units": 45,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 9,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.24028904464843406,
+        "touch": 0.02564102564102564
+      }
+    },
+    {
+      "stage": 20,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 4,
+        "touch": 11,
+        "boss": 13
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 3,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 16,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 62.08,
+      "units": 59,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 4,
+        "touch": 11,
+        "boss": 13
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.0881782945736434,
+        "touch": 0.15506866376508444,
+        "boss": 0.19760640728414305
+      }
+    },
+    {
+      "stage": 21,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 6,
+        "shot": 2
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 0,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 51.67,
+      "units": 59,
+      "hurtIdx0": {
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 6,
+        "shot": 2
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.2048049400186537,
+        "shot": 0.03389830508474576
+      }
+    },
+    {
+      "stage": 22,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 7,
+      "hurtAll": {
+        "shot": 5,
+        "touch": 7
+      },
+      "hurtHero": {},
+      "heroHurtWithEscort": 0,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 1,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 54.7,
+      "units": 84,
+      "hurtIdx0": {},
+      "hurtTotalByCause": {
+        "shot": 5,
+        "touch": 7
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.07389571213100625,
+        "touch": 0.10420393559928443
+      }
+    },
+    {
+      "stage": 23,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 7,
+      "hurtAll": {
+        "shot": 20,
+        "touch": 3
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": null,
+      "drawnHeroChanges": 0,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 5,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 74.22,
+      "units": 84,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 20,
+        "touch": 3
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.33186225129593777,
+        "touch": 0.05375180375180376
+      }
+    },
+    {
+      "stage": 24,
+      "policy": "planBoss",
+      "difficulty": "normal",
+      "startUnits": 8,
+      "hurtAll": {
+        "shot": 42,
+        "touch": 13,
+        "boss": 22,
+        "shock": 1
+      },
+      "hurtHero": {
+        "shot": 2
+      },
+      "heroHurtWithEscort": 2,
+      "heroLost": {
+        "t": 68.37,
+        "cause": "shot",
+        "unitsLeft": 80,
+        "phase": "arena"
+      },
+      "drawnHeroChanges": 7,
+      "shockSteps": 5,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 1,
+      "multiShotSteps": 9,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 26,
+        "shot": 16,
+        "shock": 1,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 74.43,
+      "units": 61,
+      "hurtIdx0": {
+        "shot": 12
+      },
+      "hurtTotalByCause": {
+        "shot": 42,
+        "touch": 13,
+        "boss": 22,
+        "shock": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.5251628523371071,
+        "touch": 0.17390179271024664,
+        "boss": 0.27195182149711095,
+        "shock": 0.010752688172043012
+      }
+    },
+    {
+      "stage": 1,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 1,
+      "hurtAll": {
+        "shot": 9
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 16.62,
+        "cause": "shot",
+        "unitsLeft": 28,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 2,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 9,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 39.95,
+      "units": 26,
+      "hurtIdx0": {
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "shot": 9
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.3493020858313213
+      }
+    },
+    {
+      "stage": 2,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 2,
+      "hurtAll": {
+        "touch": 6,
+        "shot": 19
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 27.9,
+        "cause": "shot",
+        "unitsLeft": 2,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 6,
+        "shot": 19,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 66.92,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 5
+      },
+      "hurtTotalByCause": {
+        "touch": 6,
+        "shot": 19
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.6351190476190476,
+        "shot": 4.19515207015207
+      }
+    },
+    {
+      "stage": 3,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 3,
+      "hurtAll": {
+        "touch": 4,
+        "shot": 14
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 50,
+        "cause": "shot",
+        "unitsLeft": 70,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 4,
+        "shot": 14,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 61.5,
+      "units": 61,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 4,
+        "shot": 14
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.054872870582252736,
+        "shot": 0.2036770785636623
+      }
+    },
+    {
+      "stage": 4,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 4,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 9
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 42.33,
+        "cause": "shot",
+        "unitsLeft": 25,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 2,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 9,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 42.63,
+      "units": 24,
+      "hurtIdx0": {
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 9
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.14835164835164835,
+        "shot": 0.3117647791688392
+      }
+    },
+    {
+      "stage": 5,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 15
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 34.77,
+        "cause": "shot",
+        "unitsLeft": 25,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 15,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 46.45,
+      "units": 20,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 15
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.7827515695468985
+      }
+    },
+    {
+      "stage": 6,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 19
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 49.3,
+        "cause": "shot",
+        "unitsLeft": 35,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 19,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 53.8,
+      "units": 27,
+      "hurtIdx0": {
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "shot": 19
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.5833524893545573
+      }
+    },
+    {
+      "stage": 7,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 7,
+        "shot": 24
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 42.63,
+        "cause": "shot",
+        "unitsLeft": 27,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 7,
+        "shot": 24,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 53.12,
+      "units": 13,
+      "hurtIdx0": {
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "touch": 7,
+        "shot": 24
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.24012415173405885,
+        "shot": 1.0511869195242396
+      }
+    },
+    {
+      "stage": 8,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 3,
+      "hurtAll": {
+        "shot": 15,
+        "touch": 8
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 19.45,
+        "cause": "touch",
+        "unitsLeft": 20,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 8,
+        "shot": 15,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 64.08,
+      "units": 26,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "shot": 15,
+        "touch": 8
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.636748417628644,
+        "touch": 0.3206813818226862
+      }
+    },
+    {
+      "stage": 9,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 54,
+        "touch": 5
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 49.68,
+        "cause": "shot",
+        "unitsLeft": 37,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 5,
+        "shot": 54,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 82.5,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 5
+      },
+      "hurtTotalByCause": {
+        "shot": 54,
+        "touch": 5
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 4.697221290064162,
+        "touch": 0.16358222098628106
+      }
+    },
+    {
+      "stage": 10,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 4,
+        "shot": 39
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 47.67,
+        "cause": "shot",
+        "unitsLeft": 49,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 24,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 4,
+        "shot": 39,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 232.6,
+      "units": 9,
+      "hurtIdx0": {
+        "shot": 24
+      },
+      "hurtTotalByCause": {
+        "touch": 4,
+        "shot": 39
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.24145941777520724,
+        "shot": 1.5099806741047608
+      }
+    },
+    {
+      "stage": 11,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 47,
+        "touch": 3
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 26.2,
+        "cause": "shot",
+        "unitsLeft": 28,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 8,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 3,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 3,
+        "shot": 47,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 64.38,
+      "units": 15,
+      "hurtIdx0": {
+        "shot": 8
+      },
+      "hurtTotalByCause": {
+        "shot": 47,
+        "touch": 3
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 1.5802011860844403,
+        "touch": 0.1035303776683087
+      }
+    },
+    {
+      "stage": 12,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 39,
+        "touch": 3
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 52.1,
+        "cause": "shot",
+        "unitsLeft": 57,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 7,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 3,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 3,
+        "shot": 39,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 63.5,
+      "units": 26,
+      "hurtIdx0": {
+        "shot": 7
+      },
+      "hurtTotalByCause": {
+        "shot": 39,
+        "touch": 3
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.9477708837180714,
+        "touch": 0.08719405594405594
+      }
+    },
+    {
+      "stage": 13,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 6,
+        "shot": 11
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 48.25,
+        "cause": "shot",
+        "unitsLeft": 44,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 6,
+        "shot": 11,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 50.72,
+      "units": 39,
+      "hurtIdx0": {
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "touch": 6,
+        "shot": 11
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.21297667679246626,
+        "shot": 0.24146061872078017
+      }
+    },
+    {
+      "stage": 14,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 17,
+        "shot": 12
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 52.53,
+        "cause": "shot",
+        "unitsLeft": 39,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 17,
+        "shot": 12,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 53.7,
+      "units": 36,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 17,
+        "shot": 12
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.5035862946060281,
+        "shot": 0.2842379782694798
+      }
+    },
+    {
+      "stage": 15,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 19,
+        "shot": 9,
+        "boss": 43
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 30,
+        "cause": "shot",
+        "unitsLeft": 33,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 14,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 62,
+        "shot": 9,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 95.65,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 1,
+        "boss": 3
+      },
+      "hurtTotalByCause": {
+        "touch": 19,
+        "shot": 9,
+        "boss": 43
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.5927918893136029,
+        "shot": 0.2654545649146418,
+        "boss": 4.349998620601827
+      }
+    },
+    {
+      "stage": 16,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 16,
+        "shot": 21
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 38.35,
+        "cause": "touch",
+        "unitsLeft": 51,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 16,
+        "shot": 21,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 56.35,
+      "units": 35,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "touch": 16,
+        "shot": 21
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.2923041149131488,
+        "shot": 0.4938289959275099
+      }
+    },
+    {
+      "stage": 17,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 63,
+        "touch": 1
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 28.68,
+        "cause": "shot",
+        "unitsLeft": 43,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 11,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 2,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 63,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 60.72,
+      "units": 10,
+      "hurtIdx0": {
+        "shot": 11
+      },
+      "hurtTotalByCause": {
+        "shot": 63,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 2.2234369611213833,
+        "touch": 0.02631578947368421
+      }
+    },
+    {
+      "stage": 18,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 51,
+        "touch": 22
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 30,
+        "cause": "shot",
+        "unitsLeft": 33,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 9,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 22,
+        "shot": 51,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 75.6,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 10
+      },
+      "hurtTotalByCause": {
+        "shot": 51,
+        "touch": 22
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 4.750479937724656,
+        "touch": 0.5478101764395686
+      }
+    },
+    {
+      "stage": 19,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 59,
+        "touch": 1
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 15.53,
+        "cause": "shot",
+        "unitsLeft": 19,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 11,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 59,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 58.52,
+      "units": 16,
+      "hurtIdx0": {
+        "shot": 11
+      },
+      "hurtTotalByCause": {
+        "shot": 59,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 1.82696019203495,
+        "touch": 0.027777777777777776
+      }
+    },
+    {
+      "stage": 20,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 47,
+        "shot": 8,
+        "boss": 29
+      },
+      "hurtHero": {
+        "boss": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 66.68,
+        "cause": "boss",
+        "unitsLeft": 27,
+        "phase": "arena"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 10,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 76,
+        "shot": 8,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 81.07,
+      "units": 0,
+      "hurtIdx0": {
+        "boss": 4,
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 47,
+        "shot": 8,
+        "boss": 29
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 2.0249605140686056,
+        "shot": 0.15528552549283484,
+        "boss": 2.9284454188129936
+      }
+    },
+    {
+      "stage": 21,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 12,
+        "shot": 10
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 46.15,
+        "cause": "touch",
+        "unitsLeft": 77,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 12,
+        "shot": 10,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 53.42,
+      "units": 67,
+      "hurtIdx0": {
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 12,
+        "shot": 10
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.23415926876224702,
+        "shot": 0.13814813090067452
+      }
+    },
+    {
+      "stage": 22,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 20,
+        "shot": 23
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 13.95,
+        "cause": "touch",
+        "unitsLeft": 20,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 20,
+        "shot": 23,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 58.42,
+      "units": 68,
+      "hurtIdx0": {
+        "touch": 2,
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "touch": 20,
+        "shot": 23
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.3354380749165119,
+        "shot": 0.3233891016714534
+      }
+    },
+    {
+      "stage": 23,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 13,
+        "shot": 68
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 13.42,
+        "cause": "touch",
+        "unitsLeft": 21,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 19,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 13,
+        "shot": 68,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 127.18,
+      "units": 36,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 18
+      },
+      "hurtTotalByCause": {
+        "touch": 13,
+        "shot": 68
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.28988397440485064,
+        "shot": 1.0529958854363053
+      }
+    },
+    {
+      "stage": 24,
+      "policy": "evLead",
+      "difficulty": "brutal",
+      "startUnits": 8,
+      "hurtAll": {
+        "shot": 73,
+        "touch": 41,
+        "boss": 15
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 53.93,
+        "cause": "shot",
+        "unitsLeft": 96,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 13,
+      "shockSteps": 6,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 8,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 56,
+        "shot": 73,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 73.95,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 13,
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 73,
+        "touch": 41,
+        "boss": 15
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 2.583802106815133,
+        "touch": 2.0959172435285116,
+        "boss": 0.969447791925051
+      }
+    },
+    {
+      "stage": 1,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 1,
+      "hurtAll": {
+        "shot": 13,
+        "touch": 2
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 16.62,
+        "cause": "shot",
+        "unitsLeft": 13,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 2,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 13,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 44.93,
+      "units": 5,
+      "hurtIdx0": {
+        "shot": 2
+      },
+      "hurtTotalByCause": {
+        "shot": 13,
+        "touch": 2
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 1.5456099456099455,
+        "touch": 0.2361111111111111
+      }
+    },
+    {
+      "stage": 2,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 2,
+      "hurtAll": {
+        "touch": 6,
+        "shot": 19
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 27.9,
+        "cause": "shot",
+        "unitsLeft": 2,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 6,
+        "shot": 19,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 66.92,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 5
+      },
+      "hurtTotalByCause": {
+        "touch": 6,
+        "shot": 19
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.6351190476190476,
+        "shot": 4.19515207015207
+      }
+    },
+    {
+      "stage": 3,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 3,
+      "hurtAll": {
+        "shot": 27
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 50,
+        "cause": "shot",
+        "unitsLeft": 44,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 27,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 65.45,
+      "units": 24,
+      "hurtIdx0": {
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "shot": 27
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.742855003713173
+      }
+    },
+    {
+      "stage": 4,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 4,
+      "hurtAll": {
+        "touch": 1,
+        "shot": 18
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 42.33,
+        "cause": "shot",
+        "unitsLeft": 10,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 9,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 18,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 50.35,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 10
+      },
+      "hurtTotalByCause": {
+        "touch": 1,
+        "shot": 18
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.1111111111111111,
+        "shot": 3.4951080781963135
+      }
+    },
+    {
+      "stage": 5,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 18
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 34.77,
+        "cause": "shot",
+        "unitsLeft": 8,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 6,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 0,
+        "shot": 18,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 55.15,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 7
+      },
+      "hurtTotalByCause": {
+        "shot": 18
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 3.773088023088023
+      }
+    },
+    {
+      "stage": 6,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 9,
+        "shot": 6
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 14.55,
+        "cause": "touch",
+        "unitsLeft": 4,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 7,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 9,
+        "shot": 6,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 60.67,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 4,
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "touch": 9,
+        "shot": 6
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 1.8261904761904761,
+        "shot": 2.212301587301587
+      }
+    },
+    {
+      "stage": 7,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 5,
+        "shot": 16
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 27.77,
+        "cause": "shot",
+        "unitsLeft": 13,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 5,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 5,
+        "shot": 16,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 58.35,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 6
+      },
+      "hurtTotalByCause": {
+        "touch": 5,
+        "shot": 16
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.44283216783216783,
+        "shot": 3.3896575646575644
+      }
+    },
+    {
+      "stage": 8,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 3,
+      "hurtAll": {
+        "shot": 20,
+        "touch": 6
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 17.37,
+        "cause": "shot",
+        "unitsLeft": 11,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 8,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 6,
+        "shot": 20,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 68.58,
+      "units": 8,
+      "hurtIdx0": {
+        "shot": 8
+      },
+      "hurtTotalByCause": {
+        "shot": 20,
+        "touch": 6
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 1.4439008488931089,
+        "touch": 0.475225651541441
+      }
+    },
+    {
+      "stage": 9,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 25,
+        "touch": 6
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 26.62,
+        "cause": "shot",
+        "unitsLeft": 11,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 6,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 6,
+        "shot": 25,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 63.83,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 5,
+        "touch": 2
+      },
+      "hurtTotalByCause": {
+        "shot": 25,
+        "touch": 6
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 4.089069672157908,
+        "touch": 0.4156135531135531
+      }
+    },
+    {
+      "stage": 10,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 7,
+        "shot": 21
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 47.67,
+        "cause": "shot",
+        "unitsLeft": 20,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 5,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 7,
+        "shot": 21,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 61.98,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 6
+      },
+      "hurtTotalByCause": {
+        "touch": 7,
+        "shot": 21
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.4017768035721327,
+        "shot": 3.6453587047627294
+      }
+    },
+    {
+      "stage": 11,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 23,
+        "touch": 11
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 24.52,
+        "cause": "shot",
+        "unitsLeft": 17,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 5,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 4,
+      "heroShotPlusOtherShotSameStep": 1,
+      "lossBy": {
+        "touch": 11,
+        "shot": 23,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 54.57,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 5,
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 23,
+        "touch": 11
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 2.9039176896375034,
+        "touch": 2.103210678210678
+      }
+    },
+    {
+      "stage": 12,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 11,
+        "shot": 29
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 52.1,
+        "cause": "shot",
+        "unitsLeft": 23,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 1,
+      "lossBy": {
+        "touch": 11,
+        "shot": 29,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 69.08,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 5
+      },
+      "hurtTotalByCause": {
+        "touch": 11,
+        "shot": 29
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.8318666412706659,
+        "shot": 3.9505043722997013
+      }
+    },
+    {
+      "stage": 13,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 9,
+        "shot": 19
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 42.37,
+        "cause": "touch",
+        "unitsLeft": 22,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 7,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 9,
+        "shot": 19,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 59.92,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 7
+      },
+      "hurtTotalByCause": {
+        "touch": 9,
+        "shot": 19
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.7138046450117388,
+        "shot": 3.4140275359315604
+      }
+    },
+    {
+      "stage": 14,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 13,
+        "shot": 21
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 31.42,
+        "cause": "touch",
+        "unitsLeft": 22,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 7,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 13,
+        "shot": 21,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 62.88,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 7
+      },
+      "hurtTotalByCause": {
+        "touch": 13,
+        "shot": 21
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.7299096988302385,
+        "shot": 3.6453587047627294
+      }
+    },
+    {
+      "stage": 15,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 16,
+        "shot": 8
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 29.2,
+        "cause": "shot",
+        "unitsLeft": 13,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 16,
+        "shot": 8,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 37.88,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 3,
+        "touch": 2
+      },
+      "hurtTotalByCause": {
+        "touch": 16,
+        "shot": 8
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 3.2116285460325704,
+        "shot": 0.7253718503718503
+      }
+    },
+    {
+      "stage": 16,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 17,
+        "shot": 20
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 38.35,
+        "cause": "touch",
+        "unitsLeft": 45,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 5,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 17,
+        "shot": 20,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 57.68,
+      "units": 28,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "touch": 17,
+        "shot": 20
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.39648743860841396,
+        "shot": 0.5495386965044686
+      }
+    },
+    {
+      "stage": 17,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 29,
+        "touch": 7
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 15.53,
+        "cause": "shot",
+        "unitsLeft": 11,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 16,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 4,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 7,
+        "shot": 29,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 50.27,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 16,
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "shot": 29,
+        "touch": 7
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 4.255395829660536,
+        "touch": 0.5801698301698301
+      }
+    },
+    {
+      "stage": 18,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 17,
+        "touch": 18
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 30,
+        "cause": "shot",
+        "unitsLeft": 13,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 18,
+        "shot": 17,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 64.88,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "shot": 17,
+        "touch": 18
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 2.9940461284501527,
+        "touch": 1.716754955570745
+      }
+    },
+    {
+      "stage": 19,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 33,
+        "touch": 5
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 28.68,
+        "cause": "shot",
+        "unitsLeft": 20,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 13,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 4,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 5,
+        "shot": 33,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 52.62,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 14
+      },
+      "hurtTotalByCause": {
+        "shot": 33,
+        "touch": 5
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 3.8571518205250874,
+        "touch": 0.2795106639146887
+      }
+    },
+    {
+      "stage": 20,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 35,
+        "shot": 8,
+        "boss": 14
+      },
+      "hurtHero": {
+        "boss": 1
+      },
+      "heroHurtWithEscort": 0,
+      "heroLost": {
+        "t": 66.62,
+        "cause": "boss",
+        "unitsLeft": 0,
+        "phase": "arena"
+      },
+      "drawnHeroChanges": 0,
+      "shockSteps": 5,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 49,
+        "shot": 8,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 66.62,
+      "units": 0,
+      "hurtIdx0": {
+        "boss": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 35,
+        "shot": 8,
+        "boss": 14
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 2.299404851971044,
+        "shot": 0.1926871278969974,
+        "boss": 2.313639546727782
+      }
+    },
+    {
+      "stage": 21,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 8,
+        "shot": 20
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 29.73,
+        "cause": "touch",
+        "unitsLeft": 34,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 8,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 8,
+        "shot": 20,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 59.12,
+      "units": 18,
+      "hurtIdx0": {
+        "touch": 3,
+        "shot": 5
+      },
+      "hurtTotalByCause": {
+        "touch": 8,
+        "shot": 20
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.27445532408767703,
+        "shot": 0.7327939350990367
+      }
+    },
+    {
+      "stage": 22,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 19,
+        "shot": 23
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 55.62,
+        "cause": "shot",
+        "unitsLeft": 71,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 19,
+        "shot": 23,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 59.3,
+      "units": 62,
+      "hurtIdx0": {
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "touch": 19,
+        "shot": 23
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.37630404069025325,
+        "shot": 0.36102551305180103
+      }
+    },
+    {
+      "stage": 23,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 22,
+        "shot": 88
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 31.85,
+        "cause": "shot",
+        "unitsLeft": 51,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 32,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 22,
+        "shot": 88,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 92.77,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 32,
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 22,
+        "shot": 88
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 1.6080759946891852,
+        "shot": 4.008560029899117
+      }
+    },
+    {
+      "stage": 24,
+      "policy": "aimLead",
+      "difficulty": "brutal",
+      "startUnits": 8,
+      "hurtAll": {
+        "shot": 63,
+        "touch": 33,
+        "boss": 13
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 53.93,
+        "cause": "shot",
+        "unitsLeft": 85,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 9,
+      "shockSteps": 5,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 5,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 46,
+        "shot": 63,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 71.25,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 10
+      },
+      "hurtTotalByCause": {
+        "shot": 63,
+        "touch": 33,
+        "boss": 13
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 3.282721175926327,
+        "touch": 1.3083336320178636,
+        "boss": 0.7760182594367007
+      }
+    },
+    {
+      "stage": 1,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 1,
+      "hurtAll": {
+        "shot": 13,
+        "touch": 1
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 27.9,
+        "cause": "shot",
+        "unitsLeft": 3,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 2,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 13,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 54.35,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "shot": 13,
+        "touch": 1
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 2.8848956598956597,
+        "touch": 0.3333333333333333
+      }
+    },
+    {
+      "stage": 2,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 2,
+      "hurtAll": {
+        "touch": 2,
+        "shot": 12
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 27.9,
+        "cause": "shot",
+        "unitsLeft": 4,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 12,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 59.62,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "touch": 2,
+        "shot": 12
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.26785714285714285,
+        "shot": 3.2817460317460316
+      }
+    },
+    {
+      "stage": 3,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 3,
+      "hurtAll": {
+        "touch": 4,
+        "shot": 13
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 50,
+        "cause": "shot",
+        "unitsLeft": 70,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 1,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 4,
+        "shot": 13,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 61.45,
+      "units": 62,
+      "hurtIdx0": {
+        "shot": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 4,
+        "shot": 13
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.054872870582252736,
+        "shot": 0.1875480463055978
+      }
+    },
+    {
+      "stage": 4,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 4,
+      "hurtAll": {
+        "touch": 1,
+        "shot": 27
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 42.33,
+        "cause": "shot",
+        "unitsLeft": 18,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 10,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 1,
+        "shot": 27,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 54.95,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 11
+      },
+      "hurtTotalByCause": {
+        "touch": 1,
+        "shot": 27
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.05555555555555555,
+        "shot": 3.8914567532520827
+      }
+    },
+    {
+      "stage": 5,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 4,
+      "hurtAll": {
+        "shot": 17,
+        "touch": 2
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 31.65,
+        "cause": "touch",
+        "unitsLeft": 3,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 2,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 2,
+        "shot": 17,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 52.73,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "shot": 17,
+        "touch": 2
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 3.8746392496392494,
+        "touch": 0.45
+      }
+    },
+    {
+      "stage": 6,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 9,
+        "shot": 22
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 36.83,
+        "cause": "touch",
+        "unitsLeft": 6,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 6,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 9,
+        "shot": 22,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 58.7,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 6
+      },
+      "hurtTotalByCause": {
+        "touch": 9,
+        "shot": 22
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.8134670884670885,
+        "shot": 3.7934597265479617
+      }
+    },
+    {
+      "stage": 7,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 6,
+        "shot": 20
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 26.85,
+        "cause": "shot",
+        "unitsLeft": 17,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 8,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 6,
+        "shot": 20,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 57.02,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 9
+      },
+      "hurtTotalByCause": {
+        "touch": 6,
+        "shot": 20
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.5820378151260505,
+        "shot": 3.599618742111002
+      }
+    },
+    {
+      "stage": 8,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 3,
+      "hurtAll": {
+        "shot": 24,
+        "touch": 5
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 17.37,
+        "cause": "shot",
+        "unitsLeft": 11,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 10,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 5,
+        "shot": 24,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 70.08,
+      "units": 5,
+      "hurtIdx0": {
+        "shot": 10
+      },
+      "hurtTotalByCause": {
+        "shot": 24,
+        "touch": 5
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 1.9232131001093848,
+        "touch": 0.37814962814962816
+      }
+    },
+    {
+      "stage": 9,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 28,
+        "touch": 5
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 49.68,
+        "cause": "shot",
+        "unitsLeft": 12,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 5,
+        "shot": 28,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 63.83,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 4
+      },
+      "hurtTotalByCause": {
+        "shot": 28,
+        "touch": 5
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 4.258720751213011,
+        "touch": 0.5698773448773449
+      }
+    },
+    {
+      "stage": 10,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 3,
+        "shot": 37
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 47.67,
+        "cause": "shot",
+        "unitsLeft": 36,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 22,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 3,
+        "shot": 37,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 68.1,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 23
+      },
+      "hurtTotalByCause": {
+        "touch": 3,
+        "shot": 37
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.08225984541774015,
+        "shot": 4.201586223821666
+      }
+    },
+    {
+      "stage": 11,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 20,
+        "touch": 12
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 24.47,
+        "cause": "shot",
+        "unitsLeft": 14,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 6,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 3,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 12,
+        "shot": 20,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 46.85,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 4,
+        "touch": 3
+      },
+      "hurtTotalByCause": {
+        "shot": 20,
+        "touch": 12
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 2.1302955214719916,
+        "touch": 3.2503968253968254
+      }
+    },
+    {
+      "stage": 12,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "shot": 45,
+        "touch": 5
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 52.1,
+        "cause": "shot",
+        "unitsLeft": 35,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 12,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 2,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 5,
+        "shot": 45,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 67.78,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 13
+      },
+      "hurtTotalByCause": {
+        "shot": 45,
+        "touch": 5
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 4.444061114279966,
+        "touch": 0.21197297679683078
+      }
+    },
+    {
+      "stage": 13,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 11,
+        "shot": 16
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 42.37,
+        "cause": "touch",
+        "unitsLeft": 19,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 7,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 11,
+        "shot": 16,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 57.52,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 7
+      },
+      "hurtTotalByCause": {
+        "touch": 11,
+        "shot": 16
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.8369370825253178,
+        "shot": 3.2263110857151105
+      }
+    },
+    {
+      "stage": 14,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 5,
+      "hurtAll": {
+        "touch": 14
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 29.73,
+        "cause": "touch",
+        "unitsLeft": 2,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 4,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 14,
+        "shot": 0,
+        "shock": 0,
+        "gate": 2
+      },
+      "win": false,
+      "lose": true,
+      "time": 37.42,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 5
+      },
+      "hurtTotalByCause": {
+        "touch": 14
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 4.073015873015873
+      }
+    },
+    {
+      "stage": 15,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 11,
+        "shot": 12
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 30,
+        "cause": "shot",
+        "unitsLeft": 11,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 3,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 2,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 11,
+        "shot": 12,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 37.77,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 2,
+        "touch": 2
+      },
+      "hurtTotalByCause": {
+        "touch": 11,
+        "shot": 12
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 2.5548875960640665,
+        "shot": 1.2462051837051837
+      }
+    },
+    {
+      "stage": 16,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 14,
+        "shot": 27
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 38.35,
+        "cause": "touch",
+        "unitsLeft": 40,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 7,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 14,
+        "shot": 27,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 60,
+      "units": 19,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 6
+      },
+      "hurtTotalByCause": {
+        "touch": 14,
+        "shot": 27
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.30508280218679806,
+        "shot": 0.9159310032224977
+      }
+    },
+    {
+      "stage": 17,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 38,
+        "touch": 6
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 12.88,
+        "cause": "shot",
+        "unitsLeft": 17,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 14,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 3,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 6,
+        "shot": 38,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 53.57,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 15
+      },
+      "hurtTotalByCause": {
+        "shot": 38,
+        "touch": 6
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 4.668086236537576,
+        "touch": 0.7058913308913308
+      }
+    },
+    {
+      "stage": 18,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 11,
+        "touch": 7
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 20.05,
+        "cause": "touch",
+        "unitsLeft": 2,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 6,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 7,
+        "shot": 11,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 38.37,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 4,
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "shot": 11,
+        "touch": 7
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 1.5972582972582972,
+        "touch": 2.9499999999999997
+      }
+    },
+    {
+      "stage": 19,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "shot": 41,
+        "touch": 7
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 12.88,
+        "cause": "shot",
+        "unitsLeft": 17,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 13,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 3,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 7,
+        "shot": 41,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 55.77,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 14
+      },
+      "hurtTotalByCause": {
+        "shot": 41,
+        "touch": 7
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 4.482141343973973,
+        "touch": 0.4115171378329273
+      }
+    },
+    {
+      "stage": 20,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 39,
+        "shot": 14,
+        "boss": 17
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 30.25,
+        "cause": "shot",
+        "unitsLeft": 32,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 5,
+      "shockSteps": 6,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 56,
+        "shot": 14,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 70.52,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 4,
+        "boss": 1,
+        "touch": 1
+      },
+      "hurtTotalByCause": {
+        "touch": 39,
+        "shot": 14,
+        "boss": 17
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 2.7129033260752644,
+        "shot": 0.43545273118696204,
+        "boss": 2.04156608379225
+      }
+    },
+    {
+      "stage": 21,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 6,
+      "hurtAll": {
+        "touch": 11,
+        "shot": 16
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 13.42,
+        "cause": "touch",
+        "unitsLeft": 16,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 6,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 11,
+        "shot": 16,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 57.62,
+      "units": 25,
+      "hurtIdx0": {
+        "touch": 3,
+        "shot": 3
+      },
+      "hurtTotalByCause": {
+        "touch": 11,
+        "shot": 16
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.4714133225905366,
+        "shot": 0.48697510508530806
+      }
+    },
+    {
+      "stage": 22,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 7,
+      "hurtAll": {
+        "shot": 32,
+        "touch": 23
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 55.62,
+        "cause": "shot",
+        "unitsLeft": 49,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 6,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 23,
+        "shot": 32,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": true,
+      "lose": false,
+      "time": 63.13,
+      "units": 31,
+      "hurtIdx0": {
+        "shot": 6
+      },
+      "hurtTotalByCause": {
+        "shot": 32,
+        "touch": 23
+      },
+      "expectedIdx0IfUniform": {
+        "shot": 0.7336100122907406,
+        "touch": 0.356864750478917
+      }
+    },
+    {
+      "stage": 23,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 7,
+      "hurtAll": {
+        "touch": 7,
+        "shot": 65
+      },
+      "hurtHero": {
+        "touch": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 46.15,
+        "cause": "touch",
+        "unitsLeft": 43,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 24,
+      "shockSteps": 0,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 1,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 7,
+        "shot": 65,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 73.8,
+      "units": 0,
+      "hurtIdx0": {
+        "touch": 1,
+        "shot": 24
+      },
+      "hurtTotalByCause": {
+        "touch": 7,
+        "shot": 65
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 0.27437249735203695,
+        "shot": 4.995562720762976
+      }
+    },
+    {
+      "stage": 24,
+      "policy": "planBoss",
+      "difficulty": "brutal",
+      "startUnits": 8,
+      "hurtAll": {
+        "touch": 40,
+        "shot": 53,
+        "boss": 12
+      },
+      "hurtHero": {
+        "shot": 1
+      },
+      "heroHurtWithEscort": 1,
+      "heroLost": {
+        "t": 53.93,
+        "cause": "shot",
+        "unitsLeft": 69,
+        "phase": "main"
+      },
+      "drawnHeroChanges": 6,
+      "shockSteps": 4,
+      "shockStepsHeroPlusOthers": 0,
+      "shockMaxHits": 0,
+      "multiShotSteps": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "lossBy": {
+        "touch": 52,
+        "shot": 53,
+        "shock": 0,
+        "gate": 0
+      },
+      "win": false,
+      "lose": true,
+      "time": 69.65,
+      "units": 0,
+      "hurtIdx0": {
+        "shot": 7
+      },
+      "hurtTotalByCause": {
+        "touch": 40,
+        "shot": 53,
+        "boss": 12
+      },
+      "expectedIdx0IfUniform": {
+        "touch": 1.684413170340878,
+        "shot": 2.7463961730332858,
+        "boss": 1.2077496033378385
+      }
+    }
+  ],
+  "summary": {
+    "normal/evLead": {
+      "runs": 24,
+      "wins": 24,
+      "heroLostRuns": 5,
+      "heroLostInWins": 5,
+      "heroLostCause": {
+        "shot": 4,
+        "shot+shot": 1
+      },
+      "hurtAll": 291,
+      "hurtHero": 11,
+      "heroHurtWithEscort": 11,
+      "shockSteps": 12,
+      "shockStepsHeroPlusOthers": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "drawnHeroChangesTotal": 8,
+      "lossGate": 0,
+      "idx0Hits": {
+        "shot": 17,
+        "touch": 2
+      },
+      "idx0Expected": {
+        "touch": 1.48,
+        "shot": 3.64,
+        "boss": 0.61,
+        "shock": 0.01
+      },
+      "hitsByCause": {
+        "touch": 66,
+        "shot": 179,
+        "boss": 45,
+        "shock": 1
+      },
+      "heroHitShare": 0.038
+    },
+    "normal/aimLead": {
+      "runs": 24,
+      "wins": 23,
+      "heroLostRuns": 9,
+      "heroLostInWins": 8,
+      "heroLostCause": {
+        "touch": 1,
+        "shot": 5,
+        "boss": 2,
+        "shot+shot": 1
+      },
+      "hurtAll": 389,
+      "hurtHero": 19,
+      "heroHurtWithEscort": 18,
+      "shockSteps": 18,
+      "shockStepsHeroPlusOthers": 0,
+      "heroShotPlusOtherShotSameStep": 1,
+      "drawnHeroChangesTotal": 15,
+      "lossGate": 0,
+      "idx0Hits": {
+        "touch": 2,
+        "shot": 30,
+        "boss": 2
+      },
+      "idx0Expected": {
+        "touch": 3.08,
+        "shot": 7,
+        "boss": 4.88,
+        "shock": 0.01
+      },
+      "hitsByCause": {
+        "touch": 88,
+        "shot": 223,
+        "boss": 77,
+        "shock": 1
+      },
+      "heroHitShare": 0.049
+    },
+    "normal/planBoss": {
+      "runs": 24,
+      "wins": 24,
+      "heroLostRuns": 6,
+      "heroLostInWins": 6,
+      "heroLostCause": {
+        "shot": 6
+      },
+      "hurtAll": 365,
+      "hurtHero": 15,
+      "heroHurtWithEscort": 15,
+      "shockSteps": 13,
+      "shockStepsHeroPlusOthers": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "drawnHeroChangesTotal": 18,
+      "lossGate": 0,
+      "idx0Hits": {
+        "shot": 35,
+        "touch": 1
+      },
+      "idx0Expected": {
+        "shot": 6.98,
+        "touch": 2.13,
+        "boss": 1.15,
+        "shock": 0.01
+      },
+      "hitsByCause": {
+        "shot": 229,
+        "touch": 78,
+        "boss": 57,
+        "shock": 1
+      },
+      "heroHitShare": 0.041
+    },
+    "brutal/evLead": {
+      "runs": 24,
+      "wins": 18,
+      "heroLostRuns": 24,
+      "heroLostInWins": 18,
+      "heroLostCause": {
+        "shot": 18,
+        "touch": 5,
+        "boss": 1
+      },
+      "hurtAll": 1055,
+      "hurtHero": 24,
+      "heroHurtWithEscort": 24,
+      "shockSteps": 30,
+      "shockStepsHeroPlusOthers": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "drawnHeroChangesTotal": 145,
+      "lossGate": 0,
+      "idx0Hits": {
+        "shot": 136,
+        "touch": 8,
+        "boss": 7
+      },
+      "idx0Expected": {
+        "shot": 31.18,
+        "touch": 9.17,
+        "boss": 8.25
+      },
+      "hitsByCause": {
+        "shot": 711,
+        "touch": 257,
+        "boss": 87
+      },
+      "heroHitShare": 0.023
+    },
+    "brutal/aimLead": {
+      "runs": 24,
+      "wins": 6,
+      "heroLostRuns": 24,
+      "heroLostInWins": 6,
+      "heroLostCause": {
+        "shot": 18,
+        "touch": 5,
+        "boss": 1
+      },
+      "hurtAll": 877,
+      "hurtHero": 24,
+      "heroHurtWithEscort": 23,
+      "shockSteps": 10,
+      "shockStepsHeroPlusOthers": 0,
+      "heroShotPlusOtherShotSameStep": 2,
+      "drawnHeroChangesTotal": 172,
+      "lossGate": 0,
+      "idx0Hits": {
+        "shot": 172,
+        "touch": 17,
+        "boss": 1
+      },
+      "idx0Expected": {
+        "shot": 63.41,
+        "touch": 20.99,
+        "boss": 3.09
+      },
+      "hitsByCause": {
+        "shot": 584,
+        "touch": 266,
+        "boss": 27
+      },
+      "heroHitShare": 0.027
+    },
+    "brutal/planBoss": {
+      "runs": 24,
+      "wins": 5,
+      "heroLostRuns": 24,
+      "heroLostInWins": 5,
+      "heroLostCause": {
+        "shot": 16,
+        "touch": 8
+      },
+      "hurtAll": 877,
+      "hurtHero": 24,
+      "heroHurtWithEscort": 24,
+      "shockSteps": 10,
+      "shockStepsHeroPlusOthers": 0,
+      "heroShotPlusOtherShotSameStep": 0,
+      "drawnHeroChangesTotal": 188,
+      "lossGate": 2,
+      "idx0Hits": {
+        "shot": 183,
+        "touch": 23,
+        "boss": 1
+      },
+      "idx0Expected": {
+        "shot": 64.01,
+        "touch": 24.37,
+        "boss": 3.25
+      },
+      "hitsByCause": {
+        "shot": 603,
+        "touch": 245,
+        "boss": 29
+      },
+      "heroHitShare": 0.027
+    }
+  }
+}

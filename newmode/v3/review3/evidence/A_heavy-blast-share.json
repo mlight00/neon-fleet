@@ -1,0 +1,51 @@
+{
+  "kind": "합성 판(개발용 시작 무기 = 중화기) · evLead 봇 결정적 1판씩. 사람 성공률 아님",
+  "generatedBy": "A_heavy-blast-share.mjs",
+  "rows": [
+    {
+      "stage": 1,
+      "policy": "evLead",
+      "startWeapon": "heavy",
+      "won": true,
+      "timeSec": 40.11666666666567,
+      "endUnits": 24,
+      "finalWeapon": "heavy",
+      "dmg": {
+        "direct": 519,
+        "blast": 0,
+        "arc": 0
+      },
+      "blastShare": 0
+    },
+    {
+      "stage": 2,
+      "policy": "evLead",
+      "startWeapon": "heavy",
+      "won": true,
+      "timeSec": 55.016666666664825,
+      "endUnits": 2,
+      "finalWeapon": "heavy",
+      "dmg": {
+        "direct": 423,
+        "blast": 0,
+        "arc": 0
+      },
+      "blastShare": 0
+    },
+    {
+      "stage": 3,
+      "policy": "evLead",
+      "startWeapon": "heavy",
+      "won": true,
+      "timeSec": 65.08333333333093,
+      "endUnits": 28,
+      "finalWeapon": "heavy",
+      "dmg": {
+        "direct": 1113,
+        "blast": 106,
+        "arc": 0
+      },
+      "blastShare": 0.08695652173913043
+    }
+  ]
+}

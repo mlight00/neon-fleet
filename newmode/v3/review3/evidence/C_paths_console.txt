@@ -1,0 +1,128 @@
+{
+ "P1": [
+  "safeSet<write<updateStage<startRun {stages.1.versions.2.cleared: undefined → false ; stages.1.versions.2.attempts: undefined → 1 ; stages.1.versions.2.bestSurvivors: undefined → 0 ; stages.1.versions.2.bestTime: undefined → 0}",
+  "safeSet<write<patch<startRun {lastStage: null → 1}"
+ ],
+ "P2win": [
+  "safeSet<write<patch<updateShutterGuide<frame {seenShutter: false → true}",
+  "safeSet<write<updateStage<commitMain<handleEvents<frame {stages.1.versions.2.cleared: false → true ; stages.1.versions.2.bestSurvivors: 0 → 14 ; stages.1.versions.2.bestTime: 0 → 39.99999999999901}"
+ ],
+ "P2finish": [
+  "safeSet<write<updateStage<finishRun<frame {}"
+ ],
+ "P3win": [
+  "safeSet<write<patch<updateShutterGuide<frame {seenShutter: false → true}",
+  "safeSet<write<updateStage<commitMain<handleEvents<frame {stages.8.versions.3.cleared: false → true ; stages.8.versions.3.bestSurvivors: 0 → 33 ; stages.8.versions.3.bestTime: 0 → 41.699999999998916}"
+ ],
+ "P3finish": [
+  "safeSet<write<updateStage<finishRun<frame {stages.8.versions.3.bestBonus: undefined → 176}"
+ ],
+ "P4": 0,
+ "P5": {
+  "id": 1,
+  "diff": "brutal",
+  "pol": "center"
+ },
+ "P5finish": [
+  "safeSet<write<updateStage<finishRun<frame {}"
+ ],
+ "P5b": 0,
+ "P5c": 0,
+ "P6": 0,
+ "P7": {
+  "attemptsBefore": 1,
+  "attemptsAfter": 2,
+  "state": "run",
+  "writes": [
+   {
+    "seq": 7,
+    "fns": [
+     "safeSet",
+     "write",
+     "updateStage",
+     "startRun",
+     "onPress",
+     "(anon)"
+    ],
+    "changed": [
+     "stages.1.versions.2.attempts: 1 → 2"
+    ]
+   },
+   {
+    "seq": 8,
+    "fns": [
+     "safeSet",
+     "write",
+     "patch",
+     "startRun",
+     "onPress",
+     "(anon)"
+    ],
+    "changed": []
+   }
+  ],
+  "afterNextFrameTap": {
+   "sameRun": true,
+   "attempts": 2,
+   "writes": [],
+   "state": "run"
+  }
+ },
+ "P8": {
+  "dev": true,
+  "start": [
+   "safeSet<write<updateStage<startRun {v: undefined → 3 ; stages.proto3.versions.1:brutal.cleared: undefined → false ; stages.proto3.versions.1:brutal.attempts: undefined → 1 ; stages.proto3.versions.1:brutal.bestSurvivors: undefined → 0 ; stages.proto3.versions.1:brutal.bestTime: undefined → 0 ; lastStage: undefined → null ; difficulty: undefined → \"brutal\" ; volume: undefined → 1 ; mute: undefined → false ; seenShutter: undefined → false ; seenVehicle: undefined → false ; zoom: undefined → false}",
+   "safeSet<write<patch<startRun {lastStage: null → \"proto3\"}"
+  ],
+  "later": 1,
+  "keys": [
+   "proto3"
+  ]
+ },
+ "S1": {
+  "desc": "탭 A 가 5번 지옥 클리어를 쓴 뒤, 먼저 열려 있던 탭 B 가 음량만 바꿈",
+  "A_wrote_stage5": true,
+  "B_inMemory_sees_A": false,
+  "afterB_stage5_present": false,
+  "afterB_volume": 0.4,
+  "reloadedStage5": {
+   "cleared": false,
+   "attempts": 0,
+   "bestSurvivors": 0,
+   "bestTime": 0
+  }
+ },
+ "S2": {
+  "ok1": false,
+  "p1": null,
+  "p2": {
+   "versions": {
+    "2:brutal": {
+     "cleared": true,
+     "attempts": 0,
+     "bestSurvivors": 12,
+     "bestTime": 70
+    }
+   }
+  }
+ },
+ "S3": {
+  "ok": true,
+  "inMemoryCleared": true,
+  "persistedAnywhere": false,
+  "note": "저장소가 없어 메모리 Map 에만 있다(새로고침하면 사라짐)"
+ },
+ "S4": 1,
+ "S4u": {
+  "desc": "현 코드에서 patch({coins:100})",
+  "persistedHasCoins": false,
+  "inMemoryHasCoins": false
+ },
+ "U": {
+  "A 모든 칸 cleared — 1번부터 연속 클리어 끝": 2,
+  "B 모든 칸 cleared — 최고 번호": 15,
+  "C 지옥 칸만(옛 버전 포함) — 1번부터 연속": 1,
+  "D 지옥 칸만(옛 버전 포함) — 최고 번호": 15,
+  "E 지옥·현재 버전만 — 1번부터 연속": 1
+ }
+}

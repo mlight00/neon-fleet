@@ -1,0 +1,276 @@
+{
+ "meta": {
+  "script": "E_perf-conditions.mjs",
+  "date": "2026-09-24T07:09:24.342Z",
+  "note": "원자료 읽기 + 현재 코드 병력 재현. fps 를 새로 재지 않았다(개발 서버 실행 금지 조건)."
+ },
+ "hitfeel": {
+  "files": {
+   "fpsPy": true,
+   "fpsLog": true,
+   "fpsFixLog": true,
+   "report": true,
+   "auditFps2Json": true
+  },
+  "conditionLines": {
+   "headlessChromium": {
+    "line": 40,
+    "text": "br = p.chromium.launch()"
+   },
+   "viewportDpr": {
+    "line": 17,
+    "text": "ctx = br.new_context(viewport={'width': 480, 'height': 800}, device_scale_factor=2)"
+   },
+   "localStorageClear": {
+    "line": 19,
+    "text": "pg.add_init_script('try { localStorage.clear(); } catch (e) {}')"
+   },
+   "difficultyKey": {
+    "line": 23,
+    "text": "pg.keyboard.press('Digit1'); pg.keyboard.press('Space')"
+   },
+   "arenaWait": {
+    "line": 25,
+    "text": "pg.wait_for_function('(() => { const d = window.__rush3Dbg(); return d.arena || d.state !== \"run\"; })()', timeout=240000, polling=200)"
+   },
+   "count5s": {
+    "line": 13,
+    "text": "const f = () => { n++; if (performance.now() - t0 < 5000) requestAnimationFrame(f); else res(n); }; requestAnimationFrame(f); })'''"
+   },
+   "serverNewBase": {
+    "line": 3,
+    "text": "#  new = 8782(v3-zoom 작업본) · base = 8783(HEAD 66af24b 를 git archive 로 풀어 둔 사본, 그림 폴더는 정션)"
+   },
+   "noKeyZ": "KeyZ 누름 없음 → zoom false(표준 보기)",
+   "infoFields": {
+    "line": 35,
+    "text": "return n / 5, {'state': d0['state'], 'arena': d0.get('arena'), 'enemies': [d0['enemies'], d1['enemies']], 'z': [d0['z'], d1['z']], 'parts': d1.get('parts')}"
+   }
+  },
+  "fpsLog": [
+   "2026-09-23 02:04 {\"S13_road\": {\"base\": [58.2, 49.8], \"new\": [60.4, 57.8]}, \"S24_arena\": {\"base\": [31.0, 38.4], \"new\": [31.0, 36.2]}}",
+   "2026-09-23 02:12 {\"S13_road\": {\"base\": [46.2, 55.2, 58.6], \"new\": [57.2, 52.8, 57.6]}, \"S24_arena\": {\"base\": [29.0, 37.0, 37.8], \"new\": [37.4, 38.6, 39.6]}}"
+  ],
+  "fpsFixLog": [
+   "2026-09-23 05:32 {\"S13_road\": {\"new\": [57.6, 58.2]}, \"S24_arena\": {\"new\": [38.4, 39.0]}}"
+  ],
+  "reportLine": {
+   "line": 77,
+   "text": "- **fps(같은 기계·같은 방식, 5초 rAF 세기, 3회)**: 도로 S13(장갑체 2기와 교전 중) base(HEAD 66af24b) `46.2 / 55.2 / 58.6` → new `57.2 / 52.8 / 57.6`. 광장 S24(아레나 진입 1초 뒤) base `29.0 / 37.0 / 37.8` → new `37.4 / 38.6 / 39.6`"
+  },
+  "audit": {
+   "S24_arena_normal": [
+    {
+     "fps": 25.6,
+     "p95_ms": 72.7,
+     "max_ms": 95.5,
+     "over33ms": 52,
+     "over50ms": 26,
+     "parts": [
+      240,
+      148
+     ]
+    },
+    {
+     "fps": 32.8,
+     "p95_ms": 52.7,
+     "max_ms": 75,
+     "over33ms": 42,
+     "over50ms": 8,
+     "parts": [
+      240,
+      113
+     ]
+    }
+   ],
+   "S10_arena_normal": [
+    {
+     "fps": 47.2,
+     "p95_ms": 38.1,
+     "max_ms": 49.9,
+     "over33ms": 20,
+     "over50ms": 0,
+     "parts": [
+      235,
+      232
+     ]
+    },
+    {
+     "fps": 47.3,
+     "p95_ms": 35.4,
+     "max_ms": 42.2,
+     "over33ms": 17,
+     "over50ms": 0,
+     "parts": [
+      239,
+      166
+     ]
+    }
+   ],
+   "S13_road_normal": [
+    {
+     "fps": 50.4,
+     "p95_ms": 25.3,
+     "max_ms": 48.9,
+     "over33ms": 3,
+     "over50ms": 0,
+     "parts": [
+      0,
+      240
+     ]
+    },
+    {
+     "fps": 52.4,
+     "p95_ms": 32,
+     "max_ms": 37.3,
+     "over33ms": 9,
+     "over50ms": 0,
+     "parts": [
+      0,
+      240
+     ]
+    }
+   ],
+   "S13_road_brutal": [
+    {
+     "fps": 46,
+     "p95_ms": 42.7,
+     "max_ms": 69.7,
+     "over33ms": 12,
+     "over50ms": 8,
+     "parts": [
+      0,
+      74
+     ]
+    },
+    {
+     "fps": 48.2,
+     "p95_ms": 29.6,
+     "max_ms": 39.2,
+     "over33ms": 1,
+     "over50ms": 0,
+     "parts": [
+      6,
+      71
+     ]
+    }
+   ]
+  },
+  "auditScenarioLine": {
+   "line": 56,
+   "text": "('S24_arena', 24, True, 'Digit1'),"
+  }
+ },
+ "perspective": {
+  "fpsProbeLog": [
+   "strips16: flat=60.0fps std=60.2fps close=57.2fps",
+   "strips32: flat=60.0fps std=55.2fps close=60.0fps"
+  ],
+  "auditRunC": [
+   "fps 6 std 58.9 26.3 21 0",
+   "fps 6 close 57.8 24.1 25 0",
+   "fps 24 std 29.6 66.4 119 53",
+   "fps 10 std 36.2 44.4 145 24",
+   "fps 6 flat 60.0 20.1 1 0"
+  ],
+  "auditJsonFps": [
+   {
+    "stage": 6,
+    "mode": "std",
+    "frames": 236,
+    "meanMs": 16.99,
+    "maxMs": 26.3,
+    "over20ms": 21,
+    "over33ms": 0,
+    "fps": 58.9
+   },
+   {
+    "stage": 6,
+    "mode": "close",
+    "frames": 232,
+    "meanMs": 17.3,
+    "maxMs": 24.1,
+    "over20ms": 25,
+    "over33ms": 0,
+    "fps": 57.8
+   },
+   {
+    "stage": 24,
+    "mode": "std",
+    "frames": 119,
+    "meanMs": 33.73,
+    "maxMs": 66.4,
+    "over20ms": 119,
+    "over33ms": 53,
+    "fps": 29.6
+   },
+   {
+    "stage": 10,
+    "mode": "std",
+    "frames": 145,
+    "meanMs": 27.59,
+    "maxMs": 44.4,
+    "over20ms": 145,
+    "over33ms": 24,
+    "fps": 36.2
+   },
+   {
+    "stage": 6,
+    "mode": "flat",
+    "frames": 240,
+    "meanMs": 16.66,
+    "maxMs": 20.1,
+    "over20ms": 1,
+    "over33ms": 0,
+    "fps": 60
+   }
+  ],
+  "fps2PairsLine": {
+   "line": 3,
+   "text": "pairs = [(24,'flat'),(24,'std'),(24,'close'),(10,'flat'),(10,'std'),(6,'std')]"
+  },
+  "fps2OutputSaved": false
+ },
+ "s24CloseRecordFound": {
+  "s24CloseInAuditJson": false,
+  "s24CloseInRunC": false,
+  "hitfeelUsesKeyZ": false,
+  "fpsProbeIsStage6Only": {
+   "line": 16,
+   "text": "pg.goto('http://127.0.0.1:8779/rush3.html?stage=6' + ('&flat=1' if mode == 'flat' else ''))"
+  },
+  "found": false
+ },
+ "unitsScene": [
+  {
+   "difficulty": "normal",
+   "policy": "noInput",
+   "arenaEntered": true,
+   "unitsAtArenaEnter": 93,
+   "unitsAfter1s": 93,
+   "timeAtEnterSec": 56.85,
+   "over": false,
+   "won": false
+  },
+  {
+   "difficulty": "brutal",
+   "policy": "noInput",
+   "arenaEntered": true,
+   "unitsAtArenaEnter": 30,
+   "unitsAfter1s": 29,
+   "timeAtEnterSec": 56.85,
+   "over": false,
+   "won": false
+  },
+  {
+   "difficulty": "brutal",
+   "policy": "evLead",
+   "arenaEntered": true,
+   "unitsAtArenaEnter": 82,
+   "unitsAfter1s": 82,
+   "timeAtEnterSec": 56.85,
+   "over": false,
+   "won": false
+  }
+ ]
+}

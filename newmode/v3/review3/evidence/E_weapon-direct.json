@@ -1,0 +1,826 @@
+{
+ "meta": {
+  "script": "E_weapon-direct.mjs",
+  "date": "2026-09-24T07:06:07.764Z",
+  "note": "산술 계산(전투 시뮬레이션 아님). 화력 단계 L 의 직격 피해 = 무기 피해 × (1 + 0.3L), Mk I 기준. 폭발·연쇄 피해와 기절 시간은 무기 정의 값 그대로(코드 현 구조).",
+  "codeRefs": {
+   "directHit": "rush3/combat.js L411 e.hp -= b.dmg",
+   "weaponDefRead": "rush3/combat.js L414 const w = WEAPONS[b.kind]; L415 stun(e, w.stunSec); L416 blast(run, e, w.blastR, w.blastDmg); L417 chainArc(run, e, w.chain, w.chainR, w.chainDmg, ev, w.stunSec)",
+   "bulletCarriesOnlyDmg": "rush3/weapons.js L48 makeBullet: { ..., dmg: s.dmg, ..., kind: s.id, gateHit: 1 }",
+   "mkAlsoDirectOnly": "rush3/weapons.js L22 \"발사 간격·피해·탄 폭만 Mk 를 타고, 나머지(vz·fan·pierce·chain·blast)는 정의 그대로\"",
+   "supplyUsesDmg": "rush3/supply.js L193 const dmg = Math.max(0, bullet.dmg ?? 1)",
+   "gateIgnoresDmg": "rush3/gates.js L87 const gain = Math.max(0, Math.trunc(bullet.gateHit ?? 1))"
+  },
+  "brutalSpawnHpValues": {
+   "4": 104,
+   "8": 194,
+   "12": 26,
+   "16": 192,
+   "20": 8,
+   "24": 30,
+   "28": 183,
+   "32": 28,
+   "48": 294,
+   "56": 42,
+   "72": 12,
+   "84": 10,
+   "96": 30,
+   "140": 32,
+   "144": 10,
+   "196": 22,
+   "216": 22,
+   "240": 12,
+   "336": 10,
+   "480": 32
+  },
+  "totalSpawnEnemies": 1293
+ },
+ "weapons": {
+  "rifle": {
+   "name": "소총",
+   "direct": 1,
+   "interval": 0.5,
+   "fan": 1,
+   "spreadDeg": 0,
+   "range": null,
+   "pierce": 0,
+   "blastR": 0,
+   "blastDmg": 0,
+   "chain": 0,
+   "chainR": 0,
+   "chainDmg": 0,
+   "stunSec": 0
+  },
+  "auto": {
+   "name": "기관총",
+   "direct": 1,
+   "interval": 0.25,
+   "fan": 1,
+   "spreadDeg": 0,
+   "range": null,
+   "pierce": 0,
+   "blastR": 0,
+   "blastDmg": 0,
+   "chain": 0,
+   "chainR": 0,
+   "chainDmg": 0,
+   "stunSec": 0
+  },
+  "heavy": {
+   "name": "중화기",
+   "direct": 3,
+   "interval": 0.8,
+   "fan": 1,
+   "spreadDeg": 0,
+   "range": null,
+   "pierce": 0,
+   "blastR": 22,
+   "blastDmg": 1,
+   "chain": 0,
+   "chainR": 0,
+   "chainDmg": 0,
+   "stunSec": 0
+  },
+  "scatter": {
+   "name": "산탄포",
+   "direct": 1,
+   "interval": 0.55,
+   "fan": 3,
+   "spreadDeg": 14,
+   "range": 420,
+   "pierce": 0,
+   "blastR": 0,
+   "blastDmg": 0,
+   "chain": 0,
+   "chainR": 0,
+   "chainDmg": 0,
+   "stunSec": 0
+  },
+  "sniper": {
+   "name": "저격총",
+   "direct": 3,
+   "interval": 0.9,
+   "fan": 1,
+   "spreadDeg": 0,
+   "range": null,
+   "pierce": 2,
+   "blastR": 0,
+   "blastDmg": 0,
+   "chain": 0,
+   "chainR": 0,
+   "chainDmg": 0,
+   "stunSec": 0
+  },
+  "arc": {
+   "name": "전격포",
+   "direct": 1,
+   "interval": 0.7,
+   "fan": 1,
+   "spreadDeg": 0,
+   "range": null,
+   "pierce": 0,
+   "blastR": 0,
+   "blastDmg": 0,
+   "chain": 2,
+   "chainR": 90,
+   "chainDmg": 1,
+   "stunSec": 0.8
+  }
+ },
+ "perShotShareHeavyArc": {
+  "heavy": [
+   {
+    "neighbors": 0,
+    "L0": {
+     "total": 3,
+     "gainPct": 0
+    },
+    "L1": {
+     "total": 3.9,
+     "gainPct": 30
+    },
+    "L2": {
+     "total": 4.8,
+     "gainPct": 60
+    },
+    "L3": {
+     "total": 5.7,
+     "gainPct": 90
+    },
+    "L4": {
+     "total": 6.6,
+     "gainPct": 120
+    },
+    "L5": {
+     "total": 7.5,
+     "gainPct": 150
+    }
+   },
+   {
+    "neighbors": 1,
+    "L0": {
+     "total": 4,
+     "gainPct": 0
+    },
+    "L1": {
+     "total": 4.9,
+     "gainPct": 22.5
+    },
+    "L2": {
+     "total": 5.8,
+     "gainPct": 45
+    },
+    "L3": {
+     "total": 6.7,
+     "gainPct": 67.5
+    },
+    "L4": {
+     "total": 7.6,
+     "gainPct": 90
+    },
+    "L5": {
+     "total": 8.5,
+     "gainPct": 112.5
+    }
+   },
+   {
+    "neighbors": 2,
+    "L0": {
+     "total": 5,
+     "gainPct": 0
+    },
+    "L1": {
+     "total": 5.9,
+     "gainPct": 18
+    },
+    "L2": {
+     "total": 6.8,
+     "gainPct": 36
+    },
+    "L3": {
+     "total": 7.7,
+     "gainPct": 54
+    },
+    "L4": {
+     "total": 8.6,
+     "gainPct": 72
+    },
+    "L5": {
+     "total": 9.5,
+     "gainPct": 90
+    }
+   },
+   {
+    "neighbors": 3,
+    "L0": {
+     "total": 6,
+     "gainPct": 0
+    },
+    "L1": {
+     "total": 6.9,
+     "gainPct": 15
+    },
+    "L2": {
+     "total": 7.8,
+     "gainPct": 30
+    },
+    "L3": {
+     "total": 8.7,
+     "gainPct": 45
+    },
+    "L4": {
+     "total": 9.6,
+     "gainPct": 60
+    },
+    "L5": {
+     "total": 10.5,
+     "gainPct": 75
+    }
+   }
+  ],
+  "arc": [
+   {
+    "chained": 0,
+    "L0": {
+     "total": 1,
+     "gainPct": 0
+    },
+    "L1": {
+     "total": 1.3,
+     "gainPct": 30
+    },
+    "L2": {
+     "total": 1.6,
+     "gainPct": 60
+    },
+    "L3": {
+     "total": 1.9,
+     "gainPct": 90
+    },
+    "L4": {
+     "total": 2.2,
+     "gainPct": 120
+    },
+    "L5": {
+     "total": 2.5,
+     "gainPct": 150
+    }
+   },
+   {
+    "chained": 1,
+    "L0": {
+     "total": 2,
+     "gainPct": 0
+    },
+    "L1": {
+     "total": 2.3,
+     "gainPct": 15
+    },
+    "L2": {
+     "total": 2.6,
+     "gainPct": 30
+    },
+    "L3": {
+     "total": 2.9,
+     "gainPct": 45
+    },
+    "L4": {
+     "total": 3.2,
+     "gainPct": 60
+    },
+    "L5": {
+     "total": 3.5,
+     "gainPct": 75
+    }
+   },
+   {
+    "chained": 2,
+    "L0": {
+     "total": 3,
+     "gainPct": 0
+    },
+    "L1": {
+     "total": 3.3,
+     "gainPct": 10
+    },
+    "L2": {
+     "total": 3.6,
+     "gainPct": 20
+    },
+    "L3": {
+     "total": 3.9,
+     "gainPct": 30
+    },
+    "L4": {
+     "total": 4.2,
+     "gainPct": 40
+    },
+    "L5": {
+     "total": 4.5,
+     "gainPct": 50
+    }
+   }
+  ]
+ },
+ "scatterSpread": [
+  {
+   "distance": 60,
+   "sideOffsetPx": 14.96,
+   "sideHits_grunt": true,
+   "sideHits_rusher": true,
+   "sideHits_shooter": true
+  },
+  {
+   "distance": 120,
+   "sideOffsetPx": 29.919,
+   "sideHits_grunt": false,
+   "sideHits_rusher": false,
+   "sideHits_shooter": false
+  },
+  {
+   "distance": 200,
+   "sideOffsetPx": 49.866,
+   "sideHits_grunt": false,
+   "sideHits_rusher": false,
+   "sideHits_shooter": false
+  },
+  {
+   "distance": 300,
+   "sideOffsetPx": 74.798,
+   "sideHits_grunt": false,
+   "sideHits_rusher": false,
+   "sideHits_shooter": false
+  },
+  {
+   "distance": 420,
+   "sideOffsetPx": 104.718,
+   "sideHits_grunt": false,
+   "sideHits_rusher": false,
+   "sideHits_shooter": false
+  }
+ ],
+ "shotsToKillByWeapon": {
+  "rifle": {
+   "L0": {
+    "dmg": 1,
+    "enemiesWithFewerShotsPct": 0,
+    "meanShotsRatio": 1,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L1": {
+    "dmg": 1.3,
+    "enemiesWithFewerShotsPct": 91.957,
+    "meanShotsRatio": 0.816,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L2": {
+    "dmg": 1.6,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.667,
+    "fpExtraShotEnemiesPct": 35.576,
+    "fpCases": [
+     {
+      "hp": 8,
+      "dmg": 1.6,
+      "shotsSim": 6,
+      "shotsExact": 5
+     },
+     {
+      "hp": 16,
+      "dmg": 1.6,
+      "shotsSim": 11,
+      "shotsExact": 10
+     },
+     {
+      "hp": 96,
+      "dmg": 1.6,
+      "shotsSim": 61,
+      "shotsExact": 60
+     },
+     {
+      "hp": 144,
+      "dmg": 1.6,
+      "shotsSim": 91,
+      "shotsExact": 90
+     },
+     {
+      "hp": 216,
+      "dmg": 1.6,
+      "shotsSim": 136,
+      "shotsExact": 135
+     },
+     {
+      "hp": 240,
+      "dmg": 1.6,
+      "shotsSim": 151,
+      "shotsExact": 150
+     }
+    ]
+   },
+   "L3": {
+    "dmg": 1.9,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.572,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L4": {
+    "dmg": 2.2,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.476,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L5": {
+    "dmg": 2.5,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.438,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   }
+  },
+  "auto": {
+   "L0": {
+    "dmg": 1,
+    "enemiesWithFewerShotsPct": 0,
+    "meanShotsRatio": 1,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L1": {
+    "dmg": 1.3,
+    "enemiesWithFewerShotsPct": 91.957,
+    "meanShotsRatio": 0.816,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L2": {
+    "dmg": 1.6,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.667,
+    "fpExtraShotEnemiesPct": 35.576,
+    "fpCases": [
+     {
+      "hp": 8,
+      "dmg": 1.6,
+      "shotsSim": 6,
+      "shotsExact": 5
+     },
+     {
+      "hp": 16,
+      "dmg": 1.6,
+      "shotsSim": 11,
+      "shotsExact": 10
+     },
+     {
+      "hp": 96,
+      "dmg": 1.6,
+      "shotsSim": 61,
+      "shotsExact": 60
+     },
+     {
+      "hp": 144,
+      "dmg": 1.6,
+      "shotsSim": 91,
+      "shotsExact": 90
+     },
+     {
+      "hp": 216,
+      "dmg": 1.6,
+      "shotsSim": 136,
+      "shotsExact": 135
+     },
+     {
+      "hp": 240,
+      "dmg": 1.6,
+      "shotsSim": 151,
+      "shotsExact": 150
+     }
+    ]
+   },
+   "L3": {
+    "dmg": 1.9,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.572,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L4": {
+    "dmg": 2.2,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.476,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L5": {
+    "dmg": 2.5,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.438,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   }
+  },
+  "scatter": {
+   "L0": {
+    "dmg": 1,
+    "enemiesWithFewerShotsPct": 0,
+    "meanShotsRatio": 1,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L1": {
+    "dmg": 1.3,
+    "enemiesWithFewerShotsPct": 91.957,
+    "meanShotsRatio": 0.816,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L2": {
+    "dmg": 1.6,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.667,
+    "fpExtraShotEnemiesPct": 35.576,
+    "fpCases": [
+     {
+      "hp": 8,
+      "dmg": 1.6,
+      "shotsSim": 6,
+      "shotsExact": 5
+     },
+     {
+      "hp": 16,
+      "dmg": 1.6,
+      "shotsSim": 11,
+      "shotsExact": 10
+     },
+     {
+      "hp": 96,
+      "dmg": 1.6,
+      "shotsSim": 61,
+      "shotsExact": 60
+     },
+     {
+      "hp": 144,
+      "dmg": 1.6,
+      "shotsSim": 91,
+      "shotsExact": 90
+     },
+     {
+      "hp": 216,
+      "dmg": 1.6,
+      "shotsSim": 136,
+      "shotsExact": 135
+     },
+     {
+      "hp": 240,
+      "dmg": 1.6,
+      "shotsSim": 151,
+      "shotsExact": 150
+     }
+    ]
+   },
+   "L3": {
+    "dmg": 1.9,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.572,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L4": {
+    "dmg": 2.2,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.476,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L5": {
+    "dmg": 2.5,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.438,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   }
+  },
+  "heavy": {
+   "L0": {
+    "dmg": 3,
+    "enemiesWithFewerShotsPct": 0,
+    "meanShotsRatio": 1,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L1": {
+    "dmg": 3.9,
+    "enemiesWithFewerShotsPct": 74.942,
+    "meanShotsRatio": 0.856,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L2": {
+    "dmg": 4.8,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.643,
+    "fpExtraShotEnemiesPct": 26.759,
+    "fpCases": [
+     {
+      "hp": 48,
+      "dmg": 4.8,
+      "shotsSim": 11,
+      "shotsExact": 10
+     },
+     {
+      "hp": 72,
+      "dmg": 4.8,
+      "shotsSim": 16,
+      "shotsExact": 15
+     },
+     {
+      "hp": 96,
+      "dmg": 4.8,
+      "shotsSim": 21,
+      "shotsExact": 20
+     },
+     {
+      "hp": 144,
+      "dmg": 4.8,
+      "shotsSim": 31,
+      "shotsExact": 30
+     }
+    ]
+   },
+   "L3": {
+    "dmg": 5.7,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.554,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L4": {
+    "dmg": 6.6,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.518,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L5": {
+    "dmg": 7.5,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.479,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   }
+  },
+  "sniper": {
+   "L0": {
+    "dmg": 3,
+    "enemiesWithFewerShotsPct": 0,
+    "meanShotsRatio": 1,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L1": {
+    "dmg": 3.9,
+    "enemiesWithFewerShotsPct": 74.942,
+    "meanShotsRatio": 0.856,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L2": {
+    "dmg": 4.8,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.643,
+    "fpExtraShotEnemiesPct": 26.759,
+    "fpCases": [
+     {
+      "hp": 48,
+      "dmg": 4.8,
+      "shotsSim": 11,
+      "shotsExact": 10
+     },
+     {
+      "hp": 72,
+      "dmg": 4.8,
+      "shotsSim": 16,
+      "shotsExact": 15
+     },
+     {
+      "hp": 96,
+      "dmg": 4.8,
+      "shotsSim": 21,
+      "shotsExact": 20
+     },
+     {
+      "hp": 144,
+      "dmg": 4.8,
+      "shotsSim": 31,
+      "shotsExact": 30
+     }
+    ]
+   },
+   "L3": {
+    "dmg": 5.7,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.554,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L4": {
+    "dmg": 6.6,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.518,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L5": {
+    "dmg": 7.5,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.479,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   }
+  },
+  "arc": {
+   "L0": {
+    "dmg": 1,
+    "enemiesWithFewerShotsPct": 0,
+    "meanShotsRatio": 1,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L1": {
+    "dmg": 1.3,
+    "enemiesWithFewerShotsPct": 91.957,
+    "meanShotsRatio": 0.816,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L2": {
+    "dmg": 1.6,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.667,
+    "fpExtraShotEnemiesPct": 35.576,
+    "fpCases": [
+     {
+      "hp": 8,
+      "dmg": 1.6,
+      "shotsSim": 6,
+      "shotsExact": 5
+     },
+     {
+      "hp": 16,
+      "dmg": 1.6,
+      "shotsSim": 11,
+      "shotsExact": 10
+     },
+     {
+      "hp": 96,
+      "dmg": 1.6,
+      "shotsSim": 61,
+      "shotsExact": 60
+     },
+     {
+      "hp": 144,
+      "dmg": 1.6,
+      "shotsSim": 91,
+      "shotsExact": 90
+     },
+     {
+      "hp": 216,
+      "dmg": 1.6,
+      "shotsSim": 136,
+      "shotsExact": 135
+     },
+     {
+      "hp": 240,
+      "dmg": 1.6,
+      "shotsSim": 151,
+      "shotsExact": 150
+     }
+    ]
+   },
+   "L3": {
+    "dmg": 1.9,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.572,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L4": {
+    "dmg": 2.2,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.476,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   },
+   "L5": {
+    "dmg": 2.5,
+    "enemiesWithFewerShotsPct": 100,
+    "meanShotsRatio": 0.438,
+    "fpExtraShotEnemiesPct": 0,
+    "fpCases": []
+   }
+  }
+ }
+}

@@ -1,0 +1,42 @@
+{
+  "kind": "proposal arithmetic; no gameplay simulation",
+  "cost": 3830,
+  "proposedUpperIncome": 21031,
+  "targetIncome": 1915,
+  "upperOverCost": 5.4911227154047,
+  "upperOverTarget": 10.9822454308094,
+  "firstPower": {
+    "damage": 1.3,
+    "hp4ShotsBefore": 4,
+    "hp4ShotsAfter": 4,
+    "directSquadGainAt30": 0.010000000000000009
+  },
+  "maxHeroDirectEquivalent": 20.063363283298074,
+  "middleCost": 830,
+  "stageUpperIncome": [
+    112,
+    78,
+    144,
+    132,
+    170,
+    176,
+    200,
+    242,
+    354,
+    440,
+    546,
+    500,
+    788,
+    980,
+    773,
+    671,
+    968,
+    1027,
+    1234,
+    1268,
+    2046,
+    2200,
+    3066,
+    2916
+  ]
+}

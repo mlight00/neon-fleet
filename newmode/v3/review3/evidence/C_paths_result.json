@@ -1,0 +1,826 @@
+{
+  "generatedAt": "2026-09-24T07:04:53.252Z",
+  "node": "v24.14.0",
+  "note": "봇 결과는 정해진 입력으로 한 판씩 돌린 결과이며 사람의 성공률이 아니다",
+  "paths": {
+    "P1_startRun": {
+      "desc": "startRun(1) 직후(첫 STEP 전)",
+      "writes": [
+        {
+          "seq": 2,
+          "fns": [
+            "safeSet",
+            "write",
+            "updateStage",
+            "startRun"
+          ],
+          "changed": [
+            "stages.1.versions.2.cleared: undefined → false",
+            "stages.1.versions.2.attempts: undefined → 1",
+            "stages.1.versions.2.bestSurvivors: undefined → 0",
+            "stages.1.versions.2.bestTime: undefined → 0"
+          ]
+        },
+        {
+          "seq": 3,
+          "fns": [
+            "safeSet",
+            "write",
+            "patch",
+            "startRun"
+          ],
+          "changed": [
+            "lastStage: null → 1"
+          ]
+        }
+      ],
+      "state": "run"
+    },
+    "P2_win_noBonus": {
+      "desc": "1번 보통 planBoss 봇 1판: 승리 프레임 → 결과 화면",
+      "atWinFrame": {
+        "won": true,
+        "over": true,
+        "state": "run",
+        "frames": 2400,
+        "mainRecord": {
+          "isBest": true,
+          "survivors": 14,
+          "time": 39.99999999999901
+        },
+        "writes": [
+          {
+            "seq": 4,
+            "fns": [
+              "safeSet",
+              "write",
+              "patch",
+              "updateShutterGuide",
+              "frame"
+            ],
+            "changed": [
+              "seenShutter: false → true"
+            ]
+          },
+          {
+            "seq": 5,
+            "fns": [
+              "safeSet",
+              "write",
+              "updateStage",
+              "commitMain",
+              "handleEvents",
+              "frame"
+            ],
+            "changed": [
+              "stages.1.versions.2.cleared: false → true",
+              "stages.1.versions.2.bestSurvivors: 0 → 14",
+              "stages.1.versions.2.bestTime: 0 → 39.99999999999901"
+            ]
+          }
+        ]
+      },
+      "overDelayToResult": {
+        "frames": 78,
+        "state": "result",
+        "writes": [
+          {
+            "seq": 6,
+            "fns": [
+              "safeSet",
+              "write",
+              "updateStage",
+              "finishRun",
+              "frame"
+            ],
+            "changed": []
+          }
+        ]
+      },
+      "record": {
+        "cleared": true,
+        "attempts": 1,
+        "bestSurvivors": 14,
+        "bestTime": 39.99999999999901
+      },
+      "storageHasRunMarker": false
+    },
+    "P7_result_retry_doubleTap": {
+      "attemptsBefore": 1,
+      "attemptsAfter": 2,
+      "state": "run",
+      "writes": [
+        {
+          "seq": 7,
+          "fns": [
+            "safeSet",
+            "write",
+            "updateStage",
+            "startRun",
+            "onPress",
+            "(anon)"
+          ],
+          "changed": [
+            "stages.1.versions.2.attempts: 1 → 2"
+          ]
+        },
+        {
+          "seq": 8,
+          "fns": [
+            "safeSet",
+            "write",
+            "patch",
+            "startRun",
+            "onPress",
+            "(anon)"
+          ],
+          "changed": []
+        }
+      ],
+      "afterNextFrameTap": {
+        "sameRun": true,
+        "attempts": 2,
+        "writes": [],
+        "state": "run"
+      }
+    },
+    "P3_win_bonus8": {
+      "desc": "8번 보통 planBoss 봇 1판: 승리 프레임(보너스 진입) → 20초 보너스 → 결과",
+      "stageVersion8": 3,
+      "atWinFrame": {
+        "phase": "bonus",
+        "won": true,
+        "over": false,
+        "state": "run",
+        "frames": 2501,
+        "writes": [
+          {
+            "seq": 4,
+            "fns": [
+              "safeSet",
+              "write",
+              "patch",
+              "updateShutterGuide",
+              "frame"
+            ],
+            "changed": [
+              "seenShutter: false → true"
+            ]
+          },
+          {
+            "seq": 5,
+            "fns": [
+              "safeSet",
+              "write",
+              "updateStage",
+              "commitMain",
+              "handleEvents",
+              "frame"
+            ],
+            "changed": [
+              "stages.8.versions.3.cleared: false → true",
+              "stages.8.versions.3.bestSurvivors: 0 → 33",
+              "stages.8.versions.3.bestTime: 0 → 41.699999999998916"
+            ]
+          }
+        ],
+        "recordAtWin": {
+          "cleared": true,
+          "attempts": 1,
+          "bestSurvivors": 33,
+          "bestTime": 41.699999999998916
+        }
+      },
+      "bonusToResult": {
+        "frames": 1278,
+        "state": "result",
+        "bonusScore": 176,
+        "writes": [
+          {
+            "seq": 6,
+            "fns": [
+              "safeSet",
+              "write",
+              "updateStage",
+              "finishRun",
+              "frame"
+            ],
+            "changed": [
+              "stages.8.versions.3.bestBonus: undefined → 176"
+            ]
+          }
+        ]
+      },
+      "record": {
+        "cleared": true,
+        "attempts": 1,
+        "bestSurvivors": 33,
+        "bestTime": 41.699999999998916,
+        "bestBonus": 176
+      }
+    },
+    "P4_bonus_giveup": {
+      "desc": "8번: 보너스 3초 진행 중 ⏸→toTitle",
+      "bonusScoreAtLeave": 26,
+      "writes": [],
+      "state": "title",
+      "record": {
+        "cleared": true,
+        "attempts": 1,
+        "bestSurvivors": 33,
+        "bestTime": 41.699999999998916
+      },
+      "afterReloadRecord": {
+        "cleared": true,
+        "attempts": 1,
+        "bestSurvivors": 33,
+        "bestTime": 41.699999999998916
+      }
+    },
+    "lossCaseUsed": {
+      "id": 1,
+      "diff": "brutal",
+      "pol": "center"
+    },
+    "P5_loss_result": {
+      "desc": "1번 brutal 'center' 봇 1판 패배 → 결과",
+      "atLoseFrame": {
+        "frames": 2495,
+        "won": false,
+        "writes": [
+          {
+            "seq": 3,
+            "fns": [
+              "safeSet",
+              "write",
+              "patch",
+              "updateShutterGuide",
+              "frame"
+            ],
+            "changed": [
+              "seenShutter: false → true"
+            ]
+          }
+        ]
+      },
+      "overDelayToResult": {
+        "state": "result",
+        "writes": [
+          {
+            "seq": 4,
+            "fns": [
+              "safeSet",
+              "write",
+              "updateStage",
+              "finishRun",
+              "frame"
+            ],
+            "changed": []
+          }
+        ]
+      },
+      "record": {
+        "cleared": false,
+        "attempts": 1,
+        "bestSurvivors": 0,
+        "bestTime": 0
+      }
+    },
+    "P5b_loss_overDelay_giveup": {
+      "desc": "패배 확정(over) 직후 여운 1.0초 안에 ⏸→toTitle",
+      "stateAtOver": "run",
+      "pausedState": "paused",
+      "writes": [],
+      "finalState": "title"
+    },
+    "P5c_win_overDelay_giveup": {
+      "desc": "1번 승리 프레임 직후(over=true, 여운 중) ⏸→toTitle",
+      "stateBefore": "run",
+      "runOver": true,
+      "writes": [],
+      "record": {
+        "cleared": true,
+        "attempts": 1,
+        "bestSurvivors": 14,
+        "bestTime": 39.99999999999901
+      },
+      "finalState": "title"
+    },
+    "P6_midrun_giveup": {
+      "desc": "3번 보통 planBoss 봇, 처치 3 시점(27.8초)에 ⏸→toTitle",
+      "killsAtLeave": 3,
+      "writes": [],
+      "record": {
+        "cleared": false,
+        "attempts": 1,
+        "bestSurvivors": 0,
+        "bestTime": 0
+      }
+    },
+    "P9_reload_midrun": {
+      "desc": "3번 처치 3 이후 출격 중 새로고침 모의(같은 저장소로 새 createSave3)",
+      "killsInMemory": 3,
+      "persistedRecord": {
+        "cleared": false,
+        "attempts": 1,
+        "bestSurvivors": 0,
+        "bestTime": 0
+      },
+      "writesTotal": 4
+    },
+    "P8_devWeapon_proto3": {
+      "desc": "startRun('proto3') — devWeapon 판",
+      "devWeapon": true,
+      "startWrites": [
+        {
+          "seq": 1,
+          "fns": [
+            "safeSet",
+            "write",
+            "updateStage",
+            "startRun"
+          ],
+          "changed": [
+            "v: undefined → 3",
+            "stages.proto3.versions.1:brutal.cleared: undefined → false",
+            "stages.proto3.versions.1:brutal.attempts: undefined → 1",
+            "stages.proto3.versions.1:brutal.bestSurvivors: undefined → 0",
+            "stages.proto3.versions.1:brutal.bestTime: undefined → 0",
+            "lastStage: undefined → null",
+            "difficulty: undefined → \"brutal\"",
+            "volume: undefined → 1",
+            "mute: undefined → false",
+            "seenShutter: undefined → false",
+            "seenVehicle: undefined → false",
+            "zoom: undefined → false"
+          ]
+        },
+        {
+          "seq": 2,
+          "fns": [
+            "safeSet",
+            "write",
+            "patch",
+            "startRun"
+          ],
+          "changed": [
+            "lastStage: null → \"proto3\""
+          ]
+        }
+      ],
+      "reachedResult": true,
+      "frames": 1696,
+      "won": true,
+      "laterWrites": [
+        {
+          "seq": 3,
+          "fns": [
+            "safeSet",
+            "write",
+            "patch",
+            "updateShutterGuide",
+            "frame"
+          ],
+          "changed": [
+            "seenShutter: false → true"
+          ]
+        }
+      ],
+      "persistedStagesKeys": [
+        "proto3"
+      ],
+      "persistedLastStage": "proto3"
+    },
+    "P8b_devWeapon_realStage": {
+      "desc": "?weapon=scatter&mk=2 로 5번 출격(devWeapon)",
+      "devWeapon": true,
+      "weapon": "scatter",
+      "writes": [
+        {
+          "seq": 1,
+          "fns": [
+            "safeSet",
+            "write",
+            "updateStage",
+            "startRun"
+          ],
+          "changed": [
+            "v: undefined → 3",
+            "stages.5.versions.2:brutal.cleared: undefined → false",
+            "stages.5.versions.2:brutal.attempts: undefined → 1",
+            "stages.5.versions.2:brutal.bestSurvivors: undefined → 0",
+            "stages.5.versions.2:brutal.bestTime: undefined → 0",
+            "lastStage: undefined → null",
+            "difficulty: undefined → \"brutal\"",
+            "volume: undefined → 1",
+            "mute: undefined → false",
+            "seenShutter: undefined → false",
+            "seenVehicle: undefined → false",
+            "zoom: undefined → false"
+          ]
+        },
+        {
+          "seq": 2,
+          "fns": [
+            "safeSet",
+            "write",
+            "patch",
+            "startRun"
+          ],
+          "changed": [
+            "lastStage: null → 5"
+          ]
+        }
+      ],
+      "record5": {
+        "cleared": false,
+        "attempts": 1,
+        "bestSurvivors": 0,
+        "bestTime": 0
+      }
+    },
+    "P10_freeEntry_buttons": {
+      "desc": "클리어 기록이 전혀 없는 새 저장에서 스테이지 버튼 누름",
+      "stage8_started": 8,
+      "stage24_started": 24,
+      "state24": "run",
+      "titleTextsHaveLockWord": false
+    },
+    "P11_freeEntry_urlEnter": {
+      "desc": "새 저장 + 주소 ?stage=24 에서 타이틀 Enter",
+      "started": 24,
+      "devWeapon": false,
+      "writes": [
+        {
+          "fns": [
+            "safeSet",
+            "write",
+            "updateStage",
+            "startRun",
+            "(anon)"
+          ],
+          "changed": [
+            "v: undefined → 3",
+            "stages.24.versions.3:brutal.cleared: undefined → false",
+            "stages.24.versions.3:brutal.attempts: undefined → 1",
+            "stages.24.versions.3:brutal.bestSurvivors: undefined → 0",
+            "stages.24.versions.3:brutal.bestTime: undefined → 0",
+            "lastStage: undefined → null",
+            "difficulty: undefined → \"brutal\"",
+            "volume: undefined → 1",
+            "mute: undefined → false",
+            "seenShutter: undefined → false",
+            "seenVehicle: undefined → false",
+            "zoom: undefined → false"
+          ]
+        },
+        {
+          "fns": [
+            "safeSet",
+            "write",
+            "patch",
+            "startRun",
+            "(anon)"
+          ],
+          "changed": [
+            "lastStage: null → 24"
+          ]
+        }
+      ]
+    },
+    "P7b_result_enter_enter_tap": {
+      "desc": "결과 화면에서 같은 프레임에 Enter·Enter·[다시 도전] 탭",
+      "attemptsBefore": 1,
+      "attemptsAfter": 2,
+      "state": "run",
+      "writes": 2
+    }
+  },
+  "save": {
+    "S1_multiTab": {
+      "desc": "탭 A 가 5번 지옥 클리어를 쓴 뒤, 먼저 열려 있던 탭 B 가 음량만 바꿈",
+      "A_wrote_stage5": true,
+      "B_inMemory_sees_A": false,
+      "afterB_stage5_present": false,
+      "afterB_volume": 0.4,
+      "reloadedStage5": {
+        "cleared": false,
+        "attempts": 0,
+        "bestSurvivors": 0,
+        "bestTime": 0
+      }
+    },
+    "S2_writeFail": {
+      "desc": "setItem 이 던지는 동안 updateStage → 이후 저장소 회복 뒤 patch({mute})",
+      "updateStageReturn": {
+        "cleared": true,
+        "attempts": 0,
+        "bestSurvivors": 12,
+        "bestTime": 70
+      },
+      "inMemory": {
+        "cleared": true,
+        "attempts": 0,
+        "bestSurvivors": 12,
+        "bestTime": 70
+      },
+      "persistedDuringFailure": null,
+      "okAfterFailure": false,
+      "okAfterRecovery": false,
+      "persistedAfterRecovery_stage2": {
+        "versions": {
+          "2:brutal": {
+            "cleared": true,
+            "attempts": 0,
+            "bestSurvivors": 12,
+            "bestTime": 70
+          }
+        }
+      },
+      "log": [
+        {
+          "seq": 1,
+          "failed": true,
+          "fns": [
+            "safeSet@save:130",
+            "write@save:150",
+            "updateStage@save:167"
+          ]
+        },
+        {
+          "seq": 2,
+          "failed": false,
+          "fns": [
+            "safeSet",
+            "write",
+            "patch"
+          ]
+        }
+      ]
+    },
+    "S3_noLocalStorage": {
+      "ok": true,
+      "inMemoryCleared": true,
+      "persistedAnywhere": false,
+      "note": "저장소가 없어 메모리 Map 에만 있다(새로고침하면 사라짐)"
+    },
+    "S4_singleBlob": {
+      "desc": "patch 한 번에 최상위 2칸 + 기록 1칸",
+      "setItemCalls": 1,
+      "keys": [
+        "starforgeRush.v3"
+      ],
+      "changed": [
+        "v: undefined → 3",
+        "stages.4.versions.2:brutal.cleared: undefined → false",
+        "stages.4.versions.2:brutal.attempts: undefined → 3",
+        "stages.4.versions.2:brutal.bestSurvivors: undefined → 0",
+        "stages.4.versions.2:brutal.bestTime: undefined → 0",
+        "lastStage: undefined → null",
+        "difficulty: undefined → \"brutal\"",
+        "volume: undefined → 0.5",
+        "mute: undefined → true",
+        "seenShutter: undefined → false",
+        "seenVehicle: undefined → false",
+        "zoom: undefined → false"
+      ]
+    },
+    "S4_unknownField": {
+      "desc": "현 코드에서 patch({coins:100})",
+      "persistedHasCoins": false,
+      "inMemoryHasCoins": false
+    }
+  },
+  "unlock": {
+    "currentVersions": {
+      "1": 2,
+      "2": 2,
+      "3": 2,
+      "4": 2,
+      "5": 2,
+      "6": 3,
+      "7": 3,
+      "8": 3,
+      "9": 4,
+      "10": 3,
+      "11": 3,
+      "12": 3,
+      "13": 2,
+      "14": 2,
+      "15": 4,
+      "16": 2,
+      "17": 2,
+      "18": 2,
+      "19": 2,
+      "20": 4,
+      "21": 2,
+      "22": 2,
+      "23": 3,
+      "24": 3
+    },
+    "currentKeys": {
+      "1": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "2": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "3": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "4": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "5": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "6": {
+        "normal": "3",
+        "hard": "3:hard",
+        "brutal": "3:brutal"
+      },
+      "7": {
+        "normal": "3",
+        "hard": "3:hard",
+        "brutal": "3:brutal"
+      },
+      "8": {
+        "normal": "3",
+        "hard": "3:hard",
+        "brutal": "3:brutal"
+      },
+      "9": {
+        "normal": "4",
+        "hard": "4:hard",
+        "brutal": "4:brutal"
+      },
+      "10": {
+        "normal": "3",
+        "hard": "3:hard",
+        "brutal": "3:brutal"
+      },
+      "11": {
+        "normal": "3",
+        "hard": "3:hard",
+        "brutal": "3:brutal"
+      },
+      "12": {
+        "normal": "3",
+        "hard": "3:hard",
+        "brutal": "3:brutal"
+      },
+      "13": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "14": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "15": {
+        "normal": "4",
+        "hard": "4:hard",
+        "brutal": "4:brutal"
+      },
+      "16": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "17": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "18": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "19": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "20": {
+        "normal": "4",
+        "hard": "4:hard",
+        "brutal": "4:brutal"
+      },
+      "21": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "22": {
+        "normal": "2",
+        "hard": "2:hard",
+        "brutal": "2:brutal"
+      },
+      "23": {
+        "normal": "3",
+        "hard": "3:hard",
+        "brutal": "3:brutal"
+      },
+      "24": {
+        "normal": "3",
+        "hard": "3:hard",
+        "brutal": "3:brutal"
+      }
+    },
+    "synthetic": {
+      "desc": "가상의 기존 저장(실사용자 저장 아님)으로 판별 규칙별 결과가 달라지는지 확인",
+      "perStage": {
+        "1": {
+          "keys": [
+            "2:brutal"
+          ],
+          "clearedAnySlot": true,
+          "clearedBrutalAnyVersion": true,
+          "clearedCurrentVersionBrutal": true,
+          "attemptsAnySlot": 4
+        },
+        "2": {
+          "keys": [
+            "2",
+            "2:brutal"
+          ],
+          "clearedAnySlot": true,
+          "clearedBrutalAnyVersion": false,
+          "clearedCurrentVersionBrutal": false,
+          "attemptsAnySlot": 7
+        },
+        "3": {
+          "keys": [
+            "2:brutal"
+          ],
+          "clearedAnySlot": false,
+          "clearedBrutalAnyVersion": false,
+          "clearedCurrentVersionBrutal": false,
+          "attemptsAnySlot": 7
+        },
+        "4": {
+          "keys": [
+            "1"
+          ],
+          "clearedAnySlot": true,
+          "clearedBrutalAnyVersion": false,
+          "clearedCurrentVersionBrutal": false,
+          "attemptsAnySlot": 1
+        },
+        "8": {
+          "keys": [
+            "1"
+          ],
+          "clearedAnySlot": true,
+          "clearedBrutalAnyVersion": false,
+          "clearedCurrentVersionBrutal": false,
+          "attemptsAnySlot": 1
+        },
+        "15": {
+          "keys": [
+            "4:brutal"
+          ],
+          "clearedAnySlot": true,
+          "clearedBrutalAnyVersion": true,
+          "clearedCurrentVersionBrutal": true,
+          "attemptsAnySlot": 1
+        }
+      },
+      "rules": {
+        "A 모든 칸 cleared — 1번부터 연속 클리어 끝": 2,
+        "B 모든 칸 cleared — 최고 번호": 15,
+        "C 지옥 칸만(옛 버전 포함) — 1번부터 연속": 1,
+        "D 지옥 칸만(옛 버전 포함) — 최고 번호": 15,
+        "E 지옥·현재 버전만 — 1번부터 연속": 1
+      },
+      "nonNumericStageKeysKept": [
+        "proto3"
+      ],
+      "lastStage": 15,
+      "hasAnyTimestampField": false
+    },
+    "newSave": {
+      "stages": {},
+      "lastStage": null,
+      "difficulty": "brutal",
+      "writesOnLoad": 0
+    },
+    "corruptSave": {
+      "stagesAfterLoad": {},
+      "bakKept": "{not json"
+    }
+  }
+}

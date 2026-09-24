@@ -1,0 +1,51 @@
+{
+  "generatedBy": "A_gatehit0-check.mjs",
+  "cases": [
+    {
+      "case": "열린 칸, gateHit 0",
+      "valueBefore": -3,
+      "valueAfter": -3,
+      "bulletDead": true,
+      "events": [
+        {
+          "type": "gateHit",
+          "id": "g1",
+          "idx": 0,
+          "value": -3,
+          "x": 160
+        }
+      ]
+    },
+    {
+      "case": "열린 칸, gateHit 없음(기본 1)",
+      "valueBefore": -3,
+      "valueAfter": -2,
+      "bulletDead": true,
+      "events": [
+        {
+          "type": "gateHit",
+          "id": "g1",
+          "idx": 0,
+          "value": -2,
+          "x": 160
+        }
+      ]
+    },
+    {
+      "case": "닫힌 셔터, gateHit 0",
+      "valueBefore": 5,
+      "valueAfter": 5,
+      "bulletDead": true,
+      "events": [
+        {
+          "type": "gateBlock",
+          "id": "g2",
+          "idx": 0,
+          "x": 100,
+          "z": 500
+        }
+      ],
+      "fixedWhileClosed": false
+    }
+  ]
+}

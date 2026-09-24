@@ -1,0 +1,2464 @@
+{
+  "kind": "계산값(전탄 명중·메인 로봇 한 대·Mk I 가정). 봇 판 결과가 아니고 사람 성공률도 아니다",
+  "generatedBy": "A_first-buy.mjs",
+  "assumptions": [
+    "화력 k 단계 피해 = 무기 피해 × (1 + 0.3k) (기획 3-4 (가)). 구현이 반올림을 넣으면 탄 수가 달라질 수 있다",
+    "뺄셈 탄 수 = 게임과 같은 e.hp -= dmg 반복(부동소수). ceil 탄 수 = ceil(체력 ÷ 피해)",
+    "처치 시간 = 발사 횟수 × 발사 간격(첫 발 이후 총이 그 적에 묶이는 시간, 비행 시간 제외). 다연발 탄은 모두 같은 적에 맞는다고 가정",
+    "중화기 폭발(blastDmg 1)·전격 연쇄는 WEAPONS 에서 읽으므로 화력 강화가 적용되지 않는다고 보고 제외(직격만)",
+    "1~3번에서 Mk III(피해 +1)는 스테이지 데이터상 도달 불가: 같은 무기 통이 판마다 최대 1개(3번은 중화기 통 + 랜덤 길 중화기일 때만 Mk II). Mk II 는 피해가 같아 탄 수 표가 같다"
+  ],
+  "stages": {
+    "1": {
+      "difficulty": "brutal",
+      "difficultyHp": true,
+      "enemyHpMul": 1,
+      "startUnits": 1,
+      "startWeapon": "rifle",
+      "tableHp": {
+        "grunt": 4,
+        "rusher": 8,
+        "shooter": 12
+      },
+      "spawns": [
+        {
+          "z": 2600,
+          "kind": "shooter",
+          "n": 4,
+          "hp": 12,
+          "fromBrutalSpawns": true
+        },
+        {
+          "z": 3300,
+          "kind": "grunt",
+          "n": 8,
+          "hp": 20,
+          "fromBrutalSpawns": true
+        },
+        {
+          "z": 3800,
+          "kind": "grunt",
+          "n": 8,
+          "hp": 4,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 4600,
+          "kind": "shooter",
+          "n": 6,
+          "hp": 12,
+          "fromBrutalSpawns": true
+        },
+        {
+          "z": 5300,
+          "kind": "grunt",
+          "n": 12,
+          "hp": 4,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 6300,
+          "kind": "rusher",
+          "n": 6,
+          "hp": 8,
+          "fromBrutalSpawns": true
+        }
+      ],
+      "elites": [
+        {
+          "z": 7200,
+          "hp": 180,
+          "summon": false,
+          "role": "elite"
+        }
+      ],
+      "summonKind": null,
+      "summonHp": null,
+      "weaponCrates": [
+        {
+          "id": "c2",
+          "z": 4180,
+          "x": 240,
+          "weapon": "auto",
+          "durability": 8,
+          "pairId": null
+        }
+      ],
+      "supplyDur": [
+        {
+          "id": "c1",
+          "kind": "soldier",
+          "durability": 4
+        },
+        {
+          "id": "c2",
+          "kind": "weapon",
+          "durability": 8
+        },
+        {
+          "id": "c3",
+          "kind": "soldier",
+          "durability": 6
+        },
+        {
+          "id": "c4",
+          "kind": "soldier",
+          "durability": 10
+        }
+      ],
+      "lotteryDefaultSeedPick": null
+    },
+    "2": {
+      "difficulty": "brutal",
+      "difficultyHp": true,
+      "enemyHpMul": 1,
+      "startUnits": 2,
+      "startWeapon": "rifle",
+      "tableHp": {
+        "grunt": 4,
+        "rusher": 8,
+        "shooter": 12
+      },
+      "spawns": [
+        {
+          "z": 3600,
+          "kind": "grunt",
+          "n": 8,
+          "hp": 4,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 3600,
+          "kind": "rusher",
+          "n": 8,
+          "hp": 8,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 4600,
+          "kind": "shooter",
+          "n": 6,
+          "hp": 12,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 7000,
+          "kind": "grunt",
+          "n": 16,
+          "hp": 4,
+          "fromBrutalSpawns": false
+        }
+      ],
+      "elites": [
+        {
+          "z": 8200,
+          "hp": 330,
+          "summon": false,
+          "role": "elite"
+        }
+      ],
+      "summonKind": null,
+      "summonHp": null,
+      "weaponCrates": [
+        {
+          "id": "c2",
+          "z": 2300,
+          "x": 326,
+          "weapon": "auto",
+          "durability": 12,
+          "pairId": "w1"
+        }
+      ],
+      "supplyDur": [
+        {
+          "id": "c1",
+          "kind": "soldier",
+          "durability": 6
+        },
+        {
+          "id": "c2",
+          "kind": "weapon",
+          "durability": 12
+        },
+        {
+          "id": "c3",
+          "kind": "soldier",
+          "durability": 15
+        }
+      ],
+      "lotteryDefaultSeedPick": null
+    },
+    "3": {
+      "difficulty": "brutal",
+      "difficultyHp": true,
+      "enemyHpMul": 1,
+      "startUnits": 3,
+      "startWeapon": "rifle",
+      "tableHp": {
+        "grunt": 4,
+        "rusher": 8,
+        "shooter": 12
+      },
+      "spawns": [
+        {
+          "z": 5200,
+          "kind": "grunt",
+          "n": 28,
+          "hp": 4,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 6300,
+          "kind": "shooter",
+          "n": 4,
+          "hp": 12,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 8000,
+          "kind": "rusher",
+          "n": 12,
+          "hp": 8,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 8800,
+          "kind": "grunt",
+          "n": 32,
+          "hp": 4,
+          "fromBrutalSpawns": false
+        },
+        {
+          "z": 8800,
+          "kind": "shooter",
+          "n": 6,
+          "hp": 12,
+          "fromBrutalSpawns": false
+        }
+      ],
+      "elites": [
+        {
+          "z": 10600,
+          "hp": 750,
+          "summon": true,
+          "role": "elite"
+        }
+      ],
+      "summonKind": "grunt",
+      "summonHp": 4,
+      "weaponCrates": [
+        {
+          "id": "c6",
+          "z": 3500,
+          "x": 150,
+          "weapon": "auto",
+          "durability": 12,
+          "pairId": "p2"
+        },
+        {
+          "id": "c7",
+          "z": 3500,
+          "x": 330,
+          "weapon": "heavy",
+          "durability": 24,
+          "pairId": "p2"
+        }
+      ],
+      "supplyDur": [
+        {
+          "id": "c1",
+          "kind": "soldier",
+          "durability": 4
+        },
+        {
+          "id": "c2",
+          "kind": "soldier",
+          "durability": 5
+        },
+        {
+          "id": "c3",
+          "kind": "soldier",
+          "durability": 6
+        },
+        {
+          "id": "c4",
+          "kind": "chain",
+          "durability": 10
+        },
+        {
+          "id": "c5",
+          "kind": "soldier",
+          "durability": 10
+        },
+        {
+          "id": "c6",
+          "kind": "weapon",
+          "durability": 12
+        },
+        {
+          "id": "c7",
+          "kind": "weapon",
+          "durability": 24
+        },
+        {
+          "id": "c8",
+          "kind": "soldier",
+          "durability": 24
+        },
+        {
+          "id": "c9",
+          "kind": "soldier",
+          "durability": 20
+        }
+      ],
+      "lotteryDefaultSeedPick": {
+        "pick": "badGate",
+        "kind": "gate",
+        "label": "−15 게이트"
+      }
+    }
+  },
+  "lotteryPool": [
+    {
+      "id": "soldier8",
+      "kind": "soldier",
+      "weapon": null,
+      "durability": 14,
+      "chance": 0.2
+    },
+    {
+      "id": "heavy",
+      "kind": "weapon",
+      "weapon": "heavy",
+      "durability": 24,
+      "chance": 0.2
+    },
+    {
+      "id": "chain6",
+      "kind": "chain",
+      "weapon": null,
+      "durability": 8,
+      "chance": 0.2
+    },
+    {
+      "id": "badGate",
+      "kind": "gate",
+      "weapon": null,
+      "durability": null,
+      "chance": 0.2
+    },
+    {
+      "id": "trapGate",
+      "kind": "gate",
+      "weapon": null,
+      "durability": null,
+      "chance": 0.2
+    }
+  ],
+  "enemyHp": [
+    4,
+    8,
+    12,
+    20,
+    180,
+    330,
+    750
+  ],
+  "hpLabels": {
+    "4": [
+      "grunt",
+      "summon grunt S3"
+    ],
+    "8": [
+      "rusher"
+    ],
+    "12": [
+      "shooter"
+    ],
+    "20": [
+      "grunt(장갑 hp20)"
+    ],
+    "180": [
+      "boss S1"
+    ],
+    "330": [
+      "boss S2"
+    ],
+    "750": [
+      "boss S3"
+    ]
+  },
+  "weaponsMk1": {
+    "rifle": {
+      "id": "rifle",
+      "interval": 0.5,
+      "dmg": 1,
+      "w": 4,
+      "vz": 700,
+      "fan": 1,
+      "spreadDeg": 0,
+      "range": null,
+      "pierce": 0,
+      "chain": 0,
+      "chainR": 0,
+      "chainDmg": 0,
+      "blastR": 0,
+      "blastDmg": 0
+    },
+    "auto": {
+      "id": "auto",
+      "interval": 0.25,
+      "dmg": 1,
+      "w": 5,
+      "vz": 800,
+      "fan": 1,
+      "spreadDeg": 0,
+      "range": null,
+      "pierce": 0,
+      "chain": 0,
+      "chainR": 0,
+      "chainDmg": 0,
+      "blastR": 0,
+      "blastDmg": 0
+    },
+    "heavy": {
+      "id": "heavy",
+      "interval": 0.8,
+      "dmg": 3,
+      "w": 8,
+      "vz": 650,
+      "fan": 1,
+      "spreadDeg": 0,
+      "range": null,
+      "pierce": 0,
+      "chain": 0,
+      "chainR": 0,
+      "chainDmg": 0,
+      "blastR": 22,
+      "blastDmg": 1
+    }
+  },
+  "shotTable": [
+    {
+      "weapon": "rifle",
+      "mk": 1,
+      "power": 0,
+      "dmg": 1,
+      "interval": 0.5,
+      "byHp": {
+        "4": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "8": {
+          "ceil": 8,
+          "sub": 8
+        },
+        "12": {
+          "ceil": 12,
+          "sub": 12
+        },
+        "20": {
+          "ceil": 20,
+          "sub": 20
+        },
+        "180": {
+          "ceil": 180,
+          "sub": 180
+        },
+        "330": {
+          "ceil": 330,
+          "sub": 330
+        },
+        "750": {
+          "ceil": 750,
+          "sub": 750
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "mk": 1,
+      "power": 1,
+      "dmg": 1.3,
+      "interval": 0.5,
+      "byHp": {
+        "4": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "8": {
+          "ceil": 7,
+          "sub": 7
+        },
+        "12": {
+          "ceil": 10,
+          "sub": 10
+        },
+        "20": {
+          "ceil": 16,
+          "sub": 16
+        },
+        "180": {
+          "ceil": 139,
+          "sub": 139
+        },
+        "330": {
+          "ceil": 254,
+          "sub": 254
+        },
+        "750": {
+          "ceil": 577,
+          "sub": 577
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "mk": 1,
+      "power": 2,
+      "dmg": 1.6,
+      "interval": 0.5,
+      "byHp": {
+        "4": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "8": {
+          "ceil": 5,
+          "sub": 6
+        },
+        "12": {
+          "ceil": 8,
+          "sub": 8
+        },
+        "20": {
+          "ceil": 13,
+          "sub": 13
+        },
+        "180": {
+          "ceil": 113,
+          "sub": 113
+        },
+        "330": {
+          "ceil": 207,
+          "sub": 207
+        },
+        "750": {
+          "ceil": 469,
+          "sub": 469
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "mk": 1,
+      "power": 3,
+      "dmg": 1.9,
+      "interval": 0.5,
+      "byHp": {
+        "4": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "8": {
+          "ceil": 5,
+          "sub": 5
+        },
+        "12": {
+          "ceil": 7,
+          "sub": 7
+        },
+        "20": {
+          "ceil": 11,
+          "sub": 11
+        },
+        "180": {
+          "ceil": 95,
+          "sub": 95
+        },
+        "330": {
+          "ceil": 174,
+          "sub": 174
+        },
+        "750": {
+          "ceil": 395,
+          "sub": 395
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "mk": 1,
+      "power": 4,
+      "dmg": 2.2,
+      "interval": 0.5,
+      "byHp": {
+        "4": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "8": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "12": {
+          "ceil": 6,
+          "sub": 6
+        },
+        "20": {
+          "ceil": 10,
+          "sub": 10
+        },
+        "180": {
+          "ceil": 82,
+          "sub": 82
+        },
+        "330": {
+          "ceil": 150,
+          "sub": 151
+        },
+        "750": {
+          "ceil": 341,
+          "sub": 341
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "mk": 1,
+      "power": 5,
+      "dmg": 2.5,
+      "interval": 0.5,
+      "byHp": {
+        "4": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "8": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "12": {
+          "ceil": 5,
+          "sub": 5
+        },
+        "20": {
+          "ceil": 8,
+          "sub": 8
+        },
+        "180": {
+          "ceil": 72,
+          "sub": 72
+        },
+        "330": {
+          "ceil": 132,
+          "sub": 132
+        },
+        "750": {
+          "ceil": 300,
+          "sub": 300
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "mk": 1,
+      "power": 0,
+      "dmg": 1,
+      "interval": 0.25,
+      "byHp": {
+        "4": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "8": {
+          "ceil": 8,
+          "sub": 8
+        },
+        "12": {
+          "ceil": 12,
+          "sub": 12
+        },
+        "20": {
+          "ceil": 20,
+          "sub": 20
+        },
+        "180": {
+          "ceil": 180,
+          "sub": 180
+        },
+        "330": {
+          "ceil": 330,
+          "sub": 330
+        },
+        "750": {
+          "ceil": 750,
+          "sub": 750
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "mk": 1,
+      "power": 1,
+      "dmg": 1.3,
+      "interval": 0.25,
+      "byHp": {
+        "4": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "8": {
+          "ceil": 7,
+          "sub": 7
+        },
+        "12": {
+          "ceil": 10,
+          "sub": 10
+        },
+        "20": {
+          "ceil": 16,
+          "sub": 16
+        },
+        "180": {
+          "ceil": 139,
+          "sub": 139
+        },
+        "330": {
+          "ceil": 254,
+          "sub": 254
+        },
+        "750": {
+          "ceil": 577,
+          "sub": 577
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "mk": 1,
+      "power": 2,
+      "dmg": 1.6,
+      "interval": 0.25,
+      "byHp": {
+        "4": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "8": {
+          "ceil": 5,
+          "sub": 6
+        },
+        "12": {
+          "ceil": 8,
+          "sub": 8
+        },
+        "20": {
+          "ceil": 13,
+          "sub": 13
+        },
+        "180": {
+          "ceil": 113,
+          "sub": 113
+        },
+        "330": {
+          "ceil": 207,
+          "sub": 207
+        },
+        "750": {
+          "ceil": 469,
+          "sub": 469
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "mk": 1,
+      "power": 3,
+      "dmg": 1.9,
+      "interval": 0.25,
+      "byHp": {
+        "4": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "8": {
+          "ceil": 5,
+          "sub": 5
+        },
+        "12": {
+          "ceil": 7,
+          "sub": 7
+        },
+        "20": {
+          "ceil": 11,
+          "sub": 11
+        },
+        "180": {
+          "ceil": 95,
+          "sub": 95
+        },
+        "330": {
+          "ceil": 174,
+          "sub": 174
+        },
+        "750": {
+          "ceil": 395,
+          "sub": 395
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "mk": 1,
+      "power": 4,
+      "dmg": 2.2,
+      "interval": 0.25,
+      "byHp": {
+        "4": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "8": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "12": {
+          "ceil": 6,
+          "sub": 6
+        },
+        "20": {
+          "ceil": 10,
+          "sub": 10
+        },
+        "180": {
+          "ceil": 82,
+          "sub": 82
+        },
+        "330": {
+          "ceil": 150,
+          "sub": 151
+        },
+        "750": {
+          "ceil": 341,
+          "sub": 341
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "mk": 1,
+      "power": 5,
+      "dmg": 2.5,
+      "interval": 0.25,
+      "byHp": {
+        "4": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "8": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "12": {
+          "ceil": 5,
+          "sub": 5
+        },
+        "20": {
+          "ceil": 8,
+          "sub": 8
+        },
+        "180": {
+          "ceil": 72,
+          "sub": 72
+        },
+        "330": {
+          "ceil": 132,
+          "sub": 132
+        },
+        "750": {
+          "ceil": 300,
+          "sub": 300
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "mk": 1,
+      "power": 0,
+      "dmg": 3,
+      "interval": 0.8,
+      "byHp": {
+        "4": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "8": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "12": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "20": {
+          "ceil": 7,
+          "sub": 7
+        },
+        "180": {
+          "ceil": 60,
+          "sub": 60
+        },
+        "330": {
+          "ceil": 110,
+          "sub": 110
+        },
+        "750": {
+          "ceil": 250,
+          "sub": 250
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "mk": 1,
+      "power": 1,
+      "dmg": 3.9000000000000004,
+      "interval": 0.8,
+      "byHp": {
+        "4": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "8": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "12": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "20": {
+          "ceil": 6,
+          "sub": 6
+        },
+        "180": {
+          "ceil": 47,
+          "sub": 47
+        },
+        "330": {
+          "ceil": 85,
+          "sub": 85
+        },
+        "750": {
+          "ceil": 193,
+          "sub": 193
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "mk": 1,
+      "power": 2,
+      "dmg": 4.800000000000001,
+      "interval": 0.8,
+      "byHp": {
+        "4": {
+          "ceil": 1,
+          "sub": 1
+        },
+        "8": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "12": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "20": {
+          "ceil": 5,
+          "sub": 5
+        },
+        "180": {
+          "ceil": 38,
+          "sub": 38
+        },
+        "330": {
+          "ceil": 69,
+          "sub": 69
+        },
+        "750": {
+          "ceil": 157,
+          "sub": 157
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "mk": 1,
+      "power": 3,
+      "dmg": 5.699999999999999,
+      "interval": 0.8,
+      "byHp": {
+        "4": {
+          "ceil": 1,
+          "sub": 1
+        },
+        "8": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "12": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "20": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "180": {
+          "ceil": 32,
+          "sub": 32
+        },
+        "330": {
+          "ceil": 58,
+          "sub": 58
+        },
+        "750": {
+          "ceil": 132,
+          "sub": 132
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "mk": 1,
+      "power": 4,
+      "dmg": 6.6000000000000005,
+      "interval": 0.8,
+      "byHp": {
+        "4": {
+          "ceil": 1,
+          "sub": 1
+        },
+        "8": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "12": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "20": {
+          "ceil": 4,
+          "sub": 4
+        },
+        "180": {
+          "ceil": 28,
+          "sub": 28
+        },
+        "330": {
+          "ceil": 50,
+          "sub": 50
+        },
+        "750": {
+          "ceil": 114,
+          "sub": 114
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "mk": 1,
+      "power": 5,
+      "dmg": 7.5,
+      "interval": 0.8,
+      "byHp": {
+        "4": {
+          "ceil": 1,
+          "sub": 1
+        },
+        "8": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "12": {
+          "ceil": 2,
+          "sub": 2
+        },
+        "20": {
+          "ceil": 3,
+          "sub": 3
+        },
+        "180": {
+          "ceil": 24,
+          "sub": 24
+        },
+        "330": {
+          "ceil": 44,
+          "sub": 44
+        },
+        "750": {
+          "ceil": 100,
+          "sub": 100
+        }
+      }
+    }
+  ],
+  "floatMismatch": [
+    {
+      "weapon": "rifle",
+      "power": 2,
+      "dmg": 1.6,
+      "hp": 8,
+      "ceil": 5,
+      "sub": 6
+    },
+    {
+      "weapon": "rifle",
+      "power": 4,
+      "dmg": 2.2,
+      "hp": 330,
+      "ceil": 150,
+      "sub": 151
+    },
+    {
+      "weapon": "auto",
+      "power": 2,
+      "dmg": 1.6,
+      "hp": 8,
+      "ceil": 5,
+      "sub": 6
+    },
+    {
+      "weapon": "auto",
+      "power": 4,
+      "dmg": 2.2,
+      "hp": 330,
+      "ceil": 150,
+      "sub": 151
+    }
+  ],
+  "power1Visible": [
+    {
+      "weapon": "rifle",
+      "hp": 4,
+      "labels": [
+        "grunt",
+        "summon grunt S3"
+      ],
+      "shots0": 4,
+      "shots1": 4,
+      "changed": false,
+      "killTimeCut": 0
+    },
+    {
+      "weapon": "rifle",
+      "hp": 8,
+      "labels": [
+        "rusher"
+      ],
+      "shots0": 8,
+      "shots1": 7,
+      "changed": true,
+      "killTimeCut": 0.125
+    },
+    {
+      "weapon": "rifle",
+      "hp": 12,
+      "labels": [
+        "shooter"
+      ],
+      "shots0": 12,
+      "shots1": 10,
+      "changed": true,
+      "killTimeCut": 0.16666666666666663
+    },
+    {
+      "weapon": "rifle",
+      "hp": 20,
+      "labels": [
+        "grunt(장갑 hp20)"
+      ],
+      "shots0": 20,
+      "shots1": 16,
+      "changed": true,
+      "killTimeCut": 0.19999999999999996
+    },
+    {
+      "weapon": "rifle",
+      "hp": 180,
+      "labels": [
+        "boss S1"
+      ],
+      "shots0": 180,
+      "shots1": 139,
+      "changed": true,
+      "killTimeCut": 0.22777777777777775
+    },
+    {
+      "weapon": "rifle",
+      "hp": 330,
+      "labels": [
+        "boss S2"
+      ],
+      "shots0": 330,
+      "shots1": 254,
+      "changed": true,
+      "killTimeCut": 0.23030303030303034
+    },
+    {
+      "weapon": "rifle",
+      "hp": 750,
+      "labels": [
+        "boss S3"
+      ],
+      "shots0": 750,
+      "shots1": 577,
+      "changed": true,
+      "killTimeCut": 0.2306666666666667
+    },
+    {
+      "weapon": "auto",
+      "hp": 4,
+      "labels": [
+        "grunt",
+        "summon grunt S3"
+      ],
+      "shots0": 4,
+      "shots1": 4,
+      "changed": false,
+      "killTimeCut": 0
+    },
+    {
+      "weapon": "auto",
+      "hp": 8,
+      "labels": [
+        "rusher"
+      ],
+      "shots0": 8,
+      "shots1": 7,
+      "changed": true,
+      "killTimeCut": 0.125
+    },
+    {
+      "weapon": "auto",
+      "hp": 12,
+      "labels": [
+        "shooter"
+      ],
+      "shots0": 12,
+      "shots1": 10,
+      "changed": true,
+      "killTimeCut": 0.16666666666666663
+    },
+    {
+      "weapon": "auto",
+      "hp": 20,
+      "labels": [
+        "grunt(장갑 hp20)"
+      ],
+      "shots0": 20,
+      "shots1": 16,
+      "changed": true,
+      "killTimeCut": 0.19999999999999996
+    },
+    {
+      "weapon": "auto",
+      "hp": 180,
+      "labels": [
+        "boss S1"
+      ],
+      "shots0": 180,
+      "shots1": 139,
+      "changed": true,
+      "killTimeCut": 0.22777777777777775
+    },
+    {
+      "weapon": "auto",
+      "hp": 330,
+      "labels": [
+        "boss S2"
+      ],
+      "shots0": 330,
+      "shots1": 254,
+      "changed": true,
+      "killTimeCut": 0.23030303030303034
+    },
+    {
+      "weapon": "auto",
+      "hp": 750,
+      "labels": [
+        "boss S3"
+      ],
+      "shots0": 750,
+      "shots1": 577,
+      "changed": true,
+      "killTimeCut": 0.2306666666666667
+    },
+    {
+      "weapon": "heavy",
+      "hp": 4,
+      "labels": [
+        "grunt",
+        "summon grunt S3"
+      ],
+      "shots0": 2,
+      "shots1": 2,
+      "changed": false,
+      "killTimeCut": 0
+    },
+    {
+      "weapon": "heavy",
+      "hp": 8,
+      "labels": [
+        "rusher"
+      ],
+      "shots0": 3,
+      "shots1": 3,
+      "changed": false,
+      "killTimeCut": 0
+    },
+    {
+      "weapon": "heavy",
+      "hp": 12,
+      "labels": [
+        "shooter"
+      ],
+      "shots0": 4,
+      "shots1": 4,
+      "changed": false,
+      "killTimeCut": 0
+    },
+    {
+      "weapon": "heavy",
+      "hp": 20,
+      "labels": [
+        "grunt(장갑 hp20)"
+      ],
+      "shots0": 7,
+      "shots1": 6,
+      "changed": true,
+      "killTimeCut": 0.1428571428571429
+    },
+    {
+      "weapon": "heavy",
+      "hp": 180,
+      "labels": [
+        "boss S1"
+      ],
+      "shots0": 60,
+      "shots1": 47,
+      "changed": true,
+      "killTimeCut": 0.21666666666666667
+    },
+    {
+      "weapon": "heavy",
+      "hp": 330,
+      "labels": [
+        "boss S2"
+      ],
+      "shots0": 110,
+      "shots1": 85,
+      "changed": true,
+      "killTimeCut": 0.2272727272727273
+    },
+    {
+      "weapon": "heavy",
+      "hp": 750,
+      "labels": [
+        "boss S3"
+      ],
+      "shots0": 250,
+      "shots1": 193,
+      "changed": true,
+      "killTimeCut": 0.22799999999999998
+    }
+  ],
+  "killTime": [
+    {
+      "weapon": "rifle",
+      "hp": 4,
+      "labels": [
+        "grunt",
+        "summon grunt S3"
+      ],
+      "baseSec": 2,
+      "cut": {
+        "power1": {
+          "sec": 2,
+          "cutPct": 0
+        },
+        "power2": {
+          "sec": 1.5,
+          "cutPct": 25
+        },
+        "rate1": {
+          "sec": 1.74,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 1.5138,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 1,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 1,
+          "cutPct": 50
+        },
+        "multi3": {
+          "sec": 0.5,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "hp": 8,
+      "labels": [
+        "rusher"
+      ],
+      "baseSec": 4,
+      "cut": {
+        "power1": {
+          "sec": 3.5,
+          "cutPct": 12.5
+        },
+        "power2": {
+          "sec": 3,
+          "cutPct": 25
+        },
+        "rate1": {
+          "sec": 3.48,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 3.0276,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 2,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 1.5,
+          "cutPct": 62.5
+        },
+        "multi3": {
+          "sec": 1,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "hp": 12,
+      "labels": [
+        "shooter"
+      ],
+      "baseSec": 6,
+      "cut": {
+        "power1": {
+          "sec": 5,
+          "cutPct": 16.7
+        },
+        "power2": {
+          "sec": 4,
+          "cutPct": 33.3
+        },
+        "rate1": {
+          "sec": 5.22,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 4.5414,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 3,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 2,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 1.5,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "hp": 20,
+      "labels": [
+        "grunt(장갑 hp20)"
+      ],
+      "baseSec": 10,
+      "cut": {
+        "power1": {
+          "sec": 8,
+          "cutPct": 20
+        },
+        "power2": {
+          "sec": 6.5,
+          "cutPct": 35
+        },
+        "rate1": {
+          "sec": 8.7,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 7.569,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 5,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 3.5,
+          "cutPct": 65
+        },
+        "multi3": {
+          "sec": 2.5,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "hp": 180,
+      "labels": [
+        "boss S1"
+      ],
+      "baseSec": 90,
+      "cut": {
+        "power1": {
+          "sec": 69.5,
+          "cutPct": 22.8
+        },
+        "power2": {
+          "sec": 56.5,
+          "cutPct": 37.2
+        },
+        "rate1": {
+          "sec": 78.3,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 68.121,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 45,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 30,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 22.5,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "hp": 330,
+      "labels": [
+        "boss S2"
+      ],
+      "baseSec": 165,
+      "cut": {
+        "power1": {
+          "sec": 127,
+          "cutPct": 23
+        },
+        "power2": {
+          "sec": 103.5,
+          "cutPct": 37.3
+        },
+        "rate1": {
+          "sec": 143.55,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 124.88850000000001,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 82.5,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 55,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 41.5,
+          "cutPct": 74.8
+        }
+      }
+    },
+    {
+      "weapon": "rifle",
+      "hp": 750,
+      "labels": [
+        "boss S3"
+      ],
+      "baseSec": 375,
+      "cut": {
+        "power1": {
+          "sec": 288.5,
+          "cutPct": 23.1
+        },
+        "power2": {
+          "sec": 234.5,
+          "cutPct": 37.5
+        },
+        "rate1": {
+          "sec": 326.25,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 283.83750000000003,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 187.5,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 125,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 94,
+          "cutPct": 74.9
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "hp": 4,
+      "labels": [
+        "grunt",
+        "summon grunt S3"
+      ],
+      "baseSec": 1,
+      "cut": {
+        "power1": {
+          "sec": 1,
+          "cutPct": 0
+        },
+        "power2": {
+          "sec": 0.75,
+          "cutPct": 25
+        },
+        "rate1": {
+          "sec": 0.87,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 0.7569,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 0.5,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 0.5,
+          "cutPct": 50
+        },
+        "multi3": {
+          "sec": 0.25,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "hp": 8,
+      "labels": [
+        "rusher"
+      ],
+      "baseSec": 2,
+      "cut": {
+        "power1": {
+          "sec": 1.75,
+          "cutPct": 12.5
+        },
+        "power2": {
+          "sec": 1.5,
+          "cutPct": 25
+        },
+        "rate1": {
+          "sec": 1.74,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 1.5138,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 1,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 0.75,
+          "cutPct": 62.5
+        },
+        "multi3": {
+          "sec": 0.5,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "hp": 12,
+      "labels": [
+        "shooter"
+      ],
+      "baseSec": 3,
+      "cut": {
+        "power1": {
+          "sec": 2.5,
+          "cutPct": 16.7
+        },
+        "power2": {
+          "sec": 2,
+          "cutPct": 33.3
+        },
+        "rate1": {
+          "sec": 2.61,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 2.2707,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 1.5,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 1,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 0.75,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "hp": 20,
+      "labels": [
+        "grunt(장갑 hp20)"
+      ],
+      "baseSec": 5,
+      "cut": {
+        "power1": {
+          "sec": 4,
+          "cutPct": 20
+        },
+        "power2": {
+          "sec": 3.25,
+          "cutPct": 35
+        },
+        "rate1": {
+          "sec": 4.35,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 3.7845,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 2.5,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 1.75,
+          "cutPct": 65
+        },
+        "multi3": {
+          "sec": 1.25,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "hp": 180,
+      "labels": [
+        "boss S1"
+      ],
+      "baseSec": 45,
+      "cut": {
+        "power1": {
+          "sec": 34.75,
+          "cutPct": 22.8
+        },
+        "power2": {
+          "sec": 28.25,
+          "cutPct": 37.2
+        },
+        "rate1": {
+          "sec": 39.15,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 34.0605,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 22.5,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 15,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 11.25,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "hp": 330,
+      "labels": [
+        "boss S2"
+      ],
+      "baseSec": 82.5,
+      "cut": {
+        "power1": {
+          "sec": 63.5,
+          "cutPct": 23
+        },
+        "power2": {
+          "sec": 51.75,
+          "cutPct": 37.3
+        },
+        "rate1": {
+          "sec": 71.775,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 62.444250000000004,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 41.25,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 27.5,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 20.75,
+          "cutPct": 74.8
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "hp": 750,
+      "labels": [
+        "boss S3"
+      ],
+      "baseSec": 187.5,
+      "cut": {
+        "power1": {
+          "sec": 144.25,
+          "cutPct": 23.1
+        },
+        "power2": {
+          "sec": 117.25,
+          "cutPct": 37.5
+        },
+        "rate1": {
+          "sec": 163.125,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 141.91875000000002,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 93.75,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 62.5,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 47,
+          "cutPct": 74.9
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "hp": 4,
+      "labels": [
+        "grunt",
+        "summon grunt S3"
+      ],
+      "baseSec": 1.6,
+      "cut": {
+        "power1": {
+          "sec": 1.6,
+          "cutPct": 0
+        },
+        "power2": {
+          "sec": 0.8,
+          "cutPct": 50
+        },
+        "rate1": {
+          "sec": 1.3920000000000001,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 1.2110400000000001,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 0.8,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 0.8,
+          "cutPct": 50
+        },
+        "multi3": {
+          "sec": 0.8,
+          "cutPct": 50
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "hp": 8,
+      "labels": [
+        "rusher"
+      ],
+      "baseSec": 2.4000000000000004,
+      "cut": {
+        "power1": {
+          "sec": 2.4000000000000004,
+          "cutPct": 0
+        },
+        "power2": {
+          "sec": 1.6,
+          "cutPct": 33.3
+        },
+        "rate1": {
+          "sec": 2.088,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 1.8165600000000004,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 1.6,
+          "cutPct": 33.3
+        },
+        "multi2": {
+          "sec": 0.8,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 0.8,
+          "cutPct": 66.7
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "hp": 12,
+      "labels": [
+        "shooter"
+      ],
+      "baseSec": 3.2,
+      "cut": {
+        "power1": {
+          "sec": 3.2,
+          "cutPct": 0
+        },
+        "power2": {
+          "sec": 2.4000000000000004,
+          "cutPct": 25
+        },
+        "rate1": {
+          "sec": 2.7840000000000003,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 2.4220800000000002,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 1.6,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 1.6,
+          "cutPct": 50
+        },
+        "multi3": {
+          "sec": 0.8,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "hp": 20,
+      "labels": [
+        "grunt(장갑 hp20)"
+      ],
+      "baseSec": 5.6000000000000005,
+      "cut": {
+        "power1": {
+          "sec": 4.800000000000001,
+          "cutPct": 14.3
+        },
+        "power2": {
+          "sec": 4,
+          "cutPct": 28.6
+        },
+        "rate1": {
+          "sec": 4.872000000000001,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 4.23864,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 3.2,
+          "cutPct": 42.9
+        },
+        "multi2": {
+          "sec": 2.4000000000000004,
+          "cutPct": 57.1
+        },
+        "multi3": {
+          "sec": 1.6,
+          "cutPct": 71.4
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "hp": 180,
+      "labels": [
+        "boss S1"
+      ],
+      "baseSec": 48,
+      "cut": {
+        "power1": {
+          "sec": 37.6,
+          "cutPct": 21.7
+        },
+        "power2": {
+          "sec": 30.400000000000002,
+          "cutPct": 36.7
+        },
+        "rate1": {
+          "sec": 41.76,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 36.3312,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 24,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 16,
+          "cutPct": 66.7
+        },
+        "multi3": {
+          "sec": 12,
+          "cutPct": 75
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "hp": 330,
+      "labels": [
+        "boss S2"
+      ],
+      "baseSec": 88,
+      "cut": {
+        "power1": {
+          "sec": 68,
+          "cutPct": 22.7
+        },
+        "power2": {
+          "sec": 55.2,
+          "cutPct": 37.3
+        },
+        "rate1": {
+          "sec": 76.56,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 66.6072,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 44,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 29.6,
+          "cutPct": 66.4
+        },
+        "multi3": {
+          "sec": 22.400000000000002,
+          "cutPct": 74.5
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "hp": 750,
+      "labels": [
+        "boss S3"
+      ],
+      "baseSec": 200,
+      "cut": {
+        "power1": {
+          "sec": 154.4,
+          "cutPct": 22.8
+        },
+        "power2": {
+          "sec": 125.60000000000001,
+          "cutPct": 37.2
+        },
+        "rate1": {
+          "sec": 174,
+          "cutPct": 13
+        },
+        "rate2": {
+          "sec": 151.38,
+          "cutPct": 24.3
+        },
+        "multi1": {
+          "sec": 100,
+          "cutPct": 50
+        },
+        "multi2": {
+          "sec": 67.2,
+          "cutPct": 66.4
+        },
+        "multi3": {
+          "sec": 50.400000000000006,
+          "cutPct": 74.8
+        }
+      }
+    }
+  ],
+  "E": {
+    "power1": 1.3,
+    "rate1": 1.1494252873563218,
+    "rate2": 1.321178491214163,
+    "multi1": 2,
+    "multi2": 3,
+    "multi3": 4
+  },
+  "effectivePowerE": [
+    {
+      "weapon": "rifle",
+      "hp": 4,
+      "E_power1": 1
+    },
+    {
+      "weapon": "rifle",
+      "hp": 8,
+      "E_power1": 1.1428571428571428
+    },
+    {
+      "weapon": "rifle",
+      "hp": 12,
+      "E_power1": 1.2
+    },
+    {
+      "weapon": "rifle",
+      "hp": 20,
+      "E_power1": 1.25
+    },
+    {
+      "weapon": "rifle",
+      "hp": 180,
+      "E_power1": 1.2949640287769784
+    },
+    {
+      "weapon": "rifle",
+      "hp": 330,
+      "E_power1": 1.2992125984251968
+    },
+    {
+      "weapon": "rifle",
+      "hp": 750,
+      "E_power1": 1.2998266897746966
+    },
+    {
+      "weapon": "auto",
+      "hp": 4,
+      "E_power1": 1
+    },
+    {
+      "weapon": "auto",
+      "hp": 8,
+      "E_power1": 1.1428571428571428
+    },
+    {
+      "weapon": "auto",
+      "hp": 12,
+      "E_power1": 1.2
+    },
+    {
+      "weapon": "auto",
+      "hp": 20,
+      "E_power1": 1.25
+    },
+    {
+      "weapon": "auto",
+      "hp": 180,
+      "E_power1": 1.2949640287769784
+    },
+    {
+      "weapon": "auto",
+      "hp": 330,
+      "E_power1": 1.2992125984251968
+    },
+    {
+      "weapon": "auto",
+      "hp": 750,
+      "E_power1": 1.2998266897746966
+    },
+    {
+      "weapon": "heavy",
+      "hp": 4,
+      "E_power1": 1
+    },
+    {
+      "weapon": "heavy",
+      "hp": 8,
+      "E_power1": 1
+    },
+    {
+      "weapon": "heavy",
+      "hp": 12,
+      "E_power1": 1
+    },
+    {
+      "weapon": "heavy",
+      "hp": 20,
+      "E_power1": 1.1666666666666667
+    },
+    {
+      "weapon": "heavy",
+      "hp": 180,
+      "E_power1": 1.2765957446808511
+    },
+    {
+      "weapon": "heavy",
+      "hp": 330,
+      "E_power1": 1.2941176470588236
+    },
+    {
+      "weapon": "heavy",
+      "hp": 750,
+      "E_power1": 1.2953367875647668
+    }
+  ],
+  "supplyTable": [
+    {
+      "weapon": "rifle",
+      "byDur": {
+        "4": {
+          "power0": 4,
+          "power1": 4,
+          "power2": 3
+        },
+        "5": {
+          "power0": 5,
+          "power1": 4,
+          "power2": 4
+        },
+        "6": {
+          "power0": 6,
+          "power1": 5,
+          "power2": 4
+        },
+        "8": {
+          "power0": 8,
+          "power1": 7,
+          "power2": 6
+        },
+        "10": {
+          "power0": 10,
+          "power1": 8,
+          "power2": 7
+        },
+        "12": {
+          "power0": 12,
+          "power1": 10,
+          "power2": 8
+        },
+        "14": {
+          "power0": 14,
+          "power1": 11,
+          "power2": 9
+        },
+        "15": {
+          "power0": 15,
+          "power1": 12,
+          "power2": 10
+        },
+        "20": {
+          "power0": 20,
+          "power1": 16,
+          "power2": 13
+        },
+        "24": {
+          "power0": 24,
+          "power1": 19,
+          "power2": 15
+        }
+      }
+    },
+    {
+      "weapon": "auto",
+      "byDur": {
+        "4": {
+          "power0": 4,
+          "power1": 4,
+          "power2": 3
+        },
+        "5": {
+          "power0": 5,
+          "power1": 4,
+          "power2": 4
+        },
+        "6": {
+          "power0": 6,
+          "power1": 5,
+          "power2": 4
+        },
+        "8": {
+          "power0": 8,
+          "power1": 7,
+          "power2": 6
+        },
+        "10": {
+          "power0": 10,
+          "power1": 8,
+          "power2": 7
+        },
+        "12": {
+          "power0": 12,
+          "power1": 10,
+          "power2": 8
+        },
+        "14": {
+          "power0": 14,
+          "power1": 11,
+          "power2": 9
+        },
+        "15": {
+          "power0": 15,
+          "power1": 12,
+          "power2": 10
+        },
+        "20": {
+          "power0": 20,
+          "power1": 16,
+          "power2": 13
+        },
+        "24": {
+          "power0": 24,
+          "power1": 19,
+          "power2": 15
+        }
+      }
+    },
+    {
+      "weapon": "heavy",
+      "byDur": {
+        "4": {
+          "power0": 2,
+          "power1": 2,
+          "power2": 1
+        },
+        "5": {
+          "power0": 2,
+          "power1": 2,
+          "power2": 2
+        },
+        "6": {
+          "power0": 2,
+          "power1": 2,
+          "power2": 2
+        },
+        "8": {
+          "power0": 3,
+          "power1": 3,
+          "power2": 2
+        },
+        "10": {
+          "power0": 4,
+          "power1": 3,
+          "power2": 3
+        },
+        "12": {
+          "power0": 4,
+          "power1": 4,
+          "power2": 3
+        },
+        "14": {
+          "power0": 5,
+          "power1": 4,
+          "power2": 3
+        },
+        "15": {
+          "power0": 5,
+          "power1": 4,
+          "power2": 4
+        },
+        "20": {
+          "power0": 7,
+          "power1": 6,
+          "power2": 5
+        },
+        "24": {
+          "power0": 8,
+          "power1": 7,
+          "power2": 5
+        }
+      }
+    }
+  ]
+}

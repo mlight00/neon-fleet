@@ -1,0 +1,275 @@
+{
+ "meta": {
+  "script": "E_screen-calc.mjs",
+  "date": "2026-09-24T07:04:37.967Z",
+  "constants": {
+   "H": 800,
+   "LINE_Y": 640,
+   "CX": 240,
+   "SOLDIER": 22,
+   "HERO": 46,
+   "arenaDepth": [
+    -280,
+    40
+   ],
+   "PERSPECTIVE_close": {
+    "near": 1.8,
+    "far": 0.6,
+    "depth": 700
+   },
+   "PERSPECTIVE_standard": {
+    "near": 1.45,
+    "far": 0.72,
+    "depth": 700
+   }
+  },
+  "rule": "뒷줄 밑변 = project(240, −(ay+maxDy)).y + soldierSize·s/2 (tests/rush3-project.test.mjs L188-201 과 같은 식). bob 연출 제외."
+ },
+ "n100": [
+  {
+   "mode": "close",
+   "n": 100,
+   "ay": 40,
+   "near": 1.8,
+   "far": 0.6,
+   "D": 350,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": -161,
+   "backRowY": 801,
+   "backRowScale": 1.8,
+   "backRowBottomY": 820.8,
+   "backRowBottomOverScreenPx": 20.8,
+   "heroCenterD": -40,
+   "heroScale": 1.8,
+   "heroY": 680,
+   "heroTopY": 638.6,
+   "frontRowScale": 1.57,
+   "heroScaleVsLine": 1
+  },
+  {
+   "mode": "close",
+   "n": 100,
+   "ay": 0,
+   "near": 1.8,
+   "far": 0.6,
+   "D": 350,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": -121,
+   "backRowY": 761,
+   "backRowScale": 1.8,
+   "backRowBottomY": 780.8,
+   "backRowBottomOverScreenPx": -19.2,
+   "heroCenterD": 0,
+   "heroScale": 1.8,
+   "heroY": 640,
+   "heroTopY": 598.6,
+   "frontRowScale": 1.43,
+   "heroScaleVsLine": 1
+  },
+  {
+   "mode": "close",
+   "n": 100,
+   "ay": -280,
+   "near": 1.8,
+   "far": 0.6,
+   "D": 350,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": 159,
+   "backRowY": 404.06,
+   "backRowScale": 1.24,
+   "backRowBottomY": 417.67,
+   "backRowBottomOverScreenPx": -382.33,
+   "heroCenterD": 280,
+   "heroScale": 1,
+   "heroY": 269.69,
+   "heroTopY": 246.69,
+   "frontRowScale": 0.87,
+   "heroScaleVsLine": 0.556
+  },
+  {
+   "mode": "standard",
+   "n": 100,
+   "ay": 40,
+   "near": 1.45,
+   "far": 0.72,
+   "D": 690.41,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": -161,
+   "backRowY": 801,
+   "backRowScale": 1.45,
+   "backRowBottomY": 816.95,
+   "backRowBottomOverScreenPx": 16.95,
+   "heroCenterD": -40,
+   "heroScale": 1.45,
+   "heroY": 680,
+   "heroTopY": 646.65,
+   "frontRowScale": 1.35,
+   "heroScaleVsLine": 1
+  },
+  {
+   "mode": "standard",
+   "n": 100,
+   "ay": 0,
+   "near": 1.45,
+   "far": 0.72,
+   "D": 690.41,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": -121,
+   "backRowY": 761,
+   "backRowScale": 1.45,
+   "backRowBottomY": 776.95,
+   "backRowBottomOverScreenPx": -23.05,
+   "heroCenterD": 0,
+   "heroScale": 1.45,
+   "heroY": 640,
+   "heroTopY": 606.65,
+   "frontRowScale": 1.28,
+   "heroScaleVsLine": 1
+  },
+  {
+   "mode": "standard",
+   "n": 100,
+   "ay": -280,
+   "near": 1.45,
+   "far": 0.72,
+   "D": 690.41,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": 159,
+   "backRowY": 432.52,
+   "backRowScale": 1.18,
+   "backRowBottomY": 445.48,
+   "backRowBottomOverScreenPx": -354.52,
+   "heroCenterD": 280,
+   "heroScale": 1.032,
+   "heroY": 299.19,
+   "heroTopY": 275.47,
+   "frontRowScale": 0.94,
+   "heroScaleVsLine": 0.711
+  },
+  {
+   "mode": "flat",
+   "n": 100,
+   "ay": 40,
+   "near": 1,
+   "far": 1,
+   "D": null,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": -161,
+   "backRowY": 801,
+   "backRowScale": 1,
+   "backRowBottomY": 812,
+   "backRowBottomOverScreenPx": 12,
+   "heroCenterD": -40,
+   "heroScale": 1,
+   "heroY": 680,
+   "heroTopY": 657,
+   "frontRowScale": 1,
+   "heroScaleVsLine": 1
+  },
+  {
+   "mode": "flat",
+   "n": 100,
+   "ay": 0,
+   "near": 1,
+   "far": 1,
+   "D": null,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": -121,
+   "backRowY": 761,
+   "backRowScale": 1,
+   "backRowBottomY": 772,
+   "backRowBottomOverScreenPx": -28,
+   "heroCenterD": 0,
+   "heroScale": 1,
+   "heroY": 640,
+   "heroTopY": 617,
+   "frontRowScale": 1,
+   "heroScaleVsLine": 1
+  },
+  {
+   "mode": "flat",
+   "n": 100,
+   "ay": -280,
+   "near": 1,
+   "far": 1,
+   "D": null,
+   "maxDy": 121,
+   "minDy": -91,
+   "backRowD": 159,
+   "backRowY": 481,
+   "backRowScale": 1,
+   "backRowBottomY": 492,
+   "backRowBottomOverScreenPx": -308,
+   "heroCenterD": 280,
+   "heroScale": 1,
+   "heroY": 360,
+   "heroTopY": 337,
+   "frontRowScale": 1,
+   "heroScaleVsLine": 1
+  }
+ ],
+ "thresholdsAtAyBottom": {
+  "close": {
+   "n": 60,
+   "maxDy": 101,
+   "bottomY": 800.8
+  },
+  "standard": {
+   "n": 83,
+   "maxDy": 113,
+   "bottomY": 808.95
+  },
+  "flat": {
+   "n": 83,
+   "maxDy": 113,
+   "bottomY": 804
+  }
+ },
+ "thresholdsAtAy0": {
+  "close": {
+   "n": 142,
+   "maxDy": 145,
+   "bottomY": 804.8
+  },
+  "standard": {
+   "n": 142,
+   "maxDy": 145,
+   "bottomY": 800.95
+  },
+  "flat": {
+   "n": 143,
+   "maxDy": 153,
+   "bottomY": 804
+  }
+ },
+ "planClaims": {
+  "claimBottomClose": 821,
+  "claimBottomStandard": 817,
+  "claimTopScaleClose": "1.8 → 1.0",
+  "claimTopScaleStandard": "1.45 → 1.03",
+  "claimMaxDy100": 121
+ },
+ "check": {
+  "maxDy100": 121,
+  "closeBottomAtAy40": 820.8,
+  "standardBottomAtAy40": 816.95,
+  "closeHeroScaleAtTop": 1,
+  "standardHeroScaleAtTop": 1.032,
+  "closeBackRowBottomAtTop": 417.67,
+  "matches": {
+   "maxDy": true,
+   "close821": true,
+   "standard817": true,
+   "closeTop1_0": true,
+   "standardTop1_03": true
+  }
+ }
+}
