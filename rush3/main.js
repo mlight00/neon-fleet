@@ -7,7 +7,7 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW, ZOOM, hitRole } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole } from './render.js';
 import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
 import { createAudio3 } from './audio.js';
@@ -435,16 +435,13 @@ export function boot(canvas, deps = {}) {
   const dateNow = deps.dateNow ?? (() => Date.now());
   const raf = deps.raf ?? ((fn) => (win && win.requestAnimationFrame ? win.requestAnimationFrame(fn) : setTimeout(() => fn(nowFn()), 16)));
   const save = deps.save ?? createSave3(deps.storage);
-  //  '가까이' 토글(r3.20, 화면 전용 — 원근 강도: 꺼짐 표준 near 1.45 / 켜짐 near 1.8). 저장 필드 zoom 을 그대로 재사용(뜻만 바뀜).
-  //   출격 중·일시정지·결과 화면에서 Z 키 또는 HUD '가까이' 칩으로 토글
-  let zoom = save.get().zoom === true;
-  function setZoom(on) { zoom = !!on; save.patch({ zoom }); return zoom; }
-  const zoomButton = () => ({ id: 'zoom', ...ZOOM.chip, label: zoom ? ZOOM.label.on : ZOOM.label.off, small: true, primary: zoom });
+  //  보기(r4.1, 이사 지시 2026-09-25 "줌 확대모드를 기본 모드로 하고 일반 모드를 삭제하자"): '가까이'(near 1.8) 하나뿐이다.
+  //   종전 '가까이 ○/●' 토글(Z 키·HUD 칩·저장 zoom 필드·getZoom/setZoom)은 지웠다. 저장의 zoom 칸은 읽지 않는다(save.js)
   //  개발 대조용 평면 변환(계획서 §4-6 "같은 스테이지를 두 방식으로 그리는 비교"): rush3.html?flat=1 → 종전 y = LINE_Y − d 로 그린다
   //   판정은 값 '1' 만(검수 반영 2026-09-20: `!!get('flat')` 은 ?flat=0 도 참이었다)
   const flat = (() => { try { return !!(win && win.location) && new URLSearchParams(win.location.search).get('flat') === '1'; } catch { return false; } })();
   //  이번 프레임의 투영기 — 렌더(그리기)와 셸(연출 좌표·마우스 역투영)이 같은 것을 쓴다(project.js 의 모드별 단일 인스턴스)
-  const proj = () => projectorFor(projectorMode({ flat, zoom }));
+  const proj = () => projectorFor(projectorMode({ flat }));
   const au = deps.audio ?? createAudio3({});
   const input = deps.input ?? createInput();
   au.setMuted(!!save.get().mute);
@@ -917,13 +914,11 @@ export function boot(canvas, deps = {}) {
       const paused = state === 'paused';
       v.fx = paused ? { ...fx, gateFlash: { ...fx.gateFlash }, gateOpen: { ...fx.gateOpen }, shakeT: 0, hurtT: 0 } : fx;
       v.hud = { distM: Math.max(0, Math.round((run.length - run.z) / 10)) };
-      v.zoom = zoom;
       v.flat = flat;
       if (state === 'run') {
-        v.buttons = [{ ...HUD_BTN }, zoomButton()];
+        v.buttons = [{ ...HUD_BTN }];
       } else if (state === 'paused') {
         v.buttons = [
-          zoomButton(),
           { id: 'resume', x: 120, y: 400, w: 240, h: 56, label: '계속하기', primary: true },
           { id: 'giveup', x: 120, y: 480, w: 240, h: 44, label: '스테이지 선택' },
           { id: 'vol_down', x: 120, y: 548, w: 64, h: 44, label: '−' },
@@ -954,7 +949,6 @@ export function boot(canvas, deps = {}) {
       save.patch({ mute: au.isMuted() });
       return true;
     }
-    if (id === 'zoom') { setZoom(!zoom); au.sfx('click'); return true; }
     if (id === 'vol_down' || id === 'vol_up') {
       const v = Math.max(0, Math.min(1, au.getVolume() + (id === 'vol_up' ? 0.2 : -0.2)));
       au.setVolume(v);
@@ -1032,8 +1026,6 @@ export function boot(canvas, deps = {}) {
         else if (state === 'paused') resume();
         return;
       }
-      //  Z = 확대 보기 토글(출격 중·일시정지·결과). 조향 키보다 먼저 보되 타이틀에서는 무시
-      if (code === 'KeyZ' && (state === 'run' || state === 'paused' || state === 'result')) { setZoom(!zoom); return; }
       if (input.onKey(code, true)) { if (e.preventDefault) e.preventDefault(); return; }
       //  타이틀에서 1/2/3 = 난이도 선택(클릭과 같은 경로)
       if (state === 'title' && DIFF_KEYS[code] !== undefined) {
@@ -1077,7 +1069,7 @@ export function boot(canvas, deps = {}) {
     //  r3.18: bossGuard(보호막 남아 있는가) · supplyArmed(피격 활성 구간에 든 통 id 목록 — armZ 가 있는 통만)
     bossGuard: !!(run && run.boss && run.boss.guard),
     supplyArmed: run ? run.supplies.filter((s) => s.armZ != null && !s.opened && s.z - run.z <= s.armZ).map((s) => s.id) : [],
-    zoom, flat, perspective: projectorMode({ flat, zoom }),
+    flat, perspective: projectorMode({ flat }),
     //  손맛(r3.24) 관찰: 지금 피격 반응 중인 적의 역할 목록 · 날아가는 병사 수 · 잔해 역할 목록 · 파편 수 — 캡처 스크립트가 '맞는 순간'을 잡는다
     hitRoles: Object.values(fx.hit).filter((h) => h.t < FX.hit.knockSec).map((h) => h.role),
     //  화면 안(부대 앞 거리 d 80~520)에서 반응 중인 적만 — 먼 곳(화면 위 밖)에서 맞기 시작하는 적을 캡처가 기다리지 않게
@@ -1162,7 +1154,7 @@ export function boot(canvas, deps = {}) {
   });
 
   return { dbg, ready, startRun, pause, resume, toTitle, getState: () => state, getRun: () => run, getFx: () => fx, loop, input,
-           getDifficulty: () => difficulty, setDifficulty, getZoom: () => zoom, setZoom };
+           getDifficulty: () => difficulty, setDifficulty };
 }
 
 if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'));

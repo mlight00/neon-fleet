@@ -1,6 +1,8 @@
 // rush3-project — 원근 투영(r3.20 · 계획서 §4-6 "원근 투영 — 규칙이 아니라 그리기다"). 순수 투영기와 렌더의 사용 규약을 잠근다.
 //  이사 소감(2026-09-19): 확대 모드는 캐릭터는 잘 보이는데 앞이 안 보인다 → 라스트워식 원근(부대 크게·앞은 멀수록 작게 가운데로).
 //  규칙(combat)은 투영을 모른다 — 같은 입력열이면 투영 모드와 무관하게 같은 run 이어야 한다.
+//  r4.1(2026-09-25, 이사 지시 "줌 확대모드를 기본 모드로 하고 일반 모드를 삭제하자"): 표준 칸을 지우고 '가까이'(close)가 기본·유일한 사용자 보기다.
+//   flat(개발 대조 ?flat=1, 결정 D8)은 남아 이 파일의 기준선으로 쓰인다. 기대값은 전부 '가까이' 투영으로 다시 계산했다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeProjector, projectorFor, projectorMode, PERSPECTIVE } from '../rush3/project.js';
@@ -49,7 +51,7 @@ function drawWith(run, view = {}) {
 }
 
 test('V3-PROJECT 식: s(0)=near · y(0)=LINE_Y · d 가 커지면 s·y 단조 감소 · x 중앙 불변·좌우 대칭 · far 배율 · D 역산', () => {
-  for (const mode of ['standard', 'close']) {
+  for (const mode of ['close']) {
     const c = PERSPECTIVE[mode], P = makeProjector(c);
     assert.equal(P.s(0), c.near, mode + ': 부대 줄 배율 = near');
     assert.equal(P.y(0), LINE_Y, mode + ': 부대 줄 y = LINE_Y');
@@ -85,9 +87,13 @@ test('V3-PROJECT 식: s(0)=near · y(0)=LINE_Y · d 가 커지면 s·y 단조 �
     assert.ok(Math.abs(P.y(1e-9) - LINE_Y) < 1e-6 && Math.abs(P.y(-1e-9) - LINE_Y) < 1e-6, mode + ': d 0 에서 y 연속');
     assert.ok(Math.abs(P.s(1e-9) - c.near) < 1e-9, mode + ': d 0 에서 s 연속');
   }
-  //  표준 vs 가까이: 부대는 더 크고(1.45 → 1.8) 위 끝 배율은 더 작다(0.72 → 0.6) — "앞은 그대로 보이고 부대만 더 크다"
-  assert.equal(PERSPECTIVE.standard.near, 1.45); assert.equal(PERSPECTIVE.standard.far, 0.72); assert.equal(PERSPECTIVE.standard.depth, 700);
+  //  r4.1: 모드 표에는 '가까이'와 개발용 평면만 있다(표준 near 1.45·far 0.72 삭제). 가까이 = 부대 1.8배 · 위 끝 0.6배 · depth 700(D 350)
+  assert.deepEqual(Object.keys(PERSPECTIVE).filter((k) => typeof PERSPECTIVE[k] === 'object'), ['close', 'flat'], '투영 모드는 close·flat 둘뿐');
+  assert.equal(PERSPECTIVE.standard, undefined, '표준 칸 없음');
   assert.equal(PERSPECTIVE.close.near, 1.8); assert.equal(PERSPECTIVE.close.far, 0.6); assert.equal(PERSPECTIVE.close.depth, 700);
+  assert.ok(Math.abs(projectorFor('close').D - 350) < 1e-9, 'D = 700 / (1.8/0.6 − 1) = 350: ' + projectorFor('close').D);
+  //  인자 없는 makeProjector 의 기본값도 가까이
+  assert.equal(makeProjector().near, PERSPECTIVE.close.near);
 });
 
 test('V3-PROJECT flat: near = far = 1 이면 종전 평면 변환과 항등(y = LINE_Y − d, x·s 그대로) · unproject(project(x, 0)) = x', () => {
@@ -99,18 +105,21 @@ test('V3-PROJECT flat: near = far = 1 이면 종전 평면 변환과 항등(y = 
     }
     assert.equal(F.dOf(LINE_Y - d), d);
   }
-  for (const mode of ['standard', 'close', 'flat']) {
+  for (const mode of ['close', 'flat']) {
     const P = projectorFor(mode);
     for (const x of [80, 120, 240, 300, 400]) assert.ok(Math.abs(P.unproject(P.project(x, 0).x) - x) < 1e-9, mode + ' unproject @' + x);
     //  화면 중앙은 언제나 트랙 중앙
     assert.equal(P.unproject(CX), CX);
   }
-  //  모드 선택: flat 이 가까이보다 우선, 기본은 표준. 인스턴스는 모드마다 하나
-  assert.equal(projectorMode({}), 'standard');
-  assert.equal(projectorMode({ zoom: true }), 'close');
-  assert.equal(projectorMode({ zoom: true, flat: true }), 'flat');
-  assert.equal(projectorFor('standard'), projectorFor('standard'));
-  assert.equal(projectorFor('nope'), projectorFor('standard'), '모르는 모드는 표준');
+  //  모드 선택(r4.1): flat(개발 대조)이 우선, 기본은 가까이. 옛 셸 값 zoom 은 보지 않는다. 인스턴스는 모드마다 하나
+  assert.equal(projectorMode(), 'close');
+  assert.equal(projectorMode({}), 'close');
+  assert.equal(projectorMode({ flat: true }), 'flat');
+  assert.equal(projectorMode({ zoom: false }), 'close', '옛 zoom 값(꺼짐)이 넘어와도 가까이');
+  assert.equal(projectorFor('close'), projectorFor('close'));
+  assert.notEqual(projectorFor('flat'), projectorFor('close'));
+  assert.equal(projectorFor('nope'), projectorFor('close'), '모르는 모드는 가까이');
+  assert.equal(projectorFor('standard'), projectorFor('close'), '지운 표준 이름도 가까이로 대체');
 });
 
 test('V3-PROJECT 렌더: HUD 글 위치 불변 · 게이트 값 글자 크기 하한 15px · 캔버스 변환(scale) 없이 그린다 · flat 과 원근의 그리기 호출 수가 같다', () => {
@@ -118,16 +127,17 @@ test('V3-PROJECT 렌더: HUD 글 위치 불변 · 게이트 값 글자 크기 �
   const run = runS2(1);
   while (run.gateRows[0].z - run.z > 620) { stepRun(run, { pointerX: 240, dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); }
   const d0 = run.gateRows[0].z - run.z;
-  const P = projectorFor('standard');
-  const persp = drawWith(run), flat = drawWith(run, { flat: true }), close = drawWith(run, { zoom: true });
+  //  r4.1: 기본 그리기 = 가까이 투영(표준·토글 삭제) — 기대값은 같은 투영기로 계산한다
+  const P = projectorFor('close');
+  const persp = drawWith(run), flat = drawWith(run, { flat: true });
   //  ① HUD 제목·남은 거리·칩은 투영 밖(화면 좌표 그대로)
-  for (const ops of [persp, flat, close]) {
+  for (const ops of [persp, flat]) {
     const title = ops.find((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
     assert.ok(title && title.args[1] === HUD_ROW.left && title.args[2] === HUD_ROW.cy, 'HUD 제목 자리 불변');
     const dist = ops.find((o) => o.op === 'fillText' && String(o.args[0]).startsWith('남은 거리'));
     assert.ok(dist && dist.args[2] === HUD_ROW.distCy, '남은 거리 자리 불변');
   }
-  //  ② 게이트 값 글자: 38·s(d) — 표준 원근의 위 끝 배율 0.72 라 가장 멀어도 27px(하한 15 위)이고 평면 38px 보다 작다 = 실제로 줄었다
+  //  ② 게이트 값 글자: 38·s(d) — 가까이의 위 끝 배율 0.6 이라 가장 멀어도 22.8px(하한 15 위)이고 평면 38px 보다 작다 = 실제로 줄었다
   for (const c of run.gateRows[0].cells) {
     const label = gateLabel(c.value);
     const op = persp.find((o) => o.op === 'fillText' && o.args[0] === label);
@@ -154,14 +164,13 @@ test('V3-PROJECT 렌더: HUD 글 위치 불변 · 게이트 값 글자 크기 �
   assert.equal(fontPx(durFlat), 16, 'flat 에서는 종전 16px');
   //  ③ 균일 확대(r3.19 의 translate/scale/translate — 배경보다 먼저 장면 전체를 감쌌다)는 더 이상 쓰지 않는다: 첫 그리기(배경 fillRect) 앞에 scale 이 없다.
   //     남은 scale 은 자물쇠 배지 안(save 다음)뿐이다. (재기준 2026-09-20: 종전 'scale ≤ sMax' 는 sMax 1.5 · 가까이 배지 1.4·s 에서 뜻이 안 맞는다)
-  for (const ops of [persp, close]) {
+  for (const ops of [persp]) {
     const first = ops.findIndex((o) => o.op === 'fillRect');
     assert.ok(first >= 0 && !ops.slice(0, first).some((o) => o.op === 'scale'), '장면 전체를 감싸는 균일 확대 변환 없음');
     ops.forEach((o, i) => { if (o.op === 'scale') assert.ok(ops.slice(Math.max(0, i - 2), i).some((q) => q.op === 'save'), 'scale 은 save 안(자물쇠 배지)에서만'); });
   }
-  //  ④ 같은 프레임을 flat/표준/가까이로 그리면 호출 수가 같다(화면 밖 판정이 평면 d 기준이라 같은 물체 집합)
-  assert.equal(persp.length, flat.length, 'flat 과 원근의 ops 수');
-  assert.equal(close.length, flat.length, 'flat 과 가까이의 ops 수');
+  //  ④ 같은 프레임을 flat/가까이로 그리면 호출 수가 같다(화면 밖 판정이 평면 d 기준이라 같은 물체 집합)
+  assert.equal(persp.length, flat.length, 'flat 과 원근(가까이)의 ops 수');
   //  ⑤ 그리기 순서(가림) 유지: 배경 → 게이트 → 부대 → HUD
   const idx = (ops, pred) => ops.findIndex(pred);
   const iGate = idx(persp, (o) => o.op === 'fillText' && o.args[0] === gateLabel(run.gateRows[0].cells[0].value));
@@ -170,7 +179,7 @@ test('V3-PROJECT 렌더: HUD 글 위치 불변 · 게이트 값 글자 크기 �
   assert.ok(iGate > 0 && iGate < iCount && iCount < iTitle, '게이트 → 부대 → HUD 순서: ' + [iGate, iCount, iTitle]);
 });
 
-test('V3-PROJECT 렌더: 부대(히어로)는 부대 줄 배율(near)로 그려지고, 가까이 모드에서 더 크다 · 그리기는 run 을 건드리지 않는다', () => {
+test('V3-PROJECT 렌더: 부대(히어로)는 부대 줄 배율(near)로 그려지고, 기본(가까이)에서 46 × 1.8 · 옛 zoom 값은 무시 · 그리기는 run 을 건드리지 않는다', () => {
   const run = runS2(120, 180);
   const snap = JSON.stringify({ x: run.x, z: run.z, units: run.units.length, bullets: run.bullets.length });
   const S = BAL3.squad;
@@ -184,10 +193,11 @@ test('V3-PROJECT 렌더: 부대(히어로)는 부대 줄 배율(near)로 그려�
     }
     return null;
   };
-  const hs = heroSize(drawWith(run)), hf = heroSize(drawWith(run, { flat: true })), hc = heroSize(drawWith(run, { zoom: true }));
+  const hs = heroSize(drawWith(run)), hf = heroSize(drawWith(run, { flat: true })), hz = heroSize(drawWith(run, { zoom: false }));
   assert.ok(Math.abs(hf - S.heroSize) < 1e-9, 'flat: 히어로 46');
-  assert.ok(Math.abs(hs - S.heroSize * PERSPECTIVE.standard.near) < 1e-9, '표준: 히어로 46 × 1.45 = ' + hs);
-  assert.ok(Math.abs(hc - S.heroSize * PERSPECTIVE.close.near) < 1e-9, '가까이: 히어로 46 × 1.8 = ' + hc);
+  assert.ok(Math.abs(hs - S.heroSize * PERSPECTIVE.close.near) < 1e-9, '기본(가까이): 히어로 46 × 1.8 = ' + hs);
+  //  r4.1: 렌더는 view.zoom 을 읽지 않는다 — 옛 셸 값(꺼짐)이 넘어와도 가까이로 그린다
+  assert.equal(hz, hs, '옛 zoom:false 도 가까이: ' + hz);
   assert.equal(JSON.stringify({ x: run.x, z: run.z, units: run.units.length, bullets: run.bullets.length }), snap, '그리기는 run 을 건드리지 않는다');
   //  같은 입력열 두 판 = 같은 결과(투영은 셸·렌더 값이라 규칙에 없다)
   const a = runS2(600, 150), b = runS2(600, 150);
@@ -196,7 +206,10 @@ test('V3-PROJECT 렌더: 부대(히어로)는 부대 줄 배율(near)로 그려�
 
 //  수정 라운드 2(2026-09-20, 대항 검수 Important): 뒷줄 넘침은 150명의 예외가 아니라 보통 상황이었다 — 뒷줄 병사 밑변이 H(800)를 넘는 최소 인원이
 //   표준 59명·가까이 40명(평면 143명). 뒤쪽 갈래를 '배율 near·간격 평면' 으로 바꾼 뒤의 문턱을 숫자로 잠근다(formation() + 투영기, 병사 22·s, 아레나 ay 0).
-test('V3-PROJECT 뒷줄 문턱: 부대 상한(100, r3.21) 안에서는 어느 인원도 뒷줄이 화면을 넘지 않는다 — 넘기 시작하는 인원은 표준 142 · 가까이 142 · 평면 143 으로 상한 밖', () => {
+//   r4.1: 표준 칸 삭제로 가까이·평면 두 모드만 잠근다(삭제 전 표준도 142 였다).
+//   ⚠️이 문턱은 부대가 기준선(아레나 ay 0)에 있을 때 값이다. 광장 맨 아래(ay +40)에서는 '가까이' **60명**부터 뒷줄 밑변이 화면(800)을 넘는다
+//     (종전 표준 83명 — 기획 v4.1 3-1. 24번 광장 진입 82명이 걸린다). 그림 문제라 규칙·봇 성적과 무관하며 캡처로 확인할 항목이다(여기서 잠그지 않음).
+test('V3-PROJECT 뒷줄 문턱: 부대 상한(100, r3.21) 안에서는 어느 인원도 뒷줄이 화면을 넘지 않는다 — 넘기 시작하는 인원은 가까이 142 · 평면 143 으로 상한 밖', () => {
   const H = BAL3.view.h, soldier = BAL3.squad.soldierSize;
   const threshold = (mode) => {
     const P = projectorFor(mode);
@@ -209,18 +222,17 @@ test('V3-PROJECT 뒷줄 문턱: 부대 상한(100, r3.21) 안에서는 어느 �
     }
     return null;
   };
-  const std = threshold('standard'), close = threshold('close'), flat = threshold('flat');
-  assert.deepEqual({ n: std.n, maxDy: std.maxDy, y: std.y, s: std.s }, { n: 142, maxDy: 145, y: 785, s: 1.45 }, '표준: ' + JSON.stringify(std));
+  const close = threshold('close'), flat = threshold('flat');
   assert.deepEqual({ n: close.n, maxDy: close.maxDy, y: close.y, s: close.s }, { n: 142, maxDy: 145, y: 785, s: 1.8 }, '가까이: ' + JSON.stringify(close));
   assert.deepEqual({ n: flat.n, maxDy: flat.maxDy, y: flat.y }, { n: 143, maxDy: 153, y: 793 }, '평면: ' + JSON.stringify(flat));
-  //  r3.21 부대 상한 100: 문턱(142·142·143)이 상한 밖이므로 **실제 플레이에서는 넘는 일이 없다**
-  assert.ok(std.n > BAL3.squad.unitCap && close.n > BAL3.squad.unitCap && flat.n > BAL3.squad.unitCap,
-            '문턱이 부대 상한 ' + BAL3.squad.unitCap + ' 밖: ' + [std.n, close.n, flat.n].join('/'));
-  //  무입력 봇이 8스테이지부터 닿는 60~100명은 세 모드 모두 화면 안(뒷줄 y = 640 + maxDy)
+  //  r3.21 부대 상한 100: 문턱(142·143)이 상한 밖이므로 **도로(ay 0)에서는 넘는 일이 없다**
+  assert.ok(close.n > BAL3.squad.unitCap && flat.n > BAL3.squad.unitCap,
+            '문턱이 부대 상한 ' + BAL3.squad.unitCap + ' 밖: ' + [close.n, flat.n].join('/'));
+  //  무입력 봇이 8스테이지부터 닿는 60~100명은 두 모드 모두 화면 안(뒷줄 y = 640 + maxDy)
   for (const n of [59, 64, 78, 97, 120]) {
     let maxDy = 0;
     for (const u of formation(n)) if (u.dy > maxDy) maxDy = u.dy;
-    for (const mode of ['standard', 'close', 'flat']) {
+    for (const mode of ['close', 'flat']) {
       const q = projectorFor(mode).project(CX, -maxDy);
       assert.ok(q.y + soldier * q.s / 2 <= H, mode + ' ' + n + '명 뒷줄 밑변 ' + (q.y + soldier * q.s / 2).toFixed(1) + ' ≤ 800');
       assert.equal(q.y, LINE_Y + maxDy, mode + ' ' + n + '명 뒷줄 y = 평면');
@@ -233,7 +245,7 @@ test('V3-PROJECT 뒷줄 문턱: 부대 상한(100, r3.21) 안에서는 어느 �
 test('V3-PROJECT 렌더: 병력 수는 부대 중심 마커 옆(히어로 머리 위, 병사와 겹치지 않는 전방 빈 부채꼴) · 오른쪽 끝에서는 왼쪽에', () => {
   const S = BAL3.squad;
   const countOp = (ops, run) => ops.find((o) => o.op === 'fillText' && o.args[0] === String(run.units.length) && o.fill === BAL3.colors.hero);
-  for (const [mode, view] of [['standard', {}], ['close', { zoom: true }], ['flat', { flat: true }]]) {
+  for (const [mode, view] of [['close', {}], ['flat', { flat: true }]]) {
     const P = projectorFor(mode);
     const run = runS2(120, 180);
     const op = countOp(drawWith(run, view), run);
@@ -246,10 +258,10 @@ test('V3-PROJECT 렌더: 병력 수는 부대 중심 마커 옆(히어로 머리
     //  화면 아래 끝(H − 14)에 매달리지 않는다
     assert.ok(op.args[2] < BAL3.view.h - 100, mode + ': 화면 아래 끝이 아님');
   }
-  //  오른쪽 끝: 트랙 x 400(도로 오른쪽 끝)은 표준 화면 472 > COUNT_FLIP_X(410) → 왼쪽에 쓴다
+  //  오른쪽 끝: 트랙 x 400(도로 오른쪽 끝)은 가까이 화면 528 > COUNT_FLIP_X(410) → 왼쪽에 쓴다(r4.1 재기준 — 종전 표준 472)
   const runR = runS2(200, 400);
   assert.ok(runR.x > 340, '부대가 오른쪽으로 갔다: ' + runR.x);
-  const P = projectorFor('standard');
+  const P = projectorFor('close');
   const sqR = P.project(runR.x, 0);
   assert.ok(sqR.x > COUNT_FLIP_X, '마커 화면 x ' + sqR.x.toFixed(1) + ' > ' + COUNT_FLIP_X);
   const opR = countOp(drawWith(runR), runR);

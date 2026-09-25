@@ -13,7 +13,8 @@ import { boot, makeFx, onEnemyHit, onEnemyDeath, onBossDeath, onJoin, tickHitFx,
 import { createSave3 } from '../rush3/save.js';
 
 const FX = BAL3.fx;
-const PJ = projectorFor('standard');
+//  r4.1: 기본 보기 = '가까이'(표준 칸 삭제). 이 파일의 PJ 는 검사 안 좌표 함수에만 쓰인다
+const PJ = projectorFor('close');
 //  셸의 sp(x, z) 와 같은 꼴(run.z = 0 으로 둔다)
 const sp = (x, z) => PJ.project(x, z);
 const squad = () => PJ.project(240, 0);

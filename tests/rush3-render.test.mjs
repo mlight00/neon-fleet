@@ -12,8 +12,8 @@ import { GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT
          isFixedGateRow, HUD_BTN } from '../rush3/main.js';
 import { hashSeed } from '../rush/rng.js';
 import { projectorFor, PERSPECTIVE } from '../rush3/project.js';
-//  r3.20: 기본 그리기는 표준 원근이다 — 좌표 기대값은 같은 투영기로 계산한다
-const PJ = projectorFor('standard');
+//  r3.20: 좌표 기대값은 기본 그리기와 같은 투영기로 계산한다. r4.1 재기준: 기본 = '가까이'(표준 칸 삭제)
+const PJ = projectorFor('close');
 
 //  호출 기록 ctx: 호출마다 { op, args, alpha, fill } 을 순서대로 남긴다(save/restore 로 상태도 되돌린다)
 function recCtx() {

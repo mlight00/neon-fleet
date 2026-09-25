@@ -16,20 +16,21 @@
 //   그래서 뒤쪽은 배율만 near 로 키우고 간격은 평면 그대로 둔다: 150명 뒷줄(dy 159)이 평면과 같은 y 799 에 머물고 앞줄만 커진다.
 //   d = 0 에서 y 기울기가 near(앞) → 1(뒤)로 꺾이지만 부대 줄 자체(s = near, y = LINE_Y)는 이어진다.
 //  평면(flat: near === far)은 종전 변환과 항등 — 검사·캡처 대조용(개발 주소 ?flat=1).
+//  r4.1(2026-09-25, 이사 지시 "줌 확대모드를 기본 모드로 하고 일반 모드를 삭제하자"): 표준(near 1.45·far 0.72) 칸을 지우고 '가까이' 하나만 남겼다.
+//   켜고 끄는 토글(Z 키·HUD 칩)도 없다 — 사용자 화면은 언제나 close, flat 은 개발 대조용으로만 남는다(결정 D8).
 import { BAL3 } from './balance.js';
 
 const LINE_Y = BAL3.view.LINE_Y, CX = BAL3.road.center;
 
-//  세 모드(셸 토글 '가까이 ○/●' + 개발용 flat). depth 700 = 화면 위 끝 근처(y ≈ −50~−60)까지가 종전과 비슷한 앞 거리
+//  두 모드(사용자 화면 = close · 개발 대조 = flat). depth 700 = 화면 위 끝 근처(y ≈ −52)까지가 종전과 비슷한 앞 거리
 export const PERSPECTIVE = Object.freeze({
-  standard: Object.freeze({ near: 1.45, far: 0.72, depth: 700 }),
   close:    Object.freeze({ near: 1.8,  far: 0.6,  depth: 700 }),
   flat:     Object.freeze({ near: 1,    far: 1,    depth: 700 }),
   //  가독성 하한(01 §11 "멀리 있는 물체도 선택에 필요한 큰 실루엣·숫자"): 게이트 값·통 내구·표지 글 최소 15px, 게이트 칸 높이 최소 18px
   minFont: 15, minGateH: 18,
 });
 
-export function makeProjector({ near, far, depth, lineY = LINE_Y, cx = CX } = PERSPECTIVE.standard) {
+export function makeProjector({ near, far, depth, lineY = LINE_Y, cx = CX } = PERSPECTIVE.close) {
   const flat = near === far;
   const D = flat ? Infinity : depth / (near / far - 1);
   //  뒤쪽(d < 0)은 배율 near 고정·기울기 1 직선(위 머리말). flat 은 near = 1 이라 두 갈래가 같은 식이다
@@ -47,14 +48,15 @@ export function makeProjector({ near, far, depth, lineY = LINE_Y, cx = CX } = PE
   return Object.freeze({ near, far, depth, D, flat, lineY, cx, s, y, dOf, project, unproject });
 }
 
-//  모드별 인스턴스(한 번만 만든다). 렌더(그리기)와 셸(연출 좌표·마우스 역투영)이 같은 것을 쓴다
+//  모드별 인스턴스(한 번만 만든다). 렌더(그리기)와 셸(연출 좌표·마우스 역투영)이 같은 것을 쓴다.
+//   모르는 모드(지운 'standard' 포함)는 기본 'close' 로 대체한다
 const CACHE = {};
 export function projectorFor(mode) {
-  const m = PERSPECTIVE[mode] ? mode : 'standard';
+  const m = mode === 'close' || mode === 'flat' ? mode : 'close';
   return CACHE[m] || (CACHE[m] = makeProjector(PERSPECTIVE[m]));
 }
 
-//  셸 상태 → 모드 이름. flat(개발 대조) > zoom(가까이) > 표준
-export function projectorMode({ flat = false, zoom = false } = {}) {
-  return flat ? 'flat' : zoom ? 'close' : 'standard';
+//  셸 상태 → 모드 이름. flat(개발 대조, ?flat=1) > 기본 close(r4.1 — zoom 토글 삭제)
+export function projectorMode({ flat = false } = {}) {
+  return flat ? 'flat' : 'close';
 }

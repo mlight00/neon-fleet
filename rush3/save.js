@@ -102,6 +102,8 @@ function mergeStage(cur, inc) {
 const PICK_DEFAULT = 'brutal';
 //  seenShutter = 첫 셔터 조우 배너를 이미 본 적이 있는가(계약서 6장 N2-⑥). 판이 아니라 **사용자당 1회**라 저장에 남는다
 //  seenVehicle(r3.13) = 첫 차량 통 조우 배너를 본 적이 있는가 — seenShutter 와 같은 꼴(사용자당 1회). 스키마 v 는 3 그대로(빠진 키는 기본값)
+//  zoom = 종전 '가까이' 토글 자리. r4.1(2026-09-25)에서 보기가 '가까이' 하나로 고정돼 **읽지 않는다**(normalize 가 옛 값을 옮기지 않아 늘 false).
+//   칸은 형식 호환용으로만 남긴다 — 옛 저장에 true 가 있어도 해가 없다
 function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false, zoom: false }; }
 //  전체 정규화(형식이 맞는 원문에만 적용)
 function normalize(d) {
@@ -114,8 +116,6 @@ function normalize(d) {
   out.mute = d.mute === true;
   out.seenShutter = d.seenShutter === true;
   out.seenVehicle = d.seenVehicle === true;
-  //  확대 보기 토글(화면 전용 취향, 2026-09-19). 없던 저장은 false
-  out.zoom = d.zoom === true;
   return out;
 }
 

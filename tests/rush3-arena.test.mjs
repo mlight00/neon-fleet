@@ -14,8 +14,9 @@ import { createInput, isSteerKey } from '../rush3/input.js';
 import { createRenderer3 } from '../rush3/render.js';
 import { boot, ARENA_GUIDE_TEXT } from '../rush3/main.js';
 import { projectorFor } from '../rush3/project.js';
-//  r3.20 검수 반영(2026-09-20): 셸의 세로 드래그(dragDy)도 부대 줄 기울기 near 로 나눈다 — 화면 −100 논리 px = −100/1.45 트랙 px
-const NEAR = projectorFor('standard').near;
+//  r3.20 검수 반영(2026-09-20): 셸의 세로 드래그(dragDy)도 부대 줄 기울기 near 로 나눈다 — 화면 −100 논리 px = −100/near 트랙 px
+//   r4.1 재기준: 셸 기본 보기 = '가까이'(near 1.8, 종전 표준 1.45) → −100/1.8 ≈ −55.6 트랙 px
+const NEAR = projectorFor('close').near;
 import { createSave3 } from '../rush3/save.js';
 import { pickX, pickInput, botArena } from './lib/rush3-policies.mjs';
 

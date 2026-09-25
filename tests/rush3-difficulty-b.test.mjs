@@ -11,7 +11,7 @@ import { buildStage, ALL_STAGE_IDS, STAGE_IDS, MAX_DY, DEFS } from '../rush3/sta
 import { COURSE_IDS, gainFor } from '../rush3/courses.js';
 import { createRun, stepRun, drainEvents, enemyDefsFor, STEP } from '../rush3/combat.js';
 import { SQUAD_DEFAULTS, formation } from '../rush3/squad.js';
-import { createRenderer3, ZOOM, HUD_ROW, HP_TAG_MIN_Y } from '../rush3/render.js';
+import { createRenderer3, HUD_ROW, HP_TAG_MIN_Y } from '../rush3/render.js';
 import { projectorFor } from '../rush3/project.js';
 import { playPolicy } from './lib/rush3-policies.mjs';
 
@@ -328,8 +328,8 @@ test('V3-DIFFB DB-9: 렌더 — hpMax > 2 인 적만 남은 체력 정수를 **�
   const { ctx, ops } = recCtx();
   createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true });
   const texts = ops.filter((o) => o.op === 'fillText');
-  //  기대 자리: 투영(표준) 그대로 — x 는 투영 x(트랙 x 가 아니다), y 는 적 아래 y + r·k + 16k, 글자 max(12, 16k)
-  const P = projectorFor('standard');
+  //  기대 자리: 투영(가까이 — r4.1 에서 기본·유일한 보기) 그대로 — x 는 투영 x(트랙 x 가 아니다), y 는 적 아래 y + r·k + 16k, 글자 max(12, 16k)
+  const P = projectorFor('close');
   const qa = P.project(a.x, DZ), k = qa.s;
   const fsExp = Math.max(12, 16 * k);
   const t7 = texts.find((o) => o.args[0] === '7');
@@ -356,47 +356,48 @@ test('V3-DIFFB DB-9: 렌더 — hpMax > 2 인 적만 남은 체력 정수를 **�
 });
 
 //  숫자를 적 아래에 둔 뒤의 규약 두 가지: ① 부대를 지나친 적은 생략(부대 발밑 병력 수 옆에 뜬다) ② HUD 줄과 겹치지 않는다
-function hpTexts(run, zoom = false) {
+function hpTexts(run) {
   const { ctx, ops } = recCtx();
-  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true, zoom });
+  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true });
   return ops.filter((o) => o.op === 'fillText' && /^\d+$/.test(String(o.args[0])) && o.fill === BAL3.colors.bulletHeavy);
 }
-test('V3-DIFFB DB-9b: 체력 숫자는 지나친 적·HUD 띠에서 생략하고 그 아래에서만 그린다 — 임계 거리는 투영에서 직접 구한다(표준·가까이)', () => {
+test('V3-DIFFB DB-9b: 체력 숫자는 지나친 적·HUD 띠에서 생략하고 그 아래에서만 그린다 — 임계 거리는 투영에서 직접 구한다(가까이)', () => {
   //  ⚠️r3.20 원근 화해(2026-09-21) 실측: 숫자를 적 아래로 옮겨도 **먼 구간**에서는 HUD 띠(y < HP_TAG_MIN_Y)를 지난다
   //   (표준 dz 491~647 · 가까이 469~646). 그래서 B안 대항 검수 ① 의 '생략' 은 그대로 살리고 판정만 투영 y 로 재유도했다.
-  assert.equal(HP_TAG_MIN_Y, ZOOM.chip.y + ZOOM.chip.h + 18);
-  assert.ok(HP_TAG_MIN_Y > HUD_ROW.distCy && HP_TAG_MIN_Y > ZOOM.chip.y + ZOOM.chip.h, 'HUD 줄·가까이 칩 아래');
+  //  r4.1: '가까이' 칩이 없어져 경계선을 칩 위치 계산(84 + 26 + 18) 대신 **숫자 128 로 고정**했다(같은 값 — 생략 구간 불변)
+  assert.equal(HP_TAG_MIN_Y, 128);
+  assert.ok(HP_TAG_MIN_Y > HUD_ROW.distCy, 'HUD 줄(남은 거리 ' + HUD_ROW.distCy + ') 아래');
   const mk = (dz) => {
     const run = createRun(synth({ startUnits: 3, spawns: [{ z: 0, kind: 'grunt', n: 1, xs: [240], zs: [1200], hp: 40 }] }));
     play(run, STEP);
     const e = run.enemies[0]; e.z = run.z + dz; e.pz = e.z;
     return run;
   };
-  //  ① 지나친 적(dz < 0)은 어느 모드에서도 생략 — 종전에는 부대 발밑 병력 수 옆에 숫자가 떴다
+  //  ① 지나친 적(dz < 0)은 생략 — 종전에는 부대 발밑 병력 수 옆에 숫자가 떴다
   assert.equal(hpTexts(mk(-60)).length, 0, '지나친 적');
-  assert.equal(hpTexts(mk(-60), true).length, 0, '지나친 적(가까이)');
   //  r3.31: 적 반지름은 체력 비례로 커진다(체력 40 → r 14 × sizeByHp) — 숫자 자리는 **실제 반지름**으로 구한다
   const R = mk(0).enemies[0].r;
   const tagY = (P, dz) => { const q = P.project(240, dz); return q.y + R * q.s + 16 * q.s; };
-  for (const [mode, zoom] of [['standard', false], ['close', true]]) {
+  //  r4.1: 표준 칸 삭제 — 기본 그리기(가까이) 하나만 확인한다
+  for (const mode of ['close']) {
     const P = projectorFor(mode);
     //  임계 dz: 숫자 y 가 HP_TAG_MIN_Y 아래로 내려오는 첫 거리(1px 단위로 찾는다 — 매핑이 바뀌면 이 값도 같이 움직인다)
     let dzEdge = null;
     for (let dz = 0; dz <= 900; dz++) if (tagY(P, dz) >= HP_TAG_MIN_Y) dzEdge = dz;
     assert.ok(dzEdge !== null && dzEdge > 200, mode + ' 임계 거리');
     //  바로 안쪽은 그리고, 바로 바깥(더 먼 쪽)은 생략
-    const inside = hpTexts(mk(dzEdge), zoom);
+    const inside = hpTexts(mk(dzEdge));
     assert.equal(inside.length, 1, mode + ' dz ' + dzEdge + ' 표시');
     assert.ok(inside[0].args[2] >= HP_TAG_MIN_Y, mode + ' 숫자 y ' + inside[0].args[2].toFixed(1) + ' ≥ ' + HP_TAG_MIN_Y);
-    assert.equal(hpTexts(mk(dzEdge + 2), zoom).length, 0, mode + ' dz ' + (dzEdge + 2) + ' 는 HUD 띠라 생략');
+    assert.equal(hpTexts(mk(dzEdge + 2)).length, 0, mode + ' dz ' + (dzEdge + 2) + ' 는 HUD 띠라 생략');
     //  HUD 띠 한가운데(숫자 y 가 0~128 인 거리)도 생략 — 겹침이 실제로 사라졌다
     let banded = null;
     for (let dz = 0; dz <= 900; dz++) { const ty = tagY(P, dz); if (ty >= 0 && ty < HP_TAG_MIN_Y) { banded = dz; break; } }
     assert.ok(banded !== null, mode + ' 띠 구간 존재');
-    assert.equal(hpTexts(mk(banded), zoom).length, 0, mode + ' dz ' + banded + '(숫자 y ' + tagY(P, banded).toFixed(0) + ') 생략');
+    assert.equal(hpTexts(mk(banded)).length, 0, mode + ' dz ' + banded + '(숫자 y ' + tagY(P, banded).toFixed(0) + ') 생략');
     //  가까운 거리들은 전부 표시 + 자리는 언제나 적 아래 + 12px 하한
     for (const dz of [0, 100, 300]) {
-      const t = hpTexts(mk(dz), zoom);
+      const t = hpTexts(mk(dz));
       assert.equal(t.length, 1, mode + ' dz ' + dz + ' 표시');
       const q = P.project(240, dz);
       assert.ok(Math.abs(t[0].args[1] - q.x) < 1e-6, mode + ' 투영 x');

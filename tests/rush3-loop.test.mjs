@@ -2,7 +2,6 @@
 import { test } from 'node:test';
 import { pickInput } from './lib/rush3-policies.mjs';
 import assert from 'node:assert/strict';
-import { ZOOM } from '../rush3/render.js';
 import { projectorFor } from '../rush3/project.js';
 import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine, DIFF_TOGGLE, normDifficulty,
          emptyLotteryOutcome, GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
@@ -390,8 +389,11 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   canvas.fire('pointerdown', { clientX: 200, clientY: 300, pointerType: 'touch', pointerId: 1 });
   frames(1);
   assert.ok(Math.abs(app.getRun().tx - x0) < 5, '터치 시작만으로 tx 가 튀지 않음: ' + app.getRun().tx);
-  //  r3.20 검수 반영 재기준: 터치 드래그도 부대 줄 역투영(1/near)을 거친다 — 손가락 +30 CSS = +60 화면 논리 px = +60/1.45 ≈ +41.4 트랙 px(손가락과 부대 1:1)
-  const NEAR = projectorFor('standard').near;
+  //  r3.20 검수 반영 재기준: 터치 드래그도 부대 줄 역투영(1/near)을 거친다 — 손가락 +30 CSS = +60 화면 논리 px = +60/near 트랙 px(손가락과 부대 1:1)
+  //   r4.1 재기준: 셸 기본 보기 = '가까이'(near 1.8) → +60/1.8 ≈ +33.3 트랙 px
+  const NEAR = projectorFor('close').near;
+  assert.equal(NEAR, 1.8, '셸 기본 투영 = 가까이');
+  assert.equal(app.dbg().perspective, 'close', '출격 중 보기 = 가까이(r4.1 — 토글 없음)');
   canvas.fire('pointermove', { clientX: 230, clientY: 300, pointerType: 'touch', pointerId: 1 });
   frames(1);
   assert.ok(Math.abs(app.getRun().tx - (x0 + 60 / NEAR)) < 1e-6, '드래그 +30 CSS px = +60 화면 px = +60/near 트랙 px 만큼 tx 증가: ' + app.getRun().tx + ' 기대=' + (x0 + 60 / NEAR));
@@ -510,7 +512,8 @@ test('V3-INPUT-SWITCH: 브라우저 자동반복 keydown 은 마우스 목표를
   assert.equal(app.input.state.keyDir, 1);
   //  키를 누른 채 마우스를 움직이면 마우스가 이긴다
   //  r3.20 원근: 마우스 절대 x(화면 160)는 부대 줄(배율 near)의 역투영으로 트랙 x 가 된다(중앙 240 은 그대로)
-  const mx = projectorFor('standard').unproject(160);
+  //   r4.1 재기준: 기본 보기 '가까이' → 240 + (160 − 240)/1.8 ≈ 195.6
+  const mx = projectorFor('close').unproject(160);
   canvas.fire('pointermove', { clientX: 80, clientY: 200, pointerType: 'mouse', pointerId: 1 });
   assert.equal(app.input.state.pointerX, mx);
   assert.equal(app.input.state.keyDir, 0);
@@ -1034,33 +1037,4 @@ test('V3-SHELL-RESULT-LAYOUT: 랜덤 길이 없는 판(대조군)은 부연이 �
   assert.equal(buttonBoxOf(ops, '다시 도전').top, 480);
   assert.equal(buttonBoxOf(ops, '다음 작전').top, 548, '기본 자리');
   assert.equal(buttonBoxOf(ops, '스테이지 선택').top, 620, '기본 자리');
-});
-
-//  r3.20: 확대 보기 → '가까이' 토글(원근 강도). 저장 필드 zoom 은 그대로, 칩 글자만 '가까이 ○/●'
-test('V3-ZOOM 셸: 가까이 토글은 출격 중 Z 키·HUD 칩으로 켜고 끄며 저장(zoom)에 기억되고, 타이틀에서는 Z 가 무시된다', async () => {
-  const { app, canvas, win, frames, save, texts } = await bootFake();
-  frames(2);
-  assert.equal(app.getZoom(), false, '저장 없는 첫 부팅 = 꺼짐');
-  win.fire('keydown', { code: 'KeyZ' });
-  assert.equal(app.getZoom(), false, '타이틀에서는 Z 무시');
-  tapStage1(canvas);
-  assert.equal(app.getState(), 'run');
-  win.fire('keydown', { code: 'KeyZ' });
-  assert.equal(app.getZoom(), true, 'Z 로 켜짐');
-  assert.equal(save.get().zoom, true, '저장에 기억');
-  frames(1);
-  assert.ok(texts.includes(ZOOM.label.on), 'HUD 칩이 켜짐 표시: ' + JSON.stringify(texts.filter((t) => t.startsWith('가까이'))));
-  assert.equal(ZOOM.label.on, '가까이 ●'); assert.equal(ZOOM.label.off, '가까이 ○');
-  assert.equal(app.dbg().perspective, 'close', '켜짐 = 가까이 투영');
-  //  HUD 칩 클릭(논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율) → 꺼짐
-  canvas.fire('pointerdown', { clientX: (ZOOM.chip.x + ZOOM.chip.w / 2) / 2, clientY: (ZOOM.chip.y + ZOOM.chip.h / 2) / 2, pointerType: 'mouse' });
-  assert.equal(app.getZoom(), false, '칩 클릭으로 꺼짐');
-  assert.equal(save.get().zoom, false);
-  assert.equal(app.dbg().perspective, 'standard', '꺼짐 = 표준 원근');
-  assert.equal(app.getState(), 'run', '칩 클릭은 조향·일시정지가 아니다');
-  //  다시 켜고 일시정지해도 켜진 채 — 재부팅 시 저장값으로 시작
-  win.fire('keydown', { code: 'KeyZ' });
-  win.fire('keydown', { code: 'Escape' });
-  assert.equal(app.getState(), 'paused');
-  assert.equal(app.getZoom(), true);
 });

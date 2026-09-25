@@ -56,17 +56,15 @@ const HUD_WEAPON = hudBoxOf(122, HUD_PAUSE.x - HUD_GAP);
 const HUD_DIFF = hudBoxOf(64, HUD_WEAPON.x - HUD_GAP);
 //  무기 강화 단계 표기(r3.10). Mk I 은 표기 없음
 export const MK_LABEL = Object.freeze(['', '', ' II', ' III']);
-//  '가까이' 토글(r3.20 — r3.19 의 확대 보기(균일 k 배)를 **원근 강도 토글**로 대체): 화면 전용. 규칙은 모르는 값이다.
-//  꺼짐 = 표준 원근(near 1.45·far 0.72) · 켜짐 = 가까이(near 1.8·far 0.6) — 앞은 그대로 보이고 부대만 더 크다(PERSPECTIVE, project.js).
-//  chip = HUD 왼쪽 셋째 줄의 토글 상자(셸이 버튼으로 넘기고 drawButtons 가 그린다). 저장 필드 zoom(save.js)은 그대로 재사용(뜻만 바뀜).
-export const ZOOM = Object.freeze({ chip: Object.freeze({ x: 16, y: 84, w: 70, h: 26 }), label: Object.freeze({ off: '가까이 ○', on: '가까이 ●' }) });
+//  r4.1(2026-09-25): '가까이 ○/●' 토글 칩(종전 ZOOM, HUD 왼쪽 셋째 줄 {x16, y84, w70, h26})을 지웠다 — 보기는 '가까이' 하나뿐(project.js).
 
 //  탄 그림의 화면 길이(px, Mk I 기준). 무기마다 실루엣이 달라 길이도 다르게: 저격 바늘이 가장 길고 산탄 펠릿 뭉치는 짧고 넓다
 export const BULLET_LEN = Object.freeze({ rifle: 24, auto: 26, heavy: 34, scatter: 22, sniper: 48, arc: 34 });
 //  탄의 진행 방향(라디안, 0 = 화면 위). vx 가 있는 탄(산탄 부채꼴·아레나 자동 조준)은 그 방향으로 그림을 돌린다
-//  체력 숫자를 생략하는 화면 위 띠: HUD 줄(제목·남은 거리·난이도/무기/가까이 칩) 아래 선.
+//  체력 숫자를 생략하는 화면 위 띠: HUD 줄(제목·남은 거리·난이도/무기 칩) 아래 선.
+//  r4.1: 종전에는 '가까이' 칩 아래(칩 y 84 + 높이 26 + 여백 18 = 128)로 계산했는데 칩이 없어져 **숫자 128 로 고정**한다(같은 값 — 생략 구간 불변).
 //  ⚠️원근에서는 그리는 y 가 곧 화면 y 다(균일 확대 변환 없음) — 되돌릴 배율이 없다
-export const HP_TAG_MIN_Y = ZOOM.chip.y + ZOOM.chip.h + 18;
+export const HP_TAG_MIN_Y = 128;
 
 //  손맛(r3.24): 적 종류 → 피격·사망 반응 역할. skin(역할 그림)이 우선이고 없으면 kind. 정예·아레나 보스 = 'elite'.
 //   셸(main.js)과 렌더가 같은 함수를 쓴다 — 셸이 만든 반응과 그리는 반응이 갈라지지 않게 판정식은 여기 한 곳
@@ -181,9 +179,9 @@ export function createRenderer3(ctx, sprites) {
   }
 
   //  ── 원근 투영(r3.20) ─────────────────────────────────────────────────────────────────────────────────────────
-  //  P = 이번 프레임의 투영기(draw 가 view.flat/view.zoom 으로 고른다). 세계 물체는 전부 P.project(x, d) 한 곳을 지나 화면에 오른다.
+  //  P = 이번 프레임의 투영기(draw 가 view.flat 으로 고른다 — 기본 '가까이', r4.1). 세계 물체는 전부 P.project(x, d) 한 곳을 지나 화면에 오른다.
   //   d = z − run.z(부대 기준선 앞 거리). 규칙 좌표(x, z)는 한 줄도 바뀌지 않는다 — 바뀌는 것은 화면에 찍히는 자리와 크기뿐.
-  let P = projectorFor('standard');
+  let P = projectorFor('close');
   const pj = (x, d) => P.project(x, d);
   //  화면 밖 판정은 **평면 기준 d** 로 한다(y < −m ⇔ d > LINE_Y + m, y > H + m ⇔ d < LINE_Y − H − m) —
   //   원근에서도 같은 물체 집합을 그려 평면과 그리기 호출 수가 같다(검사 V3-PROJECT 렌더). 원근에서 조금 더 밖에 있는 것을 그려도 해가 없다
@@ -931,7 +929,7 @@ export function createRenderer3(ctx, sprites) {
     //   HUD 줄(제목·거리·칩)과 겹친다(B안 대항 검수 Important #1). 아래 두기가 그 겹침을 구조적으로 없앤다.
     //   hpMax 가 없는 적(검사 합성)은 hp 로 대신 본다
     //   ⚠️부대를 지나친 적(e.z < run.z — 멈춰 선 저격수 등)은 숫자를 그리지 않는다: 부대 발밑 병력 수 옆에 뜬다(B안 대항 검수 ① 덤)
-    //   ⚠️아래에 두어도 **먼 구간**(표준 dz 491~647 · 가까이 469~646 실측)에서는 숫자가 HUD 띠에 들어온다 → 그 띠에서는 생략한다.
+    //   ⚠️아래에 두어도 **먼 구간**(가까이 dz 469~646 실측 · r4.1 에서 지운 표준은 491~647)에서는 숫자가 HUD 띠에 들어온다 → 그 띠에서는 생략한다.
     //    클램프가 아니라 생략인 이유: 끌어내리면 숫자가 다른 적 그림 위에 얹힌다(B안 대항 검수 ① 처방 그대로, 판정만 투영 y 로 재유도)
     if ((e.hpMax ?? e.hp) > 2 && e.z >= run.z) {
       const ty = y + r + 16 * k;
@@ -1811,7 +1809,7 @@ export function createRenderer3(ctx, sprites) {
     const arena = run.phase === 'arena' && run.arena
       ? { w: run.arena.w, depth: run.arena.depth, k: 1 - Math.max(0, Math.min(1, (fx.arenaOpen ?? 0) / (FX.arenaOpenSec || 0.6))) }
       : null;
-    //  원근(r3.20): 세계 그리기(배경~연출)는 전부 P(draw 가 view.flat/zoom 으로 골라 둔 투영기)를 지난다. 캔버스 변환(translate/scale)은 쓰지 않는다 —
+    //  원근(r3.20): 세계 그리기(배경~연출)는 전부 P(draw 가 view.flat 으로 골라 둔 투영기)를 지난다. 캔버스 변환(translate/scale)은 쓰지 않는다 —
     //   HUD·배너·버튼은 종전대로 마지막에 화면 좌표로. 그리기 순서(가림)는 r3.19 와 같다
     drawBackground(run.z, Math.max(0, (run.bg || 1) - 1), arena);
     drawWalls(run);
@@ -1847,8 +1845,8 @@ export function createRenderer3(ctx, sprites) {
 
   function draw(view) {
     const fx = view.fx;
-    //  이번 프레임의 투영기: ?flat=1(개발 대조) > 가까이 토글(view.zoom) > 표준. 타이틀 배경도 같은 투영으로 그린다
-    P = projectorFor(projectorMode({ flat: !!view.flat, zoom: !!view.zoom }));
+    //  이번 프레임의 투영기: ?flat=1(개발 대조) > 기본 '가까이'(r4.1 — 표준·토글 삭제). 타이틀 배경도 같은 투영으로 그린다
+    P = projectorFor(projectorMode({ flat: !!view.flat }));
     const shaking = view.state === 'run' && fx && fx.shakeT > 0;
     ctx.save();
     ctx.clearRect(0, 0, W, H);
