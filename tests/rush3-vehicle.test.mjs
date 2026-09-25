@@ -12,6 +12,7 @@ import { playPolicy } from './lib/rush3-policies.mjs';
 import { createRenderer3 } from '../rush3/render.js';
 import { boot, VEHICLE_GUIDE_TEXT, SHUTTER_GUIDE_TEXT } from '../rush3/main.js';
 import { createSave3 } from '../rush3/save.js';
+import { seedOldClears } from './lib/rush3-unlock.mjs';
 
 const R = BAL3.supply.r;
 const IN = { pointerX: 240, dragDx: 0, keyDir: 0 };
@@ -418,6 +419,8 @@ async function bootFake(storage = fakeStorage()) {
   const queue = [];
   let nowMs = 1000;
   const save = createSave3(storage);
+  //  r4.3 순차 해금: 빈 저장은 1번만 열린다 — 이 하네스는 '옛 저장에 1~5번 클리어 기록이 있는 사용자'로 시작한다(검사하는 판 6 은 비워 둔다 — 그 판의 옛 칸 단언 보존)(옛 버전 칸 — 화면·코인 무영향, tests/lib/rush3-unlock.mjs)
+  seedOldClears(save, 5);
   const app = boot(fakeCanvas(), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio: fakeAudio(), sprites: { get: () => null, ready: new Set() } });
   await app.ready;
   const frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };

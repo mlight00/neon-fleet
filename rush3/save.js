@@ -6,6 +6,8 @@
 //   r4.2(난이도 선택 삭제): 게임 화면은 늘 `${version}:brutal` 칸에 쓴다(종전 새 사용자 기본 선택 = 지옥이라 같은 칸). 옛 보통·어려움 칸('2', '2:hard')은 지우지 않고 보존만 한다.
 //  코스 배치를 고치면(stages.js 의 version 상향) 새 버전 칸에 따로 쌓이므로 옛 기록과 섞이지 않는다. 난이도도 같은 원리로 칸이 갈린다.
 //  구 저장(stages[id] 에 기록이 바로 있던 형식)은 지우지 않고 버전 1 로 귀속시킨다(마이그레이션).
+//  r4.3(v4 ③단계): 코인 지갑은 **별도 키** WALLET_KEY(아래 '지갑'), 복수 탭 확인 표식은 TAB_KEY. v3 키의 형식(v: 3·defaults·normalize)은 그대로다.
+//   읽기 전용(setReadOnly — 먼저 열린 탭이 살아 있을 때)이면 v3 키·지갑 키 모두 쓰지 않는다.
 export const KEY3 = 'starforgeRush.v3';
 export const BAK3 = 'starforgeRush.v3.bak';
 //  접미를 붙이지 않는 기본 난이도(BAL3.difficulty 의 normal). save 는 balance 를 import 하지 않는다(순수 I/O 모듈 유지)
@@ -121,12 +123,56 @@ function normalize(d) {
   return out;
 }
 
+// ── 지갑(r4.3, 기획 v4.1 3-6·3-7) ─────────────────────────────────────────────────────────────────────────────
+//  **별도 키**(WALLET_KEY)에 둔다 — 옛 코드가 도는 탭(또는 옛 캐시)이 v3 키를 통째로 다시 써도 지갑이 지워지지 않게(옛 코드는 이 키를 모른다).
+//  wallet = { coins, runNo, paid, firstClears }
+//   coins       = 보유 코인(0 이상 정수, 상한 COIN_MAX)
+//   runNo       = 출격 번호(출격 때 1 오른다 — 지급 식별자의 앞부분)
+//   paid        = 이미 지급한 식별자 `${runNo}:main` · `${runNo}:bonus`(최근 PAID_KEEP 개만). 같은 식별자는 다시 지급하지 않는다
+//   firstClears = v4 첫 클리어 보너스를 받은 판 번호(정수, 오름차순 중복 없음). 옛 지옥 칸에서 이미 깬 판도 v4 첫 클리어는 한 번 받는다(D9′)
+//  v3 키 형식(v: 3)은 그대로다 — 지갑 칸은 v3 키에 넣지 않는다(defaults·normalize 무변경)
+export const WALLET_KEY = 'starforgeRush.v3.wallet';
+export const COIN_MAX = 999999;
+export const PAID_KEEP = 20;
+const PAID_RE = /^[0-9]+:(main|bonus)$/;
+export function walletDefaults() { return { coins: 0, runNo: 0, paid: [], firstClears: [] }; }
+/** 지갑 정규화(타입 강제): coins 0~COIN_MAX 정수 · runNo 0 이상 정수 · paid 식별자 문자열(최근 PAID_KEEP 개) · firstClears 1 이상 정수(오름차순, 중복 제거) */
+export function normWallet(w) {
+  const src = isPlainObject(w) ? w : {};
+  const int = (v) => (Number.isFinite(v) ? Math.trunc(v) : 0);
+  const paid = [];
+  for (const p of Array.isArray(src.paid) ? src.paid : []) if (typeof p === 'string' && PAID_RE.test(p) && !paid.includes(p)) paid.push(p);
+  const fc = new Set();
+  for (const s of Array.isArray(src.firstClears) ? src.firstClears : []) if (Number.isInteger(s) && s >= 1) fc.add(s);
+  return {
+    coins: Math.max(0, Math.min(COIN_MAX, int(src.coins))),
+    runNo: Math.max(0, int(src.runNo)),
+    paid: paid.slice(-PAID_KEEP),
+    firstClears: [...fc].sort((a, b) => a - b),
+  };
+}
+//  합집합(순서 유지: a 먼저, 그다음 b 에만 있는 것)
+const unionList = (a, b) => { const out = [...a]; for (const x of b) if (!out.includes(x)) out.push(x); return out; };
+
+// ── 복수 탭(r4.3, 기획 v4.1 3-7 ⑥) ──────────────────────────────────────────────────────────────────────────────
+//  불러올 때 TAB_KEY 에 탭 표식 { id, t } 를 남기고 BroadcastChannel(TAB_CHANNEL)로 서로 확인한다.
+//  id = Date.now() 와 performance.now() 로 만든다(난수 아님). **먼저 열린 탭**(t 가 작은 쪽, 같으면 id 사전순)이 살아 있으면 나중 탭은 읽기 전용.
+//   나중 탭: 'hello' 를 보낸다 → 쓰기 가능한 탭은 'alive' 로 답한다 → 답한 탭이 더 먼저 열렸으면 나중 탭은 읽기 전용이 된다.
+//   읽기 전용 탭은 답하지 않는다(더 먼저 열린 쓰기 탭이 이미 있어서 읽기 전용이 된 것이므로). 채널이 없는 환경은 확인 없이 쓰기 가능.
+export const TAB_KEY = 'starforgeRush.v3.tab';
+export const TAB_CHANNEL = 'starforgeRush';
+
 export function createSave3(storage) {
   let store = storage ?? null;
   //  storage 미주입이면 localStorage 시도(접근 자체가 throw 할 수 있다)
   if (!store) { try { store = globalThis.localStorage ?? null; if (store) store.getItem(KEY3); } catch { store = null; } }
+  //  persistent(r4.3) = 실제 저장소가 있는가. localStorage 가 막힌 환경(store null)은 메모리에만 쓰므로 새로고침하면 사라진다 —
+  //   종전 ok 는 이 환경에서 true 로 남았다(쓰기 예외가 없으므로). 코인 경고는 이 값과 ok 를 함께 본다
+  const persistent = !!store;
   const mem = new Map();
   let ok = true;
+  //  읽기 전용(r4.3 복수 탭): 켜지면 v3 키·지갑 키 모두 쓰지 않는다(메모리 사본만 갱신). 탭 확인(claimTab)이 켠다
+  let readOnly = false;
   const safeGet = (k) => { try { return store ? store.getItem(k) : (mem.get(k) ?? null); } catch { ok = false; return null; } };
   const safeSet = (k, v) => {
     try { if (store) { store.setItem(k, v); return true; } mem.set(k, v); return true; }
@@ -147,9 +193,69 @@ export function createSave3(storage) {
   }
 
   const write = () => {
+    if (readOnly) return false;
     let raw;
     try { raw = JSON.stringify(data); } catch { ok = false; return false; }
     return safeSet(KEY3, raw);
+  };
+
+  //  지갑 원문 읽기: 없으면 기본값, 읽기 예외·해석 실패면 null(부르는 쪽이 정한다)
+  const readWallet = () => {
+    let raw;
+    try { raw = store ? store.getItem(WALLET_KEY) : (mem.get(WALLET_KEY) ?? null); } catch { return null; }
+    if (raw === null || raw === undefined) return walletDefaults();
+    try { return normWallet(JSON.parse(raw)); } catch { return null; }
+  };
+  //  불러오기 실패·손상 → 기본값(원문은 두지 않는다 — v3 키의 .bak 과 달리 복구할 기록이 아니라 잔액이다)
+  let wallet = readWallet() ?? walletDefaults();
+  //  walletOk = 마지막 지갑 쓰기가 저장소에 닿았는가. false 인 동안은 메모리가 저장소보다 앞서 있다(다음 지급의 기준을 메모리로 잡는다)
+  let walletOk = true;
+  //  쓰기 직전 다시 읽어 합친다(3-7 ⑥): paid·firstClears 는 합집합, runNo 는 큰 쪽, coins 는 **다시 읽은 값**(재계산하지 않음).
+  //   단 앞선 쓰기가 실패해 메모리가 앞서 있으면 메모리 값을 기준으로 둔다(실패한 지급이 다음 지급에서 되돌아가 잔액이 줄어 보이지 않게)
+  const fresh = () => {
+    //  다시 읽기에 실패하면(예외·손상) 메모리 사본이 기준
+    const w = readOnly ? wallet : (readWallet() ?? wallet);
+    return {
+      coins: walletOk ? w.coins : wallet.coins,
+      runNo: Math.max(w.runNo, wallet.runNo),
+      paid: unionList(w.paid, wallet.paid).slice(-PAID_KEEP),
+      firstClears: [...new Set([...w.firstClears, ...wallet.firstClears])].sort((a, b) => a - b),
+    };
+  };
+  const writeWallet = (w) => {
+    wallet = normWallet(w);
+    if (readOnly) return false;
+    let raw;
+    try { raw = JSON.stringify(wallet); } catch { walletOk = false; return false; }
+    walletOk = safeSet(WALLET_KEY, raw);
+    return walletOk;
+  };
+  const walletApi = {
+    /** 메모리 사본(읽기만) */
+    get: () => ({ ...wallet, paid: [...wallet.paid], firstClears: [...wallet.firstClears] }),
+    /** 저장소를 다시 읽어 합친 값(쓰지 않는다) — 첫 클리어 판정처럼 지급 직전 최신 값이 필요할 때 */
+    peek: () => fresh(),
+    /** 출격: runNo 를 1 올려 한 번 쓰고 새 번호를 돌려준다(지급 식별자의 앞부분) */
+    startRun: () => {
+      const w = fresh();
+      w.runNo += 1;
+      writeWallet(w);
+      return wallet.runNo;
+    },
+    /** 지급: 식별자 id 가 이미 paid 에 있으면 아무것도 하지 않는다. 아니면 coins = 다시 읽은 값 + amount(상한), paid 에 id, firstClear(판 번호)가
+     *  있으면 첫 클리어 표식에 더해 **한 번에** 쓴다(잔액·식별자·표식이 갈라지지 않게 setItem 1회). → { paid, coins, saved } */
+    pay: ({ id, amount = 0, firstClear = null } = {}) => {
+      const w = fresh();
+      if (typeof id !== 'string' || !PAID_RE.test(id)) return { paid: false, coins: w.coins, saved: false };
+      if (w.paid.includes(id)) { wallet = normWallet(w); return { paid: false, coins: wallet.coins, saved: false }; }
+      w.coins = Math.max(0, Math.min(COIN_MAX, w.coins + Math.max(0, Math.trunc(amount) || 0)));
+      w.paid = [...w.paid, id].slice(-PAID_KEEP);
+      if (Number.isInteger(firstClear) && firstClear >= 1 && !w.firstClears.includes(firstClear)) w.firstClears = [...w.firstClears, firstClear];
+      const saved = writeWallet(w);
+      return { paid: true, coins: wallet.coins, saved };
+    },
+    /** 코인이 저장소에 남는가(쓰기 실패·차단 환경·읽기 전용이면 false) — 결과·타이틀 경고 */
+    get ok() { return persistent && walletOk && !readOnly; },
   };
 
   return {
@@ -181,5 +287,35 @@ export function createSave3(storage) {
       return data;
     },
     get ok() { return ok; },
+    //  r4.3: 실제 저장소가 있는가(localStorage 차단 환경 = false) · 지갑 · 읽기 전용
+    get persistent() { return persistent; },
+    wallet: walletApi,
+    get readOnly() { return readOnly; },
+    setReadOnly: (v) => { readOnly = !!v; },
+    /** 탭 확인 시작(r4.3 복수 탭). BC = BroadcastChannel 생성자(없으면 확인 없이 쓰기 가능). now/perf = 시계 주입(검사).
+     *  onReadOnly(msg) = 먼저 열린 탭을 발견해 읽기 전용이 된 순간 1회. → { id, t, close() } */
+    claimTab: (BC, { now = () => Date.now(), perf = () => (typeof performance !== 'undefined' ? performance.now() : 0), onReadOnly } = {}) => {
+      const t = now();
+      const id = t.toString(36) + '-' + Math.floor(perf() * 1000).toString(36);
+      if (!readOnly && store) { try { store.setItem(TAB_KEY, JSON.stringify({ id, t })); } catch { /* 표식은 진단용 — 실패해도 진행 */ } }
+      const older = (m) => m.t < t || (m.t === t && String(m.id) < id);
+      let ch = null;
+      if (typeof BC === 'function') {
+        try {
+          ch = new BC(TAB_CHANNEL);
+          ch.onmessage = (e) => {
+            const m = e && e.data;
+            if (!m || m.id === id || !Number.isFinite(m.t)) return;
+            if (m.type === 'hello' && !readOnly) ch.postMessage({ type: 'alive', id, t });
+            if ((m.type === 'alive' || m.type === 'hello') && older(m) && !readOnly) {
+              readOnly = true;
+              if (onReadOnly) onReadOnly(m);
+            }
+          };
+          ch.postMessage({ type: 'hello', id, t });
+        } catch { ch = null; }
+      }
+      return { id, t, close: () => { try { if (ch) ch.close(); } catch { /* 이미 닫힘 */ } } };
+    },
   };
 }

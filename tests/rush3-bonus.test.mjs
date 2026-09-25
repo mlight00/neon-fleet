@@ -17,6 +17,7 @@ import { createSave3, KEY3 } from '../rush3/save.js';
 import { createRenderer3, HUD_ROW } from '../rush3/render.js';
 import { boot, bonusLine } from '../rush3/main.js';
 import { playPolicy, pickX } from './lib/rush3-policies.mjs';
+import { seedOldClears } from './lib/rush3-unlock.mjs';
 
 const C = BAL3.colors;
 const R = BAL3.bonus.targetR;
@@ -353,6 +354,8 @@ async function bootFake(storage = fakeStorage()) {
   let nowMs = 1000;
   const texts = [];
   const save = createSave3(storage);
+  //  r4.3 순차 해금: 빈 저장은 1번만 열린다 — 이 하네스는 '옛 저장에 1~7번 클리어 기록이 있는 사용자'로 시작한다(검사하는 판 8 은 비워 둔다 — 그 판의 옛 칸 단언 보존)(옛 버전 칸 — 화면·코인 무영향, tests/lib/rush3-unlock.mjs)
+  seedOldClears(save, 7);
   const audio = fakeAudio();
   //  r4.2: 종전 각 검사의 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 파일의 셸 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
   const app = boot(fakeCanvas(texts), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });

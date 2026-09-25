@@ -563,6 +563,8 @@ function arenaBossAct(run, bo, ev, dt) {
         const off = SM.n > 1 ? (k / (SM.n - 1) * 2 - 1) * SM.dx : 0;
         const e = spawnEnemy(run, SM.kind, clampNum(bo.x + off, A.w[0] + r, A.w[1] - r), bo.z + SM.dz);
         e.chase = true;
+        //  r4.3 소환 표식(희소 — 일정 스폰 적 객체에는 키가 없다). 규칙은 읽지 않고 kill 이벤트에 실어 셸이 셈에서 뺀다
+        e.summoned = true;
       }
       ev.push({ type: 'summon', kind: SM.kind, n: SM.n, x: bo.x, z: bo.z + SM.dz });
     }
@@ -651,7 +653,8 @@ function bossAct(run, bo, ev, dt) {
       for (let k = 0; k < E.summonN; k++) {
         const side = k % 2 === 0 ? -1 : 1;
         const x = Math.max(ROAD.x0 + r, Math.min(ROAD.x1 - r, bo.x + side * E.summonDx));
-        spawnEnemy(run, E.summonKind, x, bo.z + E.summonDz);
+        //  r4.3 소환 표식(희소): 광장 소환과 같은 뜻 — kill 이벤트의 summoned 로만 나간다
+        spawnEnemy(run, E.summonKind, x, bo.z + E.summonDz).summoned = true;
       }
       ev.push({ type: 'summon', kind: E.summonKind, n: E.summonN, x: bo.x, z: bo.z + E.summonDz });
     }
@@ -757,11 +760,12 @@ function applyRewards(run, ev) {
 }
 
 // 10단계 정리: dead 적 중 !touched 는 kills(이벤트 kill), 보스 사망 bossKill·bossesLeft(마지막 보스면 남은 적·적탄 소거 = 정예 격파 즉시 승리), 범위 밖 정리, peak
+//  r4.3: kill 이벤트에 hpMax(스폰 체력)·summoned(보스 소환 적인가, 일정 스폰 = false)를 **덧붙인다** — 셸의 코인 셈(coins.js)이 읽는다. 판정·진행 불변
 function cleanup(run, ev) {
   const behind = run.z - BAL3.cull.enemyBehind, ahead = run.z + LINE_Y + BAL3.cull.bulletAhead;
   run.enemies = run.enemies.filter((e) => {
     if (e.dead) {
-      if (!e.touched) { run.kills++; ev.push({ type: 'kill', id: e.id, kind: e.kind, x: e.x, z: e.z, skin: e.skin ?? null, r: e.r }); }
+      if (!e.touched) { run.kills++; ev.push({ type: 'kill', id: e.id, kind: e.kind, x: e.x, z: e.z, skin: e.skin ?? null, r: e.r, hpMax: e.hpMax, summoned: !!e.summoned }); }
       return false;
     }
     return e.z >= behind;

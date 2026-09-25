@@ -19,6 +19,7 @@ import { projectorFor } from '../rush3/project.js';
 const NEAR = projectorFor('close').near;
 import { createSave3 } from '../rush3/save.js';
 import { pickX, pickInput, botArena } from './lib/rush3-policies.mjs';
+import { seedOldClears } from './lib/rush3-unlock.mjs';
 
 const AR = BAL3.arena, SQ = BAL3.squad, LINE_Y = BAL3.view.LINE_Y;
 const ARENA_IDS = [15, 20, 24];
@@ -559,6 +560,8 @@ test('V3-ARENA A-13: 셸 — 진입 프레임에 배너·열림 연출·lotWarn/
   let nowMs = 1000;
   const shown = [];
   const save = createSave3(fakeStorage());
+  //  r4.3 순차 해금: 빈 저장은 1번만 열린다 — 이 하네스는 '옛 저장에 앞 판 클리어 기록이 있는 사용자'로 시작한다(15번 = 1~14 · 24번 = 1~23)(옛 버전 칸 — 화면·코인 무영향, tests/lib/rush3-unlock.mjs)
+  seedOldClears(save, 14);
   const audio = fakeAudio();
   const canvas = fakeCanvas(shown), win = fakeWin();
   //  r4.2: 종전 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
@@ -604,6 +607,8 @@ test('V3-ARENA A-14: 셸 — 정지 중 pointermove 누적 → 재개 후 tay �
   let nowMs = 1000;
   const shown = [];
   const save = createSave3(fakeStorage());
+  //  r4.3 순차 해금: 빈 저장은 1번만 열린다 — 이 하네스는 '옛 저장에 앞 판 클리어 기록이 있는 사용자'로 시작한다(15번 = 1~14 · 24번 = 1~23)(옛 버전 칸 — 화면·코인 무영향, tests/lib/rush3-unlock.mjs)
+  seedOldClears(save, 23);
   const audio = fakeAudio();
   const canvas = fakeCanvas(shown), win = fakeWin();
   //  r4.2: 종전 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)

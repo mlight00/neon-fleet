@@ -38,6 +38,13 @@ export function isTrapGateRow(row) {
 export const TRAP_BADGE_TEXT = '쏴도 안 줄어듦';
 //  결과 화면 [다시 도전] 아래 부연(2026-09-17 이사 결정 ①) — 랜덤 길은 재도전마다 새로 뽑는다
 export const RETRY_LOTTERY_NOTE = '랜덤 길은 새로 추첨';
+//  맨 아래 경고 한 줄(타이틀·결과, 종전 '기록 저장 안 됨' 자리 H−22). r4.3: 코인 저장 실패·차단 환경 경고와 읽기 전용 탭 안내가 더해졌다
+export const SAVE_WARN = Object.freeze({
+  readOnly: '다른 탭에서 게임이 열려 있어 이 탭은 저장하지 않습니다',
+  both: '기록 저장 안 됨 · 코인이 저장되지 않습니다',
+  coin: '코인이 저장되지 않습니다',
+  record: '기록 저장 안 됨',
+});
 //  칸 위 짧은 글의 화면 상단 한계(HUD 아래). 행이 화면 밖에서 들어오는 동안에도 글이 보이게 여기에 붙인다
 const TIP_MIN_Y = 96;
 //  r4.2(2026-09-25, 이사 지시 "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고"): 난이도 짧은 표기(HUD 칩·결과 제목 옆 '어려움'/'지옥')와
@@ -52,6 +59,9 @@ const HUD_TOP = 16, HUD_H = 36, HUD_R = 18, HUD_FS = 15, HUD_GAP = 8, HUD_RIGHT 
 const hudBoxOf = (w, right) => Object.freeze({ x: right - w, y: HUD_TOP, w, h: HUD_H });
 const HUD_PAUSE = hudBoxOf(44, W - HUD_RIGHT);
 const HUD_WEAPON = hudBoxOf(122, HUD_PAUSE.x - HUD_GAP);
+//  r4.3 이번 판 코인 칩(v4 ③단계, 기획 v4.1 3-9 '출격 중 HUD'): 종전 난이도 칩(HUD_DIFF {w 64})이 있던 자리 — 무기 칩 왼쪽 같은 간격.
+//   셸이 view.hud.coins(정산 전 누계)를 숫자로 넘길 때만 그린다(개발용 판 = null → 칩 없음, 제목 끝선은 무기 칩 왼쪽 그대로)
+const HUD_COIN = hudBoxOf(64, HUD_WEAPON.x - HUD_GAP);
 //  무기 강화 단계 표기(r3.10). Mk I 은 표기 없음
 export const MK_LABEL = Object.freeze(['', '', ' II', ' III']);
 //  r4.1(2026-09-25): '가까이 ○/●' 토글 칩(종전 ZOOM, HUD 왼쪽 셋째 줄 {x16, y84, w70, h26})을 지웠다 — 보기는 '가까이' 하나뿐(project.js).
@@ -85,8 +95,8 @@ export const HUD_ROW = Object.freeze({
   cy: HUD_TOP + HUD_H / 2,
   //  왼쪽 두 줄: 제목은 칩들과 같은 중심선, 남은 거리는 그 아래 한 줄
   left: 16, titleFs: 20, titleFsSmall: 17, distFs: 15, distCy: HUD_TOP + HUD_H / 2 + 28,
-  //  r4.2: 난이도 칩 자리(diff)를 지웠다 — 무기 칩·⏸ 둘
-  box: Object.freeze({ weapon: HUD_WEAPON, pause: HUD_PAUSE }),
+  //  r4.2: 난이도 칩 자리(diff)를 지웠다 — 무기 칩·⏸ 둘. r4.3: 그 자리에 이번 판 코인 칩(coin — 코인 값이 있을 때만 그린다)
+  box: Object.freeze({ coin: HUD_COIN, weapon: HUD_WEAPON, pause: HUD_PAUSE }),
 });
 
 export function createRenderer3(ctx, sprites) {
@@ -1412,7 +1422,9 @@ export function createRenderer3(ctx, sprites) {
     ctx.textBaseline = 'middle';
     //  제목은 무기 칩 앞에서 끝나야 한다(24스테이지 제목 중 '크라운 브레이커' 같은 긴 것). r4.2: 종전 끝선은 난이도 칩 왼쪽(x 220)이었다 — 칩이 없어져 무기 칩 왼쪽(x 292)까지
     //  순서: 기본 크기 → 한 단계 작게(17px) → 그래도 넘치면 'STAGE ' 접두 제거 → 마지막 안전망 maxWidth
-    const titleMaxW = HUD_ROW.box.weapon.x - HUD_ROW.left - 6;
+    //  r4.3: 코인 칩이 있으면 그 왼쪽(x 220 — r4.2 이전 난이도 칩 끝선과 같은 자리)까지
+    const coinN = hud && Number.isFinite(hud.coins) ? hud.coins : null;
+    const titleMaxW = (coinN !== null ? HUD_ROW.box.coin.x : HUD_ROW.box.weapon.x) - HUD_ROW.left - 6;
     const fits = (t, fs) => { ctx.font = '900 ' + fs + 'px ' + FONT; return ctx.measureText(t).width <= titleMaxW; };
     const full = 'STAGE ' + run.stageId + '  ' + run.title, short = run.stageId + '  ' + run.title;
     let titleText = full, titleFs = HUD_ROW.titleFs;
@@ -1448,6 +1460,18 @@ export function createRenderer3(ctx, sprites) {
     ctx.fillStyle = w.color;
     ctx.fillText(w.name + (MK_LABEL[mk] ?? ''), wb.x + 48, cy);
     //  r4.2: 무기 칩 왼쪽의 난이도 태그('어려움'·'지옥')를 지웠다
+    //  r4.3 코인 칩: 금색 동전 + 이번 판 누계(정산 전). 같은 칩 바탕·높이·글자 크기(HUD_ROW 한 곳)
+    if (coinN !== null) {
+      const cb = HUD_ROW.box.coin;
+      hudChip(cb);
+      ctx.fillStyle = C.gold;
+      ctx.beginPath(); ctx.arc(cb.x + 17, cy, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cb.x + 17, cy, 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = 'bold ' + HUD_ROW.fs + 'px ' + FONT;
+      ctx.fillStyle = C.gold;
+      ctx.fillText(String(coinN), cb.x + 29, cy, cb.w - 33);
+    }
     //  ⏸(일시정지) — 셸이 hud:true 로 넘긴 버튼만. 없는 상태(일시정지 중·결과)에서는 그리지 않는다
     const pb = (view.buttons ?? []).find((b) => b.hud);
     if (pb) {
@@ -1622,7 +1646,23 @@ export function createRenderer3(ctx, sprites) {
       }
       ctx.textBaseline = 'alphabetic';
       ctx.globalAlpha = 1;
+      //  r4.3 순차 해금: 잠긴 스테이지 버튼은 흐린 버튼(disabled 알파) 위 오른쪽 위 모서리에 자물쇠 — 색만으로 구분하지 않는 형태 신호(셔터 자물쇠와 같은 모양)
+      if (b.locked) drawLockBadge(b.x + b.w - 14, b.y + 16, 0.9);
     }
+  }
+
+  //  맨 아래 경고 한 줄(타이틀·결과 공통, 종전 '기록 저장 안 됨' 자리 H−22). r4.3: 읽기 전용 탭 안내 > 기록·코인 저장 실패 순으로 하나만
+  function drawSaveWarn(v) {
+    let text = null;
+    if (v.readOnly) text = SAVE_WARN.readOnly;
+    else if (v.saveOk === false && v.coinSaveOk === false) text = SAVE_WARN.both;
+    else if (v.coinSaveOk === false) text = SAVE_WARN.coin;
+    else if (v.saveOk === false) text = SAVE_WARN.record;
+    if (!text) return;
+    ctx.textAlign = 'center';
+    ctx.font = '600 13px ' + FONT;
+    ctx.fillStyle = C.gateNeg;
+    ctx.fillText(text, W / 2, H - 22);
   }
 
   //  타이틀: 워드마크 + 히어로 + 스테이지 선택 3버튼(기록은 버튼 sub)
@@ -1649,14 +1689,22 @@ export function createRenderer3(ctx, sprites) {
     ctx.font = '700 15px ' + FONT;
     ctx.fillStyle = 'rgba(20,35,58,0.8)';
     ctx.fillText('작전을 고르세요', W / 2, 430);
-    if (view.saveOk === false) {
-      ctx.font = '600 13px ' + FONT;
-      ctx.fillStyle = C.gateNeg;
-      ctx.fillText('기록 저장 안 됨', W / 2, H - 22);
+    //  r4.3 순차 해금 안내('앞 판을 먼저 깨야 합니다'): 잠긴 판을 불렀을 때 잠깐. 비워 둔 y 382~416 줄의 가운데(⑤단계 [로봇 강화] 전까지)
+    if (view.notice) {
+      ctx.font = 'bold 16px ' + FONT;
+      ctx.fillStyle = 'rgba(20,35,58,0.85)';
+      roundRect(W / 2 - 150, 382, 300, 34, 17); ctx.fill();
+      ctx.fillStyle = C.gold;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(view.notice, W / 2, 399);
+      ctx.textBaseline = 'alphabetic';
     }
+    drawSaveWarn({ saveOk: view.saveOk, coinSaveOk: view.coinSaveOk, readOnly: view.readOnly });
   }
 
   //  결과: 성공/실패·생존·최고·시간·처치·놓친 것 한 줄·저장 실패 안내(버튼은 drawButtons)
+  //  정수 세 자리 쉼표(보유 코인 999,999 까지)
+  function fmtInt(n) { return String(Math.max(0, Math.trunc(n || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   //  어절(공백) 경계에서만 끊는 줄바꿈 — 단어 중간에서 줄이 갈라지지 않게 한다
   function splitWrap(text, maxW) {
     const words = String(text).split(' ');
@@ -1688,13 +1736,34 @@ export function createRenderer3(ctx, sprites) {
     ctx.fillStyle = 'rgba(5,8,14,0.8)';
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center';
+    //  r4.3(기획 v4.1 3-9) 맨 위: '작전 성공/실패/중단' + '획득 코인 +N'(정산 뒤 값) + 작은 글씨 내역(적 · 보스 · 첫 클리어/재클리어 · 보너스) + 보유 코인.
+    //   종전 제목 y150·스테이지 y184 를 위로 올려(92·120) 코인 세 줄(156·178·196)을 넣었다 — 아래 추가 줄(212~)·통계(246~)·버튼(480~) 자리는 그대로
     ctx.font = '900 38px ' + FONT;
-    ctx.fillStyle = r.won ? C.gold : C.gateNeg;
-    ctx.fillText(r.won ? '작전 성공!' : '작전 실패', W / 2, 150);
-    ctx.font = '700 16px ' + FONT;
+    ctx.fillStyle = r.won ? C.gold : r.aborted ? C.bulletHeavy : C.gateNeg;
+    ctx.fillText(r.won ? '작전 성공!' : r.aborted ? '작전 중단' : '작전 실패', W / 2, 92);
+    ctx.font = '700 15px ' + FONT;
     ctx.fillStyle = 'rgba(243,241,232,0.75)';
     //  r4.2: 제목 옆 난이도 표기('  ·  어려움'/'  ·  지옥', 색 따로)를 지웠다 — 제목 한 줄만
-    ctx.fillText('STAGE ' + r.stageId + '  ' + r.title, W / 2, 184);
+    ctx.fillText('STAGE ' + r.stageId + '  ' + r.title, W / 2, 120);
+    if (r.coins) {
+      if (r.coins.dev) {
+        ctx.font = '600 14px ' + FONT;
+        ctx.fillStyle = 'rgba(243,241,232,0.6)';
+        ctx.fillText(r.coinLine ?? '개발용 판 — 코인 없음', W / 2, 160);
+      } else {
+        ctx.font = '900 24px ' + FONT;
+        ctx.fillStyle = C.gold;
+        ctx.fillText('획득 코인 +' + fmtInt(r.coins.gained), W / 2, 156);
+        if (r.coinLine) {
+          ctx.font = '600 13px ' + FONT;
+          ctx.fillStyle = 'rgba(243,241,232,0.8)';
+          ctx.fillText(r.coinLine, W / 2, 178, W - 40);
+        }
+        ctx.font = '600 13px ' + FONT;
+        ctx.fillStyle = 'rgba(246,200,74,0.85)';
+        ctx.fillText('보유 코인 ' + fmtInt(r.coins.balance), W / 2, 196);
+      }
+    }
     //  제목 아래 추가 줄(y 212 부터 18px 씩 쌓는다 — 통계 첫 줄 246 과 겹치지 않는 최소 간격): 랜덤 길 → 작전 목표 순
     let extraY = 212;
     //  랜덤 길 한 줄(계약서 3-9): 고른 판은 결과, 안 고른 판은 이번 판에 무엇이었는지 공개
@@ -1718,6 +1787,13 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillText(r.bonusLine, W / 2, extraY);
       extraY += 18;
     }
+    //  r4.3: 24번(마지막 판) 승리 = [다음 작전] 대신 '모든 작전 완료' 안내 문구(셸 main.ALL_CLEAR_LINE — 24번에는 랜덤 길·목표·보너스 줄이 없어 늘 y212)
+    if (r.allClear) {
+      ctx.font = 'bold 14px ' + FONT;
+      ctx.fillStyle = C.gold;
+      ctx.fillText(String(r.allClear), W / 2, extraY);
+      extraY += 18;
+    }
     const lines = [
       ['생존 병력', r.survivors + '명'],
       ['최고 병력', r.peak + '명'],
@@ -1737,8 +1813,19 @@ export function createRenderer3(ctx, sprites) {
       y += 40;
     }
     ctx.textAlign = 'center';
+    //  r4.3(3-9) 원인 → 다음 행동 순: 패배·포기는 원인 한 줄(인원 손실 + 놓친 통, 주황 작게)을 먼저, 그 아래 제안(advice) 한 줄.
+    //   원인 줄이 있는 결과(셸 r4.3 이후)는 종전의 '놓친 것' 요약을 따로 그리지 않는다(원인 줄이 같은 내용을 더 정확히 담는다)
+    if (!r.won && r.causeLine) {
+      ctx.font = '600 14px ' + FONT;
+      ctx.fillStyle = 'rgba(255,154,74,0.9)';
+      const n = wrapText(r.causeLine, W / 2, y - 2, W - 56, 18);
+      if (r.advice) {
+        ctx.font = 'bold 16px ' + FONT;
+        ctx.fillStyle = C.gatePos;
+        wrapText(r.advice, W / 2, y - 2 + 18 * n + 8, W - 56, 20);
+      }
+    } else if (r.advice) {
     //  제안 한 줄(advice)이 있으면 그것을 크게, 놓친 것 요약은 그 아래 작게(계약서 6장 · 개정 r3 §6-2)
-    if (r.advice) {
       ctx.font = 'bold 17px ' + FONT;
       ctx.fillStyle = C.gatePos;
       wrapText(r.advice, W / 2, y + 4, W - 56, 22);
@@ -1769,11 +1856,7 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillText(RETRY_LOTTERY_NOTE, retry.x + retry.w / 2, retry.y + retry.h + 16);
       }
     }
-    if (r.saveOk === false) {
-      ctx.font = '600 13px ' + FONT;
-      ctx.fillStyle = C.gateNeg;
-      ctx.fillText('기록 저장 안 됨', W / 2, H - 22);
-    }
+    drawSaveWarn({ saveOk: r.saveOk, coinSaveOk: r.coinSaveOk, readOnly: r.readOnly });
   }
 
   function drawScene(view) {

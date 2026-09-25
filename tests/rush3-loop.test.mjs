@@ -14,6 +14,7 @@ import { createSave3 } from '../rush3/save.js';
 import { RETRY_LOTTERY_NOTE } from '../rush3/render.js';
 import { BAL3, PLAY_DIFFICULTY } from '../rush3/balance.js';
 import { hashSeed } from '../rush/rng.js';
+import { seedOldClears } from './lib/rush3-unlock.mjs';
 
 // STEP 인덱스별 입력열(결정적): 호버 x 는 사인파, 40~60 STEP 마다 드래그·키 조향이 섞인다
 function inputAt(i) {
@@ -323,6 +324,9 @@ async function bootFake(opts = {}) {
   //  r4.2: opts.storage = 옛 저장 원문을 미리 넣은 storage(마지막 난이도 칸을 읽지 않는지 보는 검사용)
   const storage = opts.storage ?? fakeStorage();
   const save = createSave3(storage);
+  //  r4.3 순차 해금: opts.oldClears = n 이면 '옛 저장에 1~n 번 클리어 기록이 있는 사용자'(옛 버전 칸 — 화면·코인 무영향, tests/lib/rush3-unlock.mjs).
+  //   빈 저장은 1번만 열리므로 뒤 판으로 곧장 출격하는 검사가 쓴다
+  if (opts.oldClears) seedOldClears(save, opts.oldClears);
   const audio = fakeAudio();
   const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio,
     dateNow: opts.dateNow, sprites: { get: () => null, ready: new Set() } });
@@ -332,7 +336,8 @@ async function bootFake(opts = {}) {
   return { app, canvas, win, calls, texts, rec, frames, save, audio, storage, now: () => nowMs };
 }
 //  랜덤 길 시드를 고정한 boot 스모크(연출·효과음까지 보려면 bootLot 이 아니라 이쪽 — 프레임·오디오 기록이 필요하다)
-const bootFakeLot = (dateNow) => bootFake({ dateNow });
+//  r4.3: 랜덤 길 판(3번)으로 곧장 출격하므로 옛 기록 1~2번 시드(순차 해금)
+const bootFakeLot = (dateNow) => bootFake({ dateNow, oldClears: 2 });
 //  타이틀의 스테이지 1 칸을 누른다(24스테이지 목록 2열×4행의 첫 칸 = main.TITLE_GRID). 논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율
 const tapStage1 = (canvas) => canvas.fire('pointerdown', { clientX: (60 + 88) / 2, clientY: (TITLE_GRID.y + TITLE_GRID.h / 2) / 2, pointerType: 'mouse' });
 
@@ -468,6 +473,8 @@ test('V3-SHELL: 게이트 피격 플래시는 셸 fx 타이머(0.12s) — 피격
 test('V3-SHELL: 전멸 → 결과(실패)·놓친 것 한 줄, 저장 실패면 saveOk=false', async () => {
   const bad = { getItem: () => null, setItem: () => { throw new Error('quota'); } };
   const save = createSave3(bad);
+  //  r4.3 순차 해금: 2번으로 곧장 출격 — 옛 기록 1번 시드(쓰기는 실패하지만 메모리 사본에 남아 해금 판정에 쓰인다)
+  seedOldClears(save, 1);
   const calls = [];
   const canvas = fakeCanvas(calls);
   const queue = [];
@@ -672,7 +679,8 @@ test('V3-SHELL-DIFF2ROW 옛 저장: 마지막 선택이 보통·어려움이던 
 // ─────────────────────────────────────────────────────────────────────────────
 async function bootLot(dateNow, storage = fakeStorage()) {
   const queue = [];
-  const save = createSave3(storage);
+  //  r4.3 순차 해금: 3번으로 곧장 출격하므로 옛 기록 1~2번 시드
+  const save = seedOldClears(createSave3(storage), 2);
   const app = boot(fakeCanvas([]), { win: null, doc: null, raf: (f) => queue.push(f), now: () => 0,
     save, audio: fakeAudio(), dateNow, sprites: { get: () => null, ready: new Set() } });
   await app.ready;
@@ -722,7 +730,7 @@ test('V3-SHELL-LOTTERY: 셸이 시계·재도전 횟수로 시드를 만든다 �
 //  전부 셸이 정하므로, 이 결선이 빠지면 렌더 검사(V3-RENDER-SHUTTER)가 전부 통과해도 화면에는 아무 안내가 안 뜬다.
 // ─────────────────────────────────────────────────────────────────────────────
 test('V3-SHELL-SHUTTER: 첫 셔터 조우에 짧은 글 + 초보 배너 1회, 저장 seenShutter 에 기억된다', async () => {
-  const { app, frames, save, audio } = await bootFake();
+  const { app, frames, save, audio } = await bootFake({ oldClears: 1 });   // r4.3: 2번으로 곧장 출격(옛 기록 1번 시드)
   assert.equal(save.get().seenShutter, false, '새 사용자는 셔터를 본 적이 없다');
   app.startRun(2);                                   // S2 첫 게이트(z1140)에 셔터가 걸려 있다
   const fx = () => app.getFx();

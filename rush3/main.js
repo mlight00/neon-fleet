@@ -12,7 +12,8 @@ import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
-import { adviceLine } from './advice.js';
+import { adviceLine, ADVICE_DEFAULT } from './advice.js';
+import { createTally, addEvents, tallyTotal, mainCoins, bonusCoins } from './coins.js';
 import { hashSeed } from '../rush/rng.js';
 
 const W = BAL3.view.w, H = BAL3.view.h, LINE_Y = BAL3.view.LINE_Y;
@@ -422,6 +423,48 @@ export function timeText(sec) {
   return (m > 0 ? m + '분 ' : '') + s.toFixed(1) + '초';
 }
 
+//  ── r4.3 코인·순차 해금(기획 v4.1 3-3 (사)·3-7·3-9, 이사님 결정 N2 = (나) 순차 해금 + 기존 기록 엄격 인정) ─────────────────
+//  잠긴 판을 부를 때의 안내(스테이지 선택 화면에 잠깐 뜬다)
+export const LOCK_NOTICE = '앞 판을 먼저 깨야 합니다';
+//  24번(마지막 공개 판)을 이긴 결과 화면 — [다음 작전] 자리 대신
+export const ALL_CLEAR_LINE = '모든 작전 완료 — 24개 작전을 전부 이겼습니다';
+//  결과·타이틀 맨 아래 경고(코인 저장 실패·읽기 전용 탭)의 문구는 render.SAVE_WARN 한 곳 — 셸은 saveOk·coinSaveOk·readOnly 만 넘긴다
+//  결과 화면 [로봇 강화] 자리(⑤단계에서 넣는다 — 이번엔 자리만 비워 둔다. 셸·렌더 모두 이 상자에 아무것도 그리지 않는다):
+//   [스테이지 선택] 바로 아래(dy 52) 같은 폭 — 승리 y 672 · 패배·포기 y 604(랜덤 길 판은 부연 22px 만큼 더 아래). 화면 높이 800 안이다
+export const RESULT_UPGRADE_SLOT = Object.freeze({ x: 120, dy: 52, w: 240, h: 44 });
+
+/** 해금 범위 = 1번부터 **연속으로** 이긴 판 수 + 1(순수). wonIds = 이긴 판 번호 집합, ids = 공개 판 번호 목록(ALL_STAGE_IDS 순서).
+ *  중간에 빈 판이 있으면 그 앞까지만 열린다(N2 '엄격'). 새 저장 = 1. 반환 = 열린 마지막 판 번호(ids 범위 안) */
+export function unlockedThrough(wonIds, ids = ALL_STAGE_IDS) {
+  const won = wonIds instanceof Set ? wonIds : new Set(wonIds || []);
+  let n = 0;
+  for (const id of ids) { if (won.has(id)) n++; else break; }
+  return ids[Math.min(ids.length - 1, n)];
+}
+
+/** 결과 화면 '원인' 한 줄(패배·포기, 3-9): 인원 손실(게이트·피격·충격·접촉 — 보스 겹침은 접촉에 합산) + 놓친 통 수. 순수.
+ *  이름과 숫자 사이는 줄바꿈 없는 공백(U+00A0) — 결과 화면이 어절 경계에서 줄을 나눌 때 '게이트' 와 '3' 이 갈라지지 않게 */
+export function causeLine(run) {
+  const NB = ' ';
+  const parts = [['게이트', run.lossByGate], ['피격', run.lossByShot], ['충격', run.lossByShock], ['접촉', run.lossByTouch]]
+    .filter(([, n]) => (n || 0) > 0).map(([k, n]) => k + NB + n);
+  const loss = parts.length ? '인원 손실 ' + parts.join(' · ') : '인원 손실 없음';
+  const missed = (run.missedSupplies || 0) > 0 ? '놓친' + NB + '통' + NB + run.missedSupplies + '개' : '놓친' + NB + '통' + NB + '없음';
+  return loss + ' · ' + missed;
+}
+
+/** 결과 화면 코인 내역 한 줄(3-9, 작은 글씨): 적 · 보스 · 첫 클리어/재클리어 · 보너스(0 인 항목은 적만 남기고 뺀다). 순수 */
+export function coinBreakdown(c) {
+  if (!c) return null;
+  if (c.dev) return '개발용 판 — 코인 없음';
+  const NB = ' ';
+  const parts = ['적' + NB + (c.enemy | 0)];
+  if (c.boss > 0) parts.push('보스' + NB + c.boss);
+  if (c.clear > 0) parts.push((c.clearKind === 'first' ? '첫' + NB + '클리어' : '재클리어') + NB + c.clear);
+  if (c.bonus > 0) parts.push('보너스' + NB + c.bonus);
+  return parts.join(' · ');
+}
+
 export function boot(canvas, deps = {}) {
   const win = deps.win ?? (typeof window !== 'undefined' ? window : null);
   const doc = deps.doc ?? (typeof document !== 'undefined' ? document : null);
@@ -430,6 +473,10 @@ export function boot(canvas, deps = {}) {
   const dateNow = deps.dateNow ?? (() => Date.now());
   const raf = deps.raf ?? ((fn) => (win && win.requestAnimationFrame ? win.requestAnimationFrame(fn) : setTimeout(() => fn(nowFn()), 16)));
   const save = deps.save ?? createSave3(deps.storage);
+  //  r4.3 복수 탭(기획 v4.1 3-7 ⑥): 먼저 열린 탭이 살아 있으면 이 탭은 읽기 전용(기록·지갑 쓰기 안 함 + 화면 안내).
+  //   채널은 window 의 BroadcastChannel 만 쓴다(검사는 deps.BroadcastChannel 로 가짜 채널을 넣는다) — Node 전역 채널을 잡으면 검사끼리 서로 읽기 전용으로 만든다
+  const BCtor = deps.BroadcastChannel !== undefined ? deps.BroadcastChannel : (win && typeof win.BroadcastChannel === 'function' ? win.BroadcastChannel : null);
+  const tab = save.claimTab(BCtor, { now: dateNow, perf: nowFn });
   //  보기(r4.1, 이사 지시 2026-09-25 "줌 확대모드를 기본 모드로 하고 일반 모드를 삭제하자"): '가까이'(near 1.8) 하나뿐이다.
   //   종전 '가까이 ○/●' 토글(Z 키·HUD 칩·저장 zoom 필드·getZoom/setZoom)은 지웠다. 저장의 zoom 칸은 읽지 않는다(save.js)
   //  개발 대조용 평면 변환(계획서 §4-6 "같은 스테이지를 두 방식으로 그리는 비교"): rush3.html?flat=1 → 종전 y = LINE_Y − d 로 그린다
@@ -446,6 +493,12 @@ export function boot(canvas, deps = {}) {
   let state = 'title', run = null, renderer = null, buttons = [], fx = makeFx();
   //  overT: 판 종료 뒤 결과 화면까지 남은 여운(초). -1 = 아직 종료를 보지 못함
   let overT = -1, result = null;
+  //  notice(r4.3) = 스테이지 선택 화면에 잠깐 뜨는 안내 { text, t 남은 초 } | null — 잠긴 판을 불렀을 때 '앞 판을 먼저 깨야 합니다'
+  let notice = null;
+  const NOTICE_SEC = 2.5;
+  //  coin(r4.3) = 이번 판의 코인 상태 { runNo, tally, settled: { main, bonus } } | null. **run 객체에 두지 않는다** — 셸의 이벤트 처리는
+  //   규칙 run 을 한 글자도 고치지 않는다(V3-HITFEEL HF-9). 출격 때 만들고 타이틀로 나가면 지운다
+  let coin = null;
   //  출격 줄(r4.2 난이도 단일화): 게임 화면은 **늘** 기본 줄(PLAY_DIFFICULTY = 'brutal', 옛 지옥 수치)로 buildStage 를 부른다.
   //   고르는 곳(타이틀 토글·1/2/3 키)·바꾸는 곳(setDifficulty)·저장에서 읽는 곳(save.difficulty)이 없다. 그 뒤로는 run.difficulty 가 진실(기록 칸 키 `버전:brutal`).
   //   deps.difficulty 는 **검사 전용 주입**이다(save·audio·sprites 주입과 같은 결 — 실제 페이지의 boot(#game3)는 넘기지 않는다).
@@ -495,7 +548,35 @@ export function boot(canvas, deps = {}) {
     return Math.max(0, Math.min(titlePages() - 1, titlePage));
   }
 
+  //  ── r4.3 순차 해금(이사님 결정 N2 = (나) 엄격) ──
+  //  '이긴 판' = v3 저장의 **모든 난이도·버전 칸** 중 하나라도 cleared 인 판(옛 기록 인정) ∪ 지갑의 v4 첫 클리어 표식. 공개 판 번호만 센다
+  //   (지갑은 별도 키라 옛 코드 탭이 v3 키를 덮어써도 v4 에서 이긴 판은 남는다)
+  function wonStageIds() {
+    const won = new Set(save.wallet.get().firstClears);
+    for (const id of ALL_STAGE_IDS) if (Object.values(save.getStageVersions(id)).some((r) => r.cleared === true)) won.add(id);
+    return won;
+  }
+  const unlockedMax = () => unlockedThrough(wonStageIds());
+  //  잠긴 판 = 공개 판 중 해금 범위 밖. 시제품(proto3)은 진행 순서 밖이라 잠그지 않는다(개발용 판 — 코인·기록 없음)
+  const isLocked = (id) => ALL_STAGE_IDS.includes(id) && id > unlockedMax();
+  //  ?dev=1(개발 확인 표시). ?stage=N 의 잠금 예외는 이 표시가 **함께** 있을 때만
+  function devFlag() {
+    try { return !!(win && win.location) && typeof URLSearchParams === 'function' && new URLSearchParams(win.location.search).get('dev') === '1'; } catch { return false; }
+  }
+  //  잠긴 판 요청: 안내 + 스테이지 선택 화면(열린 마지막 판이 있는 쪽으로)
+  function refuseLocked() {
+    notice = { text: LOCK_NOTICE, t: NOTICE_SEC };
+    titlePage = Math.max(0, Math.floor(ALL_STAGE_IDS.indexOf(unlockedMax()) / TITLE_PAGE));
+    if (state !== 'title') toTitle();
+  }
+
   function startRun(id) {
+    //  r4.3 순차 해금: **모든 출격 경로**(스테이지 버튼·타이틀 Enter·?stage=N·결과 [다음 작전]·[다시 도전])가 여기를 지난다 — 막는 곳은 여기 한 곳.
+    //   개발 확인용 ?stage=N 은 ?dev=1 이 함께 있을 때만 **그 판에 한해** 예외이고, 그렇게 연 잠긴 판은 개발용 판(코인·기록 없음)이다
+    const locked = isLocked(id);
+    const devPass = locked && devFlag() && devStageId() === id;
+    if (locked && !devPass) { refuseLocked(); return false; }
+    notice = null;
     //  랜덤 길 시드는 **판마다** 다르다(계약서 3-9 = '재도전 동일 배치' 원칙의 명시적 예외).
     //   시계는 셸에만 둔다 — 규칙 계층(stages.buildStage)은 인자로 받은 시드로 mulberry32 를 한 번 돌릴 뿐이다.
     const tries = save.getStage(id, stageVersion(id), difficulty).attempts || 0;
@@ -504,7 +585,7 @@ export function boot(canvas, deps = {}) {
     //  개발 확인용 시작 무기(r3.10): rush3.html?weapon=scatter&mk=2 — 규칙엔 startWeapon/startMk 로만 들어가고, 이 판은 기록에 남기지 않는다
     const devStart = devStartWeapon();
     run = createRun(stage, devStart);
-    run.devWeapon = !!devStart.startWeapon || PROTO_IDS.includes(id);
+    run.devWeapon = !!devStart.startWeapon || PROTO_IDS.includes(id) || devPass;
     //  랜덤 길 실제 결과 집계(계약서 3-9 결과 문구). 규칙이 아니라 셸이 갖는 칸이다 — 규칙 모듈은 lottery 를 모른다
     run.lotteryOutcome = run.lottery ? emptyLotteryOutcome() : null;
     //  기록은 stageId + 코스 버전 + 난이도로 묶는다(run.stageVersion = stage.version, run.difficulty = stage.difficulty)
@@ -520,9 +601,58 @@ export function boot(canvas, deps = {}) {
     if (run.objective && run.objective.kind === 'capsule') { fx.objText = OBJECTIVE_BANNER_TEXT; fx.objT = FX.objectiveBannerSec; }
     save.updateStage(id, { attempts: (save.getStage(id, ver, diff).attempts || 0) + 1 }, ver, diff);
     save.patch({ lastStage: id });
+    //  r4.3 코인: 출격 번호(지갑 runNo +1, 출격 시작 쓰기와 함께 — 지갑은 별도 키라 쓰기 1회 더) → 지급 식별자 `${runNo}:main`·`${runNo}:bonus`.
+    //   판 안 누계(tally)는 셸 변수 coin 에 둔다(규칙 모듈은 모른다). settled = 정산 결과(판당 kind 마다 1회)
+    coin = { runNo: save.wallet.startRun(), tally: createTally(stage, { dev: run.devWeapon }), settled: { main: null, bonus: null } };
     state = 'run';
     loop.start(nowSec());
     au.bgmPlay(BGM.stage[Math.max(0, Math.min(2, id - 1))]);
+    return true;
+  }
+
+  /** 정산(r4.3, 기획 v4.1 3-7): **지갑에 코인을 더하는 곳은 이 함수 하나.** 부르는 곳 네 곳 — 승리 이벤트(본전투분, commitMain 보다 먼저) ·
+   *  보너스 종료(보너스분) · 패배 이벤트(여운 전) · 포기 버튼(결과 화면을 띄우기 전). toTitle 은 부르지 않는다(commitMain 안전망만).
+   *  kind = 'main' | 'bonus'. 판당 kind 마다 1회(coin.settled 표식) + 지갑의 지급 식별자로 한 번 더 막는다(새로고침·다른 경로로 다시 불려도 중복 없음).
+   *  첫 클리어 판정은 **지갑의 첫 클리어 표식만** 본다 — 승리 프레임에 commitMain 이 cleared 를 먼저 써도 흔들리지 않는다(옛 지옥 칸 클리어도 v4 첫 클리어 1회) */
+  function settleRun(kind) {
+    const c = run ? coin : null;
+    if (!c) return null;
+    if (c.settled[kind]) return c.settled[kind];
+    const dev = !!run.devWeapon;
+    let parts, firstClear = null;
+    if (kind === 'main') {
+      const won = !!run.won;
+      const first = won && !dev && ALL_STAGE_IDS.includes(run.stageId) && !save.wallet.peek().firstClears.includes(run.stageId);
+      parts = { ...mainCoins(c.tally, { cleared: won, firstClear: first }), clearKind: null };
+      if (parts.clear > 0) parts.clearKind = first ? 'first' : 'replay';
+      if (first) firstClear = run.stageId;
+    } else {
+      const bonus = bonusCoins(run.stageId, run.bonus ? run.bonus.tier : 0, { dev });
+      parts = { enemy: 0, boss: 0, clear: 0, clearKind: null, bonus, total: bonus };
+    }
+    //  개발용 판은 지갑을 건드리지 않는다(0 코인 — 식별자도 남기지 않는다)
+    const res = dev ? { paid: false, coins: save.wallet.get().coins, saved: false }
+                    : save.wallet.pay({ id: c.runNo + ':' + kind, amount: parts.total, firstClear });
+    c.settled[kind] = { ...parts, paid: res.paid, balance: res.coins };
+    return c.settled[kind];
+  }
+
+  /** 출격 중 이번 판 코인(정산 전 누계 — HUD): 본전투 적·보스 소수 합의 반올림 + 보너스전이면 지금 단계의 보너스분. 개발용 판 = null(표시 안 함) */
+  function liveCoins() {
+    const c = run ? coin : null;
+    if (!c || run.devWeapon) return null;
+    return tallyTotal(c.tally) + (run.bonus ? bonusCoins(run.stageId, run.bonus.tier) : 0);
+  }
+
+  /** ⏸ → [작전 중단](giveup, r4.3): 종전엔 곧장 타이틀이었다. 이제 정산 → '작전 중단' 결과 화면 → 선택.
+   *  승리·패배 여운(1.3·1.0초) 중이면 원래 결과(승리·패배) 화면 — 정산은 그 이벤트에서 이미 했다.
+   *  8번 보너스 도중이면 승리 결과 화면(본전투분만 — 보너스 점수·보너스 코인은 버려진다, 보너스 끝까지 가야 받는다) */
+  function giveUp() {
+    if (!run) { toTitle(); return; }
+    if (run.over) { finishRun(); return; }
+    if (run.won) { finishRun({ bonusCut: true }); return; }
+    settleRun('main');
+    finishRun({ aborted: true });
   }
 
   function pause() {
@@ -545,6 +675,7 @@ export function boot(canvas, deps = {}) {
     state = 'title';
     loop.stop(nowSec());
     run = null;
+    coin = null;
     au.bgmPlay(BGM.title);
   }
 
@@ -586,9 +717,11 @@ export function boot(canvas, deps = {}) {
     return run.mainRecord;
   }
 
-  function finishRun() {
+  //  opts(r4.3): aborted = 포기(작전 중단 — 승패 없음, 코인은 giveUp 이 먼저 정산) · bonusCut = 보너스 도중 포기(보너스 점수·bestBonus 를 버린다)
+  function finishRun(opts = {}) {
     const id = run.stageId, ver = run.stageVersion, diff = run.difficulty;
     const won = !!run.won;
+    const aborted = !!opts.aborted;
     //  승리 판의 본전투 기록은 'win' 프레임에 commitMain 이 이미 썼다(표식이 없으면 — 검사가 won/over 만 세운 판 — 여기서 쓴다). 패배 판은 cleared 유지·rescued 만
     const rec = won ? commitMain(run) : null;
     const cur = save.getStage(id, ver, diff);
@@ -601,21 +734,35 @@ export function boot(canvas, deps = {}) {
     //  구출 기록(r3.14): 승패와 무관하게 구출했으면 남는다(승리 판은 commitMain 이 이미 썼다 — OR 병합이라 다시 써도 같다)
     if (run.objective && run.objective.done) patch.rescued = true;
     //  보너스 점수(r3.15): 보너스가 있던 판만(희소 필드 bestBonus, 병합은 max). 신기록 여부는 생존 신기록과 별개 — 여기서만 쓴다(보너스는 over 에서 끝난다)
-    const bo = run.bonus;
+    //   r4.3: 보너스 도중 포기(bonusCut)면 미완 점수는 버린다(종전 toTitle 경로와 같은 규칙 — B-8)
+    const bo = opts.bonusCut ? null : run.bonus;
     const isBestBonus = !!bo && bo.score > (cur.bestBonus || 0);
     if (bo) patch.bestBonus = Math.max(cur.bestBonus || 0, bo.score);
     if (!run.devWeapon) save.updateStage(id, patch, ver, diff);
     const o = run.objective;
     const bonus = bo ? { score: bo.score, tier: bo.tier, hits: bo.hits, isBestBonus } : null;
+    //  코인(r4.3, 3-9): 정산은 이미 끝났다(settleRun — 승리·패배 이벤트, 보너스 종료, 포기). 여기서는 읽기만 한다
+    const c = coin, sm = c && c.settled.main, sb = c && c.settled.bonus;
+    const coins = c ? {
+      gained: (sm ? sm.total : 0) + (sb ? sb.total : 0),
+      enemy: sm ? sm.enemy : 0, boss: sm ? sm.boss : 0, clear: sm ? sm.clear : 0, clearKind: sm ? sm.clearKind : null, bonus: sb ? sb.bonus : 0,
+      balance: save.wallet.get().coins, dev: !!run.devWeapon,
+    } : null;
+    const nextId = won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null;
     result = {
       stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak, time, timeText: timeText(time), kills,
-      missedLine: missedLine(run), advice: adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }), isBest, saveOk: save.ok,
-      nextId: won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null,
+      //  다음 행동(3-9): 패배·포기 = adviceLine(가장 고칠 만한 원인), 승리 = advice.js 의 승리 문구
+      missedLine: missedLine(run), advice: won ? ADVICE_DEFAULT.won : adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }), isBest, saveOk: save.ok,
+      nextId,
       //  작전 목표(r3.14): 결과 한 줄 + 성공/실패 색 분기용 사본. 목표가 없는 판은 둘 다 null
       objective: o ? { kind: o.kind, done: o.done, missed: o.missed, n: o.n } : null,
       objectiveLine: objectiveLine(run),
       //  보너스전(r3.15): 점수 사본 + 결과 한 줄 '보너스 N점 · 단계 K'. 보너스가 없던 판은 둘 다 null
       bonus, bonusLine: bonusLine(bonus),
+      //  r4.3: 작전 중단(포기) · 코인(획득·내역·보유) · 원인 한 줄(패배·포기) · 24번 승리 = 모든 작전 완료 · 코인 저장 여부 · 읽기 전용 탭
+      aborted, coins, coinLine: coinBreakdown(coins), causeLine: won ? null : causeLine(run),
+      allClear: won && !run.devWeapon && id === ALL_STAGE_IDS[ALL_STAGE_IDS.length - 1] ? ALL_CLEAR_LINE : null,
+      coinSaveOk: save.wallet.ok, readOnly: save.readOnly,
     };
     state = 'result';
     loop.stop(nowSec());
@@ -642,6 +789,8 @@ export function boot(canvas, deps = {}) {
   const trapShown = (id) => !hiddenRow(id) && isFixedGateRow(rowById(id));
   function handleEvents(events) {
     collectLotteryOutcome(run.lotteryOutcome, events, run);
+    //  r4.3 코인 누계: 이 묶음의 kill(일정 스폰만)·bossKill 을 **먼저** 센다 — 같은 STEP 의 win·lose 를 처리할 때 누계가 이미 완전하다
+    if (coin) addEvents(coin.tally, events);
     let guardSfx = false;
     for (const ev of events) {
       switch (ev.type) {
@@ -766,12 +915,17 @@ export function boot(canvas, deps = {}) {
           break;
         //  정예 처치: 파편·흔들림은 매번, 효과음은 마지막(left 0)이면 승리음, 아니면 처치음. 남은 목표 배너는 bossesLeft 가 세운다
         //  r3.24: 처치 순간 큰 폭발 + 0.6초에 걸친 다단 폭발(onBossDeath 예약 → tickHitFx)
-        case 'bossKill': burstAt(ev.x, ev.z, ev.r, true); onBossDeath(fx, ev); fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']); break;
+        case 'bossKill':
+          burstAt(ev.x, ev.z, ev.r, true); onBossDeath(fx, ev); fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']);
+          //  r4.3: 보스 처치 때만 '+코인' 글자(일반 적 처치마다는 띄우지 않는다). 값 = 보스 1체 몫(V × 0.5 ÷ 보스 수)의 반올림
+          if (coin && !run.devWeapon && coin.tally.perBoss > 0) floaterAt(ev.x, ev.z, -60, '+' + Math.round(coin.tally.perBoss) + ' 코인', C.gold, true);
+          break;
         case 'bossesLeft':
           if (ev.left > 0) { fx.bossBannerText = '정예 ' + (ev.index + 1) + ' 격파 — 남은 목표 ' + ev.left; fx.bossBannerT = FX.bossKillBannerSec; }
           break;
         //  승리 확정 프레임(r3.15 검수 반영): 본전투 기록을 지금 쓴다 — 보너스전·여운 중 나가도 확정된 승리가 남는다
-        case 'win': commitMain(run); break;
+        //   r4.3: 본전투 코인 정산을 commitMain **보다 먼저**(여운·보너스 중에 나가도 지급은 이미 끝났다)
+        case 'win': settleRun('main'); commitMain(run); break;
         //  보너스전(r3.15): 시작 배너(슬롯 A) + 합류음 재사용. 정예가 있던 판만 보스 BGM 을 스테이지 BGM 으로 되돌린다
         //   (정예 없는 스테이지에 bonus 를 붙이면 스테이지 BGM 이 이미 흐르고 있어 다시 틀면 처음부터 재시작된다). 승리는 이미 확정 — 결과 화면은 over 로만
         case 'bonusStart':
@@ -782,7 +936,8 @@ export function boot(canvas, deps = {}) {
         case 'bonusTargetHit': fx.sfx.push(['crateHit']); break;
         case 'bonusHit': burstAt(ev.x, ev.z, BAL3.bonus.targetR, false, C.bonusBox); floaterAt(ev.x, ev.z, -30, '+' + ev.value, C.gold); fx.sfx.push(['crateBreak']); break;
         case 'bonusTier': floaterSquad(-130, '보상 단계 ' + ev.tier + '!', C.gold, true); fx.sfx.push(['weaponSwap']); break;
-        case 'bonusEnd': fx.sfx.push(['gateFlip']); break;
+        //  r4.3: 보너스 종료 = 보너스분 정산(단계 K × round(V × 0.25)). 도중에 나가면 이 이벤트가 없어 보너스분은 없다
+        case 'bonusEnd': fx.sfx.push(['gateFlip']); settleRun('bonus'); break;
         case 'bonusRespawn': break;
         //  아레나(r3.17): 광장 열림 연출 + 안내 배너(판마다 진입 시 1회). 정예 배너·효과음·BGM 은 같은 STEP 의 elite 이벤트가 맡는다
         case 'arenaEnter': fx.arenaOpen = FX.arenaOpenSec; fx.arenaT = FX.arenaGuideSec; fx.arenaText = ARENA_GUIDE_TEXT; break;
@@ -802,7 +957,8 @@ export function boot(canvas, deps = {}) {
         }
         //  착지 충격: 확장 링(화면 좌표·반지름 × 그 자리 배율) + 흔들림. hits > 0 이면 hurt 이벤트가 따로 나므로 피격 플래시·hurt 음은 그쪽이 맡는다
         case 'bossShock': { const q = sp(ev.x, ev.z); fx.shocks.push({ x: q.x, y: q.y, r: ev.r * q.s, t: 0, life: FX.shockRingSec }); fx.shakeT = FX.shakeDur; break; }
-        case 'lose': fx.sfx.push(['lose']); break;
+        //  r4.3: 패배 = 그때까지의 적·보스분 정산(여운 1.0초 **전** — 여운 중에 나가도 받는다)
+        case 'lose': fx.sfx.push(['lose']); settleRun('main'); break;
         default: break;
       }
     }
@@ -877,9 +1033,13 @@ export function boot(canvas, deps = {}) {
   }
 
   function view(now) {
-    const v = { state, now, buttons: [], saveOk: save.ok };
+    //  r4.3: coinSaveOk = 코인이 저장소에 남는가(쓰기 실패·차단 환경이면 경고) · readOnly = 다른 탭이 먼저 열려 이 탭은 저장하지 않음
+    const v = { state, now, buttons: [], saveOk: save.ok, coinSaveOk: save.wallet.ok, readOnly: save.readOnly };
     if (state === 'title') {
       const last = lastStageId();
+      //  r4.3 순차 해금: 잠긴 판은 자물쇠·흐린 버튼(disabled — hitButton 이 건너뛴다). 안내('앞 판을 먼저 깨야 합니다')는 잠깐
+      const lim = unlockedMax();
+      v.notice = notice && notice.t > 0 ? notice.text : null;
       //  r4.2: 난이도 토글 3칸을 지웠다(y 382 줄은 비워 둔다). 스테이지 버튼의 기록(sub)은 출격 줄(기본 = brutal) 칸의 기록 —
       //   종전 새 사용자 기본 선택이 지옥이었으므로 같은 칸(`버전:brutal`)이 그대로 이어진다
       //  24스테이지(B-2): 한 페이지 8칸(2열×4행) + 페이지 넘김
@@ -892,7 +1052,9 @@ export function boot(canvas, deps = {}) {
         const sub = (st.cleared ? '완료 · ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전')
           + (st.rescued === true ? ' · 구출✓' : '');
         const col = i % 2, row = Math.floor(i / 2);
-        v.buttons.push({ id: 'stage' + id, x: 60 + col * 184, y: TITLE_GRID.y + row * TITLE_GRID.dy, w: 176, h: TITLE_GRID.h, label: id + ' ' + m.title, sub, primary: last === id, small: true });
+        const locked = id > lim;
+        v.buttons.push({ id: 'stage' + id, x: 60 + col * 184, y: TITLE_GRID.y + row * TITLE_GRID.dy, w: 176, h: TITLE_GRID.h, label: id + ' ' + m.title,
+          sub: locked ? '잠김' : sub, primary: last === id && !locked, small: true, ...(locked ? { disabled: true, locked: true } : {}) });
       }
       v.buttons.push({ id: 'pageL', x: 60, y: TITLE_GRID.pageY, w: 100, h: 40, label: '◀ 이전', small: true, primary: false, disabled: pg === 0 });
       v.buttons.push({ id: 'pageInfo', x: 168, y: TITLE_GRID.pageY, w: 144, h: 40, label: (pg + 1) + ' / ' + pages, small: true, primary: false });
@@ -902,14 +1064,16 @@ export function boot(canvas, deps = {}) {
       v.run = run;
       const paused = state === 'paused';
       v.fx = paused ? { ...fx, gateFlash: { ...fx.gateFlash }, gateOpen: { ...fx.gateOpen }, shakeT: 0, hurtT: 0 } : fx;
-      v.hud = { distM: Math.max(0, Math.round((run.length - run.z) / 10)) };
+      //  r4.3: coins = 이번 판 코인(정산 전 누계 — 종전 난이도 칩 자리에 작게). 개발용 판은 null(칩 없음)
+      v.hud = { distM: Math.max(0, Math.round((run.length - run.z) / 10)), coins: liveCoins() };
       v.flat = flat;
       if (state === 'run') {
         v.buttons = [{ ...HUD_BTN }];
       } else if (state === 'paused') {
         v.buttons = [
           { id: 'resume', x: 120, y: 400, w: 240, h: 56, label: '계속하기', primary: true },
-          { id: 'giveup', x: 120, y: 480, w: 240, h: 44, label: '스테이지 선택' },
+          //  r4.3: 종전 [스테이지 선택](곧장 타이틀) → 정산 → 결과 화면. 판이 끝난 뒤(여운·보너스)엔 그 판의 결과 화면이라 '결과 보기'
+          { id: 'giveup', x: 120, y: 480, w: 240, h: 44, label: run.over || run.won ? '결과 보기' : '작전 중단' },
           { id: 'vol_down', x: 120, y: 548, w: 64, h: 44, label: '−' },
           { id: 'mute', x: 192, y: 548, w: 96, h: 44, label: au.isMuted() ? '🔇' : '음량 ' + Math.round(au.getVolume() * 100) + '%' },
           { id: 'vol_up', x: 296, y: 548, w: 64, h: 44, label: '+' },
@@ -956,7 +1120,7 @@ export function boot(canvas, deps = {}) {
       if (id === 'pause') pause();
     } else if (state === 'paused') {
       if (id === 'resume') resume();
-      else if (id === 'giveup') toTitle();
+      else if (id === 'giveup') giveUp();
     } else if (state === 'result') {
       if (id === 'retry') startRun(result.stageId);
       else if (id === 'next' && result.nextId) startRun(result.nextId);
@@ -1018,7 +1182,8 @@ export function boot(canvas, deps = {}) {
       //  r4.2: 타이틀의 1/2/3(난이도 선택) 분기를 지웠다 — 숫자 키는 이제 아무 일도 하지 않는다
       if (code === 'Space' || code === 'Enter') {
         if (state === 'title') startRun(lastStageId());
-        else if (state === 'result') startRun(result.stageId);
+        //  r4.3 결과 화면 기본 버튼(3-9): 승리 = [다음 작전], 패배·포기 = [다시 도전](종전엔 승패와 상관없이 재도전). 24번 승리(다음 없음)는 [다시 도전]
+        else if (state === 'result') startRun(result.won && result.nextId ? result.nextId : result.stageId);
         else if (state === 'paused') resume();
       }
     });
@@ -1059,6 +1224,8 @@ export function boot(canvas, deps = {}) {
     //  화면 안(부대 앞 거리 d 80~520)에서 반응 중인 적만 — 먼 곳(화면 위 밖)에서 맞기 시작하는 적을 캡처가 기다리지 않게
     hitSeen: run ? run.enemies.concat(run.bosses).filter((e) => !e.dead && fx.hit[e.id] && fx.hit[e.id].t < FX.hit.knockSec && e.z - run.z > 80 && e.z - run.z < 520).map((e) => fx.hit[e.id].role) : [],
     recruits: fx.recruits.length, corpseRoles: fx.corpses.map((c) => c.role ?? 'grunt'), parts: fx.parts.length, booms: fx.booms.length,
+    //  r4.3 코인·해금 관찰: 이번 판 누계(HUD 값)·보유 코인·열린 마지막 판·읽기 전용 탭·탭 id
+    coins: run ? liveCoins() : null, wallet: save.wallet.get().coins, unlocked: unlockedMax(), readOnly: save.readOnly, tabId: tab.id,
   });
   if (win) win.__rush3Dbg = dbg;
 
@@ -1106,6 +1273,7 @@ export function boot(canvas, deps = {}) {
     const now = nowMs / 1000;
     const dt = lastFx === null ? 0 : Math.min(0.05, Math.max(0, now - lastFx));
     lastFx = now;
+    if (notice) { notice.t -= dt; if (notice.t <= 0) notice = null; }
     if (state === 'run') {
       loop.frame(now);
       //  랜덤 길 공개: 통로 확정선을 넘는 프레임에 '?' 상자를 걷고 효과음 1회(좋음 gateFlip / 꽝 hurt 재사용)
@@ -1138,7 +1306,9 @@ export function boot(canvas, deps = {}) {
   });
 
   //  r4.2: 외부 API 의 getDifficulty/setDifficulty 는 지웠다(난이도 선택 삭제)
-  return { dbg, ready, startRun, pause, resume, toTitle, getState: () => state, getRun: () => run, getFx: () => fx, loop, input };
+  //  r4.3: giveUp(⏸ → [작전 중단] 과 같은 경로) · getResult(결과 화면 값) · getNotice(스테이지 선택 안내)
+  return { dbg, ready, startRun, pause, resume, toTitle, giveUp, getState: () => state, getRun: () => run, getFx: () => fx, getResult: () => result,
+           getNotice: () => (notice ? notice.text : null), loop, input };
 }
 
 if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'));

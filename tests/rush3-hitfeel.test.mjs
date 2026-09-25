@@ -11,6 +11,7 @@ import { projectorFor } from '../rush3/project.js';
 import { createRenderer3, hitRole, HIT_FLASH_FILL } from '../rush3/render.js';
 import { boot, makeFx, onEnemyHit, onEnemyDeath, onBossDeath, onJoin, tickHitFx, addCorpse, trimParts } from '../rush3/main.js';
 import { createSave3 } from '../rush3/save.js';
+import { seedOldClears } from './lib/rush3-unlock.mjs';
 
 const FX = BAL3.fx;
 //  r4.1: 기본 보기 = '가까이'(표준 칸 삭제). 이 파일의 PJ 는 검사 안 좌표 함수에만 쓰인다
@@ -206,7 +207,8 @@ test('V3-HITFEEL HF-9: 연출은 규칙 run 을 쓰지 않는다 — 피격·사
   const queue = [];
   let nowMs = 1000;
   //  r4.2: 종전 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
-  const app = boot(fakeCanvas(null), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save: createSave3(fakeStorage()), audio: fakeAudio(), sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });
+  //  r4.3 순차 해금: 13번으로 곧장 출격 — '옛 저장에 1~12번 클리어 기록이 있는 사용자'(옛 버전 칸 — 화면·코인 무영향, tests/lib/rush3-unlock.mjs)
+  const app = boot(fakeCanvas(null), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save: seedOldClears(createSave3(fakeStorage()), 12), audio: fakeAudio(), sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });
   await app.ready;
   const frame = (dt) => { nowMs += dt; queue.shift()(nowMs); };
   app.startRun(13);
