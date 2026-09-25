@@ -565,10 +565,14 @@ test('UNLOCK: 네 진입 경로 모두 startRun 에서 거부 — 스테이지 �
   assert.ok(h.textNow().includes(LOCK_NOTICE), '안내 글');
   h.frames(200);
   assert.equal(h.app.getNotice(), null, '안내는 잠깐(2.5초)');
-  //  ② 타이틀 Enter — 마지막 출격 판이 잠긴 판이면 거부
+  //  ② 타이틀 Enter — 옛 저장의 마지막 출격 판이 잠긴 판이면 열린 마지막 판으로 낮춰 출격(잠긴 판으로는 가지 않는다).
+  //   종전(537e731)엔 거부 + 안내였으나, 옛 기록을 가진 사용자가 Enter 를 누를 때마다 막히는 문제가 있어 보정
   const h2 = await bootApp({ storage: memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, lastStage: 5 }) }) });
   h2.key('Enter');
-  assert.equal(h2.app.getState(), 'title'); assert.equal(h2.app.getNotice(), LOCK_NOTICE);
+  assert.equal(h2.app.getState(), 'run'); assert.equal(h2.app.getRun().stageId, 1, '잠긴 5 대신 열린 마지막 판 1');
+  const h2b = await bootApp({ storage: memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: { 1: { cleared: true }, 2: { cleared: true } }, lastStage: 9 }) }) });
+  h2b.key('Enter');
+  assert.equal(h2b.app.getRun().stageId, 3, '1·2 클리어 + 마지막 9(잠김) → 3');
   //  ③ ?stage=N(개발 확인용) — ?dev=1 없이는 거부
   const h3 = await bootApp({ search: '?stage=5' });
   h3.key('Enter');

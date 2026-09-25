@@ -537,7 +537,10 @@ export function boot(canvas, deps = {}) {
     const dev = devStageId();
     if (dev) return dev;
     const id = save.get().lastStage;
-    return ALL_STAGE_IDS.includes(id) ? id : ALL_STAGE_IDS[0];
+    //  r4.3 보정: 옛 저장의 마지막 판이 순차 해금으로 잠겨 있으면 열린 마지막 판을 고른다
+    //   (그대로 두면 옛 기록을 가진 사용자는 타이틀 Enter 가 매번 '앞 판을 먼저 깨야 합니다'로 막힌다)
+    if (ALL_STAGE_IDS.includes(id)) return isLocked(id) ? unlockedMax() : id;
+    return ALL_STAGE_IDS[0];
   }
   //  타이틀 스테이지 목록 페이지(8칸 = 2열×4행). -1 = 마지막으로 한 스테이지가 있는 쪽
   const TITLE_PAGE = TITLE_GRID.perPage;
