@@ -292,7 +292,7 @@ export function tickHitFx(fx, dt, { sp, squad, burstAt }) {
 
 //  게이트 피격 플래시(초): 규칙의 cell.flashT 는 감소되지 않으므로(계약서 4장 STEP 순서에 없음) 연출 타이머는 셸이 갖는다
 const GATE_FLASH_SEC = BAL3.gate.flashT;
-//  무기 강화 단계 표기(HUD·플로터 공용, render.MK_LABEL 과 같은 값)
+//  판 안 무기 Mk 단계 글자(플로터·랜덤 길 결과용 — 앞에 ' Mk '를 붙여 쓴다. HUD 칩은 render.MK_LABEL). '강화'는 판 밖 로봇 강화에만 쓰는 말
 const MK_LABEL = ['', 'I', 'II', 'III'];
 
 export function makeFx() {

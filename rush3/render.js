@@ -2122,7 +2122,9 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillRect(0, 0, W, H);
     }
     drawHud(view);
-    drawBanners(fx);
+    //  r4.5 보정: 결과 화면 밑으로는 안내·경고 배너를 그리지 않는다 — 출격 직후 [작전 중단]이면 첫 플레이 안내(y 268)가
+    //   반투명 결과 오버레이 너머로 '최고 병력' 줄과 겹쳐 비쳤다(2026-09-25 캡처 06·09)
+    if (view.state !== 'result') drawBanners(fx);
   }
 
   function draw(view) {

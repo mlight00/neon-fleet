@@ -784,3 +784,17 @@ test('V3-PURE-COIN: 규칙 모듈은 코인·저장을 모른다 — combat/gate
   const tail = combat.slice(combat.indexOf('export function stepRun'));
   for (const s of ['BAL3.enemies', 'EN[', 'EN.', 'difficult']) assert.ok(!tail.includes(s), 'DIFF-6: ' + s);
 });
+
+//  r4.5 보정: 출격 직후 [작전 중단] — 첫 플레이 안내 배너가 결과 화면 밑으로 비치지 않는다(캡처 06·09 에서 '최고 병력' 줄과 겹쳤음)
+test('RESULT-NO-BANNER: 출격 직후 포기해도 결과 화면엔 첫 플레이 안내 배너를 그리지 않는다(출격 중에는 그린다)', async () => {
+  const GUIDE = '좌우로 드래그 · 쏴서 숫자를 키우세요';
+  const h = await bootApp();
+  h.app.startRun(1);
+  h.frames(10);
+  assert.ok(h.textNow().includes(GUIDE), '출격 직후엔 안내 배너가 보인다(검사 전제)');
+  h.app.giveUp();
+  assert.equal(h.app.getState(), 'result');
+  const t = h.textNow();
+  assert.ok(t.includes('작전 중단'), '포기 결과 화면: ' + JSON.stringify(t.slice(0, 6)));
+  assert.ok(!t.includes(GUIDE), '결과 화면 밑으로 안내 배너가 그려지면 안 된다');
+});
