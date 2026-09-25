@@ -4,7 +4,7 @@
 //   비용·구매 = rush3/meta.js 의 같은 함수(nextCost·buy). 랜덤 길(3·12번)은 기본 시드 하나(LOTTERY_DEFAULT_SEED — 셸은 판마다 시드가 바뀜).
 //  ⚠️모든 값 = 정해진 입력으로 한 판씩 돌린 **결정적 봇 결과**다. 사람의 성공률·사람의 수입이 아니다. 판 사이 이동·재시작 5초는 가정이다.
 //
-//  명령(오래 걸리는 측정은 나눠 돌린다 — 한 번에 --budget 초(기본 420)를 넘기면 저장하고 멈춘다. 같은 명령을 다시 부르면 이어서 한다):
+//  명령(오래 걸리는 측정은 나눠 돌린다 — 한 번에 --budget 초(기본 280)를 넘기면 저장하고 멈춘다. 같은 명령을 다시 부르면 이어서 한다):
 //   node tools/sweep-v4.mjs grid [--bundles 0-4] [--bots evLead,aimLead,planBoss]   강화 묶음 × 판 1~24 × 봇 → runs-<봇>.json(판 기록 캐시)
 //   node tools/sweep-v4.mjs enum --stages 2,9 [--bots evLead]                        지정한 판의 강화 묶음 144개 전부(벽 판의 '이기는 최소 비용')
 //   node tools/sweep-v4.mjs verify                                                   묶음 (0,0,0) 이 V4-REAL 기준값 파일과 같은가(도구 = 셸 경로 확인)
@@ -15,7 +15,8 @@
 //   node tools/sweep-v4.mjs summary [--tag before]                                    표 → summary[.tag].json(요약 줄만 stdout)
 //   node tools/sweep-v4.mjs tables [--tag before]                                     summary·prog·econ 파일 → 보고서용 markdown 표(stdout, 새 판 없음)
 //  출력 폴더: newmode/v3/research/v4-balance-20260925/ (--out 으로 바꿀 수 있음)
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
@@ -38,7 +39,7 @@ export const BOTS = ['evLead', 'aimLead', 'planBoss'];
 export const MAX_STEPS = 28800;        // 한 판 상한(8분). V4-REAL 은 14,400 — 넉넉히 두고 시간 초과는 따로 센다(기획 v4.1 3-2 '측정 상한 주의')
 export const RESTART_SEC = 5;          // 판 사이 이동·재시작 [가정]
 export const T_LIST = [15, 30, 45, 60, 90];
-const BUDGET_SEC = Number(opt('budget', '420'));
+const BUDGET_SEC = Number(opt('budget', '280'));
 const t0 = Date.now();
 const overBudget = () => (Date.now() - t0) / 1000 > BUDGET_SEC;
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
@@ -136,7 +137,15 @@ export function playRec(id, bot, up) {
 }
 
 // ───────────────────────── 판 기록 캐시(봇마다 한 파일) ─────────────────────────
-const EFFECT_SIG = JSON.stringify({ UP_EFFECT, MAX_STEPS, diff: PLAY_DIFFICULTY });
+//  서명 = 강화 효과 폭·상한·줄 + **게임 코드 지문**(rush3/*.js · 봇 입력 tests/lib/rush3-policies.mjs, 줄바꿈 LF 로 맞춤).
+//   판 수치·게임 코드를 바꾸면 서명이 달라져 옛 판 기록(runs-*.json)을 조용히 다시 쓰지 않는다(r4.6 검토 보정 — 종전엔 효과 폭만 봤다)
+function srcHash() {
+  const h = createHash('sha256');
+  const files = readdirSync(join(ROOT, 'rush3')).filter((f) => f.endsWith('.js')).sort().map((f) => 'rush3/' + f).concat(['tests/lib/rush3-policies.mjs']);
+  for (const f of files) h.update(f + '\n' + readFileSync(join(ROOT, f), 'utf8').replace(/\r\n/g, '\n'));
+  return h.digest('hex').slice(0, 16);
+}
+const EFFECT_SIG = JSON.stringify({ UP_EFFECT, MAX_STEPS, diff: PLAY_DIFFICULTY, src: srcHash() });
 const runsPath = (bot) => join(OUT, `runs-${bot}.json`);
 const caches = {};
 function cacheOf(bot) {
@@ -144,7 +153,7 @@ function cacheOf(bot) {
   let c = { meta: { bot, effectSig: EFFECT_SIG, note: '결정적 1판 봇 결과(사람의 성공률 아님). 키 = 판/직격화력·연사·다연발 단계' }, runs: {} };
   if (existsSync(runsPath(bot))) {
     const f = JSON.parse(readFileSync(runsPath(bot), 'utf8'));
-    if (f.meta.effectSig !== EFFECT_SIG) throw new Error(`runs-${bot}.json 의 효과·설정 서명이 지금 코드와 다릅니다(강화 효과 폭을 바꿨다면 --out 으로 다른 폴더에). 파일=${f.meta.effectSig} 지금=${EFFECT_SIG}`);
+    if (f.meta.effectSig !== EFFECT_SIG) throw new Error(`runs-${bot}.json 의 효과·설정 서명이 지금 코드와 다릅니다(강화 효과 폭·판 수치·게임 코드를 바꿨다면 --out 으로 다른 폴더에, 또는 runs-*.json 을 지우고 다시). 파일=${f.meta.effectSig} 지금=${EFFECT_SIG}`);
     c = f;
   }
   caches[bot] = c;
@@ -536,7 +545,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       const fx = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/rush3-v4-real.json'), 'utf8'));
       let bad = 0, n = 0;
       for (const bot of BOTS) for (const st of ALL_STAGE_IDS) {
-        const f = fx.runs[`${bot}/${st}`], r = getRun(bot, st, { power: 0, rate: 0, multi: 0 });
+        //  r4.6 검토 보정: 캐시(getRun)가 아니라 **새로 돌린 판**과 비교해야 '도구 = 셸 경로' 확인이 된다
+        const f = fx.runs[`${bot}/${st}`], r = playRec(st, bot, { power: 0, rate: 0, multi: 0 });
         n++;
         const pairs = [['won', r.won, f.won], ['over', r.over, f.over], ['steps', r.steps, f.steps], ['survivors', r.unitsEnd, f.survivors], ['peak', r.peak, f.peak],
           ['kills', r.killsAll, f.kills], ['time', r.time, f.time], ['gates', JSON.stringify(r.gates), JSON.stringify(f.gates)], ['loss', JSON.stringify(r.loss), JSON.stringify(f.loss)],
