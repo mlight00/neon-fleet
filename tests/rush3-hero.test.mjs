@@ -338,3 +338,18 @@ test('V4-REAL: 셸 실제 설정(기본 줄 + heroGuard + 강화 0) 1~24 × evLe
   //  보호 규칙이 실제로 일한 판이 있다(기준값이 '보호 없음'과 같은 파일이 아니다)
   assert.ok(V4_BOTS.some((b) => fx.meta.summary[b].transfers > 0), '피해 이전이 일어난 판이 있다');
 });
+
+//  r4.4 검토 보정: 음수 칸을 applied 0 으로 지난 판의 문구는 로봇이 **살아 있을 때만** '로봇은 빠지지 않음'.
+//   같은 STEP 에 적 피해로 로봇까지 쓰러져 병력 0 이면(applied 0) 그 말은 사실과 반대다
+test('HERO-TEXT: 랜덤 길 함정 문구 — 로봇 생존이면 "로봇은 빠지지 않음", 병력 0(로봇 쓰러짐)이면 "함정 통과"만', async () => {
+  const { lotteryLine } = await import('../rush3/main.js');
+  const mk = (units) => ({
+    lottery: { kind: 'gate', wallId: 'w1', label: '함정 −10', good: false },
+    wallSideLog: { w1: 'R' }, units,
+  });
+  const out = { passed: true, value: -10, applied: 0 };
+  assert.equal(lotteryLine(mk([{ hero: true, hp: 2 }]), { outcome: out }), '랜덤 길: 함정 통과 · 로봇은 빠지지 않음');
+  assert.equal(lotteryLine(mk([]), { outcome: out }), '랜덤 길: 함정 통과');
+  //  병사가 빠진 판은 종전 그대로
+  assert.equal(lotteryLine(mk([{ hero: true, hp: 2 }]), { outcome: { passed: true, value: -10, applied: -3 } }), '랜덤 길: 함정 피해 −3명');
+});

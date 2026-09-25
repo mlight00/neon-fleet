@@ -397,7 +397,8 @@ function chosenLine(run, lot, out, weaponSame) {
     if (!out || !out.passed) return '랜덤 길: 꽝 ' + lot.label;
     //  쏴서 0 까지 올린 판 = 위험을 막아낸 판이다. '꽝'으로 적으면 잘한 것을 잘못 전한다
     //  r4.4 메인 로봇 보호(D4′-a): 로봇 혼자 음수 칸을 지나면 빠지는 병사가 없어 applied 0 이지만 칸 값은 음수다 — '무력화'가 아니다
-    if (out.applied === 0 && out.value < 0) return '랜덤 길: 함정 통과 · 로봇은 빠지지 않음';
+    //   (같은 STEP 에 적 피해로 로봇까지 쓰러져 병력 0 이면 applied 0 이어도 '로봇은 빠지지 않음'이 아니다 — r4.4 검토 보정)
+    if (out.applied === 0 && out.value < 0) return (run.units || []).some((u) => u.hero) ? '랜덤 길: 함정 통과 · 로봇은 빠지지 않음' : '랜덤 길: 함정 통과';
     return out.applied === 0 ? '랜덤 길: 위험 게이트 무력화 · 손실 0'
                              : '랜덤 길: 함정 피해 −' + (-out.applied) + '명';
   }
@@ -911,7 +912,9 @@ export function boot(canvas, deps = {}) {
         case 'gatePass': {
           if (ev.idx < 0) { floaterSquad(-90, '우회', C.gateZero); break; }
           //  r4.4 메인 로봇 보호(D4′-a): 로봇 혼자 음수 칸을 지나면 빠지는 병사가 없다(applied 0) — '−0' 대신 '로봇 보호'
-          const txt = ev.value > 0 ? '+' + ev.applied : ev.value < 0 ? (ev.applied === 0 ? '로봇 보호' : '−' + (-ev.applied)) : '0';
+          //   로봇이 같은 STEP 에 쓰러져 병력 0 이면(applied 0) '로봇 보호'가 사실과 반대다 — 종전처럼 '−0'(r4.4 검토 보정)
+          const heroUp = run.units.some((u) => u.hero);
+          const txt = ev.value > 0 ? '+' + ev.applied : ev.value < 0 ? (ev.applied === 0 ? (heroUp ? '로봇 보호' : '−0') : '−' + (-ev.applied)) : '0';
           floaterSquad(-90, txt, ev.value > 0 ? C.gatePos : ev.value < 0 ? C.gateNeg : C.gateZero, true);
           //  양수 통과(r3.24): 병사 합류와 같은 꼴 — 부대 위 반짝임
           if (ev.value > 0 && ev.applied > 0) squadSparkle(C.gatePos);
