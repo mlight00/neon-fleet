@@ -1,6 +1,7 @@
 // rush3/save.js — rush/save.js 복제(계약서 7장). 단일 키 localStorage, storage 주입으로 Node 테스트 가능.
 //  starforgeRush.v1 은 읽지도 쓰지도 않는다. 손상 원문은 .bak 에 보존 후 기본값.
-//  최상위 필드: lastStage · difficulty(r4.2 부터 읽지 않는 칸 — 아래 PICK_DEFAULT) · volume · mute · seenShutter(첫 셔터 안내를 봤는가) · seenVehicle(첫 차량 안내를 봤는가, r3.13).
+//  최상위 필드: lastStage · difficulty(r4.2 부터 읽지 않는 칸 — 아래 PICK_DEFAULT) · volume · mute · seenShutter(첫 셔터 안내를 봤는가) · seenVehicle(첫 차량 안내를 봤는가, r3.13) ·
+//   seenUpHint·seenUpRec(r4.5 — 첫 '로봇 강화 가능' 안내·다연발 '추천' 표시를 봤는가).
 //  스테이지 기록은 stageId + stageVersion + 난이도로 묶는다: stages[id].versions[key] = { cleared, attempts, bestSurvivors, bestTime, rescued?: true, bestBonus?: 수, survUp?: 스냅샷, timeUp?: 스냅샷 }.
 //   key = `${version}`(보통 normal — 접미 없음, 옛 기록 그대로) | `${version}:${difficulty}`(어려움·지옥). 계약서 7장·3-8.
 //   r4.2(난이도 선택 삭제): 게임 화면은 늘 `${version}:brutal` 칸에 쓴다(종전 새 사용자 기본 선택 = 지옥이라 같은 칸). 옛 보통·어려움 칸('2', '2:hard')은 지우지 않고 보존만 한다.
@@ -11,7 +12,7 @@
 //  r4.3(v4 ③단계): 코인 지갑은 **별도 키** WALLET_KEY(아래 '지갑'), 복수 탭 확인 표식은 TAB_KEY. v3 키의 형식(v: 3·defaults·normalize)은 그대로다.
 //   읽기 전용(setReadOnly — 먼저 열린 탭이 살아 있을 때)이면 v3 키·지갑 키 모두 쓰지 않는다.
 //  r4.4 (b): 로봇 강화 단계의 정규화·구매 판정은 순수 규칙 모듈 meta.js 의 것을 그대로 쓴다(최대 단계·비용이 한 곳에만 있게)
-import { UP_MAX, normUp, buy as buyUp } from './meta.js';
+import { UP_MAX, normUp, nextCost, buy as buyUp } from './meta.js';
 
 export const KEY3 = 'starforgeRush.v3';
 export const BAK3 = 'starforgeRush.v3.bak';
@@ -140,7 +141,9 @@ const PICK_DEFAULT = 'brutal';
 //  seenVehicle(r3.13) = 첫 차량 통 조우 배너를 본 적이 있는가 — seenShutter 와 같은 꼴(사용자당 1회). 스키마 v 는 3 그대로(빠진 키는 기본값)
 //  zoom = 종전 '가까이' 토글 자리. r4.1(2026-09-25)에서 보기가 '가까이' 하나로 고정돼 **읽지 않는다**(normalize 가 옛 값을 옮기지 않아 늘 false).
 //   칸은 형식 호환용으로만 남긴다 — 옛 저장에 true 가 있어도 해가 없다
-function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false, zoom: false }; }
+//  r4.5(v4 ⑤단계, 기획 v4.1 3-4 (나)·3-9): seenUpHint = 승리 결과 화면의 '로봇 강화 가능' 안내를 본 적이 있는가 · seenUpRec = 강화 화면의 다연발 '추천' 표시를 본 적이 있는가.
+//   seenShutter 와 같은 꼴(사용자당 1회, true 만 의미 — 비불리언은 false). 옛 코드 탭이 v3 키를 통째로 덮으면 사라져 안내가 한 번 더 뜰 뿐이다(해 없음)
+function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false, zoom: false, seenUpHint: false, seenUpRec: false }; }
 //  전체 정규화(형식이 맞는 원문에만 적용)
 function normalize(d) {
   const out = defaults();
@@ -151,6 +154,9 @@ function normalize(d) {
   out.mute = d.mute === true;
   out.seenShutter = d.seenShutter === true;
   out.seenVehicle = d.seenVehicle === true;
+  //  r4.5: 두 곳(defaults·normalize) 모두에 있어야 patch 때 조용히 버려지지 않는다
+  out.seenUpHint = d.seenUpHint === true;
+  out.seenUpRec = d.seenUpRec === true;
   return out;
 }
 
@@ -292,8 +298,11 @@ export function createSave3(storage) {
     },
     /** 로봇 강화 구매(r4.4 (b)): 저장소를 다시 읽어 합친 지갑에 meta.buy(비용표·최대 단계·잔액)를 적용해, 살 수 있으면 잔액 − 비용과 그 트랙 +1 을
      *  **setItem 한 번**으로 쓴다(잔액과 단계가 갈라지지 않게). 살 수 없으면(잔액 부족·최대 단계·모르는 트랙) 아무것도 쓰지 않는다.
-     *  → { ok, reason: null | 'coins' | 'max' | 'track', cost, coins, up, saved } */
+     *  → { ok, reason: null | 'coins' | 'max' | 'track' | 'readOnly', cost, coins, up, saved }
+     *  r4.5: 읽기 전용 탭이면 **메모리에도 반영하지 않고** 'readOnly' 로 거절한다(종전엔 저장되지 않는 구매가 메모리 잔액·단계에만 남았다 —
+     *   그 탭의 다음 출격이 사지 않은 강화로 돌았다). 셸은 그 밖의 '코인이 저장되지 않는' 환경(wallet.ok false)에서도 [구매]를 막는다 */
     buy: (track) => {
+      if (readOnly) return { ok: false, reason: 'readOnly', cost: nextCost(wallet.up, track), coins: wallet.coins, up: { ...wallet.up }, saved: false };
       const w = fresh();
       const r = buyUp(w, track);
       if (!r.ok) { wallet = normWallet(w); return { ok: false, reason: r.reason, cost: r.cost, coins: wallet.coins, up: { ...wallet.up }, saved: false }; }

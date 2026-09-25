@@ -45,6 +45,8 @@ export const SAVE_WARN = Object.freeze({
   coin: '코인이 저장되지 않습니다',
   record: '기록 저장 안 됨',
 });
+//  r4.5: 결과 화면 '획득 코인 +N'·'보유 코인 N' 뒤에 붙는 꼬리(코인이 저장소에 남지 않는 탭 — 읽기 전용·코인 저장 실패)
+export const UNSAVED_TAG = '저장 안 됨';
 //  칸 위 짧은 글의 화면 상단 한계(HUD 아래). 행이 화면 밖에서 들어오는 동안에도 글이 보이게 여기에 붙인다
 const TIP_MIN_Y = 96;
 //  r4.2(2026-09-25, 이사 지시 "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고"): 난이도 짧은 표기(HUD 칩·결과 제목 옆 '어려움'/'지옥')와
@@ -58,12 +60,16 @@ const TIP_MIN_Y = 96;
 const HUD_TOP = 16, HUD_H = 36, HUD_R = 18, HUD_FS = 15, HUD_GAP = 8, HUD_RIGHT = 14;
 const hudBoxOf = (w, right) => Object.freeze({ x: right - w, y: HUD_TOP, w, h: HUD_H });
 const HUD_PAUSE = hudBoxOf(44, W - HUD_RIGHT);
-const HUD_WEAPON = hudBoxOf(122, HUD_PAUSE.x - HUD_GAP);
+//  r4.5(v4 ⑤단계): 무기 칩 폭 122 → 148 — 판 안 표기 'Mk'(기획 v4.1 3-4 (라), 떠오르는 글 '기관총 Mk II!' 와 같은 꼴)를 칩 안에 한 줄로 넣는다.
+//   가장 긴 '기관총 Mk III'(bold 15px 실측 92.3px, Chromium)이 글자 시작(칩 x + 48)부터 오른쪽 여백 6px 안(글 폭 94px)에 들어가는 폭. 코인 칩·제목 끝선은 그만큼 왼쪽으로(아래 HUD_COIN)
+const HUD_WEAPON = hudBoxOf(148, HUD_PAUSE.x - HUD_GAP);
 //  r4.3 이번 판 코인 칩(v4 ③단계, 기획 v4.1 3-9 '출격 중 HUD'): 종전 난이도 칩(HUD_DIFF {w 64})이 있던 자리 — 무기 칩 왼쪽 같은 간격.
-//   셸이 view.hud.coins(정산 전 누계)를 숫자로 넘길 때만 그린다(개발용 판 = null → 칩 없음, 제목 끝선은 무기 칩 왼쪽 그대로)
+//   셸이 view.hud.coins(정산 전 누계)를 숫자로 넘길 때만 그린다(개발용 판 = null → 칩 없음, 제목 끝선은 무기 칩 왼쪽 그대로).
+//   r4.5: 무기 칩이 넓어져 x 220 → 194(무기 칩 왼쪽 같은 간격 — 겹치지 않는다). 제목 끝선은 194 − 6(가장 긴 '24  크라운 브레이커' 17px 156.6px 도 들어간다)
 const HUD_COIN = hudBoxOf(64, HUD_WEAPON.x - HUD_GAP);
-//  무기 강화 단계 표기(r3.10). Mk I 은 표기 없음
-export const MK_LABEL = Object.freeze(['', '', ' II', ' III']);
+//  무기 Mk 단계 표기(r3.10). Mk I 은 표기 없음. r4.5: 판 안 글(셸 떠오르는 글 '기관총 Mk II!'·랜덤 길 결과 '중화기 Mk II')과 같은 꼴 ' Mk II'
+//   (종전 ' II' — 기획 v4.1 3-4 (라) "판 안 = '기관총 Mk II'"). '강화'라는 말은 판 밖 로봇 강화에만 쓴다
+export const MK_LABEL = Object.freeze(['', '', ' Mk II', ' Mk III']);
 //  r4.1(2026-09-25): '가까이 ○/●' 토글 칩(종전 ZOOM, HUD 왼쪽 셋째 줄 {x16, y84, w70, h26})을 지웠다 — 보기는 '가까이' 하나뿐(project.js).
 
 //  탄 그림의 화면 길이(px, Mk I 기준). 무기마다 실루엣이 달라 길이도 다르게: 저격 바늘이 가장 길고 산탄 펠릿 뭉치는 짧고 넓다
@@ -89,6 +95,32 @@ export const HERO_RING_COLOR = '#BFF6FF';
 //  r4.4 (b) 로봇 다연발 **추가 탄**(extra — 게이트·증원 설비에 무효, 이사님 결정 N3)의 꼬리 색. 무기 6색·적탄 마젠타와 겹치지 않는 연보라 —
 //   '게이트를 올리는 원래 탄'과 눈으로 구분되게(기획 v4.1 3-4 (다) ②). 검사가 이 값으로 그리기 호출을 찾는다
 export const EXTRA_BULLET_COLOR = '#D9A6FF';
+//  r4.5(v4 ⑤단계, 원본 v4 3-5 '메인 로봇' 줄): 로봇 강화가 1단계 이상인 판에서 **로봇의 탄**(원래 탄 + 추가 탄)에 두르는 옅은 테.
+//   추가 탄 꼬리(EXTRA_BULLET_COLOR)와 같은 연보라 계열로 '로봇 탄 = 연보라'를 한 벌로 맞추고, 보호막 고리(HERO_RING_COLOR 흰 하늘색)와는 색이 달라
+//   로봇 자리에서 탄이 나올 때 고리와 섞여 보이지 않는다. 병사 탄에는 두르지 않는다(병사도 강해졌다고 오해하지 않게, 기획 v4.1 3-4 (가)). 검사가 이 값으로 찾는다
+export const HERO_BULLET_RIM = 'rgba(217,166,255,0.85)';
+
+//  r4.5 강화 화면(새 상태 'upgrade', 원본 v4 3-5 '강화 화면')의 **자리표 단일 출처** — 셸(main.js)의 [구매]·[돌아가기] 히트 상자가 이 표에서 나온다
+//   (HUD_ROW 와 같은 원칙: 그리는 자리와 누르는 자리가 갈라지지 않게 좌표를 두 곳에 적지 않는다). 480×800 기준.
+//   위 머리(제목 · 설명 두 줄 · 보유 코인 · 구매 막힘 이유) → 트랙 카드 3장(직격 화력 · 연사 · 다연발) → [돌아가기].
+//   카드 안: 이름 + 단계 막대(■■■□□) · '지금 → 다음' 효과 한 줄 · 보조 한 줄 · 짧은 설명 한 줄 · 오른쪽 아래 [구매](비용은 버튼 아랫줄)
+export const UPGRADE_UI = Object.freeze({
+  titleY: 76, headY: [104, 124], coinY: 162, blockY: 192,
+  cardX: 20, cardW: 440, cardY0: 208, cardH: 144, cardGap: 12,
+  textX: 38, textMaxW: 290,
+  buy: Object.freeze({ w: 104, h: 54, padR: 14, padB: 14 }),
+  back: Object.freeze({ x: 150, y: 686, w: 180, h: 48 }),
+});
+/** 트랙 카드 i(0·1·2)의 상자 */
+export function upgradeCard(i) {
+  const U = UPGRADE_UI;
+  return { x: U.cardX, y: U.cardY0 + i * (U.cardH + U.cardGap), w: U.cardW, h: U.cardH };
+}
+/** 트랙 카드 i 의 [구매] 버튼 상자(카드 오른쪽 아래) */
+export function upgradeBuyBox(i) {
+  const c = upgradeCard(i), B = UPGRADE_UI.buy;
+  return { x: c.x + c.w - B.padR - B.w, y: c.y + c.h - B.padB - B.h, w: B.w, h: B.h };
+}
 
 export function bulletAngle(b) {
   const vx = b.vx || 0, vz = b.vz || 1;
@@ -1243,6 +1275,10 @@ export function createRenderer3(ctx, sprites) {
   //   뒤에 무기색 꼬리(알파 그라디언트)를 깐다. 위치·크기는 그 자리 배율(q.s)을 곱해 원근을 따른다.
   //   Mk 강화의 탄 폭(b.w)이 그림 크기에도 반영된다. 그림이 없으면 종전 막대 폴백(같은 색·같은 자리).
   function drawBullets(run) {
+    //  r4.5 로봇 탄 테: 강화가 1단계 이상인 판(run.heroUp — 강화 0 이면 null)에서만, 로봇(hero 표시 유닛)이 쏜 탄(ownerId)에만.
+    //   규칙은 건드리지 않는다(탄에 새 칸을 싣지 않고 ownerId 로 가린다). 로봇이 쓰러진 뒤(보호를 끈 판)는 테가 없다
+    const heroU = run.heroUp ? (run.units || []).find((u) => u.hero) : null;
+    const heroId = heroU ? heroU.id : null;
     for (const b of run.bullets) {
       if (b.dead) continue;
       const d = b.z - run.z;
@@ -1251,6 +1287,7 @@ export function createRenderer3(ctx, sprites) {
       const w = WEAPONS[b.kind] ?? WEAPONS.rifle;
       //  꼬리·폴백 막대 색: 무기색. 로봇 다연발 추가 탄(b.extra)만 EXTRA_BULLET_COLOR(r4.4 — 원래 탄과 구분)
       const tint = b.extra ? EXTRA_BULLET_COLOR : w.color;
+      const rim = heroId !== null && b.ownerId === heroId;
       const bw0 = b.w ?? w.w;        // Mk 로 탄 폭이 커진다(트랙 기준)
       const bw = bw0 * k;
       const len = (10 + bw0 * 1.5) * k;
@@ -1271,6 +1308,11 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillRect(-Math.max(2, bw * 0.4), 0, Math.max(4, bw * 0.8), tail);
         ctx.globalAlpha = 1;
         ctx.drawImage(im, -iw / 2, -hh * 0.75, iw, hh);
+        //  로봇 탄 테(r4.5): 탄 그림을 감싸는 옅은 연보라 타원 한 줄
+        if (rim) {
+          ctx.strokeStyle = HERO_BULLET_RIM; ctx.lineWidth = Math.max(1, 1.6 * k);
+          ctx.beginPath(); ctx.ellipse(0, -hh * 0.25, iw / 2 + 2.5 * k, hh * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
+        }
         ctx.restore();
         continue;
       }
@@ -1278,6 +1320,12 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillRect(q.x - bw / 2, q.y - len, bw, len);
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
       ctx.fillRect(q.x - bw / 6, q.y - len + 2 * k, bw / 3, len * 0.5);
+      //  로봇 탄 테(r4.5, 그림이 없는 폴백): 막대를 감싸는 옅은 연보라 테
+      if (rim) {
+        const p = 2 * k;
+        ctx.strokeStyle = HERO_BULLET_RIM; ctx.lineWidth = Math.max(1, 1.4 * k);
+        ctx.strokeRect(q.x - bw / 2 - p, q.y - len - p, bw + p * 2, len + p * 2);
+      }
     }
   }
 
@@ -1454,7 +1502,7 @@ export function createRenderer3(ctx, sprites) {
     ctx.textBaseline = 'middle';
     //  제목은 무기 칩 앞에서 끝나야 한다(24스테이지 제목 중 '크라운 브레이커' 같은 긴 것). r4.2: 종전 끝선은 난이도 칩 왼쪽(x 220)이었다 — 칩이 없어져 무기 칩 왼쪽(x 292)까지
     //  순서: 기본 크기 → 한 단계 작게(17px) → 그래도 넘치면 'STAGE ' 접두 제거 → 마지막 안전망 maxWidth
-    //  r4.3: 코인 칩이 있으면 그 왼쪽(x 220 — r4.2 이전 난이도 칩 끝선과 같은 자리)까지
+    //  r4.3: 코인 칩이 있으면 그 왼쪽까지(r4.5: 무기 칩이 넓어져 x 194 — 제목 최대 폭 172px — Chromium 실측 15개 판은 20px 그대로, 8개 판은 17px, 24번은 'STAGE' 접두 없이)
     const coinN = hud && Number.isFinite(hud.coins) ? hud.coins : null;
     const titleMaxW = (coinN !== null ? HUD_ROW.box.coin.x : HUD_ROW.box.weapon.x) - HUD_ROW.left - 6;
     const fits = (t, fs) => { ctx.font = '900 ' + fs + 'px ' + FONT; return ctx.measureText(t).width <= titleMaxW; };
@@ -1488,9 +1536,14 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(wb.x + 16, cy - 3, 7, 6);
     }
-    ctx.font = 'bold ' + HUD_ROW.fs + 'px ' + FONT;
+    //  r4.5: '기관총 Mk II' 꼴 한 줄(어절 사이에서도 줄을 나누지 않는다). 칩 폭 148 은 Chromium 실측으로 15px 에 들어가는 폭이고,
+    //   글꼴이 더 넓은 기기에서 넘치면 글자 크기를 한 단계씩(최소 12px) 줄인다 — 칩 밖으로 나가거나 ⏸ 에 겹치지 않게. maxWidth 는 마지막 안전망
+    const wLabel = w.name + (MK_LABEL[mk] ?? ''), wAvail = wb.w - 54;
+    let wfs = HUD_ROW.fs;
+    ctx.font = 'bold ' + wfs + 'px ' + FONT;
+    while (wfs > 12 && ctx.measureText(wLabel).width > wAvail) { wfs--; ctx.font = 'bold ' + wfs + 'px ' + FONT; }
     ctx.fillStyle = w.color;
-    ctx.fillText(w.name + (MK_LABEL[mk] ?? ''), wb.x + 48, cy);
+    ctx.fillText(wLabel, wb.x + 48, cy, wAvail);
     //  r4.2: 무기 칩 왼쪽의 난이도 태그('어려움'·'지옥')를 지웠다
     //  r4.3 코인 칩: 금색 동전 + 이번 판 누계(정산 전). 같은 칩 바탕·높이·글자 크기(HUD_ROW 한 곳)
     if (coinN !== null) {
@@ -1724,22 +1777,51 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = C.hero;
       ctx.beginPath(); ctx.arc(W / 2, 282, 55, 0, Math.PI * 2); ctx.fill();
     });
-    //  r4.2: 난이도 토글 줄(y 382~416)의 왼쪽 라벨 '난이도'를 지웠다 — 줄은 비워 둔다(v4 ③·④단계 [로봇 강화] 자리)
-    ctx.textAlign = 'center';
-    ctx.font = '700 15px ' + FONT;
-    ctx.fillStyle = 'rgba(20,35,58,0.8)';
-    ctx.fillText('작전을 고르세요', W / 2, 430);
-    //  r4.3 순차 해금 안내('앞 판을 먼저 깨야 합니다'): 잠긴 판을 불렀을 때 잠깐. 비워 둔 y 382~416 줄의 가운데(⑤단계 [로봇 강화] 전까지)
-    if (view.notice) {
+    //  r4.5(v4 ⑤단계): 종전 난이도 토글 줄(y 382~416)에 [로봇 강화] 버튼(셸 main.TITLE_UPGRADE_BTN — drawButtons 가 그린다)과
+    //   그 왼쪽 보유 코인(코인 그림 bonus_coin 재사용, 그림이 없으면 금색 동전 도형). 코인이 저장되지 않는 탭(읽기 전용·저장 실패)은 흐리게 — 맨 아래 경고가 이유를 말한다
+    const ub = (view.buttons ?? []).find((b) => b.id === 'upgrade');
+    if (ub && Number.isFinite(view.coins)) {
+      const cy = ub.y + ub.h / 2;
+      ctx.globalAlpha = view.coinSaveOk === false ? 0.5 : 1;
+      drawCoinIcon(78, cy, 26);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
       ctx.font = 'bold 16px ' + FONT;
-      ctx.fillStyle = 'rgba(20,35,58,0.85)';
-      roundRect(W / 2 - 150, 382, 300, 34, 17); ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,35,58,0.85)';
+      const ct = '보유 코인 ' + fmtInt(view.coins);
+      ctx.strokeText(ct, 96, cy, ub.x - 104);
+      ctx.fillStyle = C.gold;
+      ctx.fillText(ct, 96, cy, ub.x - 104);
+      ctx.textBaseline = 'alphabetic';
+      ctx.globalAlpha = 1;
+    }
+    ctx.textAlign = 'center';
+    //  r4.3 순차 해금 안내('앞 판을 먼저 깨야 합니다'): 잠긴 판을 불렀을 때 잠깐. r4.5: y 382 줄에 [로봇 강화]가 들어와서
+    //   '작전을 고르세요' 글 자리(y 418~442 — 버튼 줄 아래·스테이지 칸 위)를 그동안 이 안내가 대신 쓴다(버튼 위에 덮이지 않게)
+    if (view.notice) {
+      ctx.font = 'bold 15px ' + FONT;
+      ctx.fillStyle = 'rgba(20,35,58,0.88)';
+      roundRect(W / 2 - 140, 419, 280, 24, 12); ctx.fill();
       ctx.fillStyle = C.gold;
       ctx.textBaseline = 'middle';
-      ctx.fillText(view.notice, W / 2, 399);
+      ctx.fillText(view.notice, W / 2, 431);
       ctx.textBaseline = 'alphabetic';
+    } else {
+      ctx.font = '700 15px ' + FONT;
+      ctx.fillStyle = 'rgba(20,35,58,0.8)';
+      ctx.fillText('작전을 고르세요', W / 2, 430);
     }
     drawSaveWarn({ saveOk: view.saveOk, coinSaveOk: view.coinSaveOk, readOnly: view.readOnly });
+  }
+
+  //  코인 그림(r4.5 — 타이틀·강화 화면 공용): 보너스 표적의 bonus_coin 그림을 높이 h 로. 그림이 없으면(Node·로딩 전) 금색 동전 도형
+  function drawCoinIcon(x, y, h) {
+    drawImgCentered('bonus_coin', x, y, h, () => {
+      ctx.fillStyle = C.gold;
+      ctx.beginPath(); ctx.arc(x, y, h * 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, y, h * 0.24, 0, Math.PI * 2); ctx.stroke();
+    });
   }
 
   //  결과: 성공/실패·생존·최고·시간·처치·놓친 것 한 줄·저장 실패 안내(버튼은 drawButtons)
@@ -1791,9 +1873,14 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillStyle = 'rgba(243,241,232,0.6)';
         ctx.fillText(r.coinLine ?? '개발용 판 — 코인 없음', W / 2, 160);
       } else {
+        //  r4.5: 코인이 저장소에 남지 않는 탭(읽기 전용 탭·코인 저장 실패)은 획득·보유 코인 두 줄에 '저장 안 됨'을 붙이고 흐리게 —
+        //   종전엔 저장되지 않는 금액이 보통 판과 똑같이 보였다(맨 아래 경고 한 줄만). 보통 판의 글자는 한 글자도 바뀌지 않는다
+        const unsaved = r.readOnly === true || r.coinSaveOk === false;
+        const tail = unsaved ? ' · ' + UNSAVED_TAG : '';
+        if (unsaved) ctx.globalAlpha = 0.55;
         ctx.font = '900 24px ' + FONT;
         ctx.fillStyle = C.gold;
-        ctx.fillText('획득 코인 +' + fmtInt(r.coins.gained), W / 2, 156);
+        ctx.fillText('획득 코인 +' + fmtInt(r.coins.gained) + tail, W / 2, 156, W - 40);
         if (r.coinLine) {
           ctx.font = '600 13px ' + FONT;
           ctx.fillStyle = 'rgba(243,241,232,0.8)';
@@ -1801,7 +1888,8 @@ export function createRenderer3(ctx, sprites) {
         }
         ctx.font = '600 13px ' + FONT;
         ctx.fillStyle = 'rgba(246,200,74,0.85)';
-        ctx.fillText('보유 코인 ' + fmtInt(r.coins.balance), W / 2, 196);
+        ctx.fillText('보유 코인 ' + fmtInt(r.coins.balance) + tail, W / 2, 196);
+        ctx.globalAlpha = 1;
       }
     }
     //  제목 아래 추가 줄(y 212 부터 18px 씩 쌓는다 — 통계 첫 줄 246 과 겹치지 않는 최소 간격): 랜덤 길 → 작전 목표 순
@@ -1896,7 +1984,101 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillText(RETRY_LOTTERY_NOTE, retry.x + retry.w / 2, retry.y + retry.h + 16);
       }
     }
+    //  r4.5 첫 구매 안내(기획 v4.1 3-4 (나)·3-9): 처음으로 살 수 있게 된 **승리** 결과 화면에서만 한 번 — 보조 버튼 [로봇 강화] 바로 아래 금색 한 줄.
+    //   버튼은 강조하지 않는다(보조 버튼 그대로). 문구는 셸이 넘긴다(result.upHint)
+    if (r.upHint) {
+      const ub = (view.buttons ?? []).find((b) => b.id === 'upgrade');
+      if (ub) {
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 14px ' + FONT;
+        ctx.fillStyle = C.gold;
+        ctx.fillText(String(r.upHint), ub.x + ub.w / 2, ub.y + ub.h + 18, W - 40);
+      }
+    }
     drawSaveWarn({ saveOk: r.saveOk, coinSaveOk: r.coinSaveOk, readOnly: r.readOnly });
+  }
+
+  //  ── r4.5 강화 화면(원본 v4 3-5 '강화 화면', 기획 v4.1 3-4 (가)(나)) ──────────────────────────────────────────────
+  //  view.upgrade = { head: [줄, 줄], coins, coinSaveOk, blocked: 이유 | null, rows: [{ track, name, level, max, lines: [효과, 보조, 설명], rec }], flash: { i, k } | null }
+  //  버튼([구매]×3 · [돌아가기])은 셸이 UPGRADE_UI 에서 만든 상자 그대로 drawButtons 가 그린다. 여기서는 바탕·머리·카드·글만
+  function drawUpgrade(view) {
+    const U = UPGRADE_UI, u = view.upgrade || {};
+    drawBackground(view.now * 30, 0);
+    ctx.fillStyle = 'rgba(5,8,14,0.82)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.font = '900 34px ' + FONT;
+    ctx.fillStyle = C.gold;
+    ctx.fillText('로봇 강화', W / 2, U.titleY);
+    ctx.font = '600 14px ' + FONT;
+    ctx.fillStyle = 'rgba(243,241,232,0.85)';
+    (u.head || []).forEach((t, i) => ctx.fillText(t, W / 2, U.headY[i] ?? U.headY[0] + i * 20, W - 40));
+    //  보유 코인: 코인 그림 + 금색 글(가운데 정렬 — 그림은 글 왼쪽)
+    if (Number.isFinite(u.coins)) {
+      const t = '보유 코인 ' + fmtInt(u.coins);
+      ctx.font = '900 22px ' + FONT;
+      const tw = ctx.measureText(t).width;
+      if (u.coinSaveOk === false) ctx.globalAlpha = 0.55;
+      drawCoinIcon(W / 2 - tw / 2 - 18, U.coinY - 8, 26);
+      ctx.fillStyle = C.gold;
+      ctx.fillText(t, W / 2 + 4, U.coinY);
+      ctx.globalAlpha = 1;
+    }
+    //  구매 막힘 이유(읽기 전용 탭·코인 저장 실패) — 한 줄, 붉은 글
+    if (u.blocked) {
+      ctx.font = '600 13px ' + FONT;
+      ctx.fillStyle = C.gateNeg;
+      ctx.fillText(u.blocked, W / 2, U.blockY, W - 40);
+    }
+    const rows = u.rows || [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i], c = upgradeCard(i);
+      //  카드 바탕 + 테(추천 줄은 금색 테, 방금 산 줄은 잠깐 밝은 금색)
+      ctx.fillStyle = 'rgba(20,35,58,0.9)';
+      roundRect(c.x, c.y, c.w, c.h, 16); ctx.fill();
+      ctx.strokeStyle = row.rec ? 'rgba(246,200,74,0.9)' : 'rgba(243,241,232,0.22)';
+      ctx.lineWidth = row.rec ? 2 : 1.5;
+      roundRect(c.x, c.y, c.w, c.h, 16); ctx.stroke();
+      if (u.flash && u.flash.i === i && u.flash.k > 0) {
+        ctx.globalAlpha = Math.min(1, u.flash.k);
+        ctx.strokeStyle = '#FFE070'; ctx.lineWidth = 4;
+        roundRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2, 15); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      //  이름 + 단계 막대(■ = 산 단계, □ = 남은 단계) + 'k/최대'
+      const x0 = U.textX;
+      ctx.textAlign = 'left';
+      ctx.font = '900 20px ' + FONT;
+      ctx.fillStyle = C.hero;
+      ctx.fillText(row.name, x0, c.y + 32);
+      let bx = x0 + ctx.measureText(row.name).width + 12;
+      for (let k = 0; k < row.max; k++) {
+        if (k < row.level) { ctx.fillStyle = C.gold; ctx.fillRect(bx, c.y + 19, 12, 12); }
+        else { ctx.strokeStyle = 'rgba(243,241,232,0.55)'; ctx.lineWidth = 1.5; ctx.strokeRect(bx + 0.75, c.y + 19.75, 10.5, 10.5); }
+        bx += 16;
+      }
+      ctx.font = '600 13px ' + FONT;
+      ctx.fillStyle = 'rgba(243,241,232,0.7)';
+      ctx.fillText(row.level + '/' + row.max + '단계', bx + 4, c.y + 30);
+      //  '추천'(첫 구매 주 가설 = 다연발, 한 번만): 카드 오른쪽 위 금색 꼬리표
+      if (row.rec) {
+        const tw = 52, tx = c.x + c.w - 14 - tw, ty = c.y + 14;
+        ctx.fillStyle = C.gold;
+        roundRect(tx, ty, tw, 24, 12); ctx.fill();
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '900 14px ' + FONT;
+        ctx.fillStyle = C.outline;
+        ctx.fillText(row.recText || '추천', tx + tw / 2, ty + 12);
+        ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+      }
+      //  효과 세 줄(지금 → 다음 · 보조 · 짧은 설명). 줄은 셸이 어절 단위로 끊어 넘긴다 — 여기서는 줄을 나누지 않는다(maxWidth 는 안전망)
+      const [l1, l2, l3] = row.lines || [];
+      if (l1) { ctx.font = 'bold 16px ' + FONT; ctx.fillStyle = C.hero; ctx.fillText(l1, x0, c.y + 64, U.textMaxW); }
+      if (l2) { ctx.font = '600 14px ' + FONT; ctx.fillStyle = 'rgba(246,200,74,0.95)'; ctx.fillText(l2, x0, c.y + 90, U.textMaxW); }
+      if (l3) { ctx.font = '13px ' + FONT; ctx.fillStyle = 'rgba(243,241,232,0.62)'; ctx.fillText(l3, x0, c.y + 114, U.textMaxW); }
+    }
+    ctx.textAlign = 'center';
+    drawSaveWarn({ saveOk: view.saveOk, coinSaveOk: view.coinSaveOk, readOnly: view.readOnly });
   }
 
   function drawScene(view) {
@@ -1956,6 +2138,9 @@ export function createRenderer3(ctx, sprites) {
     }
     if (view.state === 'title') {
       drawTitle(view);
+    } else if (view.state === 'upgrade') {
+      //  r4.5 강화 화면: 결과 화면에서 들어와도(셸에 run 이 남아 있어도) 판 장면을 그리지 않고 강화 화면만 — view.run 검사보다 먼저
+      drawUpgrade(view);
     } else if (view.run) {
       drawScene(view);
       if (view.state === 'paused') {

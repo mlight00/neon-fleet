@@ -297,27 +297,52 @@ const fontPx = (o) => Number(String(o.font).match(/(\d+)px/)[1]);
 
 //  기본 줄(brutal, 게임 화면이 늘 쓰는 줄) 판 한 프레임 — r4.2 이전엔 이 줄에서 난이도 칩('지옥')이 그려졌다. 지금은 없어야 한다.
 //  버튼은 셸이 실제로 넘기는 것과 같은 객체(main.HUD_BTN)를 그대로 넘긴다
-function hudFrame() {
+//  r4.5: opts.coins = 이번 판 코인(셸이 게임 판에 늘 넘기는 값 — 개발용 판만 null) · opts.weapon/mk = 무기 칩 표기 확인용
+function hudFrame(opts = {}) {
   const run = createRun(buildStage(2, { difficulty: 'brutal' }));
   for (let i = 0; i < 120; i++) { stepRun(run, { pointerX: 240, dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); }
+  if (opts.weapon) run.weapon = opts.weapon;
+  if (opts.mk) run.weaponMk = opts.mk;
   const { ctx, ops } = recCtx();
-  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: makeFxLike(), hud: { distM: 120 },
+  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: makeFxLike(), hud: { distM: 120, coins: opts.coins ?? null },
     buttons: [{ ...HUD_BTN }], saveOk: true });
   return { run, ops };
 }
 
-test('V3-RENDER-HUD: 무기 칩·⏸ 가 같은 높이·같은 세로 중심선·같은 모서리 반경·같은 글자 크기로 한 줄에 선다 — 기본 줄 판에도 난이도 칩은 없다(r4.2)', () => {
-  const { run, ops } = hudFrame();
+//  r4.5(v4 ⑤단계) 개정: 게임 판에는 셸이 늘 이번 판 코인(hud.coins)을 넘긴다(r4.3) — 칩은 **코인 · 무기 · ⏸ 셋이 이 순서로** 선다.
+//   종전 검사는 코인 없이 그려 칩 둘만 쟀다. 이제 셋의 개수·순서·간격(겹침 없음)을 재고, 코인 없는 판(개발용 판)은 무기·⏸ 둘인지 따로 잰다
+test('V3-RENDER-HUD: 출격 중 칩 셋(코인·무기·⏸)이 이 순서로 같은 높이·같은 세로 중심선·같은 모서리 반경·같은 글자 크기, 서로 겹치지 않고 간격이 같다 — 코인 없는 개발용 판은 무기·⏸ 둘, 난이도 칩은 없다(r4.2)', () => {
+  const { run, ops } = hudFrame({ coins: 128 });
   assert.equal(run.difficulty, 'brutal', '게임 화면과 같은 기본 줄 판을 그렸다');
   const title = ops.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
   assert.ok(title >= 0, 'HUD 제목을 그린다: ' + JSON.stringify(textsOf(ops).slice(0, 8)));
-  const [weapon, pause] = chipBoxes(ops, title);
-  assert.equal(chipBoxes(ops, title).length, 2, 'HUD 칩은 정확히 두 개(무기·⏸) — r4.2 에서 난이도 칩 삭제');
+  const chips = chipBoxes(ops, title);
+  assert.equal(chips.length, 3, 'HUD 칩은 정확히 셋(코인·무기·⏸) — r4.2 에서 난이도 칩 삭제, r4.3 코인 칩');
+  const [coin, weapon, pause] = chips;
+  //  순서(왼쪽 → 오른쪽) = 자리표 코인 · 무기 · ⏸
+  for (const [name, b, want] of [['코인', coin, HUD_ROW.box.coin], ['무기', weapon, HUD_ROW.box.weapon], ['⏸', pause, HUD_ROW.box.pause]]) {
+    assert.deepEqual({ left: b.left, right: b.right }, { left: want.x, right: want.x + want.w }, name + ' 칩 자리 = 자리표');
+  }
   assert.ok(!textsOf(ops).some((s) => s === '지옥' || s === '어려움' || s === '보통'), '난이도 글자를 그리지 않는다: ' + JSON.stringify(textsOf(ops).slice(0, 12)));
   assert.equal(HUD_ROW.box.diff, undefined, '자리표에도 난이도 칸이 없다');
+  //  코인 칩이 무기 칩·⏸ 와 겹치지 않는다(칩 사이 = gap) · 코인 숫자는 코인 칩 안(시작 x 와 maxWidth 가 칩 오른쪽 끝을 넘지 않는다)
+  assert.equal(weapon.left - coin.right, HUD_ROW.gap, '코인 ↔ 무기 사이 = ' + HUD_ROW.gap + 'px(겹침 없음)');
+  const num = ops.find((o) => o.op === 'fillText' && o.args[0] === '128');
+  assert.ok(num, '코인 숫자를 그린다');
+  assert.ok(num.args[1] > coin.left && num.args[1] + num.args[3] <= coin.right, '코인 숫자는 코인 칩 안: x ' + num.args[1] + ' + ' + num.args[3] + ' ≤ ' + coin.right);
+  assert.equal(fontPx(num), HUD_ROW.fs, '코인 숫자 글자 크기 = 칩 글자 크기');
+  assert.equal(num.args[2], HUD_ROW.cy, '코인 숫자 중심 y = 칩 중심선');
+  //  제목은 코인 칩 앞에서 끝난다(maxWidth)
+  assert.ok(ops[title].args[1] + ops[title].args[3] <= coin.left, '제목 끝선 < 코인 칩');
+  //  코인 없는 판(개발용 판 — 셸이 null 을 넘긴다): 무기·⏸ 둘, 자리는 그대로
+  const dev = hudFrame();
+  const t0 = dev.ops.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
+  const devChips = chipBoxes(dev.ops, t0);
+  assert.equal(devChips.length, 2, '코인 없는 판 = 무기·⏸ 둘');
+  assert.deepEqual(devChips.map((b) => b.left), [HUD_ROW.box.weapon.x, HUD_ROW.box.pause.x]);
 
   //  ① 같은 높이 · 같은 세로 중심선 — 위·아래 경계가 픽셀까지 같다(이사 소견의 '높이가 안 맞는다')
-  for (const [name, b] of [['무기', weapon], ['⏸', pause]]) {
+  for (const [name, b] of [['코인', coin], ['무기', weapon], ['⏸', pause]]) {
     assert.equal(b.top, HUD_ROW.top, name + ' 칩 위 경계 = ' + HUD_ROW.top);
     assert.equal(b.bottom - b.top, HUD_ROW.h, name + ' 칩 높이 = ' + HUD_ROW.h);
     assert.equal((b.top + b.bottom) / 2, HUD_ROW.cy, name + ' 칩 세로 중심 = ' + HUD_ROW.cy);
@@ -325,6 +350,7 @@ test('V3-RENDER-HUD: 무기 칩·⏸ 가 같은 높이·같은 세로 중심선�
   }
   assert.equal(weapon.top, pause.top, '무기·⏸ 위 경계가 같다');
   assert.equal(weapon.bottom, pause.bottom, '무기·⏸ 아래 경계가 같다');
+  assert.equal(coin.top, weapon.top, '코인·무기 위 경계가 같다');
 
   //  ② 오른쪽 정렬 간격이 일정하다
   assert.equal(pause.left - weapon.right, HUD_ROW.gap, '무기 ↔ ⏸ 사이 = ' + HUD_ROW.gap + 'px');
@@ -371,6 +397,36 @@ test('V3-RENDER-HUD: ⏸ 는 셸이 넘긴 버튼 상자 그대로 그려진다 
   const t2 = noBtn.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
   assert.equal(chipBoxes(noBtn, t2).length, 1, '⏸ 버튼이 없으면 칩은 무기 하나뿐(r4.2 난이도 칩 삭제)');
   assert.ok(!textsOf(noBtn).includes(HUD_BTN.label), '⏸ 글자도 없다');
+});
+
+//  r4.5(v4 ⑤단계) — 무기 칩 표기를 판 안 글('기관총 Mk II!' · 랜덤 길 결과 '중화기 Mk II', 기획 v4.1 3-4 (라))과 같은 'Mk II' 꼴로.
+//   한 줄(어절 사이에서도 줄을 나누지 않는다)이고 칩 안에 들어가야 한다. 칩 폭 148 은 Chromium 실측 '기관총 Mk III' bold 15px = 92.3px 가
+//   글자 시작(칩 x + 48)부터 들어가는 폭이다. 글꼴이 더 넓은 기기에서는 글자 크기를 한 단계씩(최소 12px) 줄인다
+test('V3-RENDER-HUD: 무기 칩 = "기관총 Mk II" 꼴 한 줄(Mk I 은 이름만) — 글자 시작·maxWidth 가 칩 안, 실측 폭(92.3px)이 들어가는 칩 폭, 넓은 글꼴이면 글자 크기를 줄인다', () => {
+  const wb = HUD_ROW.box.weapon;
+  assert.ok(wb.w - 54 >= 92.3, '가장 긴 표기(기관총 Mk III, Chromium bold 15px 92.3px)가 15px 그대로 들어가는 폭: ' + (wb.w - 54));
+  for (const [mk, want] of [[1, '기관총'], [2, '기관총 Mk II'], [3, '기관총 Mk III']]) {
+    const { ops } = hudFrame({ coins: 5, weapon: 'auto', mk });
+    const op = ops.find((o) => o.op === 'fillText' && o.args[0] === want);
+    assert.ok(op, 'Mk ' + mk + ' 표기 "' + want + '" 한 줄: ' + JSON.stringify(textsOf(ops).slice(0, 10)));
+    assert.ok(!textsOf(ops).some((t) => t === 'II' || t === 'III' || t === ' II' || t === 'Mk'), '단계 글자를 따로 떼어 쓰지 않는다');
+    assert.equal(op.args[2], HUD_ROW.cy, '칩 중심선');
+    assert.equal(fontPx(op), HUD_ROW.fs, '실측 폭 안이면 칩 글자 크기 그대로(15px)');
+    assert.ok(op.args[1] >= wb.x && op.args[1] + op.args[3] <= wb.x + wb.w, '글자 시작 + maxWidth ≤ 칩 오른쪽 끝(⏸ 에 겹치지 않는다)');
+  }
+  //  넓은 글꼴(한 글자 = 12px 로 재는 가짜 ctx): '기관총 Mk II'(10자 = 120px) > 92 → 12px 까지 줄이고 maxWidth 로 칩 안에 묶는다
+  const run = createRun(buildStage(2, { difficulty: 'brutal' }));
+  run.weapon = 'auto'; run.weaponMk = 2;
+  const ops = [];
+  const st = { canvas: null, font: '', fillStyle: '', textBaseline: '' };
+  const ctx = new Proxy(st, { get(t, k) { if (k in t) return t[k]; if (typeof k !== 'string') return undefined;
+    return (...a) => { ops.push({ op: k, args: a, font: t.font }); if (k === 'measureText') return { width: String(a[0]).length * 12 }; return k.startsWith('create') ? { addColorStop() {} } : undefined; }; },
+    set(t, k, v) { t[k] = v; return true; } });
+  createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: makeFxLike(), hud: { distM: 1, coins: 1 }, buttons: [{ ...HUD_BTN }], saveOk: true });
+  const wide = ops.find((o) => o.op === 'fillText' && o.args[0] === '기관총 Mk II');
+  assert.ok(wide, '넓은 글꼴에서도 한 줄');
+  assert.equal(fontPx(wide), 12, '최소 12px 까지 줄인다');
+  assert.ok(wide.args[1] + wide.args[3] <= wb.x + wb.w, 'maxWidth 로 칩 안');
 });
 
 //  동작 시트(2026-09-18 파일럿): 시트가 있으면 히어로(걷기/사격)·피격 잡졸·쓰러진 잡졸이 시트 칸(drawImage 9인자)으로 그려지고,

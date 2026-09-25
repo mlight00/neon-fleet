@@ -604,11 +604,23 @@ test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 �
   assert.ok(texts.includes('이전 기록 5명 · 1분 1.0초'), '옛 지옥 칸 기록 = 이전 기록: ' + JSON.stringify(texts.filter((t) => t.includes('명'))));
   assert.ok(!texts.some((t) => t.includes('99명') || t.includes('77명')), '옛 보통·어려움 칸 기록은 화면에 나오지 않는다');
   for (const w of ['보통', '어려움', '지옥', '난이도']) assert.ok(!texts.includes(w), `타이틀에 '${w}' 글자 없음(토글 3칸·라벨 삭제)`);
-  //  종전 토글 자리(y 382 줄 세 칸 가운데)를 눌러도 아무 버튼도 없다 — 출격·효과음·저장 변화 없음
+  //  종전 토글 자리(y 382 줄 세 칸 가운데). r4.5(v4 ⑤단계) 재기준: 그 줄은 이제 **[로봇 강화] 한 칸**(x 250~420) + 왼쪽 보유 코인 글.
+  //   왼쪽 칸 자리(x 183 — 보유 코인 글)는 버튼이 아니고(클릭음 없음), 가운데·오른쪽 칸 자리는 [로봇 강화] — 누르면 강화 화면이지
+  //   난이도가 바뀌거나 출격하지 않는다(저장 무변화). 난이도 글자가 없다는 단언(위)은 그대로
   audio.played.length = 0;
-  for (let i = 0; i < 3; i++) canvas.fire('pointerdown', { clientX: (138 + i * 96 + 45) / 2, clientY: (382 + 17) / 2, pointerType: 'mouse' });
-  assert.equal(app.getState(), 'title', '빈 줄을 눌러도 타이틀 그대로');
-  assert.ok(!audio.played.some((p) => p[0] === 'click'), '빈 줄은 버튼이 아니다(클릭음 없음)');
+  const beforeRow = storage.getItem('starforgeRush.v3');
+  canvas.fire('pointerdown', { clientX: (138 + 45) / 2, clientY: (382 + 17) / 2, pointerType: 'mouse' });
+  assert.equal(app.getState(), 'title', '왼쪽 칸 자리를 눌러도 타이틀 그대로');
+  assert.ok(!audio.played.some((p) => p[0] === 'click'), '왼쪽 칸 자리(보유 코인 글)는 버튼이 아니다(클릭음 없음)');
+  for (let i = 1; i < 3; i++) {
+    canvas.fire('pointerdown', { clientX: (138 + i * 96 + 45) / 2, clientY: (382 + 17) / 2, pointerType: 'mouse' });
+    assert.equal(app.getState(), 'upgrade', '옛 토글 ' + (i + 1) + '번째 칸 자리 = [로봇 강화] → 강화 화면');
+    assert.equal(app.getRun(), null, '출격하지 않는다');
+    app.closeUpgrade();
+    assert.equal(app.getState(), 'title', '[돌아가기] → 타이틀');
+  }
+  assert.equal(storage.getItem('starforgeRush.v3'), beforeRow, '[로봇 강화]를 열고 닫아도 저장이 바뀌지 않는다(난이도 칸 없음)');
+  audio.played.length = 0;
   //  숫자 키 1/2/3(code·Numpad·key 만 오는 환경)은 아무 일도 하지 않는다
   const before = storage.getItem('starforgeRush.v3');
   for (const e of [{ code: 'Digit1' }, { code: 'Digit2' }, { code: 'Digit3' }, { code: 'Numpad1' }, { code: 'Numpad2' }, { code: 'Numpad3' },

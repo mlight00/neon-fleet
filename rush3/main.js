@@ -7,7 +7,8 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox } from './render.js';
+import { UP_TRACKS, UP_MAX, UP_EFFECT, normUp, hasUp, nextCost, canBuy } from './meta.js';
 import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
 import { createAudio3 } from './audio.js';
@@ -23,7 +24,9 @@ const C = BAL3.colors;
 const OVER_DELAY = { won: 1.3, lost: 1.0 };
 const BGM = { title: 'nf_bgm_title', stage: ['nf_bgm_sector1a', 'nf_bgm_sector2a', 'nf_bgm_sector3a'], boss: ['nf_bgm_boss_sector1', 'nf_bgm_boss_sector2', 'nf_bgm_boss_sector3'] };
 //  r4.2(2026-09-25, 이사 지시 "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고"): 타이틀 난이도 토글 3칸(종전 DIFF_TOGGLE,
-//   스테이지 버튼 바로 위 y 382 줄 {x0 138, w 90, h 34, gap 6})과 1/2/3 키를 지웠다. 그 줄은 **비워 둔다** — v4 ③·④단계의 [로봇 강화] 자리
+//   스테이지 버튼 바로 위 y 382 줄 {x0 138, w 90, h 34, gap 6})과 1/2/3 키를 지웠다. r4.5(v4 ⑤단계): 그 줄에 [로봇 강화] 버튼(아래 TITLE_UPGRADE_BTN)과
+//   그 왼쪽 보유 코인(render.drawTitle). 숫자 키는 여전히 아무 일도 하지 않는다
+export const TITLE_UPGRADE_BTN = Object.freeze({ x: 250, y: 382, w: 170, h: 34 });
 //  타이틀 스테이지 목록(24스테이지·B-2): 2열×4행 = 8칸/페이지, 첫 칸 x 60~236·y 446~500. 페이지 줄은 그 아래(694)
 export const TITLE_GRID = Object.freeze({ y: 446, dy: 60, h: 54, pageY: 694, perPage: 8 });
 //  ⏸(일시정지) 버튼 = HUD 상단 줄의 셋째 칸. 상자는 render 의 자리표(HUD_ROW.box.pause) 하나에서만 온다 —
@@ -443,9 +446,73 @@ export const LOCK_NOTICE = '앞 판을 먼저 깨야 합니다';
 //  24번(마지막 공개 판)을 이긴 결과 화면 — [다음 작전] 자리 대신
 export const ALL_CLEAR_LINE = '모든 작전 완료 — 24개 작전을 전부 이겼습니다';
 //  결과·타이틀 맨 아래 경고(코인 저장 실패·읽기 전용 탭)의 문구는 render.SAVE_WARN 한 곳 — 셸은 saveOk·coinSaveOk·readOnly 만 넘긴다
-//  결과 화면 [로봇 강화] 자리(⑤단계에서 넣는다 — 이번엔 자리만 비워 둔다. 셸·렌더 모두 이 상자에 아무것도 그리지 않는다):
-//   [스테이지 선택] 바로 아래(dy 52) 같은 폭 — 승리 y 672 · 패배·포기 y 604(랜덤 길 판은 부연 22px 만큼 더 아래). 화면 높이 800 안이다
-export const RESULT_UPGRADE_SLOT = Object.freeze({ x: 120, dy: 52, w: 240, h: 44 });
+//  결과 화면 보조 버튼 [로봇 강화](r4.5, 기획 v4.1 3-9): [스테이지 선택] 바로 아래(dy 52) — 승리 y 672 · 패배·포기 y 604(랜덤 길 판은 부연 22px 만큼 더 아래).
+//   **살 수 있는 단계가 있을 때만**(그리고 코인이 저장되는 탭일 때만) 작게(180×40, 15px) 보조 버튼으로 — 강조하지 않는다(패배·포기에서 구매로 몰지 않는다).
+//   ③단계의 자리(240×44)를 작게 줄였다. 화면 높이 800 안이다(랜덤 길 승리 판 최저 734, 첫 구매 안내 글 752, 맨 아래 경고 778)
+export const RESULT_UPGRADE_SLOT = Object.freeze({ x: 150, dy: 52, w: 180, h: 40 });
+
+//  ── r4.5 로봇 강화 화면(v4 ⑤단계, 원본 v4 3-5 '강화 화면' · 기획 v4.1 3-4 (가)(나) · 3-9) ─────────────────────────────────────
+//  새 상태 'upgrade'. 들어오는 곳 = 타이틀 [로봇 강화] · 결과 화면 보조 버튼 [로봇 강화]. [돌아가기]는 **들어온 화면으로 복귀**한다(결과에서 왔으면
+//   방금 판 결과 화면 그대로 — 기본 버튼 [다시 도전]/[다음 작전] 유지, CLAUDE.md '다른 화면으로 이동시키는 기능은 원래 화면으로 복귀').
+//  구매 = 지갑 buy(meta.buy 비용표·최대 단계 + 잔액·단계를 setItem 한 번). 같은 프레임 연타는 한 번만(프레임 번호 표식 + 누른 즉시 버튼 다시 계산).
+//  코인이 저장되지 않는 탭(읽기 전용·코인 저장 실패·저장소 차단 = save.wallet.ok false)은 [구매]를 흐리게 하고 이유 한 줄을 띄운다
+export const UP_TRACK_NAME = Object.freeze({ power: '직격 화력', rate: '연사', multi: '다연발' });
+//  머리 두 줄(로봇만 강해진다 · 판 밖 성장)
+export const UPGRADE_HEAD = Object.freeze(['메인 로봇 한 대만 강해집니다 · 병사는 그대로', '판이 끝나도, 무기를 바꿔도 계속 유지됩니다']);
+export const UP_BLOCK_TEXT = Object.freeze({
+  readOnly: '다른 탭에서 게임이 열려 있어 이 탭에서는 살 수 없습니다',
+  unsaved: '코인이 저장되지 않는 상태라 지금은 살 수 없습니다',
+});
+//  첫 구매 안내(기획 v4.1 3-4 (나) — 첫 구매 주 가설 = 다연발 1): 처음 살 수 있게 된 승리 결과 화면에서 한 번(저장 seenUpHint) ·
+//   강화 화면 다연발 줄 '추천' 한 번(저장 seenUpRec — 처음 살 수 있는 상태로 강화 화면을 연 방문 동안 보인다)
+export const UP_HINT_LINE = '로봇 강화 가능 — 모은 코인으로 로봇을 강하게';
+export const UP_REC_TEXT = '추천';
+//  미리보기 기준 무기 = 기본 소총(모든 판이 소총으로 시작 — 판 밖이라 '지금 든 무기'는 늘 소총, Mk I)
+const UP_REF_WEAPON = 'rifle';
+//  규칙 combat.HP_EPS 와 같은 여유값(소수 피해 잔량 ≤ 이 값이면 0 — 처치 탄 수 계산을 규칙과 똑같이)
+const UP_HP_EPS = 1e-9;
+const fix1 = (v) => (Math.round(v * 10 + 1e-9) / 10).toFixed(1);
+const fix2 = (v) => (Math.round(v * 100 + 1e-9) / 100).toFixed(2);
+
+/** 체력 hp 를 피해 dmg 탄으로 잡는 데 드는 발 수(순수) — 규칙(combat.hitEnemy)처럼 한 발씩 빼고 잔량이 여유값 이하면 처치 */
+export function shotsToKill(hp, dmg) {
+  if (!(hp > 0) || !(dmg > 0)) return 0;
+  let h = hp, n = 0;
+  do { h -= dmg; n++; } while (h > UP_HP_EPS && n < 1e6);
+  return n;
+}
+
+/** 살 수 있는 트랙이 하나라도 있는가(순수) — 지갑 { coins, up } */
+export function canBuyAny(wallet) {
+  return UP_TRACKS.some((t) => canBuy(wallet, t));
+}
+
+/** 강화 화면 한 줄의 글(순수). up = 지금 단계, track, ref = { stageId, bossHp }(직격 화력 미리보기의 기준 보스 — 없으면 보스 줄 없음).
+ *  → { name, level, max, cost(다음 단계 비용 | null = 최대), lines: [효과 '지금 → 다음', 보조, 짧은 설명] }. 글은 모두 기본 소총(Mk I) 기준.
+ *  줄은 어절 경계에서만 나눠 세 줄로 넘긴다(렌더는 줄을 더 나누지 않는다) — 480 화면 카드 글 폭 290px 안(Chromium 실측) */
+export function upgradeLines(up, track, ref = null) {
+  const u = normUp(up);
+  const k = u[track] ?? 0, max = UP_MAX[track] ?? 0, cost = nextCost(u, track), top = cost === null;
+  const w = WEAPONS[UP_REF_WEAPON];
+  const lines = [];
+  if (track === 'power') {
+    const dmg = (j) => w.dmg * (1 + UP_EFFECT.powerStep * j);
+    lines.push(top ? '최대 단계 · 로봇 직격 피해 ' + fix1(dmg(k)) : '로봇 직격 피해 ' + fix1(dmg(k)) + ' → ' + fix1(dmg(k + 1)));
+    const hp = ref && ref.bossHp > 0 ? ref.bossHp : null;
+    lines.push(hp ? (ref.stageId + '번 보스(체력 ' + hp + '): ' + shotsToKill(hp, dmg(k)) + '발' + (top ? '' : ' → ' + shotsToKill(hp, dmg(k + 1)) + '발')) : null);
+    lines.push('소총 기준 · 폭발·연쇄에는 적용 안 됨');
+  } else if (track === 'rate') {
+    const iv = (j) => w.interval * Math.pow(UP_EFFECT.rateMul, j);
+    lines.push(top ? '최대 단계 · 로봇 발사 간격 ' + fix2(iv(k)) + '초' : '로봇 발사 간격 ' + fix2(iv(k)) + '초 → ' + fix2(iv(k + 1)) + '초');
+    lines.push('1초에 ' + fix1(1 / iv(k)) + '발' + (top ? '' : ' → ' + fix1(1 / iv(k + 1)) + '발'));
+    lines.push('소총 기준 · 게이트 숫자도 더 빨리 오름');
+  } else if (track === 'multi') {
+    lines.push(top ? '최대 단계 · 로봇이 한 번에 ' + (1 + k) + '발' : '로봇이 한 번에 ' + (1 + k) + '발 → ' + (2 + k) + '발');
+    lines.push('게이트는 원래 1발만 오름');
+    lines.push('추가 탄(연보라)은 적·보급 통에만 맞음');
+  }
+  return { name: UP_TRACK_NAME[track] ?? track, level: k, max, cost, lines };
+}
 
 //  ── r4.4 v4 기록 칸(이사님 결정 D9′ = (가) v4 기록 칸 신설, 기획 v4.1 3-6) ─────────────────────────────────────────
 //  v4 판(셸 출격 — 메인 로봇 보호·강화가 켜진 판)의 기록은 새 접미 칸 `${버전}:v4` 에 쌓는다(save.js KEY_RE 가 이미 받는다).
@@ -532,6 +599,12 @@ export function boot(canvas, deps = {}) {
   //  coin(r4.3) = 이번 판의 코인 상태 { runNo, tally, settled: { main, bonus } } | null. **run 객체에 두지 않는다** — 셸의 이벤트 처리는
   //   규칙 run 을 한 글자도 고치지 않는다(V3-HITFEEL HF-9). 출격 때 만들고 타이틀로 나가면 지운다
   let coin = null;
+  //  r4.5 강화 화면: upgradeFrom = 들어온 화면('title' | 'result' — [돌아가기]가 그리로 복귀) · upRec = 이번 방문에 다연발 '추천'을 보이는가 ·
+  //   upFlash = 방금 산 줄의 금색 테 { track, t 남은 초 } · frameNo = 프레임 번호(frame 마다 +1) · buyFrame = 마지막 구매가 일어난 프레임(같은 프레임 연타는 1회만)
+  let upgradeFrom = 'title', upRec = false, upFlash = null, frameNo = 0, buyFrame = -1;
+  const UP_FLASH_SEC = 0.6;
+  //  직격 화력 미리보기의 기준 보스 체력(판 번호 → 첫 보스 체력, 한 번 계산해 둔다)
+  const bossHpCache = new Map();
   //  출격 줄(r4.2 난이도 단일화): 게임 화면은 **늘** 기본 줄(PLAY_DIFFICULTY = 'brutal', 옛 지옥 수치)로 buildStage 를 부른다.
   //   고르는 곳(타이틀 토글·1/2/3 키)·바꾸는 곳(setDifficulty)·저장에서 읽는 곳(save.difficulty)이 없다. 그 뒤로는 run.difficulty 가 진실(기록 칸 키 `버전:brutal`).
   //   deps.difficulty 는 **검사 전용 주입**이다(save·audio·sprites 주입과 같은 결 — 실제 페이지의 boot(#game3)는 넘기지 않는다).
@@ -721,6 +794,58 @@ export function boot(canvas, deps = {}) {
     au.bgmPlay(BGM.title);
   }
 
+  //  ── r4.5 로봇 강화 화면 ──
+  //  살 수 있는 탭인가 = 코인이 저장소에 남는가(읽기 전용 탭·코인 저장 실패·저장소 차단이면 false — 사도 저장되지 않는다)
+  const buyAllowed = () => save.wallet.ok;
+  //  직격 화력 미리보기의 기준 판 = 곧 할 판: 결과에서 왔으면 승리 = 다음 작전 · 패배·포기 = 방금 판, 타이틀에서 왔으면 타이틀 기본 선택(마지막 판)
+  function upgradeRef() {
+    let id = upgradeFrom === 'result' && result ? (result.won && result.nextId ? result.nextId : result.stageId) : lastStageId();
+    if (!ALL_STAGE_IDS.includes(id)) id = ALL_STAGE_IDS[0];
+    if (!bossHpCache.has(id)) {
+      let hp = null;
+      try { const st = buildStage(id, { difficulty, lotterySeed: 0 }); hp = (st.elites && st.elites[0] && st.elites[0].hp) || null; } catch { hp = null; }
+      bossHpCache.set(id, hp);
+    }
+    return { stageId: id, bossHp: bossHpCache.get(id) };
+  }
+  /** 강화 화면 열기(from = 'title' | 'result'). 처음 살 수 있는 상태로 연 방문이면 다연발 '추천'(사용자당 1회 — 저장 seenUpRec) */
+  function openUpgrade(from) {
+    if (from === 'result' && !(state === 'result' && result && run)) return false;
+    if (from !== 'result' && state !== 'title') return false;
+    upgradeFrom = from === 'result' ? 'result' : 'title';
+    const w = save.wallet.get();
+    upRec = !save.get().seenUpRec && !hasUp(w.up) && buyAllowed() && canBuy(w, 'multi');
+    if (upRec) save.patch({ seenUpRec: true });
+    upFlash = null;
+    state = 'upgrade';
+    return true;
+  }
+  /** [돌아가기]: 들어온 화면으로. 결과에서 왔으면 **방금 판 결과 화면 그대로**(result·run 유지 → 기본 버튼 그대로), 보유 코인만 새 값으로 */
+  function closeUpgrade() {
+    if (state !== 'upgrade') return;
+    upRec = false; upFlash = null;
+    if (upgradeFrom === 'result' && result && run) {
+      state = 'result';
+      if (result.coins) result.coins.balance = save.wallet.get().coins;
+      //  첫 구매 안내는 한 번 봤으니 내린다(돌아온 결과 화면에 다시 띄우지 않는다)
+      result.upHint = null;
+    } else state = 'title';
+  }
+  /** [구매]: 같은 프레임에 이미 한 번 샀으면 무시(연타 1회만). 코인이 저장되지 않는 탭은 사지 않는다. 산 뒤 곧바로 버튼을 다시 계산한다 */
+  function buyTrack(track) {
+    if (state !== 'upgrade' || buyFrame === frameNo || !buyAllowed()) return null;
+    const r = save.wallet.buy(track);
+    buyFrame = frameNo;
+    if (r.ok) {
+      upFlash = { track, t: UP_FLASH_SEC };
+      //  추천은 첫 구매를 위한 것 — 무엇이든 사면 내린다
+      upRec = false;
+      au.sfx('weaponSwap');
+    }
+    view(nowSec());
+    return r;
+  }
+
   //  어느 버전·난이도로 몇 번 도전했는지(첫 플레이 안내 판정용 — 코스 버전이 올라가거나 난이도를 바꿔도 초보 안내가 되살아나지 않게)
   function totalAttempts(id) {
     return Object.values(save.getStageVersions(id)).reduce((n, r) => n + (r.attempts || 0), 0);
@@ -796,6 +921,11 @@ export function boot(canvas, deps = {}) {
       balance: save.wallet.get().coins, dev: !!run.devWeapon,
     } : null;
     const nextId = won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null;
+    //  r4.5 첫 구매 안내(기획 v4.1 3-4 (나)·3-9): 지갑 잔액이 **처음으로** 가장 싼 1단계 비용 이상이 된 **승리** 결과 화면에서 한 번.
+    //   아직 아무것도 사지 않았고(첫 구매) 코인이 저장되는 탭일 때만. 본 적 있음 = 저장 seenUpHint(seenShutter 와 같은 꼴, 사용자당 1회)
+    const wNow = save.wallet.get();
+    const upHint = won && !run.devWeapon && !save.get().seenUpHint && !hasUp(wNow.up) && buyAllowed() && canBuyAny(wNow);
+    if (upHint) save.patch({ seenUpHint: true });
     result = {
       stageId: id, stageVersion: ver, difficulty: run.difficulty, recordSlot: diff, title: run.title, won, survivors, peak, time, timeText: timeText(time), kills,
       //  다음 행동(3-9): 패배·포기 = adviceLine(가장 고칠 만한 원인), 승리 = advice.js 의 승리 문구
@@ -810,6 +940,8 @@ export function boot(canvas, deps = {}) {
       aborted, coins, coinLine: coinBreakdown(coins), causeLine: won ? null : causeLine(run),
       allClear: won && !run.devWeapon && id === ALL_STAGE_IDS[ALL_STAGE_IDS.length - 1] ? ALL_CLEAR_LINE : null,
       coinSaveOk: save.wallet.ok, readOnly: save.readOnly,
+      //  r4.5: 첫 구매 안내 한 줄(보조 버튼 [로봇 강화] 아래) | null
+      upHint: upHint ? UP_HINT_LINE : null,
     };
     state = 'result';
     loop.stop(nowSec());
@@ -1114,7 +1246,7 @@ export function boot(canvas, deps = {}) {
       //  r4.3 순차 해금: 잠긴 판은 자물쇠·흐린 버튼(disabled — hitButton 이 건너뛴다). 안내('앞 판을 먼저 깨야 합니다')는 잠깐
       const lim = unlockedMax();
       v.notice = notice && notice.t > 0 ? notice.text : null;
-      //  r4.2: 난이도 토글 3칸을 지웠다(y 382 줄은 비워 둔다). r4.4: 스테이지 버튼의 기록(sub)은 v4 칸(`버전:v4`)의 기록이고,
+      //  r4.2: 난이도 토글 3칸을 지웠다(r4.5: 그 y 382 줄 = [로봇 강화] + 보유 코인 — 아래). r4.4: 스테이지 버튼의 기록(sub)은 v4 칸(`버전:v4`)의 기록이고,
       //   옛 지옥 칸(`버전:brutal`)의 기록은 지우지 않고 '이전 기록'으로 흐리게 병기한다(prev)
       //  24스테이지(B-2): 한 페이지 8칸(2열×4행) + 페이지 넘김
       const pg = curTitlePage(), pages = titlePages();
@@ -1136,7 +1268,29 @@ export function boot(canvas, deps = {}) {
       v.buttons.push({ id: 'pageL', x: 60, y: TITLE_GRID.pageY, w: 100, h: 40, label: '◀ 이전', small: true, primary: false, disabled: pg === 0 });
       v.buttons.push({ id: 'pageInfo', x: 168, y: TITLE_GRID.pageY, w: 144, h: 40, label: (pg + 1) + ' / ' + pages, small: true, primary: false });
       v.buttons.push({ id: 'pageR', x: 320, y: TITLE_GRID.pageY, w: 100, h: 40, label: '다음 ▶', small: true, primary: false, disabled: pg >= pages - 1 });
+      //  r4.5: 종전 난이도 토글 줄(y 382)에 [로봇 강화] + 보유 코인(v.coins — render 가 버튼 왼쪽에 코인 그림과 함께 그린다). 코인이 없어도 들어가 볼 수 있다
+      v.buttons.push({ id: 'upgrade', ...TITLE_UPGRADE_BTN, label: '로봇 강화', small: true });
+      v.coins = save.wallet.get().coins;
       v.buttons.push({ id: 'mute', x: 422, y: 14, w: 44, h: 44, label: au.isMuted() ? '🔇' : '🔊' });
+    } else if (state === 'upgrade') {
+      //  r4.5 강화 화면 — 결과에서 들어와 run 이 남아 있어도 판 장면(v.run)은 넘기지 않는다(render 가 강화 화면만 그린다)
+      const w = save.wallet.get(), allowed = buyAllowed(), ref = upgradeRef();
+      const rows = UP_TRACKS.map((t) => ({ track: t, ...upgradeLines(w.up, t, ref), rec: t === 'multi' && upRec, recText: UP_REC_TEXT }));
+      v.upgrade = {
+        head: UPGRADE_HEAD, coins: w.coins, coinSaveOk: save.wallet.ok,
+        blocked: allowed ? null : (save.readOnly ? UP_BLOCK_TEXT.readOnly : UP_BLOCK_TEXT.unsaved),
+        rows, flash: upFlash ? { i: UP_TRACKS.indexOf(upFlash.track), k: upFlash.t / UP_FLASH_SEC } : null,
+      };
+      //  [구매]: 트랙 카드마다 오른쪽 아래(render.upgradeBuyBox — 그리는 상자 = 누르는 상자). 코인 부족·최대 단계·저장 안 되는 탭 = 흐리게(disabled — hitButton 이 건너뛴다).
+      //   같은 프레임에 이미 산 뒤에도 흐리게(연타 1회만 — 누른 즉시 반영)
+      const lock = buyFrame === frameNo;
+      v.buttons = rows.map((row, i) => {
+        const box = upgradeBuyBox(i);
+        if (row.cost === null) return { id: 'buy_' + row.track, ...box, label: '최대 단계', small: true, disabled: true };
+        const ok = allowed && !lock && canBuy(w, row.track);
+        return { id: 'buy_' + row.track, ...box, label: '구매', sub: row.cost + ' 코인', primary: ok, disabled: !ok };
+      });
+      v.buttons.push({ id: 'back', ...UPGRADE_UI.back, label: '돌아가기' });
     } else if (run) {
       v.run = run;
       const paused = state === 'paused';
@@ -1162,7 +1316,13 @@ export function boot(canvas, deps = {}) {
         const noteGap = result.lottery ? 22 : 0;
         const bs = [{ id: 'retry', x: 120, y: 480, w: 240, h: 56, label: '다시 도전', primary: !result.nextId }];
         if (result.nextId) bs.push({ id: 'next', x: 120, y: 548 + noteGap, w: 240, h: 56, label: '다음 작전', sub: 'STAGE ' + result.nextId + '  ' + stageMeta(result.nextId).title, primary: true });
-        bs.push({ id: 'title', x: 120, y: (result.nextId ? 620 : 552) + noteGap, w: 240, h: 44, label: '스테이지 선택' });
+        const titleY = (result.nextId ? 620 : 552) + noteGap;
+        bs.push({ id: 'title', x: 120, y: titleY, w: 240, h: 44, label: '스테이지 선택' });
+        //  r4.5 보조 버튼 [로봇 강화](3-9): 살 수 있는 단계가 있을 때만(코인이 저장되는 탭), 작게·강조 없이 [스테이지 선택] 아래. 기본 버튼(Enter)은 그대로
+        if (buyAllowed() && canBuyAny(save.wallet.get())) {
+          const S = RESULT_UPGRADE_SLOT;
+          bs.push({ id: 'upgrade', x: S.x, y: titleY + S.dy, w: S.w, h: S.h, label: '로봇 강화', small: true });
+        }
         v.buttons = bs;
       }
     }
@@ -1192,7 +1352,11 @@ export function boot(canvas, deps = {}) {
       if (id === 'pageL') { titlePage = Math.max(0, curTitlePage() - 1); }
       else if (id === 'pageR') { titlePage = Math.min(titlePages() - 1, curTitlePage() + 1); }
       else if (id === 'pageInfo') { /* 표시 전용 */ }
+      else if (id === 'upgrade') openUpgrade('title');
       else if (id.startsWith('stage')) startRun(Number(id.slice(5)));
+    } else if (state === 'upgrade') {
+      if (id === 'back') closeUpgrade();
+      else if (id.startsWith('buy_')) buyTrack(id.slice(4));
     } else if (state === 'run') {
       if (id === 'pause') pause();
     } else if (state === 'paused') {
@@ -1202,6 +1366,7 @@ export function boot(canvas, deps = {}) {
       if (id === 'retry') startRun(result.stageId);
       else if (id === 'next' && result.nextId) startRun(result.nextId);
       else if (id === 'title') toTitle();
+      else if (id === 'upgrade') openUpgrade('result');
     }
     return true;
   }
@@ -1222,7 +1387,7 @@ export function boot(canvas, deps = {}) {
 
   canvas.addEventListener('pointerdown', (e) => {
     au.unlock();
-    if (state === 'title' || state === 'result') au.bgmPlay(BGM.title);
+    if (state === 'title' || state === 'result' || state === 'upgrade') au.bgmPlay(BGM.title);
     const [x, y] = toLogical(e);
     if (onPress(x, y)) return;
     //  y(r3.17 아레나 세로 입력)는 뒤에 붙는 선택 인자 — 도로에서는 규칙이 읽지 않는다
@@ -1253,6 +1418,8 @@ export function boot(canvas, deps = {}) {
       if (code === 'Escape') {
         if (state === 'run') pause();
         else if (state === 'paused') resume();
+        //  r4.5: 강화 화면의 ESC = [돌아가기](들어온 화면으로). Enter·Space 는 강화 화면에서 아무 일도 하지 않는다(실수로 사지 않게)
+        else if (state === 'upgrade') closeUpgrade();
         return;
       }
       if (input.onKey(code, true)) { if (e.preventDefault) e.preventDefault(); return; }
@@ -1305,6 +1472,8 @@ export function boot(canvas, deps = {}) {
     coins: run ? liveCoins() : null, wallet: save.wallet.get().coins, unlocked: unlockedMax(), readOnly: save.readOnly, tabId: tab.id,
     //  r4.4 메인 로봇 관찰: hero(로봇이 살아 있는가) · heroShield(보호막 켜짐) · heroGuard(보호 규칙 켬)
     hero: !!(run && run.units.some((u) => u.hero)), heroShield: !!(run && run.heroShield), heroGuard: !!(run && run.heroGuard),
+    //  r4.5 로봇 강화 관찰: 지갑의 강화 단계 · 강화 화면을 어디서 열었는가(state 'upgrade' 일 때) · 이번 판 로봇 강화 단계(run.up)
+    up: save.wallet.get().up, upgradeFrom: state === 'upgrade' ? upgradeFrom : null, runUp: run ? { ...run.up } : null,
   });
   if (win) win.__rush3Dbg = dbg;
 
@@ -1352,6 +1521,9 @@ export function boot(canvas, deps = {}) {
     const now = nowMs / 1000;
     const dt = lastFx === null ? 0 : Math.min(0.05, Math.max(0, now - lastFx));
     lastFx = now;
+    //  r4.5: 프레임 번호(같은 프레임 [구매] 연타 판정) · 방금 산 줄의 금색 테 타이머
+    frameNo++;
+    if (upFlash) { upFlash.t -= dt; if (upFlash.t <= 0) upFlash = null; }
     if (notice) { notice.t -= dt; if (notice.t <= 0) notice = null; }
     if (state === 'run') {
       loop.frame(now);
@@ -1386,8 +1558,12 @@ export function boot(canvas, deps = {}) {
 
   //  r4.2: 외부 API 의 getDifficulty/setDifficulty 는 지웠다(난이도 선택 삭제)
   //  r4.3: giveUp(⏸ → [작전 중단] 과 같은 경로) · getResult(결과 화면 값) · getNotice(스테이지 선택 안내)
-  return { dbg, ready, startRun, pause, resume, toTitle, giveUp, getState: () => state, getRun: () => run, getFx: () => fx, getResult: () => result,
-           getNotice: () => (notice ? notice.text : null), loop, input };
+  //  r4.5: openUpgrade('title' | 'result') · closeUpgrade([돌아가기]와 같은 경로) · buyTrack(트랙 — [구매]와 같은 경로) · getButtons(지금 화면의 버튼 — 검사·캡처용)
+  const api = { dbg, ready, startRun, pause, resume, toTitle, giveUp, getState: () => state, getRun: () => run, getFx: () => fx, getResult: () => result,
+                getNotice: () => (notice ? notice.text : null), openUpgrade, closeUpgrade, buyTrack, getButtons: () => buttons, loop, input };
+  //  r4.5 개발 확인용(?dev=1 일 때만): 캡처 스크립트가 결과 화면·강화 화면을 부를 수 있게 앱 손잡이를 창에 둔다(게임 동작에는 영향 없음 — __rush3Dbg 와 같은 결)
+  if (win && devFlag()) win.__rush3App = api;
+  return api;
 }
 
 if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'));

@@ -1,7 +1,7 @@
 // rush3-coins — r4.3(v4 ③단계) 코인(획득·지급·저장) + 순차 해금. 이사 지시(원문) "스테이지에 획득된 코인을 누적해서",
 //  이사님 결정 N2 = (나) 순차 해금 + 기존 기록 엄격 인정(기획 v4.1 0장 인용 블록), 공식 = P2(기획 v4.1 3-3 (라)).
-//  묶음: COIN-1~6(공식·소환 0·접촉 소멸 0·개발용 판 0·포기·패배 지급·첫 클리어 1회) · WALLET-1·2·3·5·6·7·9·10(지급 1회·여운·보너스 이탈·새로고침·
-//   저장 실패/차단·복수 탭·포기 → 다시 도전·여운 중 ⏸) · UNLOCK(네 진입 경로 거부·dev 예외·옛 기록 연속 인정) · V3-PURE-COIN · RESULT-ENTER · HUD·결과 화면 글자.
+//  묶음: COIN-1~6(공식·소환 0·접촉 소멸 0·개발용 판 0·포기·패배 지급·첫 클리어 1회) · WALLET-1~10(지급 1회·여운·보너스 이탈·r4.5 [구매] 같은 프레임 연타 1회(4)·새로고침·
+//   저장 실패/차단·복수 탭·r4.5 구매 = 잔액·단계 한 번에 저장(8)·포기 → 다시 도전·여운 중 ⏸) · UNLOCK(네 진입 경로 거부·dev 예외·옛 기록 연속 인정) · V3-PURE-COIN · RESULT-ENTER · HUD·결과 화면 글자.
 //  ⚠️봇 결과는 정해진 입력으로 한 판씩 돌린 값이다(사람의 수입이 아니다). 셸 검사는 실제 boot() 결선(가짜 캔버스·저장·오디오·rAF)을 두드린다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -358,6 +358,66 @@ test('WALLET-3: 8번 보너스 도중 이탈 = 본전투분만(보너스 점수�
   assert.equal(wallet(h).coins, main + r2.coins.gained);
 });
 
+//  r4.5(v4 ⑤단계) — 강화 화면 [구매]. 번호 4·8 은 ③단계 때 비워 둔 자리(기획 v4.1 3-7 표 '결과 화면 버튼 연타 — 새로 넣는 [로봇 강화] 버튼은 같은 프레임 연타 주의')
+async function upgradeScreen(coins, up = { power: 0, rate: 0, multi: 0 }) {
+  const storage = memStorage({ [WALLET_KEY]: JSON.stringify({ coins, runNo: 0, paid: [], firstClears: [], up }) });
+  const h = await bootApp({ storage });
+  h.frames(1);
+  h.app.openUpgrade('title');
+  h.frames(1);
+  const at = (id) => { const b = h.app.getButtons().find((x) => x.id === id); return [b.x + b.w / 2, b.y + b.h / 2]; };
+  return { h, storage, at };
+}
+
+test('WALLET-4: 강화 화면 [구매] 같은 프레임 연타 = 1회만(두 번 살 잔액이 있어도) — 누른 즉시 버튼이 흐려지고, 다음 프레임부터 다시 살 수 있다', async () => {
+  const { h, storage, at } = await upgradeScreen(500);
+  const w0 = storage.writes.filter((k) => k === WALLET_KEY).length;
+  const [mx, my] = at('buy_multi'), [px, py] = at('buy_power');
+  //  같은 프레임(프레임 사이에 frames 없음)에 다연발 두 번 + 직격 화력 한 번
+  h.tap(mx, my); h.tap(mx, my); h.tap(px, py);
+  assert.deepEqual(wallet(h).up, { power: 0, rate: 0, multi: 1 }, '다연발 1단계만(2단계 120 을 살 잔액이 있어도)');
+  assert.equal(wallet(h).coins, 460);
+  assert.equal(storage.writes.filter((k) => k === WALLET_KEY).length, w0 + 1, '지갑 쓰기 1회');
+  //  누른 즉시 반영: 이번 프레임의 [구매] 버튼이 모두 흐리다(hitButton 이 건너뛴다)
+  assert.ok(h.app.getButtons().filter((b) => b.id.startsWith('buy_')).every((b) => b.disabled), '같은 프레임엔 [구매] 전부 흐림');
+  assert.equal(h.app.buyTrack('rate'), null, 'API 로 불러도 같은 프레임은 막힌다');
+  //  다음 프레임: 다시 산다(다연발 2단계 120)
+  h.frames(1);
+  h.tap(mx, my);
+  assert.deepEqual(wallet(h).up, { power: 0, rate: 0, multi: 2 });
+  assert.equal(wallet(h).coins, 340);
+  assert.equal(storage.writes.filter((k) => k === WALLET_KEY).length, w0 + 2);
+});
+
+test('WALLET-8: 구매 = 잔액·단계를 **한 번에** 저장(지갑 쓰기 1회, 한 원문) — 새로 읽어도(새로고침·새 앱) 유지, 잔액 부족·최대 단계는 쓰지 않는다', async () => {
+  const { h, storage, at } = await upgradeScreen(125, { power: 0, rate: 4, multi: 0 });
+  const writes = () => storage.writes.filter((k) => k === WALLET_KEY).length;
+  const w0 = writes();
+  const [rx, ry] = at('buy_rate');
+  h.tap(rx, ry);                                      // 연사 4 → 5(330) — 잔액 부족: 흐린 버튼이라 눌리지 않는다
+  assert.equal(writes(), w0, '잔액 부족 = 쓰기 없음');
+  const [px, py] = at('buy_power');
+  h.tap(px, py);                                      // 직격 화력 0 → 1(40)
+  assert.equal(writes(), w0 + 1, '구매 1회 = 쓰기 1회');
+  const raw = JSON.parse(storage.getItem(WALLET_KEY));
+  assert.deepEqual({ coins: raw.coins, up: raw.up }, { coins: 85, up: { power: 1, rate: 4, multi: 0 } }, '잔액·단계가 한 원문에');
+  //  새로 읽기(새 저장 객체 · 새 앱)
+  assert.deepEqual(createSave3(storage).wallet.get().up, { power: 1, rate: 4, multi: 0 });
+  const h2 = await bootApp({ storage });
+  assert.equal(h2.save.wallet.get().coins, 85);
+  h2.frames(1);
+  h2.app.openUpgrade('title');
+  h2.frames(1);
+  const t = h2.textNow();
+  assert.ok(t.includes('보유 코인 85') && t.includes('1/5단계') && t.includes('4/5단계'), '새 앱 강화 화면에 산 단계: ' + JSON.stringify(t.filter((s) => /단계|코인/.test(s))));
+  //  최대 단계 버튼은 흐림(쓰기 없음)
+  const { h: h3, storage: st3, at: at3 } = await upgradeScreen(9999, { power: 5, rate: 5, multi: 3 });
+  const n3 = st3.writes.filter((k) => k === WALLET_KEY).length;
+  for (const id of ['buy_power', 'buy_rate', 'buy_multi']) { const [x, y] = at3(id); h3.tap(x, y); }
+  assert.equal(st3.writes.filter((k) => k === WALLET_KEY).length, n3, '최대 단계 = 쓰기 없음');
+  assert.ok(h3.app.getButtons().filter((b) => b.id.startsWith('buy_')).every((b) => b.disabled && b.label === '최대 단계'));
+});
+
 test('WALLET-5: 판 도중 새로고침 — 정산 전 코인만 사라지고(중복 없음), 다음 출격은 새 번호', async () => {
   const st = memStorage();
   const a = await bootApp({ storage: st });
@@ -672,7 +732,7 @@ test('RESULT 3-9 글자·배치: 맨 위 제목(성공/실패/중단) → 획득
 });
 
 test('HUD 코인: 난이도 칩이 있던 자리(무기 칩 왼쪽)에 이번 판 누계 — 칩 셋이 같은 높이·중심선·간격, 적 처치 "+n" 없음, 보스 처치에만 "+코인"', async () => {
-  //  렌더: hud.coins 가 숫자면 코인 칩(HUD_ROW.box.coin — x 220, w 64)
+  //  렌더: hud.coins 가 숫자면 코인 칩(HUD_ROW.box.coin — x 194, w 64. r4.5 전 x 220)
   const run = createRun(buildStage(2, { difficulty: 'brutal' }));
   for (let i = 0; i < 60; i++) { stepRun(run, { pointerX: 240, dragDx: 0, keyDir: 0 }, STEP); drainEvents(run); }
   const ops = [];
@@ -686,7 +746,8 @@ test('HUD 코인: 난이도 칩이 있던 자리(무기 칩 왼쪽)에 이번 �
   assert.equal(chips.length, 3, '코인·무기·⏸ 칩 셋');
   const cb = HUD_ROW.box.coin;
   assert.deepEqual(chips[0], { left: cb.x, top: cb.y, right: cb.x + cb.w, bottom: cb.y + cb.h });
-  assert.equal(cb.x, 220, '종전 난이도 칩 자리');
+  //  r4.5 재기준: 무기 칩이 'Mk II' 표기를 한 줄로 넣으려 122 → 148 로 넓어져 코인 칩은 그만큼 왼쪽(220 → 194). 무기 칩과는 간격 gap 그대로(겹치지 않는다)
+  assert.equal(cb.x, 194, '무기 칩 왼쪽 같은 간격(종전 난이도 칩 자리 220 에서 무기 칩이 넓어진 만큼)');
   assert.equal(chips[1].left - chips[0].right, HUD_ROW.gap); assert.equal(chips[0].top, chips[1].top); assert.equal(chips[0].bottom, chips[2].bottom);
   const num = ops.find((o) => o.op === 'fillText' && o.args[0] === '12');
   assert.ok(num && num.fill === C.gold && num.args[2] === HUD_ROW.cy, '코인 숫자(금색, 칩 중심선)');
