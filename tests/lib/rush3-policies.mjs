@@ -107,11 +107,17 @@ function nearestVehicle(run) {
   for (const c of run.supplies) if (c.move && !c.opened && !c.missed && !c.skipped && c.z > run.z && c.z - run.z <= 760 && (!s || c.z < s.z)) s = c;
   return s && s.moveT !== null ? s : null;
 }
+//  r4.4 (b) 로봇 강화(run.heroUp): 다연발의 추가 탄은 게이트를 올리지 않으므로(gateHit 0, 이사님 결정 N3) 세지 않고 **원래 탄만** 센다.
+//   연사 강화는 로봇의 원래 탄 수를 늘리므로 그 몫(fan × 구간 초 ÷ 간격 × (1/간격 배수 − 1))만 더한다. 강화 0 판(heroUp null)은 종전 식 그대로
+//   — 식을 (n−1)·x + x 처럼 나눠 쓰면 마지막 자리가 달라져 동률 칸 선택이 뒤집힐 수 있어, 종전 값에 0 을 더하는 꼴로 둔다
 export function expectedGateHits(run, row) {
   const w = weaponStats(run.weapon, run.weaponMk || 1);
   const fan = w.fan ?? 1;
   const armSec = (row.armZ == null ? BAL3.enterZ : Math.min(row.armZ, Math.max(0, row.z - run.z))) / BAL3.scroll;
-  return run.units.length * fan * (armSec / w.interval) * GATE_HIT_FRAC;
+  const base = run.units.length * fan * (armSec / w.interval) * GATE_HIT_FRAC;
+  const hu = run.heroUp;
+  if (!hu || hu.intervalMul === 1 || !run.units.some((u) => u.hero)) return base;
+  return base + fan * (armSec / w.interval) * (1 / hu.intervalMul - 1) * GATE_HIT_FRAC;
 }
 export function botEvLead(run) {
   if (run.boss || run.phase === 'bonus' || run.phase === 'arena') return botPlanBoss(run);

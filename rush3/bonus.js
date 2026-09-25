@@ -70,7 +70,8 @@ export function hitBonusTarget(run, t, b, ev) {
   if (b.pierce) { b.hit.push(t.id); if (b.hit.length >= b.pierce) b.dead = true; }
   else b.dead = true;
   t.hp -= b.dmg;
-  if (t.hp > 0) { ev.push({ type: 'bonusTargetHit', id: t.id, hp: t.hp, x: t.x, z: t.z }); return; }
+  //  r4.4 소수 피해 여유값(combat 과 같은 1e-9): 직격 화력 강화 탄의 부동소수 잔량은 0 으로 본다(정수 피해에선 결과 불변)
+  if (t.hp > 1e-9) { ev.push({ type: 'bonusTargetHit', id: t.id, hp: t.hp, x: t.x, z: t.z }); return; }
   t.hp = 0; t.alive = false; t.respawnT = t.respawn;
   const bo = run.bonus;
   bo.hits++;

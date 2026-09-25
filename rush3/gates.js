@@ -75,6 +75,8 @@ export function sweepHitsGate(row, cell, bullet) {
 }
 
 // 탄 1발 → 칸 값 +gateHit(모든 무기 1, 상한 maxValue). 탄은 흡수(dead). 음수→0 이상 전환은 gateFlip.
+//  r4.4 (b): 이벤트에 gain(실제로 오른 값)을 싣는다 — 로봇 다연발의 추가 탄(gateHit 0, 이사님 결정 N3)은 gain 0 이라
+//   셸이 흰 번쩍임·숫자음(gateTick)을 내지 않는다(수치가 안 오르는데 오르는 것처럼 보이고 들리지 않게)
 //  ⚠️셔터 검사는 여기(hitGateCell)에만 둔다. sweepContactGate 에서 null 을 돌려주면 행이 충돌 후보에서 빠져
 //   탄이 '흡수'가 아니라 '통과'해 버린다(개정 r3 §1-5).
 export function hitGateCell(row, cell, bullet, events) {
@@ -87,7 +89,7 @@ export function hitGateCell(row, cell, bullet, events) {
   const gain = Math.max(0, Math.trunc(bullet.gateHit ?? 1));
   cell.value = Math.min(cell.maxValue, cell.value + gain);
   cell.flashT = GATE_FLASH;
-  const ev = { id: cell.rowId, idx: cell.idx, value: cell.value, x: (cell.x0 + cell.x1) / 2 };
+  const ev = { id: cell.rowId, idx: cell.idx, value: cell.value, x: (cell.x0 + cell.x1) / 2, gain: cell.value - before };
   if (before < 0 && cell.value >= 0) events.push({ type: 'gateFlip', ...ev });
   else events.push({ type: 'gateHit', ...ev });
   return true;

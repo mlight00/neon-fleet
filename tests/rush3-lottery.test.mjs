@@ -519,11 +519,12 @@ test('V3-LOTTERY LOT-7b: 우측 통로를 고르면 결과 한 줄이 실제 결
   assert.equal(bad.run.wallSideLog.w3, 'R');
   assert.equal(bad.run.lossByGate, 0, '쏴서 0 으로 만든 뒤 통과 = 실제 손실 0');
   assert.equal(lotteryLine(bad.run), '랜덤 길: 위험 게이트 무력화 · 손실 0');
-  //  이미 중화기인 판이 중화기 통을 열면 r3.10 부터는 강화(Mk II)다 — '획득'도 '중복'도 아니라 '강화'로 적는다
+  //  이미 중화기인 판이 중화기 통을 열면 r3.10 부터는 Mk II 다 — '획득'도 '중복'도 아니라 'Mk'로 적는다
+  //   r4.4 재기준(기획 v4.1 3-4 (라)): 종전 '중화기 강화 · Mk II' → '중화기 Mk II'('강화'라는 말은 판 밖 로봇 강화에만)
   const hv = playRight(SEED_OF.heavy, 'normal', heavyThenRight);
   assert.equal(hv.run.weapon, 'heavy');
   assert.equal(hv.run.weaponMk, 2);
-  assert.equal(lotteryLine(hv.run), '랜덤 길: 중화기 강화 · Mk II');
+  assert.equal(lotteryLine(hv.run), '랜덤 길: 중화기 Mk II');
   //  만렙(III)이라 교체·강화 모두 없던 판은 '중복 · 교체 없음'(셸 opts.weaponSame 경로)
   assert.equal(lotteryLine(hv.run, { weaponSame: true }), '랜덤 길: 중화기 중복 · 교체 없음');
   //  랜덤 길이 없는 스테이지는 한 줄도 없다

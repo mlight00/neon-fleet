@@ -6,6 +6,8 @@ import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm,
 import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward, moveSupply } from './supply.js';
 import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit } from './squad.js';
 import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.js';
+//  r4.4 판 밖 로봇 강화(순수 규칙 모듈 — 비용·구매는 셸·저장 몫, 여기서는 효과 수치만 읽는다)
+import { normUp, hasUp, effects } from './meta.js';
 
 export const STEP = BAL3.STEP;
 
@@ -19,6 +21,9 @@ const SIZE_BY_HP = BAL3.sizeByHp;
 const HP_BASE = Object.freeze(Object.fromEntries(Object.entries(BAL3.enemies).filter(([, d]) => d.hp != null).map(([k, d]) => [k, d.hp])));
 const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
 const DEG = Math.PI / 180;
+//  r4.4 소수 피해 오차 여유값: 직격 화력 강화(피해 1.3·1.6 …)를 체력에서 거듭 빼면 부동소수 잔량(예 2×10⁻¹⁶)이 남아 한 발이 더 든다
+//   (피해 1.6 × 체력 8 = 6발, 2.2 × 보스 330 = 151발 — 기획 v4.1 3-4 (가)). 잔량이 이 값 이하면 0 으로 본다. 정수 피해·체력에선 결과가 같다
+const HP_EPS = 1e-9;
 
 //  아레나(r3.17) 공통 헬퍼. 부대 중심은 (run.x, run.z − run.ay) 2차원 — ay 는 LINE_Y 기준 세로 오프셋(음수 = 화면 위 = z 큰 쪽).
 //   도로에서는 ay 가 항상 0 이라 squadZ === run.z, squadOrigin 은 **같은 run 객체**를 돌려줘 종전 판정과 바이트 단위로 같다
@@ -59,7 +64,10 @@ export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY, hpMul = 1, difficu
 //  heroGuard(r4.4, 기본 false): 메인 로봇 보호 규칙을 켠다 — ① 음수 게이트·랜덤 길 함정이 hero 를 빼지 않는다(이사님 결정 D4′-a 원안)
 //   ② hp > 0 호위가 있는 동안 hero 가 받을 적 피해를 가장 가까운 호위 1명에게 한 번만 넘긴다(D4′-b). **게임 화면(셸)만 true 를 넘긴다** —
 //   옵션 없이 부르는 규칙 검사·봇은 종전 판 그대로다. 판을 만들 때 한 번 정해지고 STEP 은 run.heroGuard 만 읽는다
-export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard = false } = {}) {
+//  up(r4.4 (b), 기본 0 = { power, rate, multi } 모두 0): 판 밖 로봇 강화 단계(meta.js). **hero 의 탄에만** 건다 — 직격 피해 × (1 + 0.3·power),
+//   발사 간격 × 0.87^rate, 한 번 쏠 때 추가 탄 multi 발(gateHit 0 + extra). 셸만 지갑의 단계를 넘긴다. 판을 만들 때 effects 를 한 번 계산해
+//   run.heroUp 에 두고(강화가 하나도 없으면 null — 사격이 종전과 같은 한 경로) STEP 은 그것만 읽는다(저장·코인을 모른다)
+export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard = false, up } = {}) {
   const weapon = WEAPONS[startWeapon] ? startWeapon : (WEAPONS[stage.startWeapon] ? stage.startWeapon : 'rifle');
   const weaponMk = clampMk(startMk ?? 1);
   const diff = difficulty ?? stage.difficulty ?? DEFAULT_DIFFICULTY;
@@ -94,6 +102,8 @@ export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard =
     //  메인 로봇(r4.4): 첫 유닛에 hero 표시(아래 생성 직후 — 희소 필드, 병사에는 키가 없다). 그림·강화·보호는 모두 이 표시를 본다(배열 0번이 아니라).
     //   heroGuard = 보호 규칙 켬(위 옵션) · heroShield = 보호막이 켜져 있는가(hp > 0 호위 ≥ 1, STEP 끝 guardStep 이 갱신 — 그림·연출용)
     heroGuard: !!heroGuard, heroShield: false,
+    //  r4.4 (b) 로봇 강화 단계(정규화 사본 — 기록 스냅샷 upSnapshot 이 읽는다)·효과(강화 0 이면 null)
+    up: normUp(up), heroUp: hasUp(up) ? effects(up) : null,
     weapon, weaponMk,
     bullets: [],
     gateRows: (stage.gateRows || []).map(makeGateRow),
@@ -135,6 +145,8 @@ export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard =
   //  r4.4 hero 표시: 첫 유닛(id 1). 배열 0번 = 대형 중심(0,0) 자리이고, 증원은 뒤에 붙고(addUnits) 제거·정리는 순서를 지키므로(removeUnits·pruneDeadUnits)
   //   hero 가 살아 있는 동안은 늘 0번 = 부대 중심이다. 규칙이 hero 를 읽는 곳은 heroGuard 가 켜진 판뿐이다(끈 판에서는 표시만 있고 판정은 종전 그대로)
   if (run.units.length) run.units[0].hero = true;
+  //  r4.4 (b) 연사 강화: 로봇의 첫 발 위상도 강화된 간격 기준(makeUnit 의 위상 분산 × 간격 배수)
+  if (run.units.length && run.heroUp) run.units[0].fireT *= run.heroUp.intervalMul;
   layoutUnits(run.units);
   run.peak = run.units.length;
   run.heroShield = shieldUp(run);
@@ -347,29 +359,65 @@ function spawnEnemy(run, kind, x, z, hp, skin) {
 // 4단계 유닛 사격: 각자 자기 위치(run.x + dx, squadZ - dy)에서 직진. 이벤트 fire {count} STEP당 1개
 //  아레나(r3.17) 자동 조준: 광장에서 보스가 살아 있으면 유닛마다 부대→보스 각도(atan2, 0 = +z 정면)로 makeBullet(…, angle) — 부채꼴은 각도 오프셋을 진짜 회전으로 더한다
 //   (도로의 tan 방식과 다름). 보스가 없으면(격파 직후 같은 STEP) 종전 직진
+//  r4.4 (b) 로봇 강화(run.heroUp — 강화가 있을 때만, hero 표시 유닛에만): 간격 × intervalMul, 탄마다 dmg × dmgMul(무기 + Mk 로 만든 뒤 곱한다),
+//   부채꼴 각도마다 원래 탄 뒤에 추가 탄 extra 발(heroVolley). 병사·강화 0 판은 종전 한 경로 그대로
 function fireUnits(run, ev, dt) {
   const mk = run.weaponMk || 1;
   const w = weaponStats(run.weapon, mk);
   const angles = fanAngles(w.id);
   const oz = squadZ(run);
   const aim = inArena(run) && run.boss && !run.boss.dead ? run.boss : null;
+  const hu = run.heroUp;
   let count = 0;
   for (const u of run.units) {
+    const up = hu && u.hero ? hu : null;
+    const interval = up ? w.interval * up.intervalMul : w.interval;
     u.fireT -= dt;
     while (u.fireT <= 0) {
       const ox = run.x + u.dx, uz = oz - u.dy;
       if (aim) {
         const base = Math.atan2(aim.x - ox, aim.z - uz);
-        for (const a of angles) run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, 0, base + a));
+        for (const a of angles) {
+          if (up) heroVolley(run, up, w.id, ox, uz, u.id, mk, 0, base + a, base);
+          else run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, 0, base + a));
+        }
       } else {
         //  부채꼴(산탄포): 각도마다 1발, vx = tan(각)·vz. 나머지 무기는 각도 [0] 한 발
-        for (const a of angles) run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, a ? Math.tan(a) * w.vz : 0));
+        for (const a of angles) {
+          const vx = a ? Math.tan(a) * w.vz : 0;
+          if (up) heroVolley(run, up, w.id, ox, uz, u.id, mk, vx, null, 0);
+          else run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, vx));
+        }
       }
-      u.fireT += w.interval;
+      u.fireT += interval;
       count++;
     }
   }
   if (count > 0) ev.push({ type: 'fire', count, weapon: w.id, x: run.x, z: run.z });
+}
+
+//  다연발 추가 탄의 옆 자리(원래 탄 기준): k = 1, 2, 3 … → +gap, −gap, +2gap, −2gap …(좌우로 번갈아)
+export function extraOffset(k, gap) {
+  const m = Math.ceil(k / 2) * gap;
+  return k % 2 ? m : -m;
+}
+//  로봇 한 발(부채꼴 각도 하나): 원래 탄(게이트 +1 그대로) + 추가 탄 extra 발. 추가 탄은 gateHit 0 + extra(이사님 결정 N3 —
+//   게이트 수치·증원 설비 발판을 올리지 않고 닿으면 사라진다, 적·일반 보급 통에는 효과), 피해는 원래 탄과 같다.
+//   옆 자리: 도로 탄(angle null)은 x 로, 광장 조준탄은 조준 방향(base)에 수직으로 옮긴다(부채꼴은 같은 오프셋으로 통째 복제)
+function heroVolley(run, up, id, ox, uz, ownerId, mk, vx, angle, base) {
+  const b = makeBullet(id, ox, uz, ownerId, mk, vx, angle);
+  b.dmg *= up.dmgMul;
+  run.bullets.push(b);
+  for (let k = 1; k <= up.extra; k++) {
+    const off = extraOffset(k, up.gap);
+    const ex = angle === null ? ox + off : ox + off * Math.cos(base);
+    const ez = angle === null ? uz : uz - off * Math.sin(base);
+    const e = makeBullet(id, ex, ez, ownerId, mk, vx, angle);
+    e.dmg = b.dmg;
+    e.gateHit = 0;
+    e.extra = true;
+    run.bullets.push(e);
+  }
 }
 
 // 수직 스윕 [pz, z] × x(중심, 탄 폭 미반영) 와 벽 사각형의 최초 교차 z. 겹치지 않으면 null
@@ -443,6 +491,8 @@ function hitEnemy(run, e, b, ev) {
   if (b.pierce) { b.hit.push(e.id ?? 'boss'); if (b.hit.length >= b.pierce) b.dead = true; }
   else b.dead = true;
   e.hp -= b.dmg;
+  //  r4.4 소수 피해 오차: 여유값(HP_EPS) 안의 잔량은 0(정수 피해에선 잔량이 0 또는 1 이상이라 결과 불변)
+  if (e.hp > 0 && e.hp <= HP_EPS) e.hp = 0;
   ev.push({ type: 'enemyHit', id: e.id, kind: e.kind, hp: e.hp, x: e.x, z: e.z, ...hitLook(e), dmg: b.dmg, weapon: b.kind, bx: b.x });
   if (e.hp <= 0) e.dead = true;
   const w = WEAPONS[b.kind];
@@ -480,6 +530,7 @@ function chainArc(run, from, n, r, dmg, ev, stunSec = 0) {
   cand.sort((a, b) => a.d - b.d || a.id - b.id);
   for (const { t } of cand.slice(0, n)) {
     t.hp -= dmg;
+    if (t.hp > 0 && t.hp <= HP_EPS) t.hp = 0;   // r4.4 소수 잔량(직격 화력 강화로 깎인 체력)
     ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, arc: true, ...hitLook(t), dmg, weapon: 'arc' });
     ev.push({ type: 'arc', x: from.x, z: from.z, tx: t.x, tz: t.z });
     if (t.hp <= 0) t.dead = true;
@@ -506,6 +557,7 @@ function blast(run, center, r, dmg, ev) {
     if (d > r + t.r) continue;
     if (wallBetween(run.walls.concat(run.covers), center.x, center.z, t.x, t.z)) continue;
     t.hp -= dmg;
+    if (t.hp > 0 && t.hp <= HP_EPS) t.hp = 0;   // r4.4 소수 잔량
     ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, blast: true, ...hitLook(t), dmg, weapon: 'heavy' });
     if (t.hp <= 0) t.dead = true;
   }

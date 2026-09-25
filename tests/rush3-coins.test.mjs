@@ -217,7 +217,7 @@ test('COIN-4: 개발용 판(devWeapon·proto3·?dev=1 로 연 잠긴 판)은 0 �
   const res = h.app.getResult();
   assert.equal(res.aborted, true);
   assert.equal(res.coins.dev, true); assert.equal(res.coins.gained, 0);
-  assert.deepEqual(wallet(h), { coins: 0, runNo: 1, paid: [], firstClears: [] }, '지갑엔 출격 번호만 오르고 지급 식별자는 없다');
+  assert.deepEqual(wallet(h), { coins: 0, runNo: 1, paid: [], firstClears: [], up: { power: 0, rate: 0, multi: 0 } }, '지갑엔 출격 번호만 오르고 지급 식별자는 없다');
   assert.ok(h.textNow().includes('개발용 판 — 코인 없음'));
   //  proto3(시제품)도 개발용 판
   const hp = await bootApp({ search: '?stage=proto3' });
@@ -289,13 +289,13 @@ test('COIN-6: 첫 클리어 보너스는 판마다 1회 — 옛 지옥 칸 클�
 test('WALLET-1: 이긴 판은 한 번만 지급 — commitMain(승리 프레임)·finishRun(1.3초 뒤) 둘 다 돌아도 지갑 쓰기는 출격 1회 + 지급 1회', async () => {
   const h = await bootApp();
   h.app.startRun(1);
-  assert.deepEqual(rawWallet(h), { coins: 0, runNo: 1, paid: [], firstClears: [] }, '출격 때 runNo +1 을 쓴다');
+  assert.deepEqual(rawWallet(h), { coins: 0, runNo: 1, paid: [], firstClears: [], up: { power: 0, rate: 0, multi: 0 } }, '출격 때 runNo +1 을 쓴다');
   drive(h, 'evLead', () => h.app.getState() === 'result', 20000);
   const r = h.app.getResult();
   assert.equal(r.won, true);
   const wWrites = h.storage.writes.filter((k) => k === WALLET_KEY).length;
   assert.equal(wWrites, 2, '지갑 쓰기 = 출격 1 + 지급 1');
-  assert.deepEqual(rawWallet(h), { coins: r.coins.gained, runNo: 1, paid: ['1:main'], firstClears: [1] }, '잔액·식별자·첫 클리어 표식이 한 번에');
+  assert.deepEqual(rawWallet(h), { coins: r.coins.gained, runNo: 1, paid: ['1:main'], firstClears: [1], up: { power: 0, rate: 0, multi: 0 } }, '잔액·식별자·첫 클리어 표식이 한 번에');
   //  r4.4 재기준(D9′): 셸의 기록은 v4 칸 `${ver}:v4`
   assert.equal(JSON.parse(h.storage.getItem(KEY3)).stages['1'].versions[stageVersion(1) + ':v4'].cleared, true, 'v3 기록은 그대로 따로');
   //  결과 화면에서 몇 프레임 더 — 추가 지급 없음
@@ -366,7 +366,7 @@ test('WALLET-5: 판 도중 새로고침 — 정산 전 코인만 사라지고(�
   assert.ok(a.app.dbg().coins > 0);
   //  새로고침 = 같은 저장소로 새 앱
   const b = await bootApp({ storage: st });
-  assert.deepEqual(wallet(b), { coins: 0, runNo: 1, paid: [], firstClears: [] }, '정산 전 누계는 저장되지 않았다');
+  assert.deepEqual(wallet(b), { coins: 0, runNo: 1, paid: [], firstClears: [], up: { power: 0, rate: 0, multi: 0 } }, '정산 전 누계는 저장되지 않았다');
   b.app.startRun(1);
   drive(b, 'evLead', () => b.app.getRun().over, 20000);
   assert.deepEqual(wallet(b).paid, ['2:main'], '새 출격 번호 2');
@@ -447,7 +447,7 @@ test('WALLET-7: 복수 탭 — 먼저 열린 탭이 살아 있으면 나중 탭�
   const s1 = createSave3(st2), s2 = createSave3(st2);
   s1.wallet.pay({ id: '1:main', amount: 10, firstClear: 1 });
   s2.wallet.pay({ id: '1:bonus', amount: 5 });
-  assert.deepEqual(JSON.parse(st2.getItem(WALLET_KEY)), { coins: 15, runNo: 0, paid: ['1:main', '1:bonus'], firstClears: [1] });
+  assert.deepEqual(JSON.parse(st2.getItem(WALLET_KEY)), { coins: 15, runNo: 0, paid: ['1:main', '1:bonus'], firstClears: [1], up: { power: 0, rate: 0, multi: 0 } });
   assert.equal(s2.wallet.pay({ id: '1:main', amount: 10 }).paid, false, '다른 탭이 이미 지급한 식별자는 다시 지급하지 않는다');
   assert.equal(s1.wallet.startRun(), 1); assert.equal(s2.wallet.startRun(), 2, 'runNo 는 다시 읽은 값에서 +1');
 });
@@ -499,8 +499,8 @@ test('WALLET-10: 승리·패배 여운 중 ⏸ 는 [결과 보기] → 원래 �
 test('WALLET 저장 형식: 별도 키 · 정규화(coins 0~999,999 정수 · paid 최근 20 · firstClears 정수 오름차순) · 손상 → 기본값 · v3 키 형식 v:3 그대로', () => {
   assert.equal(WALLET_KEY, 'starforgeRush.v3.wallet'); assert.notEqual(WALLET_KEY, KEY3);
   assert.deepEqual(normWallet({ coins: 1.9e7, runNo: -3, paid: ['1:main', 'x', 5, '1:main', '2:bonus'], firstClears: [3, 1, 1, 'a', 2.5, 0] }),
-    { coins: COIN_MAX, runNo: 0, paid: ['1:main', '2:bonus'], firstClears: [1, 3] });
-  assert.deepEqual(normWallet(null), { coins: 0, runNo: 0, paid: [], firstClears: [] });
+    { coins: COIN_MAX, runNo: 0, paid: ['1:main', '2:bonus'], firstClears: [1, 3], up: { power: 0, rate: 0, multi: 0 } });
+  assert.deepEqual(normWallet(null), { coins: 0, runNo: 0, paid: [], firstClears: [], up: { power: 0, rate: 0, multi: 0 } });
   assert.equal(createSave3(memStorage({ [WALLET_KEY]: '{bad' })).wallet.get().coins, 0, '손상 → 기본값');
   const s = createSave3(memStorage());
   for (let i = 1; i <= 25; i++) s.wallet.pay({ id: i + ':main', amount: 1 });

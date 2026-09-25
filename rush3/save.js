@@ -10,6 +10,9 @@
 //  구 저장(stages[id] 에 기록이 바로 있던 형식)은 지우지 않고 버전 1 로 귀속시킨다(마이그레이션).
 //  r4.3(v4 ③단계): 코인 지갑은 **별도 키** WALLET_KEY(아래 '지갑'), 복수 탭 확인 표식은 TAB_KEY. v3 키의 형식(v: 3·defaults·normalize)은 그대로다.
 //   읽기 전용(setReadOnly — 먼저 열린 탭이 살아 있을 때)이면 v3 키·지갑 키 모두 쓰지 않는다.
+//  r4.4 (b): 로봇 강화 단계의 정규화·구매 판정은 순수 규칙 모듈 meta.js 의 것을 그대로 쓴다(최대 단계·비용이 한 곳에만 있게)
+import { UP_MAX, normUp, buy as buyUp } from './meta.js';
+
 export const KEY3 = 'starforgeRush.v3';
 export const BAK3 = 'starforgeRush.v3.bak';
 //  접미를 붙이지 않는 기본 난이도(BAL3.difficulty 의 normal). save 는 balance 를 import 하지 않는다(순수 I/O 모듈 유지)
@@ -21,8 +24,8 @@ const STAGE_DEFAULTS = Object.freeze({ cleared: false, attempts: 0, bestSurvivor
 //  survUp · timeUp(r4.4 v4 기록 칸, 이사님 결정 D9′, 기획 v4.1 3-6) = 희소 필드: 최다 생존 기록·최단 시간 기록을 **세웠을 때의** 강화 단계 스냅샷
 //   { power, rate, multi, rule }(rule = 규칙 버전 'v4'). 각 스냅샷은 **자기 기록과 함께만** 바뀐다(mergeStage) — 하나의 '강화 합계'만 두면 다른 판에서 세운 기록에 잘못 붙는다
 const REC_KEYS = ['cleared', 'attempts', 'bestSurvivors', 'bestTime', 'rescued', 'bestBonus', 'survUp', 'timeUp'];
-//  스냅샷 강화 단계 상한(트랙별 최대 단계)
-const UP_LIMIT = Object.freeze({ power: 5, rate: 5, multi: 3 });
+//  스냅샷 강화 단계 상한(트랙별 최대 단계 = meta.UP_MAX)
+const UP_LIMIT = UP_MAX;
 const RULE_RE = /^[a-z0-9][a-z0-9_-]{0,15}$/;
 /** 강화 스냅샷 정규화: 객체가 아니면 null(버림). 각 트랙 = 정수(버림) 0~상한, 숫자가 아니면 0. rule = 짧은 소문자 식별자, 아니면 'v4' */
 function normSnap(s) {
@@ -153,18 +156,21 @@ function normalize(d) {
 
 // ── 지갑(r4.3, 기획 v4.1 3-6·3-7) ─────────────────────────────────────────────────────────────────────────────
 //  **별도 키**(WALLET_KEY)에 둔다 — 옛 코드가 도는 탭(또는 옛 캐시)이 v3 키를 통째로 다시 써도 지갑이 지워지지 않게(옛 코드는 이 키를 모른다).
-//  wallet = { coins, runNo, paid, firstClears }
+//  wallet = { coins, runNo, paid, firstClears, up }
 //   coins       = 보유 코인(0 이상 정수, 상한 COIN_MAX)
 //   runNo       = 출격 번호(출격 때 1 오른다 — 지급 식별자의 앞부분)
 //   paid        = 이미 지급한 식별자 `${runNo}:main` · `${runNo}:bonus`(최근 PAID_KEEP 개만). 같은 식별자는 다시 지급하지 않는다
 //   firstClears = v4 첫 클리어 보너스를 받은 판 번호(정수, 오름차순 중복 없음). 옛 지옥 칸에서 이미 깬 판도 v4 첫 클리어는 한 번 받는다(D9′)
+//   up          = r4.4 (b) 로봇 강화 단계 { power, rate, multi }(정수, 0~최대 — meta.normUp). 옛 지갑·지갑 없는 옛 저장 = 모두 0.
+//                 구매(wallet.buy)는 잔액·단계를 **setItem 한 번**으로 쓴다
 //  v3 키 형식(v: 3)은 그대로다 — 지갑 칸은 v3 키에 넣지 않는다(defaults·normalize 무변경)
 export const WALLET_KEY = 'starforgeRush.v3.wallet';
 export const COIN_MAX = 999999;
 export const PAID_KEEP = 20;
 const PAID_RE = /^[0-9]+:(main|bonus)$/;
-export function walletDefaults() { return { coins: 0, runNo: 0, paid: [], firstClears: [] }; }
-/** 지갑 정규화(타입 강제): coins 0~COIN_MAX 정수 · runNo 0 이상 정수 · paid 식별자 문자열(최근 PAID_KEEP 개) · firstClears 1 이상 정수(오름차순, 중복 제거) */
+export function walletDefaults() { return { coins: 0, runNo: 0, paid: [], firstClears: [], up: normUp(null) }; }
+/** 지갑 정규화(타입 강제): coins 0~COIN_MAX 정수 · runNo 0 이상 정수 · paid 식별자 문자열(최근 PAID_KEEP 개) · firstClears 1 이상 정수(오름차순, 중복 제거) ·
+ *  up 트랙별 정수 0~최대(r4.4 — 없거나 이상하면 0) */
 export function normWallet(w) {
   const src = isPlainObject(w) ? w : {};
   const int = (v) => (Number.isFinite(v) ? Math.trunc(v) : 0);
@@ -177,6 +183,7 @@ export function normWallet(w) {
     runNo: Math.max(0, int(src.runNo)),
     paid: paid.slice(-PAID_KEEP),
     firstClears: [...fc].sort((a, b) => a - b),
+    up: normUp(src.up),
   };
 }
 //  합집합(순서 유지: a 먼저, 그다음 b 에만 있는 것)
@@ -238,13 +245,14 @@ export function createSave3(storage) {
   let wallet = readWallet() ?? walletDefaults();
   //  walletOk = 마지막 지갑 쓰기가 저장소에 닿았는가. false 인 동안은 메모리가 저장소보다 앞서 있다(다음 지급의 기준을 메모리로 잡는다)
   let walletOk = true;
-  //  쓰기 직전 다시 읽어 합친다(3-7 ⑥): paid·firstClears 는 합집합, runNo 는 큰 쪽, coins 는 **다시 읽은 값**(재계산하지 않음).
+  //  쓰기 직전 다시 읽어 합친다(3-7 ⑥): paid·firstClears 는 합집합, runNo 는 큰 쪽, coins·up(r4.4 강화 단계)은 **다시 읽은 값**(재계산하지 않음 — 잔액과 단계가 한 벌로 움직인다).
   //   단 앞선 쓰기가 실패해 메모리가 앞서 있으면 메모리 값을 기준으로 둔다(실패한 지급이 다음 지급에서 되돌아가 잔액이 줄어 보이지 않게)
   const fresh = () => {
     //  다시 읽기에 실패하면(예외·손상) 메모리 사본이 기준
     const w = readOnly ? wallet : (readWallet() ?? wallet);
     return {
       coins: walletOk ? w.coins : wallet.coins,
+      up: walletOk ? { ...w.up } : { ...wallet.up },
       runNo: Math.max(w.runNo, wallet.runNo),
       paid: unionList(w.paid, wallet.paid).slice(-PAID_KEEP),
       firstClears: [...new Set([...w.firstClears, ...wallet.firstClears])].sort((a, b) => a - b),
@@ -260,7 +268,7 @@ export function createSave3(storage) {
   };
   const walletApi = {
     /** 메모리 사본(읽기만) */
-    get: () => ({ ...wallet, paid: [...wallet.paid], firstClears: [...wallet.firstClears] }),
+    get: () => ({ ...wallet, paid: [...wallet.paid], firstClears: [...wallet.firstClears], up: { ...wallet.up } }),
     /** 저장소를 다시 읽어 합친 값(쓰지 않는다) — 첫 클리어 판정처럼 지급 직전 최신 값이 필요할 때 */
     peek: () => fresh(),
     /** 출격: runNo 를 1 올려 한 번 쓰고 새 번호를 돌려준다(지급 식별자의 앞부분) */
@@ -281,6 +289,16 @@ export function createSave3(storage) {
       if (Number.isInteger(firstClear) && firstClear >= 1 && !w.firstClears.includes(firstClear)) w.firstClears = [...w.firstClears, firstClear];
       const saved = writeWallet(w);
       return { paid: true, coins: wallet.coins, saved };
+    },
+    /** 로봇 강화 구매(r4.4 (b)): 저장소를 다시 읽어 합친 지갑에 meta.buy(비용표·최대 단계·잔액)를 적용해, 살 수 있으면 잔액 − 비용과 그 트랙 +1 을
+     *  **setItem 한 번**으로 쓴다(잔액과 단계가 갈라지지 않게). 살 수 없으면(잔액 부족·최대 단계·모르는 트랙) 아무것도 쓰지 않는다.
+     *  → { ok, reason: null | 'coins' | 'max' | 'track', cost, coins, up, saved } */
+    buy: (track) => {
+      const w = fresh();
+      const r = buyUp(w, track);
+      if (!r.ok) { wallet = normWallet(w); return { ok: false, reason: r.reason, cost: r.cost, coins: wallet.coins, up: { ...wallet.up }, saved: false }; }
+      const saved = writeWallet(r.wallet);
+      return { ok: true, reason: null, cost: r.cost, coins: wallet.coins, up: { ...wallet.up }, saved };
     },
     /** 코인이 저장소에 남는가(쓰기 실패·차단 환경·읽기 전용이면 false) — 결과·타이틀 경고 */
     get ok() { return persistent && walletOk && !readOnly; },

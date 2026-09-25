@@ -138,6 +138,9 @@ export function sweepHitsSupply(s, bullet) {
   return sweepContactSupply(s, bullet) !== null;
 }
 
+//  r4.4 소수 피해 여유값(combat.HP_EPS 와 같은 값): 직격 화력 강화 탄(1.3·1.6 …)이 남기는 부동소수 잔량은 0 으로 본다
+const DUR_EPS = 1e-9;
+
 // 발판 1개 추가(maxPads 상한). 추가됐으면 true.
 function addPad(s, events) {
   const max = s.payload.maxPads ?? Infinity;
@@ -167,6 +170,8 @@ export function activateChain(s, events) {
 // 내구 <= 0 이 되는 첫 탄에서 opened → run.pendingRewards 에 보상 정확히 1회 push + 이벤트 supplyOpen(연출용, reward 없음).
 // run(pendingRewards 배열 포함)은 필수 — 보상 경로를 하나로 고정하기 위해 없으면 throw.
 // chain 은 opened 이후 유효탄 1발(무기 무관) = 발판 +1(maxPads 까지, 이벤트 padAdd). 아직 활성화 전이면 queuedPads 로 셈.
+//  r4.4 (b) 로봇 다연발의 추가 탄(bullet.extra, 이사님 결정 N3): 열린 증원 설비에 닿으면 흡수만 하고 발판을 늘리지 않는다(queuedPads 도).
+//   열리기 전 통의 내구에는 다른 탄과 똑같이 피해를 준다(일반 보급 통 효과). 내구 판정은 소수 피해 여유값(DUR_EPS) — 정수 피해에선 결과 불변
 export function hitSupply(s, bullet, events, run) {
   if (!run || !Array.isArray(run.pendingRewards)) throw new TypeError('hitSupply: run.pendingRewards 배열이 필요하다');
   if (!supplyActive(s)) return false;
@@ -182,6 +187,7 @@ export function hitSupply(s, bullet, events, run) {
     return true;
   }
   if (s.opened) {
+    if (bullet.extra) return true;
     if (s.activated) addPad(s, events);
     else {
       const max = s.payload.maxPads ?? Infinity;
@@ -192,7 +198,7 @@ export function hitSupply(s, bullet, events, run) {
   }
   const dmg = Math.max(0, bullet.dmg ?? 1);
   s.durability -= dmg;
-  if (s.durability <= 0) {
+  if (s.durability <= DUR_EPS) {
     s.durability = 0;
     s.opened = true;
     run.pendingRewards.push(supplyReward(s));

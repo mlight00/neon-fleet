@@ -166,9 +166,9 @@ export function onEnemyHit(fx, ev, sp) {
   const hpMax = ev.hpMax ?? 0;
   if (hpMax >= FXH.dmgFloatMinHp && ev.dmg > 0) {
     const f = prev ? prev.dmgF : null;
-    if (f && f.t < FXH.dmgMergeSec && fx.floaters.includes(f)) { f.n += ev.dmg; f.text = '-' + f.n; f.pop = 0; }
+    if (f && f.t < FXH.dmgMergeSec && fx.floaters.includes(f)) { f.n += ev.dmg; f.text = '-' + dmgText(f.n); f.pop = 0; }
     else {
-      const nf = { x: q.x + (((prev ? prev.n : 0) % 3) - 1) * 10 * q.s, y: q.y - r * 1.1, text: '-' + ev.dmg, n: ev.dmg, color: '#FFFFFF',
+      const nf = { x: q.x + (((prev ? prev.n : 0) % 3) - 1) * 10 * q.s, y: q.y - r * 1.1, text: '-' + dmgText(ev.dmg), n: ev.dmg, color: '#FFFFFF',
                    t: 0, life: FXH.dmgFloatSec, big: false, px: Math.max(13, 16 * q.s), dmg: true, pop: 0 };
       fx.floaters.push(nf);
       if (h) h.dmgF = nf;
@@ -178,6 +178,11 @@ export function onEnemyHit(fx, ev, sp) {
     }
   }
   return role;
+}
+
+//  피해 숫자 '-n' 글자(r4.4 (b) 직격 화력 강화 — 피해 1.3·2.6 … 과 누적 부동소수 오차 '3.9000000000000004' 를 소수 한 자리로 반올림). 정수 피해는 종전 글자 그대로
+export function dmgText(n) {
+  return String(Math.round(n * 10) / 10);
 }
 
 /** 적 사망(kill·touch) → 종류별 연출(파편·링·흔들림) + 잔해. 잡졸만 사망 시트, 나머지는 도형 잔해(render.drawCorpses) */
@@ -378,7 +383,7 @@ export function collectLotteryOutcome(out, events, run) {
     } else if (ev.type === 'weaponSame' && weaponHere()) {
       out.same = true;
     } else if (ev.type === 'weaponMk' && weaponHere()) {
-      //  r3.10: 같은 무기 통 = 강화. 결과 문구는 '중복'이 아니라 '강화 · Mk n'
+      //  r3.10: 같은 무기 통 = Mk 상승. 결과 문구는 '중복'이 아니라 'Mk n'(r4.4: '강화'라는 말은 판 밖 로봇 강화에만)
       out.mk = ev.mk;
     }
   }
@@ -405,7 +410,8 @@ function chosenLine(run, lot, out, weaponSame) {
   }
   if (lot.kind === 'weapon') {
     if (weaponSame || (out && out.same && !out.swapped)) return '랜덤 길: ' + lot.label + ' 중복 · 교체 없음';
-    if (out && out.mk > 1 && !out.swapped) return '랜덤 길: ' + lot.label + ' 강화 · Mk ' + MK_LABEL[out.mk];
+    //  r4.4 표기(기획 v4.1 3-4 (라)): 판 안 무기 단계는 'Mk' 로만 — '강화'는 판 밖 로봇 강화에만 쓴다
+    if (out && out.mk > 1 && !out.swapped) return '랜덤 길: ' + lot.label + ' Mk ' + MK_LABEL[out.mk];
     return '랜덤 길: ' + lot.label + ' 획득';
   }
   const n = out && out.soldiers ? out.soldiers : null;
@@ -618,8 +624,8 @@ export function boot(canvas, deps = {}) {
     const stage = buildStage(id, { difficulty, lotterySeed });
     //  개발 확인용 시작 무기(r3.10): rush3.html?weapon=scatter&mk=2 — 규칙엔 startWeapon/startMk 로만 들어가고, 이 판은 기록에 남기지 않는다
     const devStart = devStartWeapon();
-    //  r4.4: 메인 로봇 보호 규칙(heroGuard)은 셸만 켠다 — 규칙 모듈 기본값은 꺼짐(옵션 없이 부르는 검사·봇은 종전 판)
-    run = createRun(stage, { ...devStart, heroGuard });
+    //  r4.4: 메인 로봇 보호 규칙(heroGuard)과 지갑의 로봇 강화 단계(up)는 셸만 넘긴다 — 규칙 모듈 기본값은 꺼짐·0(옵션 없이 부르는 검사·봇은 종전 판)
+    run = createRun(stage, { ...devStart, heroGuard, up: save.wallet.get().up });
     run.devWeapon = !!devStart.startWeapon || PROTO_IDS.includes(id) || devPass;
     //  랜덤 길 실제 결과 집계(계약서 3-9 결과 문구). 규칙이 아니라 셸이 갖는 칸이다 — 규칙 모듈은 lottery 를 모른다
     run.lotteryOutcome = run.lottery ? emptyLotteryOutcome() : null;
@@ -895,6 +901,8 @@ export function boot(canvas, deps = {}) {
             fx.sfx.push(['trapHit']);
             break;
           }
+          //  r4.4 (b) 로봇 다연발의 추가 탄(gateHit 0, 이사님 결정 N3)은 수치를 올리지 않는다(gain 0) — 번쩍임·숫자음 없이 사라진다
+          if (ev.gain === 0) break;
           fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC;
           fx.sfx.push(['gateTick']);
           break;
@@ -920,8 +928,8 @@ export function boot(canvas, deps = {}) {
         case 'padTake': floaterAt(ev.x, run.z, -70, '+1', C.chainPad); onJoin(fx, ev.x, ev.z ?? run.z, 1, null); break;
         case 'chainOn': floaterAt(ev.x, ev.z, -40, '증원 설비 가동!', C.chainPad, true); break;
         case 'weaponSwap': fx.sfx.push(['weaponSwap']); floaterSquad(-110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' 장착!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
-        //  r3.10 강화: 같은 무기 통 → Mk 상승 표시
-        case 'weaponMk': fx.sfx.push(['weaponSwap']); floaterSquad(-110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' ' + MK_LABEL[ev.mk] + ' 강화!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
+        //  r3.10: 같은 무기 통 → Mk 상승 표시. r4.4 표기 '기관총 Mk II!'(종전 '기관총 II 강화!' — '강화'는 판 밖 로봇 강화에만, 기획 v4.1 3-4 (라))
+        case 'weaponMk': fx.sfx.push(['weaponSwap']); floaterSquad(-110, (WEAPONS[ev.weapon]?.name ?? ev.weapon) + ' Mk ' + MK_LABEL[ev.mk] + '!', WEAPONS[ev.weapon]?.color ?? C.gold, true); break;
         //  전격포 연쇄: 맞은 쪽에 작은 청보라 스파크
         case 'arc': burstAt(ev.tx, ev.tz, 8, false, WEAPONS.arc.color); break;
         case 'weaponSame':

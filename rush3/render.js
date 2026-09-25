@@ -86,6 +86,9 @@ export function hitRole(kind, skin) {
 export const HIT_FLASH_FILL = '#FFFFFF';
 //  r4.4 메인 로봇 보호막 고리·피해 이전 빛줄기 색(검사가 이 값으로 그리기 호출을 찾는다). 광장 보스 보호막(C.gatePos 점선)과 다른 흰 하늘색
 export const HERO_RING_COLOR = '#BFF6FF';
+//  r4.4 (b) 로봇 다연발 **추가 탄**(extra — 게이트·증원 설비에 무효, 이사님 결정 N3)의 꼬리 색. 무기 6색·적탄 마젠타와 겹치지 않는 연보라 —
+//   '게이트를 올리는 원래 탄'과 눈으로 구분되게(기획 v4.1 3-4 (다) ②). 검사가 이 값으로 그리기 호출을 찾는다
+export const EXTRA_BULLET_COLOR = '#D9A6FF';
 
 export function bulletAngle(b) {
   const vx = b.vx || 0, vz = b.vz || 1;
@@ -1246,7 +1249,9 @@ export function createRenderer3(ctx, sprites) {
       if (offscreen(d, 40)) continue;
       const q = pj(b.x, d), k = q.s;
       const w = WEAPONS[b.kind] ?? WEAPONS.rifle;
-      const bw0 = b.w ?? w.w;        // Mk 강화로 탄 폭이 커진다(트랙 기준)
+      //  꼬리·폴백 막대 색: 무기색. 로봇 다연발 추가 탄(b.extra)만 EXTRA_BULLET_COLOR(r4.4 — 원래 탄과 구분)
+      const tint = b.extra ? EXTRA_BULLET_COLOR : w.color;
+      const bw0 = b.w ?? w.w;        // Mk 로 탄 폭이 커진다(트랙 기준)
       const bw = bw0 * k;
       const len = (10 + bw0 * 1.5) * k;
       const im = get('bullet_' + w.id);
@@ -1260,7 +1265,7 @@ export function createRenderer3(ctx, sprites) {
         //  꼬리: 탄 뒤쪽(아래)으로 무기색이 옅어지는 띠
         const tail = hh * 0.9;
         const gr = ctx.createLinearGradient(0, 0, 0, tail);
-        gr.addColorStop(0, w.color); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        gr.addColorStop(0, tint); gr.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.globalAlpha = 0.55;
         ctx.fillStyle = gr;
         ctx.fillRect(-Math.max(2, bw * 0.4), 0, Math.max(4, bw * 0.8), tail);
@@ -1269,7 +1274,7 @@ export function createRenderer3(ctx, sprites) {
         ctx.restore();
         continue;
       }
-      ctx.fillStyle = w.color;
+      ctx.fillStyle = tint;
       ctx.fillRect(q.x - bw / 2, q.y - len, bw, len);
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
       ctx.fillRect(q.x - bw / 6, q.y - len + 2 * k, bw / 3, len * 0.5);
