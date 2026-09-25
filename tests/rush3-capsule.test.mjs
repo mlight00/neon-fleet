@@ -414,7 +414,8 @@ async function bootFake(storage = fakeStorage()) {
   const texts = [];
   const save = createSave3(storage);
   const audio = fakeAudio();
-  const app = boot(fakeCanvas(texts), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() } });
+  //  r4.2: 종전 각 검사의 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 파일의 셸 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
+  const app = boot(fakeCanvas(texts), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });
   await app.ready;
   const frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
   return { app, frames, save, storage, texts, audio };
@@ -433,7 +434,6 @@ function driveUntil(h, policy, cond, max = 6000) {
 
 test('V3-CAPSULE-SHELL SHELL-1: 배너 1회 — S7 출격 직후 objT 3·두 줄 그림, 3초 뒤 0 이고 다시 켜지지 않는다. S1 은 0', async () => {
   const h = await bootFake();
-  h.app.setDifficulty('normal');
   h.app.startRun(7);
   const fx = () => h.app.getFx();
   assert.equal(fx().objT, BAL3.fx.objectiveBannerSec);
@@ -457,7 +457,6 @@ test('V3-CAPSULE-SHELL SHELL-1: 배너 1회 — S7 출격 직후 objT 3·두 줄
 
 test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — aim 정책으로 S7 캡슐을 열면 joinMany 효과음은 기록만(n 2 < joinManyAt 3 — 검수 반영, 규칙으로 잠그지 않음)·"구출 성공!"·"+2명 합류", 결과에 "구출 성공 · +2명"(r3.21 n 2)과 "작전 성공!", rescued 저장, 타이틀 sub 에 "구출✓"', async (t) => {
   const h = await bootFake();
-  h.app.setDifficulty('normal');
   h.app.startRun(7);
   const run = () => h.app.getRun();
   h.frames(1);
@@ -494,7 +493,6 @@ test('V3-CAPSULE-SHELL SHELL-2: 구출 → 결과 → 저장 → 타이틀 — a
 
 test('V3-CAPSULE-SHELL SHELL-3: 놓침은 실패 아님 — x240 고정으로 S7 완주하면 "캡슐 놓침"·결과 "구출 실패 — 캡슐을 열지 못했습니다"와 "작전 성공!" 이 함께, rescued 없음', async () => {
   const h = await bootFake();
-  h.app.setDifficulty('normal');
   h.app.startRun(7);
   const run = () => h.app.getRun();
   h.frames(1);

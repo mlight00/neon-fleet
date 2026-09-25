@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { pickInput } from './lib/rush3-policies.mjs';
 import assert from 'node:assert/strict';
 import { projectorFor } from '../rush3/project.js';
-import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine, DIFF_TOGGLE, normDifficulty,
+import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine,
          emptyLotteryOutcome, GATE_TIP_CLOSED, GATE_TIP_OPEN, GATE_TIP_OPEN_FIXED, SHUTTER_GUIDE_TEXT,
          isFixedGateRow, TITLE_GRID } from '../rush3/main.js';
 import { makeGateRow } from '../rush3/gates.js';
@@ -12,7 +12,7 @@ import { createRun, stepRun, STEP } from '../rush3/combat.js';
 import { buildStage, stageVersion, DEFS, LOTTERY_DEFAULT_SEED } from '../rush3/stages.js';
 import { createSave3 } from '../rush3/save.js';
 import { RETRY_LOTTERY_NOTE } from '../rush3/render.js';
-import { BAL3 } from '../rush3/balance.js';
+import { BAL3, PLAY_DIFFICULTY } from '../rush3/balance.js';
 import { hashSeed } from '../rush/rng.js';
 
 // STEP 인덱스별 입력열(결정적): 호버 x 는 사인파, 40~60 STEP 마다 드래그·키 조향이 섞인다
@@ -320,7 +320,8 @@ async function bootFake(opts = {}) {
   const win = fakeWin();
   const queue = [];
   let nowMs = 1000;
-  const storage = fakeStorage();
+  //  r4.2: opts.storage = 옛 저장 원문을 미리 넣은 storage(마지막 난이도 칸을 읽지 않는지 보는 검사용)
+  const storage = opts.storage ?? fakeStorage();
   const save = createSave3(storage);
   const audio = fakeAudio();
   const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio,
@@ -343,8 +344,8 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   //  타이틀 버튼 클릭(스테이지 1): 논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율
   tapStage1(canvas);
   assert.equal(app.getState(), 'run');
-  //  기록은 코스 버전 + 난이도 칸에 쌓인다 — 저장이 없는 새 사용자의 초기 선택은 지옥(brutal)이므로 `${ver}:brutal` 칸이다(계약서 3-8·6)
-  assert.equal(app.getDifficulty(), 'brutal', '저장 없는 첫 부팅의 초기 선택 = 지옥');
+  //  기록은 코스 버전 + 출격 줄 칸에 쌓인다 — r4.2: 게임 화면은 늘 기본 줄(brutal)로 출격하므로 `${ver}:brutal` 칸이다(종전 새 사용자 초기 선택 = 지옥과 같은 칸)
+  assert.equal(app.getRun().difficulty, 'brutal', '게임 화면의 출격 줄 = 기본 줄(brutal)');
   assert.equal(save.getStage(1, stageVersion(1), 'brutal').attempts, 1, '출격 때 attempts +1');
   assert.equal(save.getStage(1, stageVersion(1)).attempts, 0, 'normal 칸은 건드리지 않는다');
   assert.equal(save.get().lastStage, 1);
@@ -569,112 +570,99 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
   }
 });
 
-test('V3-SAVE-VERSION DIFF 셸 결선: 토글 클릭·키 1/2/3 → 난이도 저장, 출격·결과 기록이 `${ver}:hard` 칸에만 쌓이고 normal 칸은 그대로, HUD·결과에 표기', async () => {
+//  r4.2(2026-09-25, 이사 지시 "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고" · 결정 D2′ = 지옥 값 그대로): 난이도 선택 삭제.
+//   종전 두 검사('DIFF 셸 결선: 토글 클릭·키 1/2/3 → 난이도 저장…' · 'DIFF 새 사용자: 초기 선택 지옥 → 토글로 보통…')를 아래 두 검사로 개정했다.
+//   게임 화면은 **늘 기본 줄(brutal, 옛 지옥 수치)** 로 출격하고, 1/2/3 키·타이틀 토글·HUD 칩·결과 표기·dbg·API 에 난이도가 없다.
+test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 출격 — 토글·1/2/3 키·HUD 칩·결과 표기·dbg·API 에 난이도가 없고, 숫자 키는 아무 일도 하지 않으며, 기록은 `${ver}:brutal` 칸에만(옛 보통·어려움 칸 보존)', async () => {
   const ver = stageVersion(1);
-  const { app, canvas, win, frames, save, texts, storage } = await bootFake();
-  //  저장이 없으면 초기 선택은 지옥(계약서 3-8·6) — normal 화면을 보려면 토글로 '보통'을 고른다
-  assert.equal(app.getDifficulty(), 'brutal', '저장 없는 첫 부팅의 초기 선택 = 지옥');
-  assert.equal(normDifficulty('zzz'), 'brutal', '모르는 값의 폴백도 초기 선택과 같다');
-  win.fire('keydown', { code: 'Digit1' });
-  //  normal 칸의 기존 기록
-  save.updateStage(1, { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, ver);
-  frames(2);
-  assert.equal(app.getDifficulty(), 'normal');
-  assert.ok(texts.some((t) => t.includes('99명')), 'normal 에서는 normal 기록이 보인다');
-  assert.ok(texts.includes('보통') && texts.includes('어려움') && texts.includes('지옥'), '토글 3칸이 그려진다: ' + JSON.stringify(texts.slice(-12)));
-  //  '어려움' 칸 클릭(둘째 칸). 논리 좌표 → CSS 절반 배율
-  const T = DIFF_TOGGLE;
-  canvas.fire('pointerdown', { clientX: (T.x0 + (T.w + T.gap) + T.w / 2) / 2, clientY: (T.y + T.h / 2) / 2, pointerType: 'mouse' });
-  assert.equal(app.getState(), 'title', '토글은 출격이 아니다');
-  assert.equal(app.getDifficulty(), 'hard');
-  assert.equal(save.get().difficulty, 'hard', '선택은 저장에 기억');
-  texts.length = 0;
+  const { app, canvas, win, frames, save, texts, storage, audio } = await bootFake();
+  assert.equal(PLAY_DIFFICULTY, 'brutal');
+  //  외부 API·관찰값에 난이도 항목이 없다
+  assert.equal(app.getDifficulty, undefined, 'getDifficulty 삭제');
+  assert.equal(app.setDifficulty, undefined, 'setDifficulty 삭제');
   frames(1);
-  assert.ok(texts.includes('미도전'), 'hard 칸은 미도전: ' + JSON.stringify(texts));
-  assert.ok(!texts.some((t) => t.includes('99명')), 'normal 기록은 hard 화면에 나오지 않는다');
-  //  키 1/2/3 도 같은 경로(타이틀에서만)
-  win.fire('keydown', { code: 'Digit3' });
-  assert.equal(app.getDifficulty(), 'brutal');
-  win.fire('keydown', { code: 'Digit1' });
-  assert.equal(app.getDifficulty(), 'normal');
-  win.fire('keydown', { code: 'Digit2' });
-  assert.equal(app.getDifficulty(), 'hard');
-  //  출격: run.difficulty = hard, 적 표가 hard, attempts 는 `${ver}:hard` 칸
+  assert.ok(!('difficulty' in app.dbg()), 'dbg 에 difficulty 없음: ' + JSON.stringify(Object.keys(app.dbg()).slice(0, 6)));
+  //  옛 칸 기록(보통 = 접미 없음 · 어려움 = :hard)과 기본 줄 칸 기록을 미리 둔다 — 화면에는 기본 줄 칸만 나와야 한다
+  save.updateStage(1, { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, ver);
+  save.updateStage(1, { cleared: true, attempts: 3, bestSurvivors: 77, bestTime: 30 }, ver, 'hard');
+  save.updateStage(1, { cleared: true, attempts: 2, bestSurvivors: 5, bestTime: 61 }, ver, 'brutal');
+  texts.length = 0;
+  frames(2);
+  assert.ok(texts.includes('완료 · 5명 · 1분 1.0초'), '스테이지 칸 기록 = 기본 줄(brutal) 칸: ' + JSON.stringify(texts.filter((t) => t.includes('명'))));
+  assert.ok(!texts.some((t) => t.includes('99명') || t.includes('77명')), '옛 보통·어려움 칸 기록은 화면에 나오지 않는다');
+  for (const w of ['보통', '어려움', '지옥', '난이도']) assert.ok(!texts.includes(w), `타이틀에 '${w}' 글자 없음(토글 3칸·라벨 삭제)`);
+  //  종전 토글 자리(y 382 줄 세 칸 가운데)를 눌러도 아무 버튼도 없다 — 출격·효과음·저장 변화 없음
+  audio.played.length = 0;
+  for (let i = 0; i < 3; i++) canvas.fire('pointerdown', { clientX: (138 + i * 96 + 45) / 2, clientY: (382 + 17) / 2, pointerType: 'mouse' });
+  assert.equal(app.getState(), 'title', '빈 줄을 눌러도 타이틀 그대로');
+  assert.ok(!audio.played.some((p) => p[0] === 'click'), '빈 줄은 버튼이 아니다(클릭음 없음)');
+  //  숫자 키 1/2/3(code·Numpad·key 만 오는 환경)은 아무 일도 하지 않는다
+  const before = storage.getItem('starforgeRush.v3');
+  for (const e of [{ code: 'Digit1' }, { code: 'Digit2' }, { code: 'Digit3' }, { code: 'Numpad1' }, { code: 'Numpad2' }, { code: 'Numpad3' },
+                   { code: '', key: '1' }, { code: '', key: '2' }, { code: '', key: '3' }]) win.fire('keydown', e);
+  assert.equal(app.getState(), 'title', '숫자 키로 출격하지 않는다');
+  assert.equal(app.getRun(), null);
+  assert.ok(!audio.played.some((p) => p[0] === 'click'), '숫자 키 클릭음 없음');
+  assert.equal(storage.getItem('starforgeRush.v3'), before, '숫자 키가 저장을 바꾸지 않는다');
+  assert.equal(save.get().difficulty, 'brutal', '저장 difficulty 칸은 고정값(읽지 않음)');
+  //  출격: 기본 줄 판 — buildStage(1, { difficulty: 'brutal' }) 와 같은 적 표·스폰 목록(S1 추가 배치 extraSpawns 포함)
   tapStage1(canvas);
   assert.equal(app.getState(), 'run');
-  assert.equal(app.getRun().difficulty, 'hard');
-  assert.equal(app.getRun().enemyDefs.shooter.shot.dmg, 2);
-  assert.equal(app.dbg().difficulty, 'hard');
-  assert.equal(save.getStage(1, ver, 'hard').attempts, 1);
-  assert.equal(save.getStage(1, ver).attempts, 9, 'normal 칸 불변');
-  //  진행 중 숫자 키는 난이도를 바꾸지 않는다
-  win.fire('keydown', { code: 'Digit3' });
-  assert.equal(app.getRun().difficulty, 'hard');
-  assert.equal(app.getDifficulty(), 'hard');
-  //  HUD 태그
+  const run = app.getRun();
+  const want = buildStage(1, { difficulty: 'brutal' });
+  assert.equal(run.difficulty, 'brutal', '출격 줄 = 기본 줄');
+  assert.deepEqual(run.enemyDefs, createRun(want).enemyDefs, '적 표 = 기본 줄(옛 지옥)');
+  assert.equal(run.enemyDefs.shooter.shot.dmg, 3);
+  assert.deepEqual(run.spawns, want.spawns, '스폰 목록 = 기본 줄(추가 배치 포함)');
+  assert.ok(run.spawns.length > buildStage(1).spawns.length, 'S1 추가 배치가 붙었다');
+  assert.equal(save.getStage(1, ver, 'brutal').attempts, 3, 'attempts 는 기본 줄 칸에서 +1');
+  assert.equal(save.getStage(1, ver).attempts, 9, '옛 보통 칸 불변');
+  assert.equal(save.getStage(1, ver, 'hard').attempts, 3, '옛 어려움 칸 불변');
+  //  진행 중 숫자 키도 아무 일도 하지 않는다
+  for (const code of ['Digit1', 'Digit2', 'Digit3']) win.fire('keydown', { code });
+  assert.equal(app.getRun(), run); assert.equal(run.difficulty, 'brutal'); assert.equal(app.getState(), 'run');
+  //  HUD 에 난이도 칩('지옥') 없음
   texts.length = 0;
   frames(1);
-  assert.ok(texts.includes('어려움'), 'HUD 에 난이도 표기: ' + JSON.stringify(texts));
+  assert.ok(!texts.includes('지옥') && !texts.includes('어려움'), 'HUD 에 난이도 표기 없음: ' + JSON.stringify(texts.slice(0, 12)));
   //  승리 판을 셸의 정상 경로(run.over → 여운 → finishRun)로 끝낸다
   frames(30);
-  const run = app.getRun();
   run.won = true; run.wonAt = 55.5; run.over = true;
   let guard = 0;
   while (app.getState() === 'run' && guard++ < 300) frames(1);
   assert.equal(app.getState(), 'result', 'guard=' + guard);
-  assert.deepEqual(save.getStage(1, ver, 'hard'), { cleared: true, attempts: 1, bestSurvivors: run.units.length, bestTime: 55.5 });
-  assert.deepEqual(save.getStage(1, ver), { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 'hard 기록이 normal 최고 기록을 덮지 않는다');
-  assert.deepEqual(Object.keys(save.getStageVersions(1)).sort(), [String(ver), ver + ':hard']);
-  assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions).sort(), [String(ver), ver + ':hard'], '저장 원문 키');
-  //  결과 화면 제목 옆 표기
+  assert.deepEqual(save.getStage(1, ver, 'brutal'), { cleared: true, attempts: 3, bestSurvivors: Math.max(5, run.units.length), bestTime: 55.5 });
+  assert.deepEqual(save.getStage(1, ver), { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, '옛 보통 칸 기록 불변');
+  assert.deepEqual(save.getStage(1, ver, 'hard'), { cleared: true, attempts: 3, bestSurvivors: 77, bestTime: 30 }, '옛 어려움 칸 기록 불변');
+  assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions).sort(), [String(ver), ver + ':brutal', ver + ':hard'], '저장 원문 키(옛 칸 보존)');
+  //  결과 화면: 제목 한 줄에 난이도 표기가 붙지 않는다
   texts.length = 0;
   frames(1);
-  assert.ok(texts.some((t) => t.includes('어려움')), '결과 화면에 난이도 표기: ' + JSON.stringify(texts));
-  //  다시 도전도 같은 난이도
+  assert.ok(texts.includes('STAGE 1  ' + run.title), '결과 제목 = STAGE n 제목만: ' + JSON.stringify(texts.filter((t) => t.startsWith('STAGE'))));
+  assert.ok(!texts.some((t) => t.includes('지옥') || t.includes('어려움')), '결과 화면에 난이도 표기 없음');
+  //  다시 도전도 기본 줄
   canvas.fire('pointerdown', { clientX: 120, clientY: (480 + 28) / 2, pointerType: 'mouse' });
   assert.equal(app.getState(), 'run');
-  assert.equal(app.getRun().difficulty, 'hard');
-  assert.equal(save.getStage(1, ver, 'hard').attempts, 2);
-  //  재로드(새 boot)해도 마지막 난이도가 살아 있다
-  app.toTitle();
-  const s2 = createSave3(storage);
-  assert.equal(s2.get().difficulty, 'hard');
-  //  normal 로 돌아가면 normal 기록이 다시 보이고 HUD 에는 표기가 없다
-  win.fire('keydown', { code: 'Digit1' });
-  texts.length = 0;
-  frames(1);
-  assert.ok(texts.some((t) => t.includes('99명')));
-  app.startRun(1);
-  texts.length = 0;
-  frames(1);
-  assert.ok(!texts.includes('어려움') && !texts.includes('지옥'), 'normal HUD 에는 난이도 표기가 없다');
+  assert.equal(app.getRun().difficulty, 'brutal');
+  assert.equal(save.getStage(1, ver, 'brutal').attempts, 4);
 });
 
-test('V3-SAVE-VERSION DIFF 새 사용자: 저장이 없으면 타이틀 초기 선택은 지옥 — 토글로 보통을 고르면 접미 없는 칸에 기록된다', async () => {
+test('V3-SHELL-DIFF2ROW 옛 저장: 마지막 선택이 보통·어려움이던 저장도 읽지 않는다 — 늘 기본 줄로 출격하고 `${ver}:brutal` 칸에 기록된다', async () => {
   const ver = stageVersion(1);
-  const { app, canvas, frames, save, storage, texts } = await bootFake();
-  //  저장 원문 자체가 없는 상태(첫 방문). 초기 선택 = 지옥(2026-09-16 이사 결정, 계약서 3-8)
-  assert.equal(storage.getItem('starforgeRush.v3'), null, '아직 저장 원문이 없다');
-  assert.equal(app.getDifficulty(), 'brutal');
-  frames(2);
-  assert.equal(app.dbg().difficulty, 'brutal', '타이틀 dbg 도 고른 값을 알린다');
-  //  '보통' 칸 클릭(첫 칸). 논리 좌표 → CSS 절반 배율
-  const T = DIFF_TOGGLE;
-  canvas.fire('pointerdown', { clientX: (T.x0 + T.w / 2) / 2, clientY: (T.y + T.h / 2) / 2, pointerType: 'mouse' });
-  assert.equal(app.getState(), 'title', '토글은 출격이 아니다');
-  assert.equal(app.getDifficulty(), 'normal');
-  assert.equal(save.get().difficulty, 'normal', '선택은 저장에 기억');
-  //  출격 — 기록은 접미 없는 칸(`${ver}`)에만 쌓이고 지옥 칸은 비어 있다
-  tapStage1(canvas);
-  assert.equal(app.getState(), 'run');
-  assert.equal(app.getRun().difficulty, 'normal');
-  assert.equal(save.getStage(1, ver).attempts, 1);
-  assert.equal(save.getStage(1, ver, 'brutal').attempts, 0, '지옥 칸은 비어 있다');
-  assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions), [String(ver)], '저장 원문 키에 난이도 접미가 없다');
-  //  보통은 HUD 에 난이도를 표기하지 않는다
-  texts.length = 0;
-  frames(1);
-  assert.ok(!texts.includes('어려움') && !texts.includes('지옥'), 'normal HUD 에는 난이도 표기가 없다: ' + JSON.stringify(texts));
+  for (const old of ['normal', 'hard']) {
+    const pre = fakeStorage();
+    pre.setItem('starforgeRush.v3', JSON.stringify({ v: 3, stages: {}, lastStage: 1, difficulty: old, volume: 1, mute: false }));
+    const { app, canvas, frames, save, storage } = await bootFake({ storage: pre });
+    assert.equal(save.get().difficulty, 'brutal', old + ': 저장의 마지막 선택을 읽지 않는다');
+    frames(2);
+    tapStage1(canvas);
+    assert.equal(app.getState(), 'run');
+    assert.equal(app.getRun().difficulty, 'brutal', old + ': 출격 줄 = 기본 줄');
+    assert.equal(save.getStage(1, ver, 'brutal').attempts, 1, old + ': 기본 줄 칸에 기록');
+    assert.equal(save.getStage(1, ver).attempts, 0, old + ': 보통 칸은 비어 있다');
+    assert.equal(save.getStage(1, ver, 'hard').attempts, 0, old + ': 어려움 칸은 비어 있다');
+    assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions), [ver + ':brutal'], old + ': 저장 원문 키');
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

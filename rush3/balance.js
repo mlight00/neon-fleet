@@ -141,24 +141,27 @@ export const BAL3 = deepFreeze({
             //   자동 조준(명중 ≈ 100%)이라 도착 병력이 크면 첫 돌진 전에 죽는 것을 규칙으로 막는다 — 최소 1회 예고·돌진·충격을 반드시 본다
             guard: true },
   },
-  // 난이도 배수(계약서 3-8). 위협만 올리고 성장 축(게이트·보급·무기·병사 hp·armZ·coverZ)은 손대지 않는다.
-  //  normal 은 전부 ×1 = 종전과 완전히 같은 판. 배수는 buildStage/createRun 시점에 한 번 적용되고 stepRun 안에는 난이도 분기가 없다.
-  //  근거: 이사 실플레이 3회 소감 "가만히 있으면 손해는 나지만 난이도가 너무 낮아 완전 쉽다"(2026-09-16). 사람이 직접 지점을 고르게 하는 명시적 선택이다.
-  //   enemyHp      잡졸·돌격체·저격수 hp(반올림)      eshotDmg     저격수·정예 적탄 dmg(어려움부터 1발 = 병사 1명)
+  // 난이도 배수 표(계약서 3-8) — **r4.2(2026-09-25) 두 줄 표**. 위협만 올리고 성장 축(게이트·보급·무기·병사 hp·armZ·coverZ)은 손대지 않는다.
+  //  이사님 지시(2026-09-24) "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고" → 결정 D2′(2026-09-25) = **지옥 값 그대로**(2번 판 조정 없음).
+  //  화면에서 난이도 선택(타이틀 토글·1/2/3 키·HUD 칩·결과 표기)을 지웠고, 표에는 두 줄만 남는다:
+  //   brutal = **기본 줄**(옛 '지옥' 수치 그대로). 게임 화면(셸 main.js)은 늘 이 줄로 출격한다(PLAY_DIFFICULTY). 기록 칸 키 `버전:brutal` 도 그대로 이어진다.
+  //   normal = **검사용 배수 1 줄**(옛 '보통', 화면에 없음). 규칙 모듈의 기본값(DEFAULT_DIFFICULTY)이라 buildStage(id)·createRun 을 인자 없이 부르는 규칙 검사의 기대값이 그대로다.
+  //   옛 '어려움'(hard) 줄은 지웠다 — 모르는 id 라 difficultyMult 가 throw 한다. 옛 저장의 `버전:hard` 칸은 save.js 가 지우지 않고 보존만 한다.
+  //  배수는 buildStage/createRun 시점에 한 번 적용되고 stepRun 안에는 난이도 분기가 없다(DIFF-6 정적 검사).
+  //   enemyHp      잡졸·돌격체·저격수 hp(반올림)      eshotDmg     저격수·정예 적탄 dmg(배수 1 줄 1 · 기본 줄 3)
   //   touchDmg     잡졸·돌격체·정예 접촉 피해          eliteHp      정예 hp(반올림)
   //   spawnCount   xs 없이 rows 로 뿌리는 스폰의 n(반올림, xs 명시 스폰은 그대로)   eliteFireRate 정예 부채꼴 발사 빈도(shootEvery ÷ 배수)
-  //  ⚠️표시 이름(label·short)과 id 는 다른 것이다 — 2026-09-18 이사 결정으로 세 칸의 화면 이름은 **보통 / 어려움 / 지옥**이지만
-  //   id('normal'·'hard'·'brutal')·배수·저장 칸 키 접미는 종전 그대로다(기록 칸 `2:brutal` 은 옛 저장과 그대로 이어진다).
+  //   extraSpawns  이 줄에서만 스테이지 정의의 추가 배치(stages/courses 의 extraSpawns — 옛 이름 brutalSpawns, S1·S5·S8)를 spawns 뒤에 붙인다(r3.22)
+  //  화면 이름(label·short)은 r4.2 에서 지웠다 — 어디에도 표시하지 않는다.
   difficulty: {
     //  r3.9(2026-09-18 이사 결정 2)는 위협을 **출현 빈도**로만 올렸다(enemyHp·eliteHp 1 고정). → **r3.21(2026-09-20 이사 결정 B안)로 뒤집음**:
-    //   이사 실기(지옥, 24까지 조작 없이 클리어) "일반 적 체력이 낮아 한두 방에 다 파괴된다" — 체력 배수를 되살린다(hard 1.5/1.25 · brutal 2/1.5).
+    //   이사 실기(지옥, 24까지 조작 없이 클리어) "일반 적 체력이 낮아 한두 방에 다 파괴된다" — 체력 배수를 되살렸다(brutal 2/1.5).
     //   빈도 배수(waves·waveGap·spawnCount·eliteSummonRate)와 적탄·접촉 피해 배수는 r3.9 그대로 둔다. 스테이지 구간 배율(enemyHpByStage)은 여기에 곱해진다.
-    //   ⚠️1~3 기준 코스(enemyHpByStage difficultyHp: false)에서는 enemyHp·eliteHp 가 ×1 로 읽힌다(stages.buildStage·combat.createRun) — 대항 검수 반영.
-    normal: { id: 'normal', label: '보통',   short: '',       enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1 },
-    //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다: hard 2/360·brutal 2/360 만 성공 경로 잠금(SD-7)·정예전 도달(SD-8)·단조성(SD-5)을 전부 지킨다.
-    //   brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반). 지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
-    hard:   { id: 'hard',   label: '어려움', short: '어려움', enemyHp: 1.5, eshotDmg: 2, touchDmg: 2, eliteHp: 1.25, spawnCount: 1.4, waves: 2, waveGap: 360, eliteFireRate: 1.25, shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1.5 },
-    brutal: { id: 'brutal', label: '지옥',   short: '지옥',   enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2 },
+    //   ⚠️1~3 기준 코스(enemyHpByStage difficultyHp: ['brutal'])에서는 배수 1 줄의 enemyHp·eliteHp 가 ×1 이다(stages.buildStage·combat.createRun).
+    normal: { id: 'normal', enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1, extraSpawns: false },
+    //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다. brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반).
+    //   지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
+    brutal: { id: 'brutal', enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2, extraSpawns: true },
   },
   //  적 체력 스테이지 배율(r3.21, 이사 결정 2026-09-20 B안 ①): 스테이지 번호 구간별 배수. 잡졸·돌격체·저격수(스폰 정의 hp 명시 포함)와
   //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).
@@ -167,6 +170,7 @@ export const BAL3 = deepFreeze({
   //   difficultyHp: false(r3.21 대항 검수 반영) = 그 구간에서는 난이도 체력 배수(enemyHp·eliteHp)도 **×1** — 1~3 기준 코스는 구간 배율 ×1 과 같은 원칙으로
   //    세 난이도의 적·정예 체력이 r3.9(33568b2)와 완전히 같다(hard S2 의 봇 성공 경로 보존·SD-7 잠금 유지). 이사 소감('한두 방에 파괴')은 지옥 24 스테이지 실기에서 나왔고
   //    1~3 은 2명 시작 코스라 체력 1.5배가 치명적이었다(hard S2 planBoss 4/17 → 0/10). 빈도·적탄·접촉 배수는 1~3 에서도 그대로 걸린다. 생략 = true(4~24·proto3·합성)
+  //   r3.22 부터 1~3 행은 difficultyHp: ['brutal'](지옥에서만 체력 배수). r4.2 두 줄 표에서도 값 그대로 — 기본 줄(brutal)은 적용, 배수 1 줄(normal)은 ×1 이라 결과가 같다.
   enemyHpByStage: [
     { to: 3, mul: 1, difficultyHp: ['brutal'] }, { to: 8, mul: 2 }, { to: 12, mul: 4 }, { to: 18, mul: 7 }, { to: 24, mul: 12 },
   ],
@@ -285,14 +289,15 @@ export const BAL3 = deepFreeze({
   },
 });
 
-// 난이도 id 목록(타이틀 토글 순서 = 표 순서). 데이터 접근만 — 규칙 로직이 아니다.
+// 배수 표의 줄 id 목록(r4.2 두 줄 표: ['normal', 'brutal']). 데이터 접근만 — 규칙 로직이 아니다. 화면에는 쓰지 않는다.
 export const DIFFICULTY_IDS = Object.freeze(Object.keys(BAL3.difficulty));
+// 규칙 계층 기본(buildStage·createRun·enemyDefsFor 인자 생략 시) = 검사용 배수 1 줄(normal) — 규칙 검사·봇 기준선. r4.2 에서도 그대로다.
 export const DEFAULT_DIFFICULTY = 'normal';
-// 타이틀 초기 선택(저장에 난이도가 없을 때). 2026-09-16 이사 결정: 가장 높은 난이도로 전 스테이지 격파 → 기본 선택을 그 칸으로.
-//  규칙 계층 기본(DEFAULT_DIFFICULTY, buildStage 인자 생략 시)은 normal 그대로 — 테스트·봇 기준선.
-export const DEFAULT_PICK_DIFFICULTY = 'brutal';
+// 게임 화면이 늘 출격하는 줄 = 기본 줄(brutal, 옛 '지옥'). r4.2(2026-09-25) 난이도 선택 삭제 — 셸(main.js)은 이 값 하나만 buildStage 에 넘긴다.
+//  종전 이름 DEFAULT_PICK_DIFFICULTY(타이틀 초기 선택, 2026-09-16 이사 결정 '지옥')와 같은 값이다 — 새 사용자의 기록 칸(`버전:brutal`)도 그대로 이어진다.
+export const PLAY_DIFFICULTY = 'brutal';
 
-// 난이도 배수 표 한 줄. 모르는 id 는 throw(규칙 모듈이 조용히 normal 로 떨어지지 않게 — 셸이 저장값을 미리 거른다)
+// 난이도 배수 표 한 줄. 모르는 id(지운 'hard' 포함)는 throw — 규칙 모듈이 조용히 배수 1 줄로 떨어지지 않게
 export function difficultyMult(id) {
   const m = BAL3.difficulty[id];
   if (!m) throw new Error('unknown difficulty ' + id);
@@ -309,7 +314,7 @@ export function enemyHpMulFor(stageId) {
   return hpRowFor(stageId)?.mul ?? 1;
 }
 // 난이도 체력 배수(enemyHp·eliteHp)를 적용하는 스테이지인가(r3.21 대항 검수 반영). 표의 difficultyHp: false 구간(1~3)만 false, 그 밖은 true. 데이터 접근만.
-//  difficultyHp 행 값: 생략·true = 모든 난이도에 적용 · false = 전부 ×1 · **배열 = 그 난이도에서만 적용**(r3.22 지옥 강화 — 1~3 은 지옥만)
+//  difficultyHp 행 값: 생략·true = 모든 줄에 적용 · false = 전부 ×1 · **배열 = 그 줄에서만 적용**(r3.22 지옥 강화 — 1~3 은 기본 줄 brutal 만)
 export function difficultyHpFor(stageId, difficulty) {
   const v = hpRowFor(stageId)?.difficultyHp;
   if (Array.isArray(v)) return difficulty != null && v.includes(difficulty);

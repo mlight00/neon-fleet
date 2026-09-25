@@ -205,10 +205,10 @@ function fakeStorage() { const m = new Map(); return { getItem: (k) => (m.has(k)
 test('V3-HITFEEL HF-9: 연출은 규칙 run 을 쓰지 않는다 — 피격·사망·합류·보스 처치 이벤트를 셸에 흘려도 run 은 한 글자도 안 바뀐다', async () => {
   const queue = [];
   let nowMs = 1000;
-  const app = boot(fakeCanvas(null), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save: createSave3(fakeStorage()), audio: fakeAudio(), sprites: { get: () => null, ready: new Set() } });
+  //  r4.2: 종전 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
+  const app = boot(fakeCanvas(null), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save: createSave3(fakeStorage()), audio: fakeAudio(), sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });
   await app.ready;
   const frame = (dt) => { nowMs += dt; queue.shift()(nowMs); };
-  app.setDifficulty('normal');
   app.startRun(13);
   for (let i = 0; i < 30; i++) frame(1000 / 60);
   const run = app.getRun();

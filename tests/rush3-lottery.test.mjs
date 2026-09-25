@@ -455,9 +455,9 @@ test('V3-LOTTERY LOT-6: 꽝 확정 게이트는 −10·상한이 자기 값 — 
   assert.equal(run.badGatesPassed, 1);
 });
 
-test('V3-LOTTERY LOT-6b: 난이도 3종 모두 — 우측(랜덤 길)을 고른 판은 확정 손실 10 이 나고 좌측보다 병력이 적다', (t) => {
+test('V3-LOTTERY LOT-6b: 두 줄 모두(배수 1 · 기본 — r4.2 어려움 줄 삭제) — 우측(랜덤 길)을 고른 판은 확정 손실 10 이 나고 좌측보다 병력이 적다', (t) => {
   const rows = [];
-  for (const difficulty of ['normal', 'hard', 'brutal']) {
+  for (const difficulty of ['normal', 'brutal']) {
     const R = unitsAtWallEnd(SEED_OF.trapGate, 'R', difficulty);
     const L = unitsAtWallEnd(SEED_OF.trapGate, 'L', difficulty);
     assert.equal(R.lossByGate, 10, difficulty + ': 우측 선택은 확정 게이트로 정확히 10 을 잃는다');

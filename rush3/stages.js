@@ -61,8 +61,9 @@ export const DEFS = {
       { z: 5300, kind: 'grunt', n: 6, xs: [94, 136, 330, 372, 115, 351], dz: [0, 0, 0, 0, 40, 40], corridorHw: 53 },
     ],
     //  r3.22 지옥 전용(이사 소감 2026-09-22 "지옥도 아직 너무 쉽다"): 학습판이라 잡졸뿐이어서 지옥에서도 손실 0 으로 흘렀다
-    //   → 저격수 2(원거리에서 병력을 깎는다) + 돌격체 2(부대에 닿는다). 보통·어려움은 이 줄을 읽지 않는다
-    brutalSpawns: [
+    //   → 저격수 2(원거리에서 병력을 깎는다) + 돌격체 2(부대에 닿는다).
+    //  r4.2(2026-09-25): 이름만 brutalSpawns → extraSpawns. 기본 줄(brutal, 게임 화면)에서만 붙고 검사용 배수 1 줄(normal)은 읽지 않는다 — 배치·순서 불변
+    extraSpawns: [
       //  r3.25 손맛(이사 관찰 2026-09-23 "여러 대 맞아야 터지는 적의 손맛"): 체력 10 잡졸 무리 — 1~3 은 구간 배율을 올리면
       //   어려움 2번 성공 경로가 깨져(스윕 2026-09-23) 지옥 1번에만 **체력을 명시한** 단단한 무리로 여러 발 맞는 장면을 준다
       { z: 3300, kind: 'grunt', n: 4, xs: [130, 200, 280, 350], corridorHw: null, hp: 10 },
@@ -366,6 +367,7 @@ function makeElites(d, mult) {
 //  난이도(3-8)는 여기서 한 번 박힌다: stage.difficulty · rows 스폰 n(spawnCount) · 정예 hp(eliteHp, 반올림).
 //  적 hp·적탄·접촉·정예 발사 빈도는 createRun 이 stage.difficulty 를 읽어 run.enemyDefs 로 만든다. 게이트·통·벽·시작 병력·무기는 난이도와 무관.
 //  difficulty 생략 = normal = 종전과 완전히 같은 객체(difficulty 필드만 추가).
+//  r4.2 두 줄 표: 'brutal'(기본 줄 = 옛 지옥, 게임 화면이 늘 넘긴다) · 'normal'(검사용 배수 1 줄 = 옛 보통, 인자 생략 기본값). 그 밖(지운 'hard' 포함)은 throw.
 //  랜덤 길(3-9)은 '재도전 동일 배치' 원칙의 명시적 예외 — lotterySeed 가 판마다 달라 우측 통로만 바뀐다(셸이 시계로 만든다).
 /** 아레나 정의 정규화(r3.17): 코스의 `arena: { z, w?, depth?, boss: {...} }` 를 BAL3.arena 기본값과 병합한 사본으로(호출마다 새 객체).
  *  boss 는 { ...BAL3.arena.boss, ...정의 boss, dash/shock 는 칸별 병합, summon/shoot 는 정의에 있을 때만 객체 아니면 null }.
@@ -410,8 +412,9 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     gateRows: d.gates.map((g, i) => makeRow(i + 1, g, mult.gateCapMul ?? 1)),
     supplies: d.supplies.map((s, i) => makeSupplyDef(i + 1, s)),
     walls,
-    //  r3.22 지옥 전용 추가 배치: 정의의 brutalSpawns 는 지옥에서만 spawns 에 합친다(뒤에서 z 순 정렬). 보통·어려움은 불변
-    spawns: (difficulty === 'brutal' && d.brutalSpawns ? d.spawns.concat(d.brutalSpawns) : d.spawns).map(sp => makeSpawn(id, sp, solid, hpMult, hpMul)),
+    //  r3.22 지옥 전용 추가 배치 → r4.2 이름 extraSpawns: 배수 표 줄의 extraSpawns 가 참인 줄(기본 줄 brutal)에서만 정의의 extraSpawns 를
+    //   spawns **뒤에** 붙인다(뒤에서 z 순 정렬 — 붙이는 순서는 r3.22 와 같다). 검사용 배수 1 줄(normal)의 배치는 불변. spawns 에 합쳐 두지 않는다(V3-DIFF2ROW)
+    spawns: (mult.extraSpawns && d.extraSpawns ? d.spawns.concat(d.extraSpawns) : d.spawns).map(sp => makeSpawn(id, sp, solid, hpMult, hpMul)),
     //  정예(r3.16 복수 정예): 정의 `elites: [...]`(1~3체) 또는 단수 `elite`(배열 1개로 정규화). 원소 z 는 정의의 eliteZ(전원 같은 z 에서 함께 등장).
     //   난이도 배수 eliteHp 는 원소마다 반올림 적용(종전과 같은 자리). role/x/patrol 은 정의에 있을 때만 싣는다 — 단수 정의의 원소는
     //   종전 stage.elite 와 **키 집합까지 같은 모양**({ z, hp, summon(, skin) })이라 C-2·C-6·STG·DIFF 의 읽기가 그대로 통과한다.

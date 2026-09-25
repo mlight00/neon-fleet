@@ -354,7 +354,8 @@ async function bootFake(storage = fakeStorage()) {
   const texts = [];
   const save = createSave3(storage);
   const audio = fakeAudio();
-  const app = boot(fakeCanvas(texts), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() } });
+  //  r4.2: 종전 각 검사의 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 파일의 셸 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
+  const app = boot(fakeCanvas(texts), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });
   await app.ready;
   const frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
   return { app, frames, save, storage, texts, audio };
@@ -372,7 +373,6 @@ function driveUntil(h, policy, cond, max = 6000) {
 
 test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결과 아님)·joinMany·스테이지 BGM·배너 "보너스전! 20초"·HUD "보너스 N초 · N점 · 단계 K", ⏸ 동작, 결과 화면 "보너스 N점 · 단계 K"·저장 bestBonus/bestSurvivors/bestTime', async () => {
   const h = await bootFake();
-  h.app.setDifficulty('normal');
   h.app.startRun(8);
   const run = () => h.app.getRun();
   assert.equal(h.app.dbg().phase, 'main'); assert.equal(h.app.dbg().bonus, null); assert.equal(h.app.dbg().bossX, null);
@@ -452,7 +452,6 @@ test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결�
 
 test('V3-BONUS B-8b: 셸 진입 프레임 — joinMany 효과음은 bonusStart 프레임에 1회, bonusHit 마다 crateBreak·"+값" 플로터, bonusTier 에 "보상 단계 K!"', async () => {
   const h = await bootFake();
-  h.app.setDifficulty('normal');
   h.app.startRun(8);
   const run = () => h.app.getRun();
   h.frames(1);
@@ -474,7 +473,8 @@ test('V3-BONUS B-8b: 셸 진입 프레임 — joinMany 효과음은 bonusStart �
 
 // ─────────────────────────────────────────────────────────────────────────────
 test('V3-BONUS B-9: C[8] 완주 — planBoss(보통) won·over·steps < 14400·bonusStart 1·bonusEnd 1·bonusHit ≥ 1, 점수·단계는 진단으로(tiers 근거)', (t) => {
-  for (const d of ['normal', 'hard', 'brutal']) {
+  //  r4.2: 두 줄(배수 1 · 기본) — 어려움 줄 삭제로 진단 한 줄이 빠졌다
+  for (const d of ['normal', 'brutal']) {
     const r = playPolicy(8, 'planBoss', 14400, d);
     if (d === 'normal') {
       assert.equal(r.run.won, true); assert.equal(r.run.over, true); assert.ok(r.steps < 14400);

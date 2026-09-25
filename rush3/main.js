@@ -2,7 +2,7 @@
 //  ⚠️모듈 상단에서 DOM 을 만지지 않는다 — Node 테스트가 hitButton/makeLoop 를 그대로 import 한다.
 //  rush/main.js 는 import 하지 않는다(자동 부트가 같은 캔버스에 붙는다). 골격(hitButton/toLogical/spawnBurst/
 //  autoPause/오디오 unlock/ESC/음량 버튼/로드 후 루프 시작/#game3 가드)만 참고해 옮겨 적었다.
-import { BAL3, DIFFICULTY_IDS, DEFAULT_PICK_DIFFICULTY } from './balance.js';
+import { BAL3, PLAY_DIFFICULTY } from './balance.js';
 import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
@@ -21,16 +21,14 @@ const C = BAL3.colors;
 //  판 종료 뒤 결과 화면까지의 여운(초)
 const OVER_DELAY = { won: 1.3, lost: 1.0 };
 const BGM = { title: 'nf_bgm_title', stage: ['nf_bgm_sector1a', 'nf_bgm_sector2a', 'nf_bgm_sector3a'], boss: ['nf_bgm_boss_sector1', 'nf_bgm_boss_sector2', 'nf_bgm_boss_sector3'] };
-//  타이틀 난이도 토글(계약서 3-8·6장): 스테이지 버튼(y 436~) 바로 위 한 줄. 버튼 id = 'diff_' + 난이도 id
-export const DIFF_TOGGLE = Object.freeze({ x0: 138, y: 382, w: 90, h: 34, gap: 6 });
+//  r4.2(2026-09-25, 이사 지시 "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고"): 타이틀 난이도 토글 3칸(종전 DIFF_TOGGLE,
+//   스테이지 버튼 바로 위 y 382 줄 {x0 138, w 90, h 34, gap 6})과 1/2/3 키를 지웠다. 그 줄은 **비워 둔다** — v4 ③·④단계의 [로봇 강화] 자리
 //  타이틀 스테이지 목록(24스테이지·B-2): 2열×4행 = 8칸/페이지, 첫 칸 x 60~236·y 446~500. 페이지 줄은 그 아래(694)
 export const TITLE_GRID = Object.freeze({ y: 446, dy: 60, h: 54, pageY: 694, perPage: 8 });
 //  ⏸(일시정지) 버튼 = HUD 상단 줄의 셋째 칸. 상자는 render 의 자리표(HUD_ROW.box.pause) 하나에서만 온다 —
 //  이 객체가 **히트 영역이자 그려지는 상자**다(`hud: true` 라 drawButtons 는 건너뛰고 drawHud 가 같은 상자로 그린다).
 //  ⚠️여기에 좌표를 직접 적지 말 것. 적는 순간 화면의 칩과 누르는 자리가 조용히 어긋난다(2026-09-18 HUD 정돈).
 export const HUD_BTN = Object.freeze({ id: 'pause', ...HUD_ROW.box.pause, label: '❚❚', hud: true });
-//  키 1/2/3 = 보통/어려움/지옥(타이틀에서만). code 가 비어 오는 환경은 key 로 대신하므로 둘 다 받는다
-const DIFF_KEYS = Object.freeze({ Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2, 1: 0, 2: 1, 3: 2 });
 //  셔터 안내 문구(계약서 6장 N2-③⑥ · 2026-09-17 2차 검수). 닫힌 동안 → 처음 열릴 때 → 첫 조우 배너 순으로 이어진다
 export const GATE_TIP_CLOSED = '가까워지면 열림';
 export const GATE_TIP_OPEN = '지금 쏘면 +1';
@@ -68,10 +66,7 @@ export function bonusLine(bonus) {
 //  ⚠️판정식은 render.isTrapGateRow 한 곳에만 둔다 — 화면의 함정 외형과 셸의 문구가 갈라지지 않게 같은 함수를 쓴다
 export const isFixedGateRow = isTrapGateRow;
 
-//  저장값·외부 입력을 난이도 id 로 거른다(모르는 값 → normal). 규칙 모듈(buildStage/createRun)은 모르는 값에 throw 하므로 거르는 곳은 셸뿐이다
-export function normDifficulty(d) {
-  return DIFFICULTY_IDS.includes(d) ? d : DEFAULT_PICK_DIFFICULTY;
-}
+//  r4.2: 저장값·외부 입력을 난이도 id 로 거르던 normDifficulty 는 지웠다 — 셸은 난이도를 고르지도, 저장에서 읽지도 않는다(늘 PLAY_DIFFICULTY)
 
 export function hitButton(buttons, x, y) {
   for (const b of buttons) if (!b.disabled && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b.id;
@@ -451,15 +446,11 @@ export function boot(canvas, deps = {}) {
   let state = 'title', run = null, renderer = null, buttons = [], fx = makeFx();
   //  overT: 판 종료 뒤 결과 화면까지 남은 여운(초). -1 = 아직 종료를 보지 못함
   let overT = -1, result = null;
-  //  타이틀에서 고른 난이도(저장에 기억). 출격 때 buildStage 에 넘기고, 그 뒤로는 run.difficulty 가 진실
-  let difficulty = normDifficulty(save.get().difficulty);
-  function setDifficulty(d) {
-    const nd = normDifficulty(d);
-    if (nd === difficulty) return false;
-    difficulty = nd;
-    save.patch({ difficulty: nd });
-    return true;
-  }
+  //  출격 줄(r4.2 난이도 단일화): 게임 화면은 **늘** 기본 줄(PLAY_DIFFICULTY = 'brutal', 옛 지옥 수치)로 buildStage 를 부른다.
+  //   고르는 곳(타이틀 토글·1/2/3 키)·바꾸는 곳(setDifficulty)·저장에서 읽는 곳(save.difficulty)이 없다. 그 뒤로는 run.difficulty 가 진실(기록 칸 키 `버전:brutal`).
+  //   deps.difficulty 는 **검사 전용 주입**이다(save·audio·sprites 주입과 같은 결 — 실제 페이지의 boot(#game3)는 넘기지 않는다).
+  //   종전 app.setDifficulty('normal') 로 배수 1 줄 판을 돌리던 셸 검사(보너스·캡슐·광장·복수 정예·손맛)의 기대값이 바뀌지 않게 남긴 자리다
+  const difficulty = deps.difficulty ?? PLAY_DIFFICULTY;
   const loop = makeLoop({ step: STEP, onStep: () => { stepRun(run, input.snapshot(), STEP); } });
 
   //  DPR 반영: 백킹스토어 = CSS 크기 × min(devicePixelRatio, 2)
@@ -889,17 +880,15 @@ export function boot(canvas, deps = {}) {
     const v = { state, now, buttons: [], saveOk: save.ok };
     if (state === 'title') {
       const last = lastStageId();
-      v.difficulty = difficulty;
-      //  난이도 토글 3칸(고른 칸 = primary). 스테이지 버튼의 기록(sub)도 그 난이도 칸의 기록이다
-      const T = DIFF_TOGGLE;
-      v.buttons = DIFFICULTY_IDS.map((d, i) => ({ id: 'diff_' + d, x: T.x0 + i * (T.w + T.gap), y: T.y, w: T.w, h: T.h, label: BAL3.difficulty[d].label, primary: d === difficulty, small: true }));
+      //  r4.2: 난이도 토글 3칸을 지웠다(y 382 줄은 비워 둔다). 스테이지 버튼의 기록(sub)은 출격 줄(기본 = brutal) 칸의 기록 —
+      //   종전 새 사용자 기본 선택이 지옥이었으므로 같은 칸(`버전:brutal`)이 그대로 이어진다
       //  24스테이지(B-2): 한 페이지 8칸(2열×4행) + 페이지 넘김
       const pg = curTitlePage(), pages = titlePages();
       for (let i = 0; i < TITLE_PAGE; i++) {
         const id = ALL_STAGE_IDS[pg * TITLE_PAGE + i];
         if (id === undefined) break;
         const m = stageMeta(id), st = save.getStage(id, stageVersion(id), difficulty);
-        //  구출 기록(r3.14)은 그 난이도 칸에서 한 번이라도 구출했으면 어느 상태에든 덧붙인다(없던 필드는 false 로 읽힌다)
+        //  구출 기록(r3.14)은 그 기록 칸에서 한 번이라도 구출했으면 어느 상태에든 덧붙인다(없던 필드는 false 로 읽힌다)
         const sub = (st.cleared ? '완료 · ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전')
           + (st.rescued === true ? ' · 구출✓' : '');
         const col = i % 2, row = Math.floor(i / 2);
@@ -959,8 +948,7 @@ export function boot(canvas, deps = {}) {
     }
     au.sfx('click');
     if (state === 'title') {
-      if (id.startsWith('diff_')) setDifficulty(id.slice(5));
-      else if (id === 'pageL') { titlePage = Math.max(0, curTitlePage() - 1); }
+      if (id === 'pageL') { titlePage = Math.max(0, curTitlePage() - 1); }
       else if (id === 'pageR') { titlePage = Math.min(titlePages() - 1, curTitlePage() + 1); }
       else if (id === 'pageInfo') { /* 표시 전용 */ }
       else if (id.startsWith('stage')) startRun(Number(id.slice(5)));
@@ -1027,11 +1015,7 @@ export function boot(canvas, deps = {}) {
         return;
       }
       if (input.onKey(code, true)) { if (e.preventDefault) e.preventDefault(); return; }
-      //  타이틀에서 1/2/3 = 난이도 선택(클릭과 같은 경로)
-      if (state === 'title' && DIFF_KEYS[code] !== undefined) {
-        if (setDifficulty(DIFFICULTY_IDS[DIFF_KEYS[code]])) au.sfx('click');
-        return;
-      }
+      //  r4.2: 타이틀의 1/2/3(난이도 선택) 분기를 지웠다 — 숫자 키는 이제 아무 일도 하지 않는다
       if (code === 'Space' || code === 'Enter') {
         if (state === 'title') startRun(lastStageId());
         else if (state === 'result') startRun(result.stageId);
@@ -1042,9 +1026,9 @@ export function boot(canvas, deps = {}) {
   }
   if (doc) doc.addEventListener('visibilitychange', () => { if (doc.hidden) autoPause(); });
 
-  //  개발 콘솔 관찰용(게임 동작에 영향 없음)
+  //  개발 콘솔 관찰용(게임 동작에 영향 없음). r4.2: 난이도 관찰값(difficulty)은 지웠다 — 출격 줄은 늘 하나(run.difficulty 로만 남는다)
   const dbg = () => ({
-    state, stageId: run ? run.stageId : null, difficulty: run ? run.difficulty : difficulty,
+    state, stageId: run ? run.stageId : null,
     z: run ? Math.round(run.z) : 0, x: run ? Math.round(run.x) : 0,
     units: run ? run.units.length : 0, weapon: run ? run.weapon : null, weaponMk: run ? run.weaponMk : null, boss: run ? !!run.boss : false,
     enemies: run ? run.enemies.length : 0, bullets: run ? run.bullets.length : 0,
@@ -1153,8 +1137,8 @@ export function boot(canvas, deps = {}) {
     raf(frame);
   });
 
-  return { dbg, ready, startRun, pause, resume, toTitle, getState: () => state, getRun: () => run, getFx: () => fx, loop, input,
-           getDifficulty: () => difficulty, setDifficulty };
+  //  r4.2: 외부 API 의 getDifficulty/setDifficulty 는 지웠다(난이도 선택 삭제)
+  return { dbg, ready, startRun, pause, resume, toTitle, getState: () => state, getRun: () => run, getFx: () => fx, loop, input };
 }
 
 if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'));

@@ -274,7 +274,8 @@ test('V3-RENDER-TRAP: 결과 화면 [다시 도전] 아래에 "랜덤 길은 새
 // ─────────────────────────────────────────────────────────────────────────────
 // V3-RENDER-HUD(2026-09-18 이사 소견) — "상단의 난이도 칩·무기 칩·⏸ 버튼 크기가 제각각이고 높이가 안 맞는다".
 //  ⚠️정적 검사(상수 표를 읽어 비교)로는 못 잡는다 — 자리표를 그대로 두고 drawHud 안에서 y 를 하나만 손대도 통과한다.
-//  그래서 실제 그리기 경로로 한 프레임을 그린 뒤, 캔버스에 찍힌 **둥근 상자 네 모서리**에서 세 칩을 되살려 잰다.
+//  그래서 실제 그리기 경로로 한 프레임을 그린 뒤, 캔버스에 찍힌 **둥근 상자 네 모서리**에서 칩을 되살려 잰다.
+//  r4.2(2026-09-25, 난이도 선택 삭제): 난이도 칩('지옥')을 지웠다 — 이제 칩은 무기·⏸ 두 개. 게임 화면의 판(기본 줄 brutal)을 그려도 난이도 글자가 없어야 한다
 // ─────────────────────────────────────────────────────────────────────────────
 
 //  칩 바탕색(hudChip 에서만 쓰는 값). 같은 색을 쓰는 칸 위 짧은 글은 drawHud 보다 먼저 그려지므로 제목 뒤부터 모은다
@@ -294,7 +295,7 @@ function chipBoxes(ops, fromIdx) {
 
 const fontPx = (o) => Number(String(o.font).match(/(\d+)px/)[1]);
 
-//  지옥(brutal) 판 한 프레임 — 난이도 칩은 보통에서는 아예 안 그려지므로 표기가 있는 난이도로 그린다.
+//  기본 줄(brutal, 게임 화면이 늘 쓰는 줄) 판 한 프레임 — r4.2 이전엔 이 줄에서 난이도 칩('지옥')이 그려졌다. 지금은 없어야 한다.
 //  버튼은 셸이 실제로 넘기는 것과 같은 객체(main.HUD_BTN)를 그대로 넘긴다
 function hudFrame() {
   const run = createRun(buildStage(2, { difficulty: 'brutal' }));
@@ -305,34 +306,34 @@ function hudFrame() {
   return { run, ops };
 }
 
-test('V3-RENDER-HUD: 난이도 칩·무기 칩·⏸ 가 같은 높이·같은 세로 중심선·같은 모서리 반경·같은 글자 크기로 한 줄에 선다', () => {
+test('V3-RENDER-HUD: 무기 칩·⏸ 가 같은 높이·같은 세로 중심선·같은 모서리 반경·같은 글자 크기로 한 줄에 선다 — 기본 줄 판에도 난이도 칩은 없다(r4.2)', () => {
   const { run, ops } = hudFrame();
-  assert.equal(run.difficulty, 'brutal', '난이도 표기가 있는 판을 그렸다');
+  assert.equal(run.difficulty, 'brutal', '게임 화면과 같은 기본 줄 판을 그렸다');
   const title = ops.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
   assert.ok(title >= 0, 'HUD 제목을 그린다: ' + JSON.stringify(textsOf(ops).slice(0, 8)));
-  const [diff, weapon, pause] = chipBoxes(ops, title);
-  assert.equal(chipBoxes(ops, title).length, 3, 'HUD 칩은 정확히 세 개(난이도·무기·⏸)');
+  const [weapon, pause] = chipBoxes(ops, title);
+  assert.equal(chipBoxes(ops, title).length, 2, 'HUD 칩은 정확히 두 개(무기·⏸) — r4.2 에서 난이도 칩 삭제');
+  assert.ok(!textsOf(ops).some((s) => s === '지옥' || s === '어려움' || s === '보통'), '난이도 글자를 그리지 않는다: ' + JSON.stringify(textsOf(ops).slice(0, 12)));
+  assert.equal(HUD_ROW.box.diff, undefined, '자리표에도 난이도 칸이 없다');
 
   //  ① 같은 높이 · 같은 세로 중심선 — 위·아래 경계가 픽셀까지 같다(이사 소견의 '높이가 안 맞는다')
-  for (const [name, b] of [['난이도', diff], ['무기', weapon], ['⏸', pause]]) {
+  for (const [name, b] of [['무기', weapon], ['⏸', pause]]) {
     assert.equal(b.top, HUD_ROW.top, name + ' 칩 위 경계 = ' + HUD_ROW.top);
     assert.equal(b.bottom - b.top, HUD_ROW.h, name + ' 칩 높이 = ' + HUD_ROW.h);
     assert.equal((b.top + b.bottom) / 2, HUD_ROW.cy, name + ' 칩 세로 중심 = ' + HUD_ROW.cy);
     assert.equal(b.r, HUD_ROW.r, name + ' 칩 모서리 반경 = ' + HUD_ROW.r);
   }
-  assert.equal(diff.top, weapon.top, '난이도·무기 위 경계가 같다');
   assert.equal(weapon.top, pause.top, '무기·⏸ 위 경계가 같다');
-  assert.equal(diff.bottom, pause.bottom, '난이도·⏸ 아래 경계가 같다');
+  assert.equal(weapon.bottom, pause.bottom, '무기·⏸ 아래 경계가 같다');
 
   //  ② 오른쪽 정렬 간격이 일정하다
-  assert.equal(weapon.left - diff.right, HUD_ROW.gap, '난이도 ↔ 무기 사이 = ' + HUD_ROW.gap + 'px');
   assert.equal(pause.left - weapon.right, HUD_ROW.gap, '무기 ↔ ⏸ 사이 = ' + HUD_ROW.gap + 'px');
   assert.equal(480 - pause.right, HUD_ROW.right, '⏸ 오른쪽 여백 = ' + HUD_ROW.right + 'px');
 
-  //  ③ 세 칸의 글자 크기가 같다(제각각이던 14 / 16 / 19px → 하나로)
+  //  ③ 두 칸의 글자 크기가 같다(제각각이던 14 / 16 / 19px → 하나로)
   const labelOf = (t) => ops.find((o) => o.op === 'fillText' && o.args[0] === t);
   const wname = run.weapon === 'auto' ? '기관총' : run.weapon === 'heavy' ? '중화기' : '소총';
-  for (const [name, t] of [['난이도', '지옥'], ['무기', wname], ['⏸', HUD_BTN.label]]) {
+  for (const [name, t] of [['무기', wname], ['⏸', HUD_BTN.label]]) {
     const op = labelOf(t);
     assert.ok(op, name + ' 칸 글자를 그린다: ' + JSON.stringify(textsOf(ops).slice(0, 12)));
     assert.equal(fontPx(op), HUD_ROW.fs, name + ' 칸 글자 크기 = ' + HUD_ROW.fs + 'px');
@@ -353,7 +354,7 @@ test('V3-RENDER-HUD: 난이도 칩·무기 칩·⏸ 가 같은 높이·같은 �
 test('V3-RENDER-HUD: ⏸ 는 셸이 넘긴 버튼 상자 그대로 그려진다 — 그린 자리와 누르는 자리가 같다', () => {
   const { ops } = hudFrame();
   const title = ops.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
-  const pause = chipBoxes(ops, title)[2];
+  const pause = chipBoxes(ops, title)[1];
   //  ① 히트 영역(main.HUD_BTN = hitButton 이 쓰는 상자)과 그려진 상자가 네 변 모두 같다
   assert.equal(pause.left, HUD_BTN.x, '왼쪽');
   assert.equal(pause.top, HUD_BTN.y, '위');
@@ -362,13 +363,13 @@ test('V3-RENDER-HUD: ⏸ 는 셸이 넘긴 버튼 상자 그대로 그려진다 
   //  ② 좌표의 출처가 한 곳이다 — 셸의 버튼은 render 의 자리표를 그대로 받는다
   assert.deepEqual({ x: HUD_BTN.x, y: HUD_BTN.y, w: HUD_BTN.w, h: HUD_BTN.h }, { ...HUD_ROW.box.pause });
   //  ③ 두 겹으로 그려지지 않는다 — drawButtons 가 같은 버튼을 한 번 더 그리면 상자가 네 개가 된다
-  assert.equal(chipBoxes(ops, title).length, 3, 'HUD 칩 상자는 셋뿐(⏸ 이 drawButtons 에서 또 그려지지 않는다)');
+  assert.equal(chipBoxes(ops, title).length, 2, 'HUD 칩 상자는 둘뿐(⏸ 이 drawButtons 에서 또 그려지지 않는다 — r4.2 난이도 칩 삭제)');
   //  ④ 셸이 ⏸ 를 안 넘기는 상태(일시정지·결과)에서는 칩도 없다
   const run = createRun(buildStage(2, { difficulty: 'brutal' }));
   const { ctx, ops: noBtn } = recCtx();
   createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx: makeFxLike(), hud: { distM: 120 }, buttons: [], saveOk: true });
   const t2 = noBtn.findIndex((o) => o.op === 'fillText' && String(o.args[0]).startsWith('STAGE '));
-  assert.equal(chipBoxes(noBtn, t2).length, 2, '⏸ 버튼이 없으면 칩은 난이도·무기 둘뿐');
+  assert.equal(chipBoxes(noBtn, t2).length, 1, '⏸ 버튼이 없으면 칩은 무기 하나뿐(r4.2 난이도 칩 삭제)');
   assert.ok(!textsOf(noBtn).includes(HUD_BTN.label), '⏸ 글자도 없다');
 });
 

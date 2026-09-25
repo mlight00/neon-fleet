@@ -2,15 +2,18 @@
 //  V3-DIFF: 배수 표가 적 hp·적탄·접촉·정예·스폰 수에 정확히 반영되고, normal 은 종전과 완전히 같다(기존 검사 174건은 그대로 통과).
 //  V3-SIM-DIFF: 봇 정책 결과표(난이도 × 스테이지 × aim/center/plan). **봇 결과이지 사람의 성공률이 아니다.**
 //  SD-7: 위 결과표와 별개로 '성공 경로가 존재하는가'만 보는 검사(planBoss 봇 · 2차 검수 §4 Q3).
+//  r4.2(2026-09-25, 이사 지시 "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고" · 결정 D2′ 지옥 값 그대로) = **두 줄 표**:
+//   'normal'(검사용 배수 1 줄 = 옛 보통, 규칙 기본값) · 'brutal'(기본 줄 = 옛 지옥, 게임 화면이 늘 쓴다). 옛 '어려움'(hard) 줄은 지웠다.
+//   그래서 이 파일은 어려움 칸만 뺐다 — 어려움만 보던 SD-2 는 삭제, 세 칸 비교(SD-5 등)는 두 칸 비교, SD-7 의 어려움 단언 삭제. 나머지 기대값은 그대로다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { BAL3, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, difficultyMult } from '../rush3/balance.js';
+import { BAL3, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, PLAY_DIFFICULTY, difficultyMult } from '../rush3/balance.js';
 import { buildStage, STAGE_IDS, DEFS } from '../rush3/stages.js';
 import { createRun, stepRun, drainEvents, enemyDefsFor, STEP } from '../rush3/combat.js';
 import { playPolicy } from './lib/rush3-policies.mjs';
 
-const DIFFS = ['normal', 'hard', 'brutal'];
+const DIFFS = ['normal', 'brutal'];
 
 //  합성 스테이지(게이트·통·벽 없음). spawns 의 hp 는 ev.hp(스폰 정의 고정값) 경로
 function synth(over = {}) {
@@ -29,22 +32,27 @@ function play(run, sec, x = 240) {
 // ─────────────────────────────────────────────────────────────────────────────
 // V3-DIFF
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-DIFF DIFF-1: 배수 표 = 계약서 3-8 표 그대로(r3.21 B안: 체력 배수 되살림 hard 1.5/1.25·brutal 2/1.5 + 출현 빈도 waves·waveGap·spawnCount·eliteSummonRate 는 r3.9 그대로) · id 목록 순서 · 모르는 id 는 throw', () => {
-  assert.deepEqual(DIFFICULTY_IDS, DIFFS);
-  assert.equal(DEFAULT_DIFFICULTY, 'normal');
+test('V3-DIFF DIFF-1: 배수 표 = 계약서 3-8 표 그대로(r4.2 두 줄 표: 배수 1 줄 normal · 기본 줄 brutal 2/1.5 — 수치 불변) · id 목록 순서 · 규칙 기본 = normal · 셸 출격 = brutal · 지운 hard·모르는 id 는 throw', () => {
+  assert.deepEqual(DIFFICULTY_IDS, DIFFS, 'r4.2: 어려움 줄을 지워 두 줄만');
+  assert.equal(DEFAULT_DIFFICULTY, 'normal', '규칙 모듈 기본값 = 검사용 배수 1 줄(그대로)');
+  assert.equal(PLAY_DIFFICULTY, 'brutal', '게임 화면이 늘 넘기는 줄 = 기본 줄(옛 지옥)');
   const pick = (m) => [m.enemyHp, m.eshotDmg, m.touchDmg, m.eliteHp, m.spawnCount, m.eliteFireRate, m.waves, m.waveGap, m.eliteSummonRate];
   assert.deepEqual(pick(BAL3.difficulty.normal), [1, 1, 1, 1, 1, 1, 1, 0, 1]);
-  assert.deepEqual(pick(BAL3.difficulty.hard), [1.5, 2, 2, 1.25, 1.4, 1.25, 2, 360, 1.5]);
   assert.deepEqual(pick(BAL3.difficulty.brutal), [2, 3, 3, 1.5, 1.8, 1.5, 2, 360, 2]);
-  //  r3.21(이사 결정 2026-09-20 B안): r3.9 의 '체력 배수 1 고정'을 뒤집었다 — 체력 배수는 난이도 순으로 단조 증가, normal 은 1
+  //  r3.22 추가 배치(extraSpawns — 옛 이름 brutalSpawns)는 기본 줄에서만 붙는다
+  assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].extraSpawns), [false, true]);
+  //  r3.21(이사 결정 2026-09-20 B안): r3.9 의 '체력 배수 1 고정'을 뒤집었다 — 체력 배수는 기본 줄이 배수 1 줄보다 크다
   for (let i = 1; i < DIFFS.length; i++) {
     assert.ok(BAL3.difficulty[DIFFS[i]].enemyHp > BAL3.difficulty[DIFFS[i - 1]].enemyHp, DIFFS[i] + ' enemyHp 단조 증가');
     assert.ok(BAL3.difficulty[DIFFS[i]].eliteHp > BAL3.difficulty[DIFFS[i - 1]].eliteHp, DIFFS[i] + ' eliteHp 단조 증가');
   }
-  assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].label), ['보통', '어려움', '지옥']);
-  assert.deepEqual(DIFFS.map((d) => BAL3.difficulty[d].short), ['', '어려움', '지옥'], 'HUD 짧은 표기는 어려움·지옥만');
-  assert.ok(Object.isFrozen(BAL3.difficulty) && Object.isFrozen(BAL3.difficulty.hard));
-  assert.equal(difficultyMult('hard'), BAL3.difficulty.hard);
+  //  r4.2: 화면 이름(label·short)은 어디에도 표시하지 않아 표에서 지웠다
+  for (const d of DIFFS) assert.ok(!('label' in BAL3.difficulty[d]) && !('short' in BAL3.difficulty[d]), d + ' 화면 이름 없음');
+  assert.ok(Object.isFrozen(BAL3.difficulty) && Object.isFrozen(BAL3.difficulty.brutal));
+  assert.equal(difficultyMult('brutal'), BAL3.difficulty.brutal);
+  assert.equal(BAL3.difficulty.hard, undefined, '어려움 줄 없음');
+  assert.throws(() => difficultyMult('hard'), /unknown difficulty/, '지운 어려움 id 는 throw');
+  assert.throws(() => buildStage(2, { difficulty: 'hard' }), /unknown difficulty/);
   assert.throws(() => difficultyMult('nope'), /unknown difficulty/);
   assert.throws(() => buildStage(1, { difficulty: 'nope' }), /unknown difficulty/);
   assert.throws(() => createRun(synth(), { difficulty: 'nope' }), /unknown difficulty/);
@@ -60,10 +68,10 @@ test('V3-DIFF DIFF-2: normal 은 종전과 완전히 같다 — buildStage(id) �
   const en = enemyDefsFor('normal');
   for (const kind of Object.keys(BAL3.enemies)) assert.deepEqual(en[kind], BAL3.enemies[kind], kind + ' 은 배수 1 이면 원표와 같다');
   assert.deepEqual(enemyDefsFor(), en, '인자 생략 = normal');
-  //  성장 축은 난이도와 무관: 게이트·통·벽·시작 병력·무기·길이·armZ·coverZ 가 세 난이도에서 deepEqual
+  //  성장 축은 난이도와 무관: 게이트·통·벽·시작 병력·무기·길이·armZ·coverZ 가 두 줄에서 deepEqual
   for (const id of STAGE_IDS) {
     const n = buildStage(id);
-    for (const d of ['hard', 'brutal']) {
+    for (const d of ['brutal']) {
       const s = buildStage(id, { difficulty: d });
       assert.equal(s.difficulty, d);
       assert.deepEqual([s.gateRows, s.supplies, s.walls, s.startUnits, s.startWeapon, s.length, s.eliteZ, s.version],
@@ -74,40 +82,41 @@ test('V3-DIFF DIFF-2: normal 은 종전과 완전히 같다 — buildStage(id) �
 });
 
 test('V3-DIFF DIFF-3: enemyDefsFor — hp(반올림)·접촉·적탄 dmg·정예 발사 주기가 배수대로, 나머지 필드는 그대로', () => {
-  const rows = { normal: enemyDefsFor('normal'), hard: enemyDefsFor('hard'), brutal: enemyDefsFor('brutal') };
+  const rows = { normal: enemyDefsFor('normal'), brutal: enemyDefsFor('brutal') };
   const hp = (k) => DIFFS.map((d) => rows[d][k].hp);
   const touch = (k) => DIFFS.map((d) => rows[d][k].touchDmg);
   //  r3.21 B안: 체력 = round(표 hp × enemyHp). hpMul(스테이지 구간 배율) 생략 = 1 — 그 경로는 V3-DIFFB 가 잠근다
-  assert.deepEqual(hp('grunt'), [2, 3, 4]);
-  assert.deepEqual(hp('rusher'), [4, 6, 8]);
-  assert.deepEqual(hp('shooter'), [6, 9, 12]);
-  assert.deepEqual(DIFFS.map((d) => +rows[d].elite.summonEvery.toFixed(4)), [4, 2.6667, 2], '정예 소환 주기 ÷ eliteSummonRate');
-  assert.deepEqual(touch('grunt'), [1, 2, 3]);
-  assert.deepEqual(touch('rusher'), [2, 4, 6]);
-  assert.deepEqual(touch('elite'), [3, 6, 9]);
-  assert.deepEqual(DIFFS.map((d) => rows[d].shooter.shot.dmg), [1, 2, 3], '어려움부터 적탄 1발 = 병사 1명(hp 2)');
-  assert.deepEqual(DIFFS.map((d) => rows[d].elite.shot.dmg), [1, 2, 3]);
-  assert.deepEqual(DIFFS.map((d) => +rows[d].elite.shootEvery.toFixed(4)), [1, 0.8, 0.6667]);
-  assert.deepEqual(DIFFS.map((d) => rows[d].shooter.shootEvery), [1.6, 1.6, 1.6], '저격수 주기는 표에 없다(정예만)');
+  //  r4.2: 두 줄(배수 1 · 기본) — 옛 세 칸의 가운데(어려움) 값만 빠졌고 두 칸 값은 그대로다
+  assert.deepEqual(hp('grunt'), [2, 4]);
+  assert.deepEqual(hp('rusher'), [4, 8]);
+  assert.deepEqual(hp('shooter'), [6, 12]);
+  assert.deepEqual(DIFFS.map((d) => +rows[d].elite.summonEvery.toFixed(4)), [4, 2], '정예 소환 주기 ÷ eliteSummonRate');
+  assert.deepEqual(touch('grunt'), [1, 3]);
+  assert.deepEqual(touch('rusher'), [2, 6]);
+  assert.deepEqual(touch('elite'), [3, 9]);
+  assert.deepEqual(DIFFS.map((d) => rows[d].shooter.shot.dmg), [1, 3], '기본 줄은 적탄 1발 = 병사 1명 이상(hp 2)');
+  assert.deepEqual(DIFFS.map((d) => rows[d].elite.shot.dmg), [1, 3]);
+  assert.deepEqual(DIFFS.map((d) => +rows[d].elite.shootEvery.toFixed(4)), [1, 0.6667]);
+  assert.deepEqual(DIFFS.map((d) => rows[d].shooter.shootEvery), [1.6, 1.6], '저격수 주기는 표에 없다(정예만)');
   for (const d of DIFFS) {
     const e = rows[d];
     assert.deepEqual([e.grunt.r, e.grunt.vz, e.grunt.track, e.rusher.accel, e.rusher.maxVz, e.shooter.aimTime, e.shooter.shot.vz, e.elite.fan, e.elite.fanDeg, e.elite.r, e.elite.summonN],
                      [14, 24, 0, 180, 290, 0.5, 260, 3, 18, 48, 2], d + ': 배수 대상이 아닌 필드는 그대로(vz 는 r3.27 에서 60 → 24 · 돌격체 가속/최대는 r3.31 에서 260/420 → 180/290, 난이도 배수 대상이 아님)');
     assert.ok(Object.isFrozen(e) && Object.isFrozen(e.elite) && Object.isFrozen(e.elite.shot));
   }
-  assert.equal(rows.hard.elite.hp, undefined, '정예 hp 는 스테이지 값(buildStage)이라 표에 없다');
+  assert.equal(rows.brutal.elite.hp, undefined, '정예 hp 는 스테이지 값(buildStage)이라 표에 없다');
 });
 
 test('V3-DIFF DIFF-4: buildStage — 1~3 기준 코스는 정예 hp·잡졸 hp 가 난이도와 무관(r3.21 대항 검수 반영: difficultyHp false = r3.9 와 같음)·rows 스폰 n(spawnCount 반올림)·xs 명시 스폰은 같은 xs 로 waves 번(waveGap 뒤) 반복', () => {
-  //  r3.22: 1~3 은 지옥에서만 × eliteHp(1.5) — 보통·어려움은 r3.9 그대로
+  //  r3.22: 1~3 은 지옥(기본 줄)에서만 × eliteHp(1.5) — 배수 1 줄은 r3.9 그대로
   assert.deepEqual(DIFFS.map((d) => STAGE_IDS.map((id) => buildStage(id, { difficulty: d }).elite.hp)),
-                   [[120, 220, 500], [120, 220, 500], [180, 330, 750]]);
+                   [[120, 220, 500], [180, 330, 750]]);
   for (const id of STAGE_IDS) for (const d of DIFFS) assert.equal(buildStage(id, { difficulty: d }).difficultyHp, d === 'brutal', `S${id} ${d} difficultyHp`);
   //  4~24 는 여전히 × eliteHp(V3-DIFFB DB-2 가 전부 대조) — 여기서는 경계 표본만
-  assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).elite.hp), [160, 200, 240]);
+  assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).elite.hp), [160, 240]);
   //  rows 스폰은 S3 z8800 잡졸(n 18, rows 2) 하나뿐
   const rowsN = DIFFS.map((d) => buildStage(3, { difficulty: d }).spawns.find((s) => s.z === 8800 && s.kind === 'grunt').n);
-  assert.deepEqual(rowsN, [18, 25, 32]);   // 18×1.4 = 25.2 → 25 · 18×1.8 = 32.4 → 32
+  assert.deepEqual(rowsN, [18, 32]);   // 18×1.8 = 32.4 → 32
   for (const d of DIFFS) {
     const sp = buildStage(3, { difficulty: d }).spawns.find((s) => s.z === 8800 && s.kind === 'grunt');
     assert.equal(sp.xs.length, sp.n); assert.equal(sp.zs.length, sp.n);
@@ -124,10 +133,10 @@ test('V3-DIFF DIFF-4: buildStage — 1~3 기준 코스는 정예 hp·잡졸 hp �
   //  corridorHw·z(이벤트)·kind·hp 는 그대로(통로 규격 불변). hp: 1~3 은 구간 배율 1 + 난이도 체력 배수 미적용(difficultyHp false)이라 세 난이도 모두 표 hp
   for (const id of STAGE_IDS) {
     const base = buildStage(id).spawns.filter((s) => !(id === 3 && s.z === 8800 && s.kind === 'grunt'));
-    for (const d of ['hard', 'brutal']) {
+    for (const d of ['brutal']) {
       const m = BAL3.difficulty[d];
-      //  r3.22 지옥 전용 추가 무리(DEFS[id].brutalSpawns)는 짝 비교에서 뺀다 — 이벤트 z·종류로 식별
-      const extra = d === 'brutal' ? (DEFS[id].brutalSpawns ?? []) : [];
+      //  r3.22 지옥 전용 추가 무리(DEFS[id].extraSpawns — r4.2 에서 brutalSpawns 이름만 바꿈)는 짝 비교에서 뺀다 — 이벤트 z·종류로 식별
+      const extra = d === 'brutal' ? (DEFS[id].extraSpawns ?? []) : [];
       const isExtra = (x) => extra.some((e) => e.z === x.z && e.kind === x.kind);
       const s = buildStage(id, { difficulty: d }).spawns.filter((x) => !(id === 3 && x.z === 8800 && x.kind === 'grunt') && !isExtra(x));
       assert.equal(s.length, base.length, `S${id} ${d}: 무리 수 같음(지옥 전용 추가 무리 제외)`);
@@ -182,7 +191,7 @@ test('V3-DIFF DIFF-5: 실제 stepRun — 스폰된 잡졸 hp·돌격체 접촉 �
     const sev = play(s, 8);
     const shot = sev.find((e) => e.type === 'hurt' && e.cause === 'shot');
     assert.ok(shot, d + ' 저격수 탄이 맞았다');
-    assert.equal(shot.n, Math.round(1 * m.eshotDmg), d + ' 적탄 피해(어려움부터 1발 = 병사 1명)');
+    assert.equal(shot.n, Math.round(1 * m.eshotDmg), d + ' 적탄 피해(기본 줄은 1발 = 병사 1명 이상)');
     if (d !== 'normal') assert.ok(sev.some((e) => e.type === 'unitLost'), d + ' 적탄 1발에 병사 1명이 죽는다');
     //  정예(hp 100000) 부채꼴 발사 횟수: 6초 동안 floor(6 / shootEvery) 회(첫 발은 spawn 뒤 shootEvery 초)
     const b = createRun(synth({ startUnits: 30, elite: { z: 0, hp: 100000, summon: false } }), { difficulty: d });
@@ -198,22 +207,23 @@ test('V3-DIFF DIFF-6: run.difficulty·run.enemyDefs 는 생성 시점에 확정�
   const after = src.slice(src.indexOf('export function stepRun'));
   assert.ok(!/difficult/i.test(after), 'stepRun 이후 소스에 difficulty 참조가 없다');
   assert.ok(!/BAL3\.enemies|\bEN\[|\bEN\./.test(after), 'stepRun 이후에는 BAL3.enemies 를 직접 읽지 않는다(run.enemyDefs 만)');
-  //  stage.difficulty 가 기본, opts.difficulty 가 덮어쓴다
-  assert.equal(createRun(buildStage(2, { difficulty: 'hard' })).difficulty, 'hard');
-  assert.equal(createRun(buildStage(2, { difficulty: 'hard' }), { difficulty: 'brutal' }).difficulty, 'brutal');
+  //  stage.difficulty 가 기본, opts.difficulty 가 덮어쓴다(r4.2: 두 줄 사이에서)
+  assert.equal(createRun(buildStage(2, { difficulty: 'brutal' })).difficulty, 'brutal');
+  assert.equal(createRun(buildStage(2, { difficulty: 'brutal' }), { difficulty: 'normal' }).difficulty, 'normal');
   assert.equal(createRun(synth()).difficulty, 'normal');
+  assert.throws(() => createRun(synth(), { difficulty: 'hard' }), /unknown difficulty/, '지운 어려움 줄로 덮어쓸 수 없다');
   const run = createRun(buildStage(2, { difficulty: 'brutal' }));
   assert.ok(Object.isFrozen(run.enemyDefs));
-  assert.deepEqual(run.enemyDefs, enemyDefsFor('brutal', 1, true), '1~3 지옥은 difficultyHp true 로 만든 표(r3.22)');
-  assert.deepEqual(createRun(buildStage(2, { difficulty: 'hard' })).enemyDefs, enemyDefsFor('hard', 1, false), '1~3 어려움은 종전 그대로 false');
+  assert.deepEqual(run.enemyDefs, enemyDefsFor('brutal', 1, true), '1~3 기본 줄(지옥)은 difficultyHp true 로 만든 표(r3.22)');
+  assert.deepEqual(createRun(buildStage(2, { difficulty: 'normal' })).enemyDefs, enemyDefsFor('normal', 1, false), '1~3 배수 1 줄은 종전 그대로 false');
   assert.deepEqual(createRun(buildStage(4, { difficulty: 'brutal' })).enemyDefs, enemyDefsFor('brutal', 2, true), '4~24 는 구간 배율 × enemyHp');
   //  같은 난이도·같은 입력열이면 결정적
   const pick = (r) => ({ z: r.z, x: r.x, units: r.units.map((u) => [u.id, u.hp]), kills: r.kills, time: r.time, weapon: r.weapon, peak: r.peak, won: r.won });
-  assert.deepEqual(pick(playPolicy(2, 'aim', 14400, 'hard').run), pick(playPolicy(2, 'aim', 14400, 'hard').run));
+  assert.deepEqual(pick(playPolicy(2, 'aim', 14400, 'brutal').run), pick(playPolicy(2, 'aim', 14400, 'brutal').run));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// V3-SIM-DIFF — 봇 결과표. 난이도 3 × 스테이지 3 × 정책(aim·center·plan) = 27판(각 판 상한 14,400 STEP).
+// V3-SIM-DIFF — 봇 결과표. 줄 2(r4.2 — 종전 난이도 3 에서 어려움을 뺐다) × 스테이지 3 × 정책(aim·center·plan) = 18판(각 판 상한 14,400 STEP).
 //  ⚠️ 이 표는 **봇 정책의 결과**다. 사람의 성공률이 아니며 1판 결정적 시뮬이라 분포도 아니다.
 //  실측(2026-09-16, 출발값 표): aim 은 normal S1~S3·hard S1·S3 완주, hard S2 와 brutal S1 은 정예전에서 전멸(코스는 끝까지 감).
 //   hard S2 는 eliteHp 1.0·eliteFireRate 1.0 까지 내려도 aim 이 못 이긴다(정예 hp 56 잔존) — 원인은 적탄 dmg 2(1발 = 병사 1명) 와
@@ -231,7 +241,8 @@ const row = (d, id, p) => {
 export const SIM_TABLE = [];
 for (const d of DIFFS) for (const id of STAGE_IDS) for (const p of SIM_POLICIES) SIM_TABLE.push(row(d, id, p));
 
-test('V3-SIM-DIFF SD-0: 27판 전부 상한 안에서 끝난다 · 결과표 출력(봇 결과 — 사람 성공률 아님)', (t) => {
+test('V3-SIM-DIFF SD-0: 18판(r4.2 — 종전 27판에서 어려움 9판을 뺐다) 전부 상한 안에서 끝난다 · 결과표 출력(봇 결과 — 사람 성공률 아님)', (t) => {
+  assert.equal(SIM_TABLE.length, 18);
   for (const r of SIM_TABLE) {
     assert.equal(R(r.difficulty, r.stage, r.policy).run.over, true, `${r.difficulty} S${r.stage} ${r.policy} 가 끝나지 않음`);
     assert.ok(r.steps < 14400);
@@ -246,15 +257,7 @@ test('V3-SIM-DIFF SD-1: normal 은 종전 그대로 — aim 3스테이지 완주
   assert.equal(R('normal', 3, 'center').run.won, false);
 });
 
-test('V3-SIM-DIFF SD-2: hard — aim 이 S1·S3 완주. S2 는 코스 끝(정예 등장)까지 가되 정예전 전멸 = 기록', () => {
-  assert.equal(R('hard', 1, 'aim').run.won, true, 'hard S1 aim');
-  assert.equal(R('hard', 3, 'aim').run.won, true, 'hard S3 aim');
-  const s2 = R('hard', 2, 'aim');
-  assert.equal(s2.events.elite, 1, 'hard S2 aim: 정예까지 도달(코스 자체는 지날 수 있다)');
-  assert.ok(s2.run.z >= 8200, 'hard S2 aim: 정예 z 도달');
-  //  기록: 이긴다면 좋고, 지면 정예전 전멸이어야 한다(코스 중간 전멸이면 배치 문제 → 실패)
-  if (!s2.run.won) assert.ok(s2.run.boss && s2.run.units.length === 0, 'hard S2 aim: 지더라도 정예전에서만 진다');
-});
+//  r4.2: SD-2(어려움 aim S1·S3 완주 · S2 정예전 기록)는 어려움 줄을 지워 삭제했다.
 
 test('V3-SIM-DIFF SD-3: brutal — aim S1 은 정예까지 도달(정예전 결과는 기록), S2·S3 는 결과만 기록', () => {
   const s1 = R('brutal', 1, 'aim');
@@ -263,8 +266,8 @@ test('V3-SIM-DIFF SD-3: brutal — aim S1 은 정예까지 도달(정예전 결�
   for (const id of [2, 3]) assert.equal(R('brutal', id, 'aim').run.over, true);
 });
 
-test('V3-SIM-DIFF SD-4: 무조작(center)은 hard·brutal 에서 S2·S3 실패 유지(units 0 → over, won 아님)', () => {
-  for (const d of ['hard', 'brutal']) for (const id of [2, 3]) {
+test('V3-SIM-DIFF SD-4: 무조작(center)은 brutal(기본 줄)에서 S2·S3 실패 유지(units 0 → over, won 아님) — r4.2 어려움 칸 제거', () => {
+  for (const d of ['brutal']) for (const id of [2, 3]) {
     const run = R(d, id, 'center').run;
     assert.equal(run.over, true);
     assert.equal(run.won, false, `${d} S${id} center 가 완주됨`);
@@ -272,31 +275,32 @@ test('V3-SIM-DIFF SD-4: 무조작(center)은 hard·brutal 에서 S2·S3 실패 �
   }
 });
 
-test('V3-SIM-DIFF SD-5: 난이도 순서가 결과에 실린다 — 같은 스테이지·같은 봇이면 생존 병력 normal ≥ hard ≥ brutal, 손실은 그 반대', () => {
+test('V3-SIM-DIFF SD-5: 두 줄의 순서가 결과에 실린다 — 같은 스테이지·같은 봇이면 생존 병력 배수 1(normal) ≥ 기본(brutal), 손실은 그 반대(r4.2: 종전 세 칸 비교에서 어려움을 뺐다)', () => {
   for (const id of STAGE_IDS) for (const p of ['aim', 'plan']) {
     const u = DIFFS.map((d) => R(d, id, p).run.units.length);
-    assert.ok(u[0] >= u[1] && u[1] >= u[2], `S${id} ${p} 생존 ${u.join(' ≥ ')}`);
+    assert.ok(u[0] >= u[1], `S${id} ${p} 생존 ${u.join(' ≥ ')}`);
     //  r3.22: '손실 수' 가 아니라 **손실 비율(손실 ÷ 최대 병력)** — 지옥은 병력이 덜 커져(게이트·통을 덜 얻고 일찍 전멸) 잃을 수 있는 수 자체가 작다
     const loss = DIFFS.map((d) => { const r = R(d, id, p).run; return r.peak ? (r.lossByShot + r.lossByTouch) / r.peak : 0; });
-    assert.ok(loss[0] <= loss[1] && loss[1] <= loss[2], `S${id} ${p} 손실 비율 ${loss.map((v) => v.toFixed(2)).join(' ≤ ')}`);
+    assert.ok(loss[0] <= loss[1], `S${id} ${p} 손실 비율 ${loss.map((v) => v.toFixed(2)).join(' ≤ ')}`);
   }
-  //  성장 축은 그대로: 같은 봇의 최고 병력(peak)은 난이도로 늘지 않는다
+  //  성장 축은 그대로: 같은 봇의 최고 병력(peak)은 기본 줄에서 늘지 않는다
   for (const id of STAGE_IDS) for (const p of SIM_POLICIES) {
     const pk = DIFFS.map((d) => R(d, id, p).run.peak);
-    assert.ok(pk[1] <= pk[0] && pk[2] <= pk[0], `S${id} ${p} peak ${pk.join('/')}`);
+    assert.ok(pk[1] <= pk[0], `S${id} ${p} peak ${pk.join('/')}`);
   }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// V3-SIM-DIFF SD-7 — 성공 경로 검사. 위 27판 결과표(SD-0~SD-6)와 **목적이 다르다**.
-//  SD-2·SD-3 는 '정예까지 코스가 이어지는가'(도달)를 보고, 여기서는 '이길 수 있는 조작이 하나라도 있는가'를 본다.
+// V3-SIM-DIFF SD-7 — 성공 경로 검사. 위 18판 결과표(SD-0~SD-6)와 **목적이 다르다**.
+//  SD-3 는 '정예까지 코스가 이어지는가'(도달)를 보고, 여기서는 '이길 수 있는 조작이 하나라도 있는가'를 본다.
 //  봇 = planBoss: 보스 등장 전은 계획 봇 그대로, 보스가 나오면 보스 x 를 따라 조준한다(이동은 실제 STEP 속도 제한).
 //  ⚠️ 이것은 **봇 1판의 결정적 결과**이지 사람의 성공률이 아니다. 탄 회피를 최적화한 봇도 아니다.
 //  실측(2026-09-17): hard S1·S2·S3 와 brutal S1·S3 완주. brutal S2 만 실패(정예 hp 201 잔존) —
 //   2차 검수도 "지옥 S2 는 단순 조준 변형으로 성공을 입증하지 못했다"고 적었다. 그래서 지옥 S2·S3 는 기록만 하고 잠그지 않는다.
+//  r4.2(2026-09-25): 어려움 줄을 지워 어려움 S1~S3 완주·S2 4명·S3 70명 단언을 뺐다. 기본 줄(brutal)의 단언은 그대로 — 결정 D2′ 로 2번은 조정하지 않는다
 // ─────────────────────────────────────────────────────────────────────────────
 const BOSS_RUNS = {};
-for (const d of ['hard', 'brutal']) for (const id of STAGE_IDS) BOSS_RUNS[d + ':' + id] = playPolicy(id, 'planBoss', 14400, d);
+for (const d of ['brutal']) for (const id of STAGE_IDS) BOSS_RUNS[d + ':' + id] = playPolicy(id, 'planBoss', 14400, d);
 const BR = (d, id) => BOSS_RUNS[d + ':' + id];
 const bossRow = (d, id) => {
   const r = BR(d, id), run = r.run;
@@ -305,19 +309,14 @@ const bossRow = (d, id) => {
            bossHpLeft: run.boss ? Math.ceil(run.boss.hp) : 0, time: +run.time.toFixed(1), steps: r.steps };
 };
 export const BOSS_TABLE = [];
-for (const d of ['hard', 'brutal']) for (const id of STAGE_IDS) BOSS_TABLE.push(bossRow(d, id));
+for (const d of ['brutal']) for (const id of STAGE_IDS) BOSS_TABLE.push(bossRow(d, id));
 
 //  r3.21 1차 구현은 체력 배수(hard 1.5/1.25)를 1~3 에도 걸어 **hard S2 의 봇 성공 경로가 사라졌었다**(정예 잔여 163/275, 병력 최고 10 → SD-7 잠금에서 빼고 SD-8 기록으로 옮김).
 //   대항 검수 반영(2026-09-20): 1~3 기준 코스는 구간 배율 ×1 과 같은 원칙으로 난이도 체력 배수도 ×1(BAL3.enemyHpByStage difficultyHp: false) →
 //   세 난이도의 1~3 이 r3.9(33568b2)와 완전히 같아져 **hard S1·S2·S3 + brutal S1 잠금**을 되살렸다. 대조점도 r3.9 값(hard S2 4명 · brutal S1 14명) 그대로.
-test('V3-SIM-DIFF SD-7 성공 경로: planBoss 가 hard S1·S2·S3 와 brutal S1 을 완주한다(봇 결과 — 사람 성공률 아님). 1~3 은 난이도 체력 배수 없음(r3.21 대항 검수 반영)', (t) => {
+//  r4.2: 어려움 줄 삭제 — 남는 잠금은 기본 줄(brutal) 1번의 두 단언(planBoss 패배 · evLead 승리 26명)이다
+test('V3-SIM-DIFF SD-7 성공 경로: 기본 줄(brutal) S1 — planBoss 는 지고 evLead 는 병력을 잃으며 26명으로 이긴다(봇 결과 — 사람 성공률 아님, r4.2 어려움 단언 삭제)', (t) => {
   for (const r of BOSS_TABLE) t.diagnostic('SIM-BOSS ' + JSON.stringify(r));
-  //  잠그는 네 판 — 이 난이도·코스에 '이길 수 있는 조작'이 존재한다는 뜻이다
-  for (const id of STAGE_IDS) {
-    const r = BR('hard', id);
-    assert.equal(r.run.won, true, `hard S${id} planBoss 미완주(정예 잔여 hp ${r.run.boss ? Math.ceil(r.run.boss.hp) : 0})`);
-    assert.ok(r.run.units.length > 0, `hard S${id} planBoss 생존 병력 0`);
-  }
   //  r3.22 지옥 강화(이사 소감 2026-09-22 "지옥도 아직 너무 쉽다"): 지옥 S1 에 저격수·돌격체를 더해 단순 조준 봇(planBoss)은 더 못 이긴다.
   //   성공 경로는 게이트 칸을 예상 최종값으로 고르는 evLead 로 잠근다 — '이길 수 있는 조작이 존재한다' 는 뜻은 그대로다
   assert.equal(BR('brutal', 1).run.won, false, 'brutal S1 planBoss 는 이제 진다(지옥 강화 확인)');
@@ -325,9 +324,6 @@ test('V3-SIM-DIFF SD-7 성공 경로: planBoss 가 hard S1·S2·S3 와 brutal S1
   assert.equal(b1.run.won, true, `brutal S1 evLead 미완주(정예 잔여 hp ${b1.run.boss ? Math.ceil(b1.run.boss.hp) : 0})`);
   assert.ok(b1.run.units.length > 0, 'brutal S1 evLead 생존 병력 0');
   assert.ok(b1.run.units.length < b1.run.peak, 'brutal S1 evLead 도 병력을 잃는다(무손실 승리 없음)');
-  //  대조점(r3.9 실측 2026-09-19 = r3.21 대항 검수 반영 뒤 2026-09-20 재실측: 어려움 S2 4명 · 어려움 S3 70명 · 지옥 S1 14명 생존)
-  assert.equal(BR('hard', 2).run.units.length, 4, 'hard S2 planBoss 생존 병력 = r3.9 실측 4명');
-  assert.equal(BR('hard', 3).run.units.length, 70, 'hard S3 planBoss 생존 병력 = r3.9 실측 70명');
   //  r3.30(확정 칸 통과): 상한에 닿은 게이트에 헛발로 흡수되던 탄이 뒤의 적을 맞히게 되어 21 → 24명(최대 29 그대로, 여전히 손실 있음)
   //  r3.31(적 크기 체력 비례·돌격체 감속·중화기 조정): 24 → 26명(최대 29 그대로, 여전히 손실 있음)
   assert.equal(b1.run.units.length, 26, 'brutal S1 evLead 생존 병력 = r3.31 실측 26명(최대 29명)');
@@ -351,10 +347,10 @@ test('V3-SIM-DIFF SD-9: planBoss 는 보스 등장 전까지 plan 과 완전히 
   //  S1 normal 은 정예전에서도 둘 다 무손실이라 판 전체가 같아야 한다
   const pick = (r) => ({ z: r.z, peak: r.peak, weapon: r.weapon, won: r.won, units: r.units.length });
   assert.deepEqual(pick(playPolicy(1, 'planBoss', 14400, 'normal').run), pick(playPolicy(1, 'plan', 14400, 'normal').run));
-  //  성장 축(최고 병력)은 정예전 조작으로 바뀌지 않는다 — 보스는 코스 끝에 나오기 때문
-  for (const d of ['hard', 'brutal']) for (const id of STAGE_IDS) {
+  //  성장 축(최고 병력)은 정예전 조작으로 바뀌지 않는다 — 보스는 코스 끝에 나오기 때문(r4.2: 어려움 칸을 뺐다)
+  for (const d of ['brutal']) for (const id of STAGE_IDS) {
     assert.equal(BR(d, id).run.peak, playPolicy(id, 'plan', 14400, d).run.peak, `${d} S${id}: peak 는 plan 과 같다`);
   }
-  //  같은 입력열이면 결정적
-  assert.equal(playPolicy(2, 'planBoss', 14400, 'hard').run.units.length, BR('hard', 2).run.units.length);
+  //  같은 입력열이면 결정적(r4.2: 종전 어려움 S2 → 기본 줄 S2)
+  assert.equal(playPolicy(2, 'planBoss', 14400, 'brutal').run.units.length, BR('brutal', 2).run.units.length);
 });

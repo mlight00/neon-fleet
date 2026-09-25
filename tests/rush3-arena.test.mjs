@@ -561,10 +561,10 @@ test('V3-ARENA A-13: 셸 — 진입 프레임에 배너·열림 연출·lotWarn/
   const save = createSave3(fakeStorage());
   const audio = fakeAudio();
   const canvas = fakeCanvas(shown), win = fakeWin();
-  const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() } });
+  //  r4.2: 종전 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
+  const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });
   await app.ready;
   const frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
-  app.setDifficulty('normal');
   app.startRun(15);
   const run = () => app.getRun(), dbg = () => app.dbg();
   assert.equal(dbg().arena, false); assert.equal(dbg().bossState, null);
@@ -606,10 +606,10 @@ test('V3-ARENA A-14: 셸 — 정지 중 pointermove 누적 → 재개 후 tay �
   const save = createSave3(fakeStorage());
   const audio = fakeAudio();
   const canvas = fakeCanvas(shown), win = fakeWin();
-  const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() } });
+  //  r4.2: 종전 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
+  const app = boot(canvas, { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });
   await app.ready;
   const frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
-  app.setDifficulty('normal');
   app.startRun(24);
   const run = () => app.getRun(), dbg = () => app.dbg();
   let n = 0;

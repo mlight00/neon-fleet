@@ -375,6 +375,9 @@ test('V3-AUDIO: 풀은 이름·파일별 4개까지, src 는 생성 때 고정(�
 
 // ─────────────────────────────────────────────────────────────────────────────
 // V3-SAVE-VERSION 난이도(계약서 7장·3-8): 기록 칸 키 `${version}`(normal) | `${version}:${difficulty}`
+//  r4.2(2026-09-25, 난이도 선택 삭제): 게임 화면은 이제 늘 `${version}:brutal` 칸에만 쓴다. 그래도 save 의 칸 키 규칙은 그대로 두고,
+//   옛 저장의 보통(접미 없음)·어려움(`:hard`) 칸을 **지우지 않고 읽을 수 있어야** 한다(옛 칸 읽기 호환) — 아래 recordKey·칸 분리·옛 저장·손상 4건은 그 뜻으로 남긴다.
+//   마지막 선택 difficulty 칸은 읽지 않게 바꿨다(마지막 검사 개정).
 // ─────────────────────────────────────────────────────────────────────────────
 test('V3-SAVE-VERSION DIFF: recordKey — normal 은 접미 없음(옛 칸 그대로), 그 밖은 version:difficulty, 버전은 1 이상 정수로 정규화', () => {
   assert.equal(BASE_DIFFICULTY, 'normal');
@@ -468,22 +471,32 @@ test("V3-SAVE-VERSION DIFF: 손상 케이스 — ':normal' 접미는 접미 없�
   assert.equal(s.get().lastStage, 1);
 });
 
-test('V3-SAVE-VERSION DIFF: 마지막 난이도(difficulty) — 기본은 타이틀 초기 선택 brutal, patch 로 기억, 재로드 유지, 형식이 아니면 brutal', () => {
+test('V3-SAVE-VERSION DIFF: 마지막 난이도(difficulty) 칸은 읽지 않는다(r4.2 난이도 선택 삭제) — 새 저장·옛 값·patch 모두 늘 brutal, 칸은 형식 호환으로 남고(v 3) 옛 기록 칸은 그대로', () => {
   const st = memStorage();
   const s = createSave3(st);
-  //  기록 접미 규칙의 기준(BASE_DIFFICULTY='normal')과 타이틀 초기 선택은 다른 값이다(계약서 3-8·7)
+  //  기록 접미 규칙의 기준(BASE_DIFFICULTY='normal')과 이 칸의 고정값(brutal = 셸 출격 줄)은 다른 값이다(계약서 3-8·7)
   assert.equal(BASE_DIFFICULTY, 'normal');
   assert.equal(s.get().difficulty, 'brutal');
+  //  patch 로 넣어도 normalize 가 옮기지 않는다(zoom 칸 r4.1 과 같은 처리)
   s.patch({ difficulty: 'hard' });
-  assert.equal(s.get().difficulty, 'hard');
-  assert.equal(JSON.parse(st.getItem(KEY3)).difficulty, 'hard');
-  assert.equal(createSave3(st).get().difficulty, 'hard');
-  for (const bad of [5, null, '', {}]) {
-    const s2 = createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, difficulty: bad }) }));
-    assert.equal(s2.get().difficulty, 'brutal', JSON.stringify(bad));
+  assert.equal(s.get().difficulty, 'brutal', 'patch 값은 읽지 않는다');
+  const saved = JSON.parse(st.getItem(KEY3));
+  assert.equal(saved.v, 3, '저장 형식 v 3 그대로');
+  assert.equal(saved.difficulty, 'brutal', '칸은 남되 값은 고정');
+  assert.equal(createSave3(st).get().difficulty, 'brutal');
+  //  옛 저장의 마지막 선택(보통·어려움·모르는 값·잘못된 형식)은 무엇이든 읽지 않는다 — bak 도 만들지 않는다(최상위 형식은 맞다)
+  for (const old of ['normal', 'hard', 'zzz', 5, null, '', {}]) {
+    const st2 = memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, difficulty: old }) });
+    assert.equal(createSave3(st2).get().difficulty, 'brutal', JSON.stringify(old));
+    assert.equal(st2.getItem(BAK3), null, JSON.stringify(old) + ' bak 없음');
   }
-  //  save 는 난이도 id 를 판정하지 않는다(그건 셸 normDifficulty 의 몫) — 문자열이면 그대로 둔다
-  assert.equal(createSave3(memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: {}, difficulty: 'zzz' }) })).get().difficulty, 'zzz');
+  //  마지막 선택이 '보통'이던 옛 저장도 보통·어려움·지옥 기록 칸은 지우지 않는다(옛 칸 읽기 호환)
+  const a = { cleared: true, attempts: 3, bestSurvivors: 30, bestTime: 50 }, b = { cleared: true, attempts: 2, bestSurvivors: 8, bestTime: 70 }, c = { cleared: false, attempts: 5, bestSurvivors: 0, bestTime: 0 };
+  const st3 = memStorage({ [KEY3]: JSON.stringify({ v: 3, stages: { 2: { versions: { '2': a, '2:hard': b, '2:brutal': c } } }, difficulty: 'normal' }) });
+  const s3 = createSave3(st3);
+  assert.deepEqual([s3.getStage(2, 2), s3.getStage(2, 2, 'hard'), s3.getStage(2, 2, 'brutal')], [a, b, c]);
+  s3.updateStage(2, { attempts: 6 }, 2, 'brutal');
+  assert.deepEqual(Object.keys(JSON.parse(st3.getItem(KEY3)).stages['2'].versions).sort(), ['2', '2:brutal', '2:hard'], '셸이 brutal 칸에 써도 옛 칸 키 그대로');
 });
 
 test('V3-AUDIO: SFX 맵의 모든 이름이 실존 음원 파일로 간다(없는 파일을 적으면 소리가 조용히 사라진다)', () => {

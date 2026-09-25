@@ -40,12 +40,11 @@ export const TRAP_BADGE_TEXT = '쏴도 안 줄어듦';
 export const RETRY_LOTTERY_NOTE = '랜덤 길은 새로 추첨';
 //  칸 위 짧은 글의 화면 상단 한계(HUD 아래). 행이 화면 밖에서 들어오는 동안에도 글이 보이게 여기에 붙인다
 const TIP_MIN_Y = 96;
-//  난이도 짧은 표기 색(HUD 태그·결과 제목). normal 은 표기 없음(BAL3.difficulty[id].short 가 빈 문자열)
-const DIFF_COLOR = { hard: C.bulletHeavy, brutal: C.gateNeg };
-const diffShort = (id) => BAL3.difficulty[id]?.short ?? '';
+//  r4.2(2026-09-25, 이사 지시 "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고"): 난이도 짧은 표기(HUD 칩·결과 제목 옆 '어려움'/'지옥')와
+//   그 색표(DIFF_COLOR)를 지웠다. run.difficulty·result.difficulty 는 기록 칸 키로만 남고 화면에는 나오지 않는다.
 
 //  HUD 상단 줄의 **자리표 단일 출처**(2026-09-18 이사 소견: "난이도 칩·무기 칩·⏸ 버튼 크기가 제각각이고 높이가 안 맞는다").
-//   세 조각(난이도 칩·무기 칩·⏸)은 같은 높이 h·같은 세로 중심선 cy·같은 모서리 반경 r·같은 글자 크기 fs 를 쓰고,
+//   조각(무기 칩·⏸ — r4.2 에서 난이도 칩 HUD_DIFF {w 64}를 지웠다)은 같은 높이 h·같은 세로 중심선 cy·같은 모서리 반경 r·같은 글자 크기 fs 를 쓰고,
 //   화면 오른쪽 끝에서 right 만큼 띄운 자리부터 gap 간격으로 왼쪽으로 줄을 선다. 왼쪽 STAGE 제목도 같은 cy 에 중심을 맞춘다.
 //  ⚠️⏸ 의 **히트 영역**(main.js HUD_BTN)도 이 표에서 나온 상자를 그대로 받는다 — 그린 자리와 누르는 자리가 갈라지지 않게
 //   좌표를 두 곳에 적지 않는다. main.js 는 render.js 를 이미 import 하므로 방향은 render → main 하나뿐이다(역방향은 순환).
@@ -53,7 +52,6 @@ const HUD_TOP = 16, HUD_H = 36, HUD_R = 18, HUD_FS = 15, HUD_GAP = 8, HUD_RIGHT 
 const hudBoxOf = (w, right) => Object.freeze({ x: right - w, y: HUD_TOP, w, h: HUD_H });
 const HUD_PAUSE = hudBoxOf(44, W - HUD_RIGHT);
 const HUD_WEAPON = hudBoxOf(122, HUD_PAUSE.x - HUD_GAP);
-const HUD_DIFF = hudBoxOf(64, HUD_WEAPON.x - HUD_GAP);
 //  무기 강화 단계 표기(r3.10). Mk I 은 표기 없음
 export const MK_LABEL = Object.freeze(['', '', ' II', ' III']);
 //  r4.1(2026-09-25): '가까이 ○/●' 토글 칩(종전 ZOOM, HUD 왼쪽 셋째 줄 {x16, y84, w70, h26})을 지웠다 — 보기는 '가까이' 하나뿐(project.js).
@@ -61,7 +59,7 @@ export const MK_LABEL = Object.freeze(['', '', ' II', ' III']);
 //  탄 그림의 화면 길이(px, Mk I 기준). 무기마다 실루엣이 달라 길이도 다르게: 저격 바늘이 가장 길고 산탄 펠릿 뭉치는 짧고 넓다
 export const BULLET_LEN = Object.freeze({ rifle: 24, auto: 26, heavy: 34, scatter: 22, sniper: 48, arc: 34 });
 //  탄의 진행 방향(라디안, 0 = 화면 위). vx 가 있는 탄(산탄 부채꼴·아레나 자동 조준)은 그 방향으로 그림을 돌린다
-//  체력 숫자를 생략하는 화면 위 띠: HUD 줄(제목·남은 거리·난이도/무기 칩) 아래 선.
+//  체력 숫자를 생략하는 화면 위 띠: HUD 줄(제목·남은 거리·무기 칩) 아래 선.
 //  r4.1: 종전에는 '가까이' 칩 아래(칩 y 84 + 높이 26 + 여백 18 = 128)로 계산했는데 칩이 없어져 **숫자 128 로 고정**한다(같은 값 — 생략 구간 불변).
 //  ⚠️원근에서는 그리는 y 가 곧 화면 y 다(균일 확대 변환 없음) — 되돌릴 배율이 없다
 export const HP_TAG_MIN_Y = 128;
@@ -85,9 +83,10 @@ export function bulletAngle(b) {
 export const HUD_ROW = Object.freeze({
   top: HUD_TOP, h: HUD_H, r: HUD_R, fs: HUD_FS, gap: HUD_GAP, right: HUD_RIGHT,
   cy: HUD_TOP + HUD_H / 2,
-  //  왼쪽 두 줄: 제목은 세 칩과 같은 중심선, 남은 거리는 그 아래 한 줄
+  //  왼쪽 두 줄: 제목은 칩들과 같은 중심선, 남은 거리는 그 아래 한 줄
   left: 16, titleFs: 20, titleFsSmall: 17, distFs: 15, distCy: HUD_TOP + HUD_H / 2 + 28,
-  box: Object.freeze({ diff: HUD_DIFF, weapon: HUD_WEAPON, pause: HUD_PAUSE }),
+  //  r4.2: 난이도 칩 자리(diff)를 지웠다 — 무기 칩·⏸ 둘
+  box: Object.freeze({ weapon: HUD_WEAPON, pause: HUD_PAUSE }),
 });
 
 export function createRenderer3(ctx, sprites) {
@@ -1396,24 +1395,24 @@ export function createRenderer3(ctx, sprites) {
     ctx.restore();
   }
 
-  //  HUD 칩 바탕(난이도·무기·⏸ 공통) — 같은 높이·같은 모서리 반경·같은 바탕색을 한 함수에서만 그린다
+  //  HUD 칩 바탕(무기·⏸ 공통 — r4.2 에서 난이도 칩 삭제) — 같은 높이·같은 모서리 반경·같은 바탕색을 한 함수에서만 그린다
   function hudChip(b) {
     ctx.fillStyle = 'rgba(20,35,58,0.82)';
     roundRect(b.x, b.y, b.w, b.h, HUD_ROW.r);
     ctx.fill();
   }
 
-  //  HUD: 좌상 STAGE n 제목 + 남은 거리 m / 우상 한 줄(난이도 칩 · 무기 칩 · ⏸) / 정예 HP 막대+숫자
-  //  ⚠️우상 세 조각의 자리는 HUD_ROW 한 곳에서 온다. ⏸ 만은 **셸이 넘긴 버튼 상자 그대로** 그린다 —
+  //  HUD: 좌상 STAGE n 제목 + 남은 거리 m / 우상 한 줄(무기 칩 · ⏸ — r4.2 에서 난이도 칩 삭제) / 정예 HP 막대+숫자
+  //  ⚠️우상 조각의 자리는 HUD_ROW 한 곳에서 온다. ⏸ 만은 **셸이 넘긴 버튼 상자 그대로** 그린다 —
   //   그 상자가 곧 히트 영역이라, 그리는 자리와 누르는 자리가 구조적으로 같아진다(drawButtons 는 이 버튼을 건너뛴다).
   function drawHud(view) {
     const run = view.run, hud = view.hud;
     const cy = HUD_ROW.cy;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    //  제목은 난이도 칩 앞에서 끝나야 한다(24스테이지 제목 중 '크라운 브레이커' 같은 긴 것).
+    //  제목은 무기 칩 앞에서 끝나야 한다(24스테이지 제목 중 '크라운 브레이커' 같은 긴 것). r4.2: 종전 끝선은 난이도 칩 왼쪽(x 220)이었다 — 칩이 없어져 무기 칩 왼쪽(x 292)까지
     //  순서: 기본 크기 → 한 단계 작게(17px) → 그래도 넘치면 'STAGE ' 접두 제거 → 마지막 안전망 maxWidth
-    const titleMaxW = HUD_ROW.box.diff.x - HUD_ROW.left - 6;
+    const titleMaxW = HUD_ROW.box.weapon.x - HUD_ROW.left - 6;
     const fits = (t, fs) => { ctx.font = '900 ' + fs + 'px ' + FONT; return ctx.measureText(t).width <= titleMaxW; };
     const full = 'STAGE ' + run.stageId + '  ' + run.title, short = run.stageId + '  ' + run.title;
     let titleText = full, titleFs = HUD_ROW.titleFs;
@@ -1448,17 +1447,7 @@ export function createRenderer3(ctx, sprites) {
     ctx.font = 'bold ' + HUD_ROW.fs + 'px ' + FONT;
     ctx.fillStyle = w.color;
     ctx.fillText(w.name + (MK_LABEL[mk] ?? ''), wb.x + 48, cy);
-    //  난이도 태그(어려움·지옥만): 무기 칩 왼쪽 옆. 보통은 short 가 빈 문자열이라 칩 자체를 그리지 않는다
-    const ds = diffShort(run.difficulty);
-    if (ds) {
-      const db = HUD_ROW.box.diff;
-      hudChip(db);
-      ctx.textAlign = 'center';
-      ctx.font = 'bold ' + HUD_ROW.fs + 'px ' + FONT;
-      ctx.fillStyle = DIFF_COLOR[run.difficulty] ?? C.hud;
-      ctx.fillText(ds, db.x + db.w / 2, cy);
-      ctx.textAlign = 'left';
-    }
+    //  r4.2: 무기 칩 왼쪽의 난이도 태그('어려움'·'지옥')를 지웠다
     //  ⏸(일시정지) — 셸이 hud:true 로 넘긴 버튼만. 없는 상태(일시정지 중·결과)에서는 그리지 않는다
     const pb = (view.buttons ?? []).find((b) => b.hud);
     if (pb) {
@@ -1655,11 +1644,7 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = C.hero;
       ctx.beginPath(); ctx.arc(W / 2, 282, 55, 0, Math.PI * 2); ctx.fill();
     });
-    //  난이도 토글 줄(버튼은 drawButtons — 여기서는 왼쪽 라벨만). 위치는 main.DIFF_TOGGLE(y 382, h 34)
-    ctx.textAlign = 'left';
-    ctx.font = '700 15px ' + FONT;
-    ctx.fillStyle = 'rgba(20,35,58,0.8)';
-    ctx.fillText('난이도', 64, 404);
+    //  r4.2: 난이도 토글 줄(y 382~416)의 왼쪽 라벨 '난이도'를 지웠다 — 줄은 비워 둔다(v4 ③·④단계 [로봇 강화] 자리)
     ctx.textAlign = 'center';
     ctx.font = '700 15px ' + FONT;
     ctx.fillStyle = 'rgba(20,35,58,0.8)';
@@ -1708,17 +1693,8 @@ export function createRenderer3(ctx, sprites) {
     ctx.fillText(r.won ? '작전 성공!' : '작전 실패', W / 2, 150);
     ctx.font = '700 16px ' + FONT;
     ctx.fillStyle = 'rgba(243,241,232,0.75)';
-    const rds = diffShort(r.difficulty);
-    const head = 'STAGE ' + r.stageId + '  ' + r.title + (rds ? '  ·  ' : '');
-    ctx.fillText(head + rds, W / 2, 184);
-    if (rds) {
-      //  난이도 표기만 색을 달리해 한 번 더 그린다(제목 오른쪽 끝 위치는 measureText 로)
-      const x0 = W / 2 - ctx.measureText(head + rds).width / 2 + ctx.measureText(head).width;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = DIFF_COLOR[r.difficulty] ?? C.hud;
-      ctx.fillText(rds, x0, 184);
-      ctx.textAlign = 'center';
-    }
+    //  r4.2: 제목 옆 난이도 표기('  ·  어려움'/'  ·  지옥', 색 따로)를 지웠다 — 제목 한 줄만
+    ctx.fillText('STAGE ' + r.stageId + '  ' + r.title, W / 2, 184);
     //  제목 아래 추가 줄(y 212 부터 18px 씩 쌓는다 — 통계 첫 줄 246 과 겹치지 않는 최소 간격): 랜덤 길 → 작전 목표 순
     let extraY = 212;
     //  랜덤 길 한 줄(계약서 3-9): 고른 판은 결과, 안 고른 판은 이번 판에 무엇이었는지 공개

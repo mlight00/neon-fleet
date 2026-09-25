@@ -85,8 +85,8 @@ export function makeCourses({ coverZFor }) {
     supplies: [soldier(2600, 120, 4, 8), soldier(2600, 360, 3, 6), weapon(4900, 240, 'auto', 12)],
     walls: [cover(190, 290, 1220), cover(80, 186, 3620), cover(240, 400, 6020)],
     spawns: [wave(2100, 'grunt', [140, 240, 340]), wave(3300, 'shooter', [200, 280]), mass(5300, 'grunt', 12, 2), wave(6900, 'rusher', [120, 360], HOUND)],
-    //  r3.22 지옥 전용: 잘하는 봇이 손실 0 으로 이기던 판 → 둔덕 뒤 저격수 2 추가
-    brutalSpawns: [wave(5900, 'shooter', [130, 350])],
+    //  r3.22 지옥 전용: 잘하는 봇이 손실 0 으로 이기던 판 → 둔덕 뒤 저격수 2 추가(r4.2 이름만 extraSpawns — 기본 줄 brutal 에서만 붙는다, version 불변)
+    extraSpawns: [wave(5900, 'shooter', [130, 350])],
     elite: { z: 8000, hp: 200, summon: false } };
   //  6 달리는 보급(r3.13 차량 3대 — 왕복하는 통은 '지금 자리'가 아니라 '갈 자리'에 서야 열린다. version 2, 정지 통 시절 기록은 1 칸에 보존)(BG4)
   //   r3.18 대항 검수 반영: 차량 3대에 armZ(440, 화면 y 200 아래에서만 피격)·내구 6/6/8 → 40/40/48. 봇 실측(2026-09-19, review-fix/sweep.mjs):
@@ -122,8 +122,8 @@ export function makeCourses({ coverZFor }) {
     supplies: [soldier(2200, 150, 5, 10), soldier(2200, 330, 5, 10), weapon(4500, 240, 'auto', 12), soldier(6500, 240, 8, 20)],
     walls: [],
     spawns: [wave(1800, 'grunt', [140, 340]), mass(3000, 'grunt', 10, 2), wave(4200, 'rusher', [120, 240, 360], HOUND), mass(6200, 'grunt', 16, 2)],
-    //  r3.22 지옥 전용: 잡졸·돌격체뿐이라 40명 중 2명만 잃던 판 → 저격수 3 추가
-    brutalSpawns: [wave(2600, 'shooter', [240]), wave(5000, 'shooter', [140, 340])],
+    //  r3.22 지옥 전용: 잡졸·돌격체뿐이라 40명 중 2명만 잃던 판 → 저격수 3 추가(r4.2 이름만 extraSpawns — 기본 줄 brutal 에서만 붙는다, version 불변)
+    extraSpawns: [wave(2600, 'shooter', [240]), wave(5000, 'shooter', [140, 340])],
     elite: { z: 7400, hp: 260, summon: true, skin: 'B2_gantrywidow' },
     bonus: bonus(20, [target(240, 120, 360, 4.0, 12, 2), target(320, 140, 340, 3.0, 16, 3, { phase: 0.75 }), target(400, 200, 280, 2.2, 20, 3, { phase: 0.5 }), target(480, 105, 375, 6.0, 32, 5, { phase: 0.25, respawn: 0.8 })]) };
   //  9 둘을 동시에(r3.16 복수 정예 실제 장치 — 포격형 B1(좌, x160) + 소환형 B2(우, x320)가 같은 STEP 에 등장. 둘 다 잡아야 승리이고

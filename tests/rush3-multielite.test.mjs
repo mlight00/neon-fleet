@@ -429,7 +429,8 @@ async function bootFake() {
   const texts = [];
   const save = createSave3(fakeStorage());
   const audio = fakeAudio();
-  const app = boot(fakeCanvas(texts), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() } });
+  //  r4.2: 종전 각 검사의 app.setDifficulty('normal') → 검사 전용 주입 deps.difficulty(게임 화면은 늘 brutal — 이 파일의 셸 검사는 배수 1 줄 판의 기대값을 그대로 쓴다)
+  const app = boot(fakeCanvas(texts), { win: null, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save, audio, sprites: { get: () => null, ready: new Set() }, difficulty: 'normal' });
   await app.ready;
   const frames = (n) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
   return { app, frames, save, texts, audio };
@@ -442,7 +443,6 @@ function shellDrive(h, cond, max = 9000) {
 
 test('V3-MULTIELITE ME-9: 셸 — 2체 등장 프레임에 elite 효과음·보스 BGM 각 1회·배너 "정예 2체 접근!", 첫 처치에 kill 음·배너 "정예 N 격파 — 남은 목표 1", 마지막에 win, 결과·저장(version 2)', async () => {
   const h = await bootFake();
-  h.app.setDifficulty('normal');
   h.app.startRun(10);   // r3.29: 복수 정예 판
   const run = () => h.app.getRun();
   const dbg = () => h.app.dbg();

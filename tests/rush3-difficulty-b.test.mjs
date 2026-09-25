@@ -4,6 +4,8 @@
 //  ③ 봇 실측: planBoss 보통 1~24 완주(⚠️4~24 planBoss = 정예 전 무입력) · evLead 보통 4~24 완주(DB-7b, 4~24 성공 경로) · 지옥 무입력 S13 이상 실패 ≥ 70% · 머리 위 체력 숫자 렌더(12px, hpMax > 2 만, HUD 아래·지나간 적 제외)
 //  ④ 대항 검수 반영(2026-09-20): 1~3 기준 코스는 난이도 체력 배수(enemyHp·eliteHp)도 ×1(enemyHpByStage difficultyHp: false) — hard S2 성공 경로(SD-7) 보존
 //  ⚠️봇 결과는 사람의 성공률이 아니다(결정적 1판). 표 전체는 보고서 newmode/v3/research/difficulty-b-20260920/report.md
+//  r4.2(2026-09-25, 난이도 단일화 — 두 줄 표): 어려움(hard) 줄을 지웠다. 이 파일의 세 칸 비교는 '배수 1 줄(normal) · 기본 줄(brutal)' 두 칸으로 줄였고
+//   두 칸의 기대값은 그대로다(DB-7 보통·DB-8 지옥 무입력 불변). DB-7b 의 '어려움 ≥ 지옥' 단언은 지웠다. 추가 배치 정의 키는 extraSpawns(옛 brutalSpawns)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BAL3, enemyHpMulFor, difficultyHpFor, difficultyMult } from '../rush3/balance.js';
@@ -15,12 +17,12 @@ import { createRenderer3, HUD_ROW, HP_TAG_MIN_Y } from '../rush3/render.js';
 import { projectorFor } from '../rush3/project.js';
 import { playPolicy } from './lib/rush3-policies.mjs';
 
-const DIFFS = ['normal', 'hard', 'brutal'];
+const DIFFS = ['normal', 'brutal'];
 
-//  정의에 체력을 직접 적은 스폰의 hp(1~3 = stages.DEFS 의 spawns·지옥이면 brutalSpawns). 4~24 는 스킨 hp 로 표현되므로 여기서 다루지 않는다
+//  정의에 체력을 직접 적은 스폰의 hp(1~3 = stages.DEFS 의 spawns·기본 줄(지옥)이면 extraSpawns). 4~24 는 스킨 hp 로 표현되므로 여기서 다루지 않는다
 function explicitHp(id, d, sp) {
   if (!DEFS[id]) return undefined;
-  const defs = DEFS[id].spawns.concat(d === 'brutal' ? (DEFS[id].brutalSpawns ?? []) : []);
+  const defs = DEFS[id].spawns.concat(d === 'brutal' ? (DEFS[id].extraSpawns ?? []) : []);
   return defs.find((x) => x.z === sp.z && x.kind === sp.kind && x.hp != null)?.hp;
 }
 
@@ -38,7 +40,7 @@ function play(run, sec, x = 240) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-DIFFB DB-1: 구간 배율 표 — to 오름차순·mul 단조 증가·1~3 은 1(difficultyHp false)·24 까지 덮음, enemyHpMulFor/difficultyHpFor 는 표 값(비숫자·범위 밖은 1/true), 난이도 표 hard 1.5/1.25·brutal 2/1.5', () => {
+test('V3-DIFFB DB-1: 구간 배율 표 — to 오름차순·mul 단조 증가·1~3 은 1(difficultyHp false)·24 까지 덮음, enemyHpMulFor/difficultyHpFor 는 표 값(비숫자·범위 밖은 1/true), 난이도 표 brutal 2/1.5(r4.2 어려움 줄 삭제)', () => {
   const T = BAL3.enemyHpByStage;
   assert.ok(Object.isFrozen(T) && T.length >= 2);
   for (let i = 1; i < T.length; i++) { assert.ok(T[i].to > T[i - 1].to, '구간 오름차순'); assert.ok(T[i].mul > T[i - 1].mul, '배율 단조 증가'); }
@@ -56,15 +58,14 @@ test('V3-DIFFB DB-1: 구간 배율 표 — to 오름차순·mul 단조 증가·1
   for (const id of STAGE_IDS) {
     assert.equal(difficultyHpFor(id), false, 'S' + id + ' 난이도 생략');
     assert.equal(difficultyHpFor(id, 'normal'), false, 'S' + id + ' 보통');
-    assert.equal(difficultyHpFor(id, 'hard'), false, 'S' + id + ' 어려움');
     assert.equal(difficultyHpFor(id, 'brutal'), true, 'S' + id + ' 지옥');
   }
   for (const id of COURSE_IDS) assert.equal(difficultyHpFor(id), true, 'S' + id);
   assert.equal(difficultyHpFor('proto3'), true); assert.equal(difficultyHpFor(undefined), true); assert.equal(difficultyHpFor(999), true);
-  assert.deepEqual(DIFFS.map((d) => [difficultyMult(d).enemyHp, difficultyMult(d).eliteHp]), [[1, 1], [1.5, 1.25], [2, 1.5]]);
+  assert.deepEqual(DIFFS.map((d) => [difficultyMult(d).enemyHp, difficultyMult(d).eliteHp]), [[1, 1], [2, 1.5]]);
 });
 
-test('V3-DIFFB DB-2: makeSpawn — 1~24 × 3난이도 모든 스폰의 hp = round((정의 hp ?? 표 hp) × 구간 배율 × enemyHp) 를 항상 명시(1~3 은 enemyHp·eliteHp ×1 = 세 난이도 같은 체력), stage.enemyHpMul·difficultyHp 기록, 정예 hp 는 구간 배율 없이 × eliteHp 만', () => {
+test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = round((정의 hp ?? 표 hp) × 구간 배율 × enemyHp) 를 항상 명시(1~3 은 배수 1 줄 enemyHp·eliteHp ×1 · 기본 줄만 ×배수 — r3.22), stage.enemyHpMul·difficultyHp 기록, 정예 hp 는 구간 배율 없이 × eliteHp 만', () => {
   for (const id of ALL_STAGE_IDS) {
     const mul = enemyHpMulFor(id);
     const base = buildStage(id);
@@ -84,12 +85,12 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 3난이도 모든 스폰의 hp = roun
       //  정예: 구간 배율 없음 — normal 값 × eliteHp(1~3 은 ×1)
       for (let k = 0; k < st.elites.length; k++) assert.equal(st.elites[k].hp, Math.round(base.elites[k].hp * bh), `S${id} ${d} 정예 ${k}`);
     }
-    //  같은 스테이지 안에서 난이도 순으로 단조 증가. r3.22: 지옥 전용 추가 무리(brutalSpawns)가 z 순 정렬 중간에 끼므로
-    //   번호(k)가 아니라 **이벤트 z·종류**로 짝을 맞춘다(추가 무리는 보통·어려움에 짝이 없어 비교에서 빠진다)
+    //  같은 스테이지 안에서 난이도 순으로 단조 증가. r3.22: 지옥 전용 추가 무리(extraSpawns — 옛 brutalSpawns)가 z 순 정렬 중간에 끼므로
+    //   번호(k)가 아니라 **이벤트 z·종류**로 짝을 맞춘다(추가 무리는 배수 1 줄에 짝이 없어 비교에서 빠진다)
     for (let k = 0; k < base.spawns.length; k++) {
       const b0 = base.spawns[k];
       const hp = DIFFS.map((d) => buildStage(id, { difficulty: d }).spawns.find((x) => x.z === b0.z && x.kind === b0.kind && x.skin === b0.skin).hp);
-      assert.ok(hp[0] <= hp[1] && hp[1] <= hp[2], `S${id} 무리 ${k}(z${b0.z} ${b0.kind}) 난이도 단조 ${hp}`);
+      assert.ok(hp[0] <= hp[1], `S${id} 무리 ${k}(z${b0.z} ${b0.kind}) 난이도 단조 ${hp}`);
     }
   }
   //  스테이지 순으로 표 잡졸(스킨 없음) hp 가 내려가지 않는다(구간 배율 단조)
@@ -101,12 +102,11 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 3난이도 모든 스폰의 hp = roun
     prev = g.hp;
   }
   assert.deepEqual([4, 9, 13, 19].map((id) => buildStage(id).spawns.find((s) => s.kind === 'grunt' && !s.skin).hp), [4, 8, 14, 24]);
-  //  1~3: 보통·어려움의 잡졸·정예 체력이 같다(r3.9 = 33568b2 와 동일) · 지옥만 × enemyHp·eliteHp(r3.22) · 4 부터는 세 난이도 모두 배수
+  //  1~3: 배수 1 줄의 잡졸·정예 체력은 r3.9(33568b2)와 동일 · 기본 줄(지옥)만 × enemyHp·eliteHp(r3.22) · 4 부터는 두 줄 모두 배수(r4.2: 어려움 칸 삭제)
   const s2 = buildStage(2).spawns.map((s) => s.hp);
-  assert.deepEqual(buildStage(2, { difficulty: 'hard' }).spawns.map((s) => s.hp), s2, 'S2 어려움 = 보통');
   assert.deepEqual(buildStage(2, { difficulty: 'brutal' }).spawns.map((s) => s.hp), s2.map((h) => Math.round(h * BAL3.difficulty.brutal.enemyHp)), 'S2 지옥 = 보통 × enemyHp');
-  assert.deepEqual(DIFFS.map((d) => buildStage(3, { difficulty: d }).elite.hp), [500, 500, Math.round(500 * BAL3.difficulty.brutal.eliteHp)]);
-  assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).spawns[0].hp), [4, 6, 8]);
+  assert.deepEqual(DIFFS.map((d) => buildStage(3, { difficulty: d }).elite.hp), [500, Math.round(500 * BAL3.difficulty.brutal.eliteHp)]);
+  assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).spawns[0].hp), [4, 8]);
   assert.equal(buildStage(13).spawns.find((s) => s.skin === 'E3_wallguard').hp, 70, '장갑체 10 × 7');
   assert.equal(buildStage(21, { difficulty: 'brutal' }).spawns.find((s) => s.skin === 'E7_cartyard').hp, 480, '카트 20 × 12 × 2');
 });
@@ -122,12 +122,12 @@ test('V3-DIFFB DB-3: enemyDefsFor(difficulty, hpMul, difficultyHp) — 표 hp ×
     assert.deepEqual([f.shooter.shot.dmg, f.grunt.touchDmg, f.elite.shootEvery], [e.shooter.shot.dmg, e.grunt.touchDmg, e.elite.shootEvery], d + ' 나머지 배수는 그대로');
   }
   assert.deepEqual(enemyDefsFor('normal', 1), enemyDefsFor('normal'), '생략 = 1');
-  assert.deepEqual(enemyDefsFor('hard', 2, true), enemyDefsFor('hard', 2), '생략 = true');
+  assert.deepEqual(enemyDefsFor('brutal', 2, true), enemyDefsFor('brutal', 2), '생략 = true');
   for (const id of [1, 2, 3, 4, 9, 13, 19]) for (const d of DIFFS) {
     const st = buildStage(id, { difficulty: d });
     assert.deepEqual(createRun(st).enemyDefs, enemyDefsFor(d, st.enemyHpMul, st.difficultyHp), `S${id} ${d} run.enemyDefs`);
   }
-  //  1~3(S3 정예 소환): run.enemyDefs 의 잡졸 hp 가 보통·어려움 2(r3.9 와 같음), 지옥은 × enemyHp(r3.22)
+  //  1~3(S3 정예 소환): run.enemyDefs 의 잡졸 hp 가 배수 1 줄 2(r3.9 와 같음), 기본 줄(지옥)은 × enemyHp(r3.22)
   for (const d of DIFFS) {
     const want = d === 'brutal' ? Math.round(2 * BAL3.difficulty.brutal.enemyHp) : 2;
     assert.equal(createRun(buildStage(3, { difficulty: d })).enemyDefs.grunt.hp, want, d + ' S3 소환 잡졸 hp');
@@ -141,7 +141,7 @@ test('V3-DIFFB DB-3: enemyDefsFor(difficulty, hpMul, difficultyHp) — 표 hp ×
   const hev = play(h, 2);
   assert.ok(hev.some((e) => e.type === 'enemyHit'));
   assert.ok(h.enemies[0].hp < 40 && h.enemies[0].hpMax === 40);
-  //  정예 소환(ev.hp 없이 spawnEnemy): 합성 stage.enemyHpMul 7 → 잡졸 hp 14(보통)·21(어려움)·28(지옥)
+  //  정예 소환(ev.hp 없이 spawnEnemy): 합성 stage.enemyHpMul 7 → 잡졸 hp 14(배수 1 줄)·28(기본 줄) — r4.2 어려움 21 칸 삭제
   //   정예는 하강(≈2.3s) 뒤 summonEvery 마다 소환하고, 소환 잡졸은 부대 사격에 곧 죽으므로 소환 STEP 에 바로 본다
   for (const d of DIFFS) {
     const run = createRun(synth({ startUnits: 30, enemyHpMul: 7, elite: { z: 0, hp: 100000, summon: true } }), { difficulty: d });
@@ -252,7 +252,7 @@ test('V3-DIFFB DB-7: 성공 경로 — planBoss 보통 1~24 전부 완주(봇 �
 const EV_RUNS = {};
 for (const d of DIFFS) for (const id of COURSE_IDS) EV_RUNS[d + ':' + id] = playPolicy(id, 'evLead', 14400, d);
 
-test('V3-DIFFB DB-7b: 4~24 성공 경로 — evLead 보통 4~24 전부 완주(정예 전 조작이 있는 봇 — 사람 성공률 아님) · 최고 병력 ≤ 100 · 어려움/지옥 완주 수는 기록하되 어려움 ≥ 지옥(난이도 순서)', (t) => {
+test('V3-DIFFB DB-7b: 4~24 성공 경로 — evLead 보통(배수 1 줄) 4~24 전부 완주(정예 전 조작이 있는 봇 — 사람 성공률 아님) · 최고 병력 ≤ 100 · 지옥(기본 줄) 완주 수는 기록(r4.2: 어려움 칸과 "어려움 ≥ 지옥" 단언 삭제)', (t) => {
   const tally = {};
   for (const d of DIFFS) {
     tally[d] = 0;
@@ -266,9 +266,8 @@ test('V3-DIFFB DB-7b: 4~24 성공 경로 — evLead 보통 4~24 전부 완주(�
       if (d === 'normal') assert.equal(r.run.won, true, `보통 S${id} evLead 미완주(병력 ${r.run.units.length}, 정예 잔여 ${bossLeft})`);
     }
   }
-  t.diagnostic(`DIFFB evLead 4~24 완주: 보통 ${tally.normal}/21 · 어려움 ${tally.hard}/21 · 지옥 ${tally.brutal}/21`);
+  t.diagnostic(`DIFFB evLead 4~24 완주: 보통(배수 1 줄) ${tally.normal}/21 · 지옥(기본 줄) ${tally.brutal}/21`);
   assert.equal(tally.normal, 21);
-  assert.ok(tally.hard >= tally.brutal, `어려움 ${tally.hard} < 지옥 ${tally.brutal}`);
   //  evLead 는 정예 전에 무입력보다 병력을 더 모은다(설계 의도대로 게이트를 올린 결과): 보통 4~24 의 peak 합
   const peak = (p) => COURSE_IDS.reduce((a, id) => a + (p === 'evLead' ? EV_RUNS['normal:' + id] : NORMAL_BOSS.find(([i]) => i === id)[1]).run.peak, 0);
   assert.ok(peak('evLead') > peak('planBoss'), `evLead peak 합 ${peak('evLead')} ≤ planBoss ${peak('planBoss')}`);

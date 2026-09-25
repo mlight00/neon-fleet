@@ -1,8 +1,9 @@
 // rush3/save.js — rush/save.js 복제(계약서 7장). 단일 키 localStorage, storage 주입으로 Node 테스트 가능.
 //  starforgeRush.v1 은 읽지도 쓰지도 않는다. 손상 원문은 .bak 에 보존 후 기본값.
-//  최상위 필드: lastStage · difficulty(타이틀에서 마지막으로 고른 난이도) · volume · mute · seenShutter(첫 셔터 안내를 봤는가) · seenVehicle(첫 차량 안내를 봤는가, r3.13).
+//  최상위 필드: lastStage · difficulty(r4.2 부터 읽지 않는 칸 — 아래 PICK_DEFAULT) · volume · mute · seenShutter(첫 셔터 안내를 봤는가) · seenVehicle(첫 차량 안내를 봤는가, r3.13).
 //  스테이지 기록은 stageId + stageVersion + 난이도로 묶는다: stages[id].versions[key] = { cleared, attempts, bestSurvivors, bestTime, rescued?: true, bestBonus?: 수 }.
 //   key = `${version}`(보통 normal — 접미 없음, 옛 기록 그대로) | `${version}:${difficulty}`(어려움·지옥). 계약서 7장·3-8.
+//   r4.2(난이도 선택 삭제): 게임 화면은 늘 `${version}:brutal` 칸에 쓴다(종전 새 사용자 기본 선택 = 지옥이라 같은 칸). 옛 보통·어려움 칸('2', '2:hard')은 지우지 않고 보존만 한다.
 //  코스 배치를 고치면(stages.js 의 version 상향) 새 버전 칸에 따로 쌓이므로 옛 기록과 섞이지 않는다. 난이도도 같은 원리로 칸이 갈린다.
 //  구 저장(stages[id] 에 기록이 바로 있던 형식)은 지우지 않고 버전 1 로 귀속시킨다(마이그레이션).
 export const KEY3 = 'starforgeRush.v3';
@@ -98,7 +99,9 @@ function mergeStage(cur, inc) {
   return { versions };
 }
 
-//  저장에 난이도가 없을 때의 초기 선택 = 지옥(id brutal, 2026-09-16 이사 결정). 기록 접미 규칙의 기준(BASE_DIFFICULTY=normal)과는 다른 값이다
+//  difficulty = 종전 '타이틀에서 마지막으로 고른 난이도' 자리(초기 선택 = 지옥 brutal, 2026-09-16 이사 결정).
+//   r4.2(2026-09-25)에서 난이도 선택이 사라져 **읽지 않는다** — normalize 가 옛 값('normal'·'hard' 등)을 옮기지 않아 늘 'brutal'(= 셸의 출격 줄과 같은 값).
+//   칸은 형식 호환용으로만 남긴다(v: 3 유지) — zoom(r4.1)과 같은 처리. 기록 접미 규칙의 기준(BASE_DIFFICULTY=normal)과는 다른 값이다
 const PICK_DEFAULT = 'brutal';
 //  seenShutter = 첫 셔터 조우 배너를 이미 본 적이 있는가(계약서 6장 N2-⑥). 판이 아니라 **사용자당 1회**라 저장에 남는다
 //  seenVehicle(r3.13) = 첫 차량 통 조우 배너를 본 적이 있는가 — seenShutter 와 같은 꼴(사용자당 1회). 스키마 v 는 3 그대로(빠진 키는 기본값)
@@ -110,8 +113,7 @@ function normalize(d) {
   const out = defaults();
   for (const [id, st] of Object.entries(d.stages)) out.stages[id] = normStage(st);
   out.lastStage = typeof d.lastStage === 'string' || Number.isFinite(d.lastStage) ? d.lastStage : null;
-  //  마지막으로 고른 난이도(형식만 검사 — 실제 id 판정은 셸이 DIFFICULTY_IDS 로 한다)
-  out.difficulty = typeof d.difficulty === 'string' && d.difficulty ? d.difficulty : PICK_DEFAULT;
+  //  r4.2: difficulty 는 옮기지 않는다(defaults 의 PICK_DEFAULT 그대로) — 옛 저장의 마지막 선택이 무엇이든 읽지 않는다
   out.volume = Math.max(0, Math.min(1, num(d.volume, 1)));
   out.mute = d.mute === true;
   out.seenShutter = d.seenShutter === true;

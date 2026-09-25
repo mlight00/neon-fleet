@@ -168,8 +168,8 @@ test('V3-ARMGUARD AG-5: 보호막 흡수 — 첫 충격 전 탄은 bossGuard 로
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-test('V3-ARMGUARD AG-6: 최소 1회 돌진 보장(봇 실측) — 10·11·24 × 보통/어려움/지옥 × center/planBoss 에서 첫 bossShock 이 bossKill 보다 먼저(또는 보스가 죽지 않고 패배), planBoss 보통은 전부 승리', (t) => {
-  for (const id of ARENA_IDS) for (const diff of ['normal', 'hard', 'brutal']) for (const pol of ['center', 'planBoss']) {
+test('V3-ARMGUARD AG-6: 최소 1회 돌진 보장(봇 실측) — 10·11·24 × 보통/지옥(r4.2 두 줄 — 어려움 삭제) × center/planBoss 에서 첫 bossShock 이 bossKill 보다 먼저(또는 보스가 죽지 않고 패배), planBoss 보통은 전부 승리', (t) => {
+  for (const id of ARENA_IDS) for (const diff of ['normal', 'brutal']) for (const pol of ['center', 'planBoss']) {
     const run = createRun(buildStage(id, { difficulty: diff }));
     let t0 = null, shock = null, kill = null, guardOff = null;
     for (let i = 0; i < 14400 && !run.over; i++) {
