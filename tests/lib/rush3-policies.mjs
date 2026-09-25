@@ -185,9 +185,10 @@ export function pickX(policy, run) {
 export const DPS = { rifle: 2, auto: 4, heavy: 5 };
 
 /** 한 판. 상한 14,400 STEP(4분). 반환 = { run, opened, gates, events }. difficulty 생략 = normal(종전과 같은 판)
- *  lotterySeed 생략 = stages.LOTTERY_DEFAULT_SEED(랜덤 길 기준선) — 기존 24판·27판 검사는 그대로 이 경로를 쓴다. */
-export function playPolicy(id, policy, maxSteps = 14400, difficulty = 'normal', lotterySeed) {
-  const run = createRun(buildStage(id, { difficulty, lotterySeed }));
+ *  lotterySeed 생략 = stages.LOTTERY_DEFAULT_SEED(랜덤 길 기준선) — 기존 24판·27판 검사는 그대로 이 경로를 쓴다.
+ *  runOpts(r4.4) = createRun 옵션(heroGuard·up 등). 생략 = 옵션 없이 만든 판(종전과 같은 판 — 기존 검사는 전부 이 경로) */
+export function playPolicy(id, policy, maxSteps = 14400, difficulty = 'normal', lotterySeed, runOpts) {
+  const run = createRun(buildStage(id, { difficulty, lotterySeed }), runOpts);
   const opened = [], gates = [], events = {};
   let steps = 0;
   while (!run.over && steps < maxSteps) {

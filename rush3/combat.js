@@ -56,7 +56,10 @@ export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY, hpMul = 1, difficu
 // 벽·스폰·정예 정의는 stage 것을 그대로 보유(buildStage 가 매번 새 객체라 복사 불필요).
 //  난이도: 기본은 stage.difficulty(buildStage 가 박는다). opts.difficulty 는 합성 스테이지(검사)용 덮어쓰기 — 셸은 항상 buildStage 경로만 쓴다.
 //  startWeapon/startMk(r3.10): 합성 스테이지·개발 확인용 시작 무기 덮어쓰기. 셸은 URL ?weapon= 로만 넘긴다(기록 저장 제외)
-export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
+//  heroGuard(r4.4, 기본 false): 메인 로봇 보호 규칙을 켠다 — ① 음수 게이트·랜덤 길 함정이 hero 를 빼지 않는다(이사님 결정 D4′-a 원안)
+//   ② hp > 0 호위가 있는 동안 hero 가 받을 적 피해를 가장 가까운 호위 1명에게 한 번만 넘긴다(D4′-b). **게임 화면(셸)만 true 를 넘긴다** —
+//   옵션 없이 부르는 규칙 검사·봇은 종전 판 그대로다. 판을 만들 때 한 번 정해지고 STEP 은 run.heroGuard 만 읽는다
+export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard = false } = {}) {
   const weapon = WEAPONS[startWeapon] ? startWeapon : (WEAPONS[stage.startWeapon] ? stage.startWeapon : 'rifle');
   const weaponMk = clampMk(startMk ?? 1);
   const diff = difficulty ?? stage.difficulty ?? DEFAULT_DIFFICULTY;
@@ -88,6 +91,9 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
     bossPhases: stage.bossPhases ?? true,
     z: 0, prevZ: 0, x: ROAD.startX, tx: ROAD.startX,
     units: [], nextUnitId: 1,
+    //  메인 로봇(r4.4): 첫 유닛에 hero 표시(아래 생성 직후 — 희소 필드, 병사에는 키가 없다). 그림·강화·보호는 모두 이 표시를 본다(배열 0번이 아니라).
+    //   heroGuard = 보호 규칙 켬(위 옵션) · heroShield = 보호막이 켜져 있는가(hp > 0 호위 ≥ 1, STEP 끝 guardStep 이 갱신 — 그림·연출용)
+    heroGuard: !!heroGuard, heroShield: false,
     weapon, weaponMk,
     bullets: [],
     gateRows: (stage.gateRows || []).map(makeGateRow),
@@ -126,9 +132,36 @@ export function createRun(stage, { difficulty, startWeapon, startMk } = {}) {
   };
   const interval = weaponStats(weapon, weaponMk).interval;
   for (let i = 0; i < (stage.startUnits | 0); i++) run.units.push(makeUnit(run.nextUnitId++, interval));
+  //  r4.4 hero 표시: 첫 유닛(id 1). 배열 0번 = 대형 중심(0,0) 자리이고, 증원은 뒤에 붙고(addUnits) 제거·정리는 순서를 지키므로(removeUnits·pruneDeadUnits)
+  //   hero 가 살아 있는 동안은 늘 0번 = 부대 중심이다. 규칙이 hero 를 읽는 곳은 heroGuard 가 켜진 판뿐이다(끈 판에서는 표시만 있고 판정은 종전 그대로)
+  if (run.units.length) run.units[0].hero = true;
   layoutUnits(run.units);
   run.peak = run.units.length;
+  run.heroShield = shieldUp(run);
   return run;
+}
+
+//  ── 메인 로봇 보호(r4.4, 이사님 결정 D4′-b = 적 피해 이전 채택, 기획 v4.1 3-5 (다)) ───────────────────────────────
+//  보호막이 켜져 있는가 = heroGuard 이고 hp > 0 인 hero 와 hp > 0 인 호위(hero 가 아닌 유닛)가 1명 이상. 끈 판은 늘 false
+function shieldUp(run) {
+  if (!run.heroGuard) return false;
+  let hero = false, escort = false;
+  for (const u of run.units) {
+    if (u.hp <= 0) continue;
+    if (u.hero) hero = true; else escort = true;
+  }
+  return hero && escort;
+}
+/** hero 가 받을 피해를 대신 받을 호위: hero 와 가장 가까운 hp > 0 호위 1명(거리 제곱 — 대형 오프셋이 정수라 비교가 정확하다), 거리가 같으면 id 가 큰 쪽.
+ *  skip(Set)에 든 유닛은 고르지 않는다(착지 충격 = 원 안 유닛). 없으면 null. 난수 없음(파일 첫 줄 원칙) */
+export function guardEscort(units, hero, skip = null) {
+  let best = null, bd = Infinity;
+  for (const u of units) {
+    if (u === hero || u.hero || u.hp <= 0 || (skip && skip.has(u))) continue;
+    const dx = u.dx - hero.dx, dy = u.dy - hero.dy, d = dx * dx + dy * dy;
+    if (d < bd || (d === bd && u.id > best.id)) { best = u; bd = d; }
+  }
+  return best;
 }
 
 // 누적 이벤트를 한 번에 비운다(프레임당 STEP 여러 번이어도 유실 없음)
@@ -160,6 +193,7 @@ export function stepRun(run, input, dt = STEP) {
   pruneDeadUnits(run, ev);
   applyRewards(run, ev);
   cleanup(run, ev);
+  guardStep(run, ev);
   verdict(run, ev);
   return run;
 }
@@ -581,10 +615,13 @@ function arenaBossAct(run, bo, ev, dt) {
 
 //  착지 충격(r3.17): 충격 원(bo.x, bo.z, shock.r)과 겹치는 유닛 전부 hp −dmg(cause 'shock'). 이벤트 bossShock { x, z, r, hits }
 //  r3.18: 첫 충격 STEP 에 보호막 해제(bossShock 뒤 bossGuardOff 1회) — 그 STEP 의 탄(5단계)은 이미 흡수됐고 다음 STEP 부터 맞는다
+//  r4.4 heroGuard: 로봇이 원 안이면 로봇 몫을 **원 밖**의 가장 가까운 hp > 0 호위에게 넘긴다(원 안 호위는 제 몫을 받으므로 후보에서 뺀다 —
+//   원 안 호위에게 넘기면 그 호위가 두 번 맞아 손실이 한 명 줄어든다). 원 밖 호위가 없으면 로봇이 맞는다. 충격 피해 ≥ 병사 체력이면 손실 인원 수는 이전 전후가 같다
 function arenaShock(run, bo, ev) {
   const S = run.arena.boss.shock;
   const hits = overlappingUnits(run.units, bo.x, bo.z, S.r, null, squadOrigin(run));
-  for (const u of hits) damageUnit(run, u, S.dmg, 'shock', ev, bo.x, bo.z);
+  const inside = run.heroGuard ? new Set(hits) : null;
+  for (const u of hits) damageUnit(run, u, S.dmg, 'shock', ev, bo.x, bo.z, inside);
   ev.push({ type: 'bossShock', x: bo.x, z: bo.z, r: S.r, hits: hits.length });
   if (bo.guard) { bo.guard = false; ev.push({ type: 'bossGuardOff', id: bo.id, x: bo.x, z: bo.z }); }
 }
@@ -676,7 +713,19 @@ function segHitsRect(ax, az, bx, bz, w) {
 }
 
 // 유닛 피해. hp <= 0 이면 원인별 손실 집계(제거는 pruneDeadUnits)
-function damageUnit(run, u, dmg, cause, ev, x, z) {
+//  r4.4 피해 이전(heroGuard, 이사님 결정 D4′-b): 맞은 유닛이 hero 이고 hp > 0 호위가 있으면 피해를 guardEscort(가장 가까운 호위 1명)가 대신 받는다.
+//   한 건을 한 번만 넘긴다 — 받는 쪽은 hero 가 아니므로 다시 넘어가지 않는다. 한 STEP 여러 발은 부르는 순서대로 하나씩(앞 발에 쓰러진 호위는 hp ≤ 0 이라 다음 발 후보에서 빠진다).
+//   손실 원인(cause)·피해 자리(x, z)는 원래 피해원 그대로. 이전이 일어나면 이벤트 heroGuard { cause, heroId, unitId, x, z(로봇 자리), tx, tz(대신 받은 호위 자리) } — 셸이 빛줄기를 그린다.
+//   skip = 대상에서 뺄 유닛(착지 충격의 원 안 유닛). 끈 판(heroGuard false)은 종전과 같은 한 경로
+function damageUnit(run, u, dmg, cause, ev, x, z, skip = null) {
+  if (run.heroGuard && u.hero) {
+    const e = guardEscort(run.units, u, skip);
+    if (e) {
+      const oz = squadZ(run);
+      ev.push({ type: 'heroGuard', cause, heroId: u.id, unitId: e.id, x: run.x + u.dx, z: oz - u.dy, tx: run.x + e.dx, tz: oz - e.dy });
+      u = e;
+    }
+  }
   u.hp -= dmg;
   ev.push({ type: 'hurt', n: dmg, cause, unitId: u.id, x, z });
   if (u.hp <= 0) {
@@ -795,6 +844,19 @@ function cleanup(run, ev) {
   //   ⚠️적탄의 ahead 정리는 **위로 나는 탄(vz < 0)** 에만 — 도로 저격수는 화면 밖 위(z ≤ run.z + 760)에서 아래로 쏘므로 종전 조건 그대로 둬야 한다
   run.eshots = run.eshots.filter((s) => !s.dead && s.z >= behind && (s.vz >= 0 || s.z <= ahead) && s.x > -40 && s.x < 520);
   if (run.units.length > run.peak) run.peak = run.units.length;
+}
+
+// 10-b단계 보호막(r4.4 heroGuard): 게이트 처리(9단계)·정리(10단계) 뒤, 승패 판정 앞에 hp > 0 호위 수로 켜짐·꺼짐을 다시 본다.
+//  바뀐 STEP 에만 이벤트 heroGuardOn / heroGuardOff { x, z }(로봇 자리 — 로봇이 없으면 부대 중심) 1회 — 셸이 고리가 깨지는 연출을 한다.
+//  게이트가 마지막 호위를 빼는 경우도 여기서 잡힌다. 끈 판은 아무것도 하지 않는다(이벤트 없음)
+function guardStep(run, ev) {
+  if (!run.heroGuard) return;
+  const on = shieldUp(run);
+  if (on === run.heroShield) return;
+  run.heroShield = on;
+  const h = run.units.find((u) => u.hero);
+  const oz = squadZ(run);
+  ev.push({ type: on ? 'heroGuardOn' : 'heroGuardOff', x: run.x + (h ? h.dx : 0), z: oz - (h ? h.dy : 0) });
 }
 
 // 11단계 승패: 승리 우선. 정예 스테이지 = 정예 격파 && 적 없음, 아니면 z >= length && 적 없음. 패배 = 유닛 0

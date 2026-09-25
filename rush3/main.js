@@ -7,7 +7,7 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR } from './render.js';
 import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
 import { createAudio3 } from './audio.js';
@@ -309,8 +309,13 @@ export function makeFx() {
            heroFire: 0, heroWalk: 0, enemyHit: {}, corpses: [],
            //  손맛(r3.24): hit = { 적 id: { t 경과 초, dir, role, n 연속 피격 수, dmgF 떠 있는 '-n' } } · booms = 보스 다단 폭발 예약(규칙 좌표) ·
            //   recruits = 부대로 날아가는 병사(규칙 좌표 출발점 + 이번 프레임 화면점 sx/sy/s)
-           hit: {}, booms: [], recruits: [] };
+           hit: {}, booms: [], recruits: [],
+           //  r4.4 메인 로봇 보호: beams = 피해 이전 빛줄기 [{ x0, y0, x1, y1, t, life }](만드는 시점에 투영한 화면 좌표, 로봇 → 대신 맞은 호위)
+           beams: [] };
 }
+
+//  r4.4 피해 이전 빛줄기 수명(초)·보호막이 깨질 때 조각 수
+const BEAM_SEC = 0.3, SHIELD_SHARDS = 10;
 
 //  쓰러진 적 등록(kill·touch 공통). 규칙은 이미 enemies 에서 뺐으므로 위치만 셸이 기억한다.
 //  r3.24: 잡졸만이 아니라 모든 적 — kind·skin·r·역할(role)과 머무는 시간(life)을 싣는다. 잡졸 = 사망 시트 + 머묾, 나머지 = 역할별 deathSec
@@ -386,6 +391,8 @@ function chosenLine(run, lot, out, weaponSame) {
   if (lot.kind === 'gate') {
     if (!out || !out.passed) return '랜덤 길: 꽝 ' + lot.label;
     //  쏴서 0 까지 올린 판 = 위험을 막아낸 판이다. '꽝'으로 적으면 잘한 것을 잘못 전한다
+    //  r4.4 메인 로봇 보호(D4′-a): 로봇 혼자 음수 칸을 지나면 빠지는 병사가 없어 applied 0 이지만 칸 값은 음수다 — '무력화'가 아니다
+    if (out.applied === 0 && out.value < 0) return '랜덤 길: 함정 통과 · 로봇은 빠지지 않음';
     return out.applied === 0 ? '랜덤 길: 위험 게이트 무력화 · 손실 0'
                              : '랜덤 길: 함정 피해 −' + (-out.applied) + '명';
   }
@@ -432,6 +439,25 @@ export const ALL_CLEAR_LINE = '모든 작전 완료 — 24개 작전을 전부 �
 //  결과 화면 [로봇 강화] 자리(⑤단계에서 넣는다 — 이번엔 자리만 비워 둔다. 셸·렌더 모두 이 상자에 아무것도 그리지 않는다):
 //   [스테이지 선택] 바로 아래(dy 52) 같은 폭 — 승리 y 672 · 패배·포기 y 604(랜덤 길 판은 부연 22px 만큼 더 아래). 화면 높이 800 안이다
 export const RESULT_UPGRADE_SLOT = Object.freeze({ x: 120, dy: 52, w: 240, h: 44 });
+
+//  ── r4.4 v4 기록 칸(이사님 결정 D9′ = (가) v4 기록 칸 신설, 기획 v4.1 3-6) ─────────────────────────────────────────
+//  v4 판(셸 출격 — 메인 로봇 보호·강화가 켜진 판)의 기록은 새 접미 칸 `${버전}:v4` 에 쌓는다(save.js KEY_RE 가 이미 받는다).
+//   옛 지옥 칸 `${버전}:brutal` 은 지우지 않고 스테이지 선택 화면에 '이전 기록'으로 흐리게 병기한다. 해금 계산(모든 칸의 cleared)은 v4 칸도 저절로 센다
+export const REC_SLOT_V4 = 'v4';
+export const PREV_REC_SLOT = 'brutal';
+//  기록마다 붙이는 강화 스냅샷의 규칙 버전(3-6 '규칙 버전을 함께 저장')
+export const REC_RULE = 'v4';
+/** 이 판의 강화 스냅샷 { power, rate, multi, rule } — 규칙 run 이 판을 만들 때 받은 단계(run.up, 없으면 0). 셸은 run 을 읽기만 한다 */
+export function upSnapshot(run) {
+  const u = (run && run.up) || {};
+  const lv = (v) => (Number.isFinite(v) ? Math.max(0, Math.trunc(v)) : 0);
+  return { power: lv(u.power), rate: lv(u.rate), multi: lv(u.multi), rule: REC_RULE };
+}
+/** 스테이지 선택 칸의 '이전 기록' 한 줄(옛 지옥 칸을 이긴 적이 있을 때만, 순수). 없으면 null */
+export function prevRecordLine(st) {
+  if (!st || st.cleared !== true) return null;
+  return '이전 기록 ' + (st.bestSurvivors | 0) + '명 · ' + timeText(st.bestTime || 0);
+}
 
 /** 해금 범위 = 1번부터 **연속으로** 이긴 판 수 + 1(순수). wonIds = 이긴 판 번호 집합, ids = 공개 판 번호 목록(ALL_STAGE_IDS 순서).
  *  중간에 빈 판이 있으면 그 앞까지만 열린다(N2 '엄격'). 새 저장 = 1. 반환 = 열린 마지막 판 번호(ids 범위 안) */
@@ -504,6 +530,11 @@ export function boot(canvas, deps = {}) {
   //   deps.difficulty 는 **검사 전용 주입**이다(save·audio·sprites 주입과 같은 결 — 실제 페이지의 boot(#game3)는 넘기지 않는다).
   //   종전 app.setDifficulty('normal') 로 배수 1 줄 판을 돌리던 셸 검사(보너스·캡슐·광장·복수 정예·손맛)의 기대값이 바뀌지 않게 남긴 자리다
   const difficulty = deps.difficulty ?? PLAY_DIFFICULTY;
+  //  r4.4 기록 칸(D9′): 게임 화면의 출격은 늘 v4 칸(`버전:v4`)에 쓴다. deps.difficulty(검사 전용 주입 — 배수 1 줄 판을 돌리던 셸 검사)를 넘긴 경우만
+  //   종전처럼 그 줄의 칸에 쓴다(그 검사들의 '옛 칸' 기대값을 바꾸지 않게 — 실제 페이지의 boot(#game3)는 넘기지 않는다)
+  const recSlot = deps.difficulty !== undefined ? difficulty : REC_SLOT_V4;
+  //  r4.4 메인 로봇 보호(D4′-a·D4′-b): 게임 화면은 늘 켠다. deps.heroGuard 는 검사 전용 주입(끈 판의 셸 동작을 볼 때)
+  const heroGuard = deps.heroGuard ?? true;
   const loop = makeLoop({ step: STEP, onStep: () => { stepRun(run, input.snapshot(), STEP); } });
 
   //  DPR 반영: 백킹스토어 = CSS 크기 × min(devicePixelRatio, 2)
@@ -582,17 +613,18 @@ export function boot(canvas, deps = {}) {
     notice = null;
     //  랜덤 길 시드는 **판마다** 다르다(계약서 3-9 = '재도전 동일 배치' 원칙의 명시적 예외).
     //   시계는 셸에만 둔다 — 규칙 계층(stages.buildStage)은 인자로 받은 시드로 mulberry32 를 한 번 돌릴 뿐이다.
-    const tries = save.getStage(id, stageVersion(id), difficulty).attempts || 0;
+    const tries = save.getStage(id, stageVersion(id), recSlot).attempts || 0;
     const lotterySeed = hashSeed('lot:' + id + ':' + tries + ':' + dateNow());
     const stage = buildStage(id, { difficulty, lotterySeed });
     //  개발 확인용 시작 무기(r3.10): rush3.html?weapon=scatter&mk=2 — 규칙엔 startWeapon/startMk 로만 들어가고, 이 판은 기록에 남기지 않는다
     const devStart = devStartWeapon();
-    run = createRun(stage, devStart);
+    //  r4.4: 메인 로봇 보호 규칙(heroGuard)은 셸만 켠다 — 규칙 모듈 기본값은 꺼짐(옵션 없이 부르는 검사·봇은 종전 판)
+    run = createRun(stage, { ...devStart, heroGuard });
     run.devWeapon = !!devStart.startWeapon || PROTO_IDS.includes(id) || devPass;
     //  랜덤 길 실제 결과 집계(계약서 3-9 결과 문구). 규칙이 아니라 셸이 갖는 칸이다 — 규칙 모듈은 lottery 를 모른다
     run.lotteryOutcome = run.lottery ? emptyLotteryOutcome() : null;
-    //  기록은 stageId + 코스 버전 + 난이도로 묶는다(run.stageVersion = stage.version, run.difficulty = stage.difficulty)
-    const ver = run.stageVersion, diff = run.difficulty;
+    //  기록은 stageId + 코스 버전 + 기록 칸(r4.4 — v4 칸 `버전:v4`, 검사 주입 줄이면 그 줄 칸)으로 묶는다
+    const ver = run.stageVersion, diff = recSlot;
     fx = makeFx();
     result = null;
     overT = -1;
@@ -704,7 +736,7 @@ export function boot(canvas, deps = {}) {
   //   finishRun 은 그 표식을 읽어 결과 화면에 쓴다(쓴 뒤 다시 비교하면 자기 기록과 같아져 '신기록!' 이 사라진다). devWeapon 판은 종전대로 저장하지 않는다
   function commitMain(run) {
     if (run.mainRecord) return run.mainRecord;
-    const id = run.stageId, ver = run.stageVersion, diff = run.difficulty;
+    const id = run.stageId, ver = run.stageVersion, diff = recSlot;
     const cur = save.getStage(id, ver, diff);
     //  생존·시간은 **본전투 확정값**(run.mainResult·wonAt — 보너스 구간은 기록에 섞지 않는다). 없으면(옛 run·검사가 won 만 세운 판) 지금 run 값
     const mr = run.mainResult;
@@ -712,7 +744,12 @@ export function boot(canvas, deps = {}) {
     const time = run.wonAt ?? run.time;
     //  best = 성공 판의 최다 생존·최단 시간(각각 독립)
     const isBest = survivors > (cur.bestSurvivors || 0);
+    const isBestTime = !(cur.bestTime > 0) || time < cur.bestTime;
     const patch = { cleared: true, bestSurvivors: Math.max(cur.bestSurvivors || 0, survivors), bestTime: cur.bestTime > 0 ? Math.min(cur.bestTime, time) : time };
+    //  r4.4 강화 스냅샷(D9′, 3-6): 최다 생존 신기록이면 survUp, 최단 시간 신기록이면 timeUp 을 **각각** 그 기록과 함께 보낸다(그때의 강화 단계 + 규칙 버전).
+    //   신기록이 아닌 쪽은 보내지 않는다 — save.mergeStage 도 자기 기록이 좋아질 때만 스냅샷을 바꾼다
+    if (isBest) patch.survUp = upSnapshot(run);
+    if (isBestTime) patch.timeUp = upSnapshot(run);
     //  구출 기록(r3.14): true 일 때만 쓴다(희소 필드 — false 는 절대 쓰지 않는다). 본전투 안에서 정해지므로 승리 확정과 함께 쓴다
     if (run.objective && run.objective.done) patch.rescued = true;
     if (!run.devWeapon) save.updateStage(id, patch, ver, diff);
@@ -722,7 +759,7 @@ export function boot(canvas, deps = {}) {
 
   //  opts(r4.3): aborted = 포기(작전 중단 — 승패 없음, 코인은 giveUp 이 먼저 정산) · bonusCut = 보너스 도중 포기(보너스 점수·bestBonus 를 버린다)
   function finishRun(opts = {}) {
-    const id = run.stageId, ver = run.stageVersion, diff = run.difficulty;
+    const id = run.stageId, ver = run.stageVersion, diff = recSlot;
     const won = !!run.won;
     const aborted = !!opts.aborted;
     //  승리 판의 본전투 기록은 'win' 프레임에 commitMain 이 이미 썼다(표식이 없으면 — 검사가 won/over 만 세운 판 — 여기서 쓴다). 패배 판은 cleared 유지·rescued 만
@@ -753,7 +790,7 @@ export function boot(canvas, deps = {}) {
     } : null;
     const nextId = won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null;
     result = {
-      stageId: id, stageVersion: ver, difficulty: diff, title: run.title, won, survivors, peak, time, timeText: timeText(time), kills,
+      stageId: id, stageVersion: ver, difficulty: run.difficulty, recordSlot: diff, title: run.title, won, survivors, peak, time, timeText: timeText(time), kills,
       //  다음 행동(3-9): 패배·포기 = adviceLine(가장 고칠 만한 원인), 승리 = advice.js 의 승리 문구
       missedLine: missedLine(run), advice: won ? ADVICE_DEFAULT.won : adviceLine(run, run), lottery: lotteryLine(run, { weaponSame: fx.lotSame }), isBest, saveOk: save.ok,
       nextId,
@@ -865,7 +902,8 @@ export function boot(canvas, deps = {}) {
         case 'gateFlip': fx.gateFlash[ev.id + ':' + ev.idx] = GATE_FLASH_SEC; fx.sfx.push(['gateFlip']); floaterAt(ev.x, run.gateRows.find((r) => r.id === ev.id)?.z ?? run.z, -40, '반전!', C.gatePos, true); break;
         case 'gatePass': {
           if (ev.idx < 0) { floaterSquad(-90, '우회', C.gateZero); break; }
-          const txt = ev.value > 0 ? '+' + ev.applied : ev.value < 0 ? '−' + (-ev.applied) : '0';
+          //  r4.4 메인 로봇 보호(D4′-a): 로봇 혼자 음수 칸을 지나면 빠지는 병사가 없다(applied 0) — '−0' 대신 '로봇 보호'
+          const txt = ev.value > 0 ? '+' + ev.applied : ev.value < 0 ? (ev.applied === 0 ? '로봇 보호' : '−' + (-ev.applied)) : '0';
           floaterSquad(-90, txt, ev.value > 0 ? C.gatePos : ev.value < 0 ? C.gateNeg : C.gateZero, true);
           //  양수 통과(r3.24): 병사 합류와 같은 꼴 — 부대 위 반짝임
           if (ev.value > 0 && ev.applied > 0) squadSparkle(C.gatePos);
@@ -892,6 +930,26 @@ export function boot(canvas, deps = {}) {
           floaterSquad(-90, '같은 무기', C.gateZero);
           break;
         case 'hurt': fx.shakeT = FX.shakeDur; fx.hurtT = FX.hurtFlashDur; fx.sfx.push(['hurt']); floaterAt(ev.x, ev.z, -10, '−' + ev.n, C.heroHurt); break;
+        //  r4.4 피해 이전(heroGuard): 로봇 → 대신 맞은 호위로 짧은 빛줄기(효과음은 같은 STEP 의 hurt 가 낸다 — 겹쳐 울리지 않게 따로 내지 않는다)
+        case 'heroGuard': {
+          const a = sp(ev.x, ev.z), b = sp(ev.tx, ev.tz);
+          fx.beams.push({ x0: a.x, y0: a.y - 14 * a.s, x1: b.x, y1: b.y - 6 * b.s, t: 0, life: BEAM_SEC });
+          break;
+        }
+        //  보호막이 꺼진 STEP(마지막 호위가 쓰러지거나 게이트로 빠짐): 로봇 둘레 고리가 깨진다 — 같은 색 링이 퍼지며 사라지고 조각이 흩어진다
+        case 'heroGuardOff': {
+          const q = sp(ev.x, ev.z);
+          fx.shocks.push({ x: q.x, y: q.y, r: 30 * q.s, t: 0, life: 0.35, color: HERO_RING_COLOR });
+          fx.burstSeed++;
+          for (let i = 0; i < SHIELD_SHARDS; i++) {
+            const an = (i / SHIELD_SHARDS) * Math.PI * 2 + fx.burstSeed * 0.5, v = 140 * q.s;
+            fx.parts.push({ x: q.x + Math.cos(an) * 24 * q.s, y: q.y + Math.sin(an) * 20 * q.s, vx: Math.cos(an) * v, vy: Math.sin(an) * v, t: 0, life: 0.4, r: 2.4 * q.s, color: HERO_RING_COLOR, shape: 'line' });
+          }
+          trimParts(fx);
+          fx.sfx.push(['gateClang']);
+          break;
+        }
+        case 'heroGuardOn': break;
         case 'unitLost': burstAt(ev.x, ev.z, 9, false, C.heroHurt); break;
         //  사망(r3.24): 종류별 연출(잡졸 파편 · 돌격체 굴러 넘어짐+먼지 · 저격수 마젠타 링 · 장갑체 장갑판+연기 · 카트 큰 폭발+약한 흔들림) + 잔해
         case 'kill': onEnemyDeath(fx, ev, sp); fx.sfx.push(['kill']); break;
@@ -987,6 +1045,8 @@ export function boot(canvas, deps = {}) {
     fx.arenaT = Math.max(0, (fx.arenaT ?? 0) - dt);
     for (const s of fx.shocks) s.t += dt;
     fx.shocks = fx.shocks.filter((s) => s.t < s.life);
+    for (const b of fx.beams) b.t += dt;
+    fx.beams = fx.beams.filter((b) => b.t < b.life);
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
     //  동작 시트 타이머: 사격이 끝나면 걷기 시간을 다시 센다 · 피격은 0 이하 삭제 · 쓰러진 잡졸은 재생+머묾이 끝나면 지운다
     fx.heroFire = Math.max(0, fx.heroFire - dt);
@@ -1043,21 +1103,24 @@ export function boot(canvas, deps = {}) {
       //  r4.3 순차 해금: 잠긴 판은 자물쇠·흐린 버튼(disabled — hitButton 이 건너뛴다). 안내('앞 판을 먼저 깨야 합니다')는 잠깐
       const lim = unlockedMax();
       v.notice = notice && notice.t > 0 ? notice.text : null;
-      //  r4.2: 난이도 토글 3칸을 지웠다(y 382 줄은 비워 둔다). 스테이지 버튼의 기록(sub)은 출격 줄(기본 = brutal) 칸의 기록 —
-      //   종전 새 사용자 기본 선택이 지옥이었으므로 같은 칸(`버전:brutal`)이 그대로 이어진다
+      //  r4.2: 난이도 토글 3칸을 지웠다(y 382 줄은 비워 둔다). r4.4: 스테이지 버튼의 기록(sub)은 v4 칸(`버전:v4`)의 기록이고,
+      //   옛 지옥 칸(`버전:brutal`)의 기록은 지우지 않고 '이전 기록'으로 흐리게 병기한다(prev)
       //  24스테이지(B-2): 한 페이지 8칸(2열×4행) + 페이지 넘김
       const pg = curTitlePage(), pages = titlePages();
       for (let i = 0; i < TITLE_PAGE; i++) {
         const id = ALL_STAGE_IDS[pg * TITLE_PAGE + i];
         if (id === undefined) break;
-        const m = stageMeta(id), st = save.getStage(id, stageVersion(id), difficulty);
+        //  r4.4(D9′): 칸 기록(sub) = v4 칸(검사 주입 줄이면 그 줄 칸). 옛 지옥 칸을 이긴 기록이 있으면 그 아래 작고 흐리게 '이전 기록'(prev)
+        const m = stageMeta(id), st = save.getStage(id, stageVersion(id), recSlot);
+        const prev = recSlot !== PREV_REC_SLOT ? prevRecordLine(save.getStage(id, stageVersion(id), PREV_REC_SLOT)) : null;
         //  구출 기록(r3.14)은 그 기록 칸에서 한 번이라도 구출했으면 어느 상태에든 덧붙인다(없던 필드는 false 로 읽힌다)
         const sub = (st.cleared ? '완료 · ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전')
           + (st.rescued === true ? ' · 구출✓' : '');
         const col = i % 2, row = Math.floor(i / 2);
         const locked = id > lim;
         v.buttons.push({ id: 'stage' + id, x: 60 + col * 184, y: TITLE_GRID.y + row * TITLE_GRID.dy, w: 176, h: TITLE_GRID.h, label: id + ' ' + m.title,
-          sub: locked ? '잠김' : sub, primary: last === id && !locked, small: true, ...(locked ? { disabled: true, locked: true } : {}) });
+          sub: locked ? '잠김' : sub, primary: last === id && !locked, small: true, ...(locked ? { disabled: true, locked: true } : {}),
+          ...(prev && !locked ? { prev } : {}) });
       }
       v.buttons.push({ id: 'pageL', x: 60, y: TITLE_GRID.pageY, w: 100, h: 40, label: '◀ 이전', small: true, primary: false, disabled: pg === 0 });
       v.buttons.push({ id: 'pageInfo', x: 168, y: TITLE_GRID.pageY, w: 144, h: 40, label: (pg + 1) + ' / ' + pages, small: true, primary: false });
@@ -1229,6 +1292,8 @@ export function boot(canvas, deps = {}) {
     recruits: fx.recruits.length, corpseRoles: fx.corpses.map((c) => c.role ?? 'grunt'), parts: fx.parts.length, booms: fx.booms.length,
     //  r4.3 코인·해금 관찰: 이번 판 누계(HUD 값)·보유 코인·열린 마지막 판·읽기 전용 탭·탭 id
     coins: run ? liveCoins() : null, wallet: save.wallet.get().coins, unlocked: unlockedMax(), readOnly: save.readOnly, tabId: tab.id,
+    //  r4.4 메인 로봇 관찰: hero(로봇이 살아 있는가) · heroShield(보호막 켜짐) · heroGuard(보호 규칙 켬)
+    hero: !!(run && run.units.some((u) => u.hero)), heroShield: !!(run && run.heroShield), heroGuard: !!(run && run.heroGuard),
   });
   if (win) win.__rush3Dbg = dbg;
 

@@ -181,11 +181,14 @@ export function frontmostUnit(units, filterFn) {
   return best;
 }
 
-/** n 명 제거(제자리 변경). from='back' = dy 큰 순, 'front' = dy 작은 순. 반환 제거된 수. layoutUnits 는 호출자 몫. */
-export function removeUnits(units, n, from = 'back') {
-  const cnt = Math.max(0, Math.min(units.length, n | 0));
+/** n 명 제거(제자리 변경). from='back' = dy 큰 순, 'front' = dy 작은 순. 반환 제거된 수. layoutUnits 는 호출자 몫.
+ *  keepHero(r4.4, 이사님 결정 D4′-a = 원안 '메인 로봇은 게이트·함정으로 절대 빠지지 않는다'): 참이면 hero 표시 유닛은 제거 후보에서 빠진다 —
+ *   병사만 같은 순서로 빼고, 감소량이 병력 이상이어도 hero 1명이 남는다(제거 수 = min(병사 수, n)). 거짓(기본)이면 종전과 한 글자도 다르지 않다 */
+export function removeUnits(units, n, from = 'back', keepHero = false) {
+  const all = units.map((u, i) => ({ u, i }));
+  const order = keepHero ? all.filter((e) => !e.u.hero) : all;
+  const cnt = Math.max(0, Math.min(order.length, n | 0));
   if (cnt === 0) return 0;
-  const order = units.map((u, i) => ({ u, i }));
   // 같은 dy 면 index 큰 쪽(나중 유닛)부터
   order.sort((a, b) => (from === 'front' ? a.u.dy - b.u.dy : b.u.dy - a.u.dy) || b.i - a.i);
   const drop = new Set(order.slice(0, cnt).map((e) => e.u));

@@ -95,6 +95,7 @@ export function hitGateCell(row, cell, bullet, events) {
 
 // prevZ < row.z <= z 인 STEP 에 중심 x 의 칸 1개만 적용. 행 단위 passed. 이벤트 gatePass { id, value, applied }.
 // 유닛 증감은 squad.js 직접: 양수 = addUnits(cap 클램프·layoutUnits 포함), 음수 = removeUnits(뒤에서) 후 layoutUnits.
+//  음수 칸은 run.heroGuard(r4.4)가 켜져 있으면 hero 를 빼지 않는다(applied = −실제로 뺀 병사 수).
 export function passGateRow(row, run, events) {
   if (row.passed) return false;
   if (!(run.prevZ < row.z && row.z <= run.z)) return false;
@@ -105,9 +106,11 @@ export function passGateRow(row, run, events) {
     value = cell.value;
     if (value > 0) applied = addUnits(run, value);
     else if (value < 0) {
-      const removed = removeUnits(run.units, -value, 'back');
+      //  r4.4 heroGuard(이사님 결정 D4′-a 원안): 메인 로봇(hero)은 음수 게이트·랜덤 길 함정으로 절대 빠지지 않는다 — 병사만 같은 순서('back')로 빼고
+      //   병력보다 큰 감소여도 로봇 1명이 남는다. 꺼져 있으면(기본·옵션 없이 만든 판) 종전 그대로
+      const removed = removeUnits(run.units, -value, 'back', !!run.heroGuard);
       layoutUnits(run.units);
-      applied = -removed;
+      applied = removed ? -removed : 0;   // 로봇 혼자 지나면 0(−0 이 아니게)
       run.lossByGate = (run.lossByGate || 0) + removed;
       run.badGatesPassed = (run.badGatesPassed || 0) + 1;
       //  결과 화면 제안(advice.js)이 '마지막으로 통과한 음수 게이트'를 정확히 짚게 하는 표식

@@ -1,9 +1,11 @@
 // rush3/save.js — rush/save.js 복제(계약서 7장). 단일 키 localStorage, storage 주입으로 Node 테스트 가능.
 //  starforgeRush.v1 은 읽지도 쓰지도 않는다. 손상 원문은 .bak 에 보존 후 기본값.
 //  최상위 필드: lastStage · difficulty(r4.2 부터 읽지 않는 칸 — 아래 PICK_DEFAULT) · volume · mute · seenShutter(첫 셔터 안내를 봤는가) · seenVehicle(첫 차량 안내를 봤는가, r3.13).
-//  스테이지 기록은 stageId + stageVersion + 난이도로 묶는다: stages[id].versions[key] = { cleared, attempts, bestSurvivors, bestTime, rescued?: true, bestBonus?: 수 }.
+//  스테이지 기록은 stageId + stageVersion + 난이도로 묶는다: stages[id].versions[key] = { cleared, attempts, bestSurvivors, bestTime, rescued?: true, bestBonus?: 수, survUp?: 스냅샷, timeUp?: 스냅샷 }.
 //   key = `${version}`(보통 normal — 접미 없음, 옛 기록 그대로) | `${version}:${difficulty}`(어려움·지옥). 계약서 7장·3-8.
 //   r4.2(난이도 선택 삭제): 게임 화면은 늘 `${version}:brutal` 칸에 쓴다(종전 새 사용자 기본 선택 = 지옥이라 같은 칸). 옛 보통·어려움 칸('2', '2:hard')은 지우지 않고 보존만 한다.
+//   r4.4(v4 기록 칸, 이사님 결정 D9′): 게임 화면은 이제 `${version}:v4` 칸에 쓴다(KEY_RE 가 이미 받는 접미 — 이 파일의 키 규칙은 그대로). 옛 `:brutal` 칸도 지우지 않는다.
+//    기록 칸에 희소 필드 survUp·timeUp(최다 생존·최단 시간 기록 때의 강화 스냅샷 { power, rate, multi, rule })이 더해졌다.
 //  코스 배치를 고치면(stages.js 의 version 상향) 새 버전 칸에 따로 쌓이므로 옛 기록과 섞이지 않는다. 난이도도 같은 원리로 칸이 갈린다.
 //  구 저장(stages[id] 에 기록이 바로 있던 형식)은 지우지 않고 버전 1 로 귀속시킨다(마이그레이션).
 //  r4.3(v4 ③단계): 코인 지갑은 **별도 키** WALLET_KEY(아래 '지갑'), 복수 탭 확인 표식은 TAB_KEY. v3 키의 형식(v: 3·defaults·normalize)은 그대로다.
@@ -16,7 +18,19 @@ const STAGE_DEFAULTS = Object.freeze({ cleared: false, attempts: 0, bestSurvivor
 //  rescued(r3.14 구출 캡슐) = 희소(sparse) 필드: **true 일 때만 존재·직렬화**하고 false 는 절대 쓰지 않는다. 기본값 4필드는 그대로라
 //   구출 전 getStage() 에는 키 자체가 없다(읽는 쪽은 === true 로 판정 = 없던 필드는 false). 옛 저장·다른 칸과 완전 호환
 //  bestBonus(r3.15 보너스전) = 희소 필드: **유한수일 때만** 존재·직렬화(보너스가 없는 스테이지·옛 기록엔 키가 없다). 병합은 max(신기록만 남는다)
-const REC_KEYS = ['cleared', 'attempts', 'bestSurvivors', 'bestTime', 'rescued', 'bestBonus'];
+//  survUp · timeUp(r4.4 v4 기록 칸, 이사님 결정 D9′, 기획 v4.1 3-6) = 희소 필드: 최다 생존 기록·최단 시간 기록을 **세웠을 때의** 강화 단계 스냅샷
+//   { power, rate, multi, rule }(rule = 규칙 버전 'v4'). 각 스냅샷은 **자기 기록과 함께만** 바뀐다(mergeStage) — 하나의 '강화 합계'만 두면 다른 판에서 세운 기록에 잘못 붙는다
+const REC_KEYS = ['cleared', 'attempts', 'bestSurvivors', 'bestTime', 'rescued', 'bestBonus', 'survUp', 'timeUp'];
+//  스냅샷 강화 단계 상한(트랙별 최대 단계)
+const UP_LIMIT = Object.freeze({ power: 5, rate: 5, multi: 3 });
+const RULE_RE = /^[a-z0-9][a-z0-9_-]{0,15}$/;
+/** 강화 스냅샷 정규화: 객체가 아니면 null(버림). 각 트랙 = 정수(버림) 0~상한, 숫자가 아니면 0. rule = 짧은 소문자 식별자, 아니면 'v4' */
+function normSnap(s) {
+  if (!isPlainObject(s)) return null;
+  const lv = (v, max) => (Number.isFinite(v) ? Math.max(0, Math.min(max, Math.trunc(v))) : 0);
+  return { power: lv(s.power, UP_LIMIT.power), rate: lv(s.rate, UP_LIMIT.rate), multi: lv(s.multi, UP_LIMIT.multi),
+           rule: typeof s.rule === 'string' && RULE_RE.test(s.rule) ? s.rule : 'v4' };
+}
 
 const isPlainObject = (o) => o !== null && typeof o === 'object' && !Array.isArray(o);
 const num = (v, d) => (Number.isFinite(v) ? v : d);
@@ -46,6 +60,10 @@ function normRec(s) {
   };
   if (src.rescued === true) out.rescued = true;
   if (Number.isFinite(src.bestBonus)) out.bestBonus = src.bestBonus;
+  //  r4.4 강화 스냅샷(희소): 객체일 때만 존재·직렬화(옛 기록·스냅샷 없는 칸엔 키가 없다)
+  const su = normSnap(src.survUp), tu = normSnap(src.timeUp);
+  if (su) out.survUp = su;
+  if (tu) out.timeUp = tu;
   return out;
 }
 
@@ -96,6 +114,16 @@ function mergeStage(cur, inc) {
     //  희소 신기록 필드 bestBonus: max 병합 — 낮은 점수 조각이 높은 기록을 덮지 않는다(유한수만 본다)
     const bb = [ra.bestBonus, rb.bestBonus].filter(Number.isFinite);
     if (bb.length) rec.bestBonus = Math.max(...bb);
+    //  r4.4 강화 스냅샷: **자기 기록과 함께만** 바뀐다. 조각의 스냅샷은 그 조각이 기록을 실제로 좋게 만들 때만 받는다 —
+    //   survUp = 조각의 bestSurvivors 가 지금보다 클 때, timeUp = 조각의 bestTime(> 0)이 지금 기록이 없거나 더 짧을 때.
+    //   그 밖의 조각(신기록 아님·기록 없이 스냅샷만·더 나쁜 기록)은 스냅샷을 바꾸지 못하고 지금 스냅샷이 남는다.
+    //   기록이 좋아졌는데 스냅샷이 없는 조각(옛 형식)이면 옛 스냅샷은 그 기록의 것이 아니므로 지운다
+    const survBetter = Number.isFinite(rb.bestSurvivors) && rb.bestSurvivors > num(ra.bestSurvivors, 0);
+    const timeBetter = Number.isFinite(rb.bestTime) && rb.bestTime > 0 && !(num(ra.bestTime, 0) > 0 && rb.bestTime >= ra.bestTime);
+    for (const [key, better] of [['survUp', survBetter], ['timeUp', timeBetter]]) {
+      const snap = normSnap(better ? rb[key] : ra[key]);
+      if (snap) rec[key] = snap; else delete rec[key];
+    }
     versions[k] = rec;
   }
   return { versions };

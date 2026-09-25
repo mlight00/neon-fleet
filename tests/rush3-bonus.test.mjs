@@ -416,7 +416,9 @@ test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결�
   assert.ok(h.texts.includes('작전 성공!'));
   assert.ok(h.texts.includes(r.mainResult.survivors + '명'), '생존 = 본전투 확정값');
   const rec = h.save.getStage(8, 3);
-  assert.deepEqual(rec, { cleared: true, attempts: 1, bestSurvivors: r.mainResult.survivors, bestTime: r.wonAt, bestBonus: r.bonus.score });
+  //  r4.4: 첫 승리 = 최다 생존·최단 시간 신기록 → 강화 스냅샷(셸이 넘긴 강화 단계 = 0, 규칙 'v4')이 각 기록과 함께 붙는다
+  const snap = { power: 0, rate: 0, multi: 0, rule: 'v4' };
+  assert.deepEqual(rec, { cleared: true, attempts: 1, bestSurvivors: r.mainResult.survivors, bestTime: r.wonAt, bestBonus: r.bonus.score, survUp: snap, timeUp: snap });
   assert.equal('bestBonus' in h.save.getStage(8, 3, 'brutal'), false);
   //  두 번째 판: bestBonus 는 max 로만 오르고, '신기록' 은 앞 판보다 높을 때만 붙는다(프레임 경계가 달라 점수는 조금 다를 수 있다 — STEP 결정성은 B-3)
   h.app.startRun(8);
@@ -438,7 +440,7 @@ test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결�
   assert.equal(r3.won, true); assert.equal(r3.over, false); assert.equal(h.app.getState(), 'run');
   const expSurv = Math.max(before.bestSurvivors, r3.mainResult.survivors), expTime = Math.min(before.bestTime, r3.wonAt);
   const atWin = h.save.getStage(8, 3);
-  assert.deepEqual(atWin, { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus }, '승리 확정 프레임에 본전투 기록이 이미 저장돼 있다(bestBonus 는 아직)');
+  assert.deepEqual(atWin, { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus, survUp: snap, timeUp: snap }, '승리 확정 프레임에 본전투 기록이 이미 저장돼 있다(bestBonus 는 아직)');
   assert.deepEqual(r3.mainRecord, { isBest: r3.mainResult.survivors > before.bestSurvivors, survivors: r3.mainResult.survivors, time: r3.wonAt }, '판당 1회 표식');
   driveUntil(h, 'planBoss', () => run().bonus.t >= 3, 600);
   assert.ok(run().bonus.t >= 3 && run().bonus.score > 0, '보너스 진행 중 점수 ' + run().bonus.score);
@@ -446,7 +448,7 @@ test('V3-BONUS B-8: 셸 결선 — S8 승리 확정 프레임에 state run(결�
   assert.equal(h.app.getState(), 'paused');
   h.app.toTitle();
   assert.equal(h.app.getState(), 'title'); assert.equal(h.app.getRun(), null);
-  assert.deepEqual(h.save.getStage(8, 3), { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus }, '나가도 확정된 승리·기록은 그대로, 미완 보너스 점수는 기록에 들어가지 않는다');
+  assert.deepEqual(h.save.getStage(8, 3), { cleared: true, attempts: 3, bestSurvivors: expSurv, bestTime: expTime, bestBonus: before.bestBonus, survUp: snap, timeUp: snap }, '나가도 확정된 승리·기록은 그대로, 미완 보너스 점수는 기록에 들어가지 않는다');
   assert.equal(h.app.dbg().state, 'title');
   //  보너스가 없는 판(1)은 dbg 가 종전 꼴
   h.app.startRun(1);

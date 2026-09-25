@@ -349,9 +349,10 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   //  타이틀 버튼 클릭(스테이지 1): 논리 좌표 = 캔버스 CSS 240×400 이므로 절반 배율
   tapStage1(canvas);
   assert.equal(app.getState(), 'run');
-  //  기록은 코스 버전 + 출격 줄 칸에 쌓인다 — r4.2: 게임 화면은 늘 기본 줄(brutal)로 출격하므로 `${ver}:brutal` 칸이다(종전 새 사용자 초기 선택 = 지옥과 같은 칸)
+  //  기록은 코스 버전 + 기록 칸에 쌓인다 — r4.2: 게임 화면은 늘 기본 줄(brutal)로 출격한다. r4.4 재기준(이사님 결정 D9′): 기록은 새 v4 칸 `${ver}:v4`
   assert.equal(app.getRun().difficulty, 'brutal', '게임 화면의 출격 줄 = 기본 줄(brutal)');
-  assert.equal(save.getStage(1, stageVersion(1), 'brutal').attempts, 1, '출격 때 attempts +1');
+  assert.equal(save.getStage(1, stageVersion(1), 'v4').attempts, 1, '출격 때 attempts +1(v4 칸)');
+  assert.equal(save.getStage(1, stageVersion(1), 'brutal').attempts, 0, '옛 지옥 칸은 건드리지 않는다');
   assert.equal(save.getStage(1, stageVersion(1)).attempts, 0, 'normal 칸은 건드리지 않는다');
   assert.equal(save.get().lastStage, 1);
   frames(60);
@@ -379,7 +380,7 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
     frames(1);
   }
   assert.equal(app.getState(), 'result', 'guard=' + guard + ' dbg=' + JSON.stringify(app.dbg()));
-  const st = save.getStage(1, stageVersion(1), 'brutal');
+  const st = save.getStage(1, stageVersion(1), 'v4');
   assert.equal(st.cleared, true);
   assert.ok(st.bestSurvivors >= 2 && st.bestTime > 30);
   assert.ok(audio.played.some((p) => p[0] === 'elite') && audio.played.some((p) => p[0] === 'win'));
@@ -388,7 +389,7 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   canvas.fire('pointerdown', { clientX: 120, clientY: (548 + 28) / 2, pointerType: 'mouse' });
   assert.equal(app.getState(), 'run');
   assert.equal(app.dbg().stageId, 2);
-  assert.equal(save.getStage(2, stageVersion(2), 'brutal').attempts, 1);
+  assert.equal(save.getStage(2, stageVersion(2), 'v4').attempts, 1);
   //  터치 드래그: 손가락 댄 위치로 튀지 않고 이동량만 반영
   frames(1);
   const x0 = app.getRun().x;
@@ -548,8 +549,8 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
     DEFS[1].version = 2;
     assert.equal(stageVersion(1), 2);
     const { app, canvas, frames, save, texts } = await bootFake();
-    //  개정 전(버전 1)의 기록. 화면에서 빠지는 이유가 '버전'뿐이도록 초기 선택 난이도(지옥) 칸에 둔다
-    save.updateStage(1, { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 1, 'brutal');
+    //  개정 전(버전 1)의 기록. 화면에서 빠지는 이유가 '버전'뿐이도록 게임 화면이 쓰는 기록 칸(r4.4 재기준: v4 칸)에 둔다
+    save.updateStage(1, { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 1, 'v4');
     frames(2);
     //  스테이지 선택 화면은 현재 코스 버전(2)의 기록만 보여 준다
     assert.ok(texts.includes('미도전'), '표시된 글: ' + JSON.stringify(texts));
@@ -558,8 +559,8 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
     tapStage1(canvas);
     assert.equal(app.getState(), 'run');
     assert.equal(app.getRun().stageVersion, 2);
-    assert.equal(save.getStage(1, 2, 'brutal').attempts, 1);
-    assert.equal(save.getStage(1, 1, 'brutal').attempts, 9);
+    assert.equal(save.getStage(1, 2, 'v4').attempts, 1);
+    assert.equal(save.getStage(1, 1, 'v4').attempts, 9);
     //  승리 판을 셸의 정상 경로(run.over → 여운 → finishRun)로 끝낸다
     frames(30);
     const run = app.getRun();
@@ -569,9 +570,11 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
     let guard = 0;
     while (app.getState() === 'run' && guard++ < 300) frames(1);
     assert.equal(app.getState(), 'result', 'guard=' + guard);
-    assert.deepEqual(save.getStage(1, 2, 'brutal'), { cleared: true, attempts: 1, bestSurvivors: run.units.length, bestTime: 55.5 });
-    assert.deepEqual(save.getStage(1, 1, 'brutal'), { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 'v2 기록이 v1 최고 기록을 덮지 않는다');
-    assert.deepEqual(Object.keys(save.getStageVersions(1)).sort(), ['1:brutal', '2:brutal'], '옛 버전 기록은 저장에 남는다');
+    //  r4.4: 첫 승리라 최다 생존·최단 시간 둘 다 신기록 — 강화 스냅샷(강화 0, 규칙 'v4')이 각각 붙는다
+    const snap = { power: 0, rate: 0, multi: 0, rule: 'v4' };
+    assert.deepEqual(save.getStage(1, 2, 'v4'), { cleared: true, attempts: 1, bestSurvivors: run.units.length, bestTime: 55.5, survUp: snap, timeUp: snap });
+    assert.deepEqual(save.getStage(1, 1, 'v4'), { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, 'v2 기록이 v1 최고 기록을 덮지 않는다');
+    assert.deepEqual(Object.keys(save.getStageVersions(1)).sort(), ['1:v4', '2:v4'], '옛 버전 기록은 저장에 남는다');
   } finally {
     DEFS[1].version = orig;
   }
@@ -580,7 +583,9 @@ test('V3-SAVE-VERSION: 코스 버전이 1 이 아니면 셸이 그 버전 칸에
 //  r4.2(2026-09-25, 이사 지시 "보통, 어려움, 지옥으로 난이도 구성된 것들 삭제하고" · 결정 D2′ = 지옥 값 그대로): 난이도 선택 삭제.
 //   종전 두 검사('DIFF 셸 결선: 토글 클릭·키 1/2/3 → 난이도 저장…' · 'DIFF 새 사용자: 초기 선택 지옥 → 토글로 보통…')를 아래 두 검사로 개정했다.
 //   게임 화면은 **늘 기본 줄(brutal, 옛 지옥 수치)** 로 출격하고, 1/2/3 키·타이틀 토글·HUD 칩·결과 표기·dbg·API 에 난이도가 없다.
-test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 출격 — 토글·1/2/3 키·HUD 칩·결과 표기·dbg·API 에 난이도가 없고, 숫자 키는 아무 일도 하지 않으며, 기록은 `${ver}:brutal` 칸에만(옛 보통·어려움 칸 보존)', async () => {
+//  r4.4 재기준(이사님 결정 D9′ = v4 기록 칸 신설): 출격 줄은 그대로 기본 줄(brutal)이고, 기록은 새 v4 칸 `${ver}:v4` 에 쌓인다.
+//   옛 지옥 칸 `${ver}:brutal` 은 지우지 않고 스테이지 칸에 '이전 기록'으로 흐리게 병기된다(옛 보통·어려움 칸은 화면에 나오지 않고 보존만)
+test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 출격 — 토글·1/2/3 키·HUD 칩·결과 표기·dbg·API 에 난이도가 없고, 숫자 키는 아무 일도 하지 않으며, 기록은 `${ver}:v4` 칸에만(옛 지옥 칸 = 이전 기록, 옛 보통·어려움 칸 보존)', async () => {
   const ver = stageVersion(1);
   const { app, canvas, win, frames, save, texts, storage, audio } = await bootFake();
   assert.equal(PLAY_DIFFICULTY, 'brutal');
@@ -595,7 +600,8 @@ test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 �
   save.updateStage(1, { cleared: true, attempts: 2, bestSurvivors: 5, bestTime: 61 }, ver, 'brutal');
   texts.length = 0;
   frames(2);
-  assert.ok(texts.includes('완료 · 5명 · 1분 1.0초'), '스테이지 칸 기록 = 기본 줄(brutal) 칸: ' + JSON.stringify(texts.filter((t) => t.includes('명'))));
+  assert.ok(texts.includes('미도전'), '스테이지 칸 기록 = v4 칸(아직 없음): ' + JSON.stringify(texts.filter((t) => t.includes('명') || t.includes('도전'))));
+  assert.ok(texts.includes('이전 기록 5명 · 1분 1.0초'), '옛 지옥 칸 기록 = 이전 기록: ' + JSON.stringify(texts.filter((t) => t.includes('명'))));
   assert.ok(!texts.some((t) => t.includes('99명') || t.includes('77명')), '옛 보통·어려움 칸 기록은 화면에 나오지 않는다');
   for (const w of ['보통', '어려움', '지옥', '난이도']) assert.ok(!texts.includes(w), `타이틀에 '${w}' 글자 없음(토글 3칸·라벨 삭제)`);
   //  종전 토글 자리(y 382 줄 세 칸 가운데)를 눌러도 아무 버튼도 없다 — 출격·효과음·저장 변화 없음
@@ -622,7 +628,8 @@ test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 �
   assert.equal(run.enemyDefs.shooter.shot.dmg, 3);
   assert.deepEqual(run.spawns, want.spawns, '스폰 목록 = 기본 줄(추가 배치 포함)');
   assert.ok(run.spawns.length > buildStage(1).spawns.length, 'S1 추가 배치가 붙었다');
-  assert.equal(save.getStage(1, ver, 'brutal').attempts, 3, 'attempts 는 기본 줄 칸에서 +1');
+  assert.equal(save.getStage(1, ver, 'v4').attempts, 1, 'attempts 는 v4 칸에서 +1');
+  assert.equal(save.getStage(1, ver, 'brutal').attempts, 2, '옛 지옥 칸 불변');
   assert.equal(save.getStage(1, ver).attempts, 9, '옛 보통 칸 불변');
   assert.equal(save.getStage(1, ver, 'hard').attempts, 3, '옛 어려움 칸 불변');
   //  진행 중 숫자 키도 아무 일도 하지 않는다
@@ -638,10 +645,12 @@ test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 �
   let guard = 0;
   while (app.getState() === 'run' && guard++ < 300) frames(1);
   assert.equal(app.getState(), 'result', 'guard=' + guard);
-  assert.deepEqual(save.getStage(1, ver, 'brutal'), { cleared: true, attempts: 3, bestSurvivors: Math.max(5, run.units.length), bestTime: 55.5 });
+  const snap = { power: 0, rate: 0, multi: 0, rule: 'v4' };
+  assert.deepEqual(save.getStage(1, ver, 'v4'), { cleared: true, attempts: 1, bestSurvivors: run.units.length, bestTime: 55.5, survUp: snap, timeUp: snap });
+  assert.deepEqual(save.getStage(1, ver, 'brutal'), { cleared: true, attempts: 2, bestSurvivors: 5, bestTime: 61 }, '옛 지옥 칸 기록 불변(v4 기록과 섞이지 않는다)');
   assert.deepEqual(save.getStage(1, ver), { cleared: true, attempts: 9, bestSurvivors: 99, bestTime: 12.5 }, '옛 보통 칸 기록 불변');
   assert.deepEqual(save.getStage(1, ver, 'hard'), { cleared: true, attempts: 3, bestSurvivors: 77, bestTime: 30 }, '옛 어려움 칸 기록 불변');
-  assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions).sort(), [String(ver), ver + ':brutal', ver + ':hard'], '저장 원문 키(옛 칸 보존)');
+  assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions).sort(), [String(ver), ver + ':brutal', ver + ':hard', ver + ':v4'], '저장 원문 키(옛 칸 보존)');
   //  결과 화면: 제목 한 줄에 난이도 표기가 붙지 않는다
   texts.length = 0;
   frames(1);
@@ -651,10 +660,10 @@ test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 �
   canvas.fire('pointerdown', { clientX: 120, clientY: (480 + 28) / 2, pointerType: 'mouse' });
   assert.equal(app.getState(), 'run');
   assert.equal(app.getRun().difficulty, 'brutal');
-  assert.equal(save.getStage(1, ver, 'brutal').attempts, 4);
+  assert.equal(save.getStage(1, ver, 'v4').attempts, 2);
 });
 
-test('V3-SHELL-DIFF2ROW 옛 저장: 마지막 선택이 보통·어려움이던 저장도 읽지 않는다 — 늘 기본 줄로 출격하고 `${ver}:brutal` 칸에 기록된다', async () => {
+test('V3-SHELL-DIFF2ROW 옛 저장: 마지막 선택이 보통·어려움이던 저장도 읽지 않는다 — 늘 기본 줄로 출격하고 `${ver}:v4` 칸에 기록된다(r4.4 재기준)', async () => {
   const ver = stageVersion(1);
   for (const old of ['normal', 'hard']) {
     const pre = fakeStorage();
@@ -665,10 +674,11 @@ test('V3-SHELL-DIFF2ROW 옛 저장: 마지막 선택이 보통·어려움이던 
     tapStage1(canvas);
     assert.equal(app.getState(), 'run');
     assert.equal(app.getRun().difficulty, 'brutal', old + ': 출격 줄 = 기본 줄');
-    assert.equal(save.getStage(1, ver, 'brutal').attempts, 1, old + ': 기본 줄 칸에 기록');
+    assert.equal(save.getStage(1, ver, 'v4').attempts, 1, old + ': v4 칸에 기록');
+    assert.equal(save.getStage(1, ver, 'brutal').attempts, 0, old + ': 옛 지옥 칸은 비어 있다');
     assert.equal(save.getStage(1, ver).attempts, 0, old + ': 보통 칸은 비어 있다');
     assert.equal(save.getStage(1, ver, 'hard').attempts, 0, old + ': 어려움 칸은 비어 있다');
-    assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions), [ver + ':brutal'], old + ': 저장 원문 키');
+    assert.deepEqual(Object.keys(JSON.parse(storage.getItem('starforgeRush.v3')).stages['1'].versions), [ver + ':v4'], old + ': 저장 원문 키');
   }
 });
 

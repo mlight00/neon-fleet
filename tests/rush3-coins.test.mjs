@@ -296,7 +296,8 @@ test('WALLET-1: 이긴 판은 한 번만 지급 — commitMain(승리 프레임)
   const wWrites = h.storage.writes.filter((k) => k === WALLET_KEY).length;
   assert.equal(wWrites, 2, '지갑 쓰기 = 출격 1 + 지급 1');
   assert.deepEqual(rawWallet(h), { coins: r.coins.gained, runNo: 1, paid: ['1:main'], firstClears: [1] }, '잔액·식별자·첫 클리어 표식이 한 번에');
-  assert.equal(JSON.parse(h.storage.getItem(KEY3)).stages['1'].versions[stageVersion(1) + ':brutal'].cleared, true, 'v3 기록은 그대로 따로');
+  //  r4.4 재기준(D9′): 셸의 기록은 v4 칸 `${ver}:v4`
+  assert.equal(JSON.parse(h.storage.getItem(KEY3)).stages['1'].versions[stageVersion(1) + ':v4'].cleared, true, 'v3 기록은 그대로 따로');
   //  결과 화면에서 몇 프레임 더 — 추가 지급 없음
   h.frames(30);
   assert.equal(h.storage.writes.filter((k) => k === WALLET_KEY).length, 2);

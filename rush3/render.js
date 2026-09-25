@@ -84,6 +84,8 @@ export function hitRole(kind, skin) {
 }
 //  피격 번쩍임 색(검사 V3-HITFEEL 이 이 값으로 그리기 호출을 찾는다)
 export const HIT_FLASH_FILL = '#FFFFFF';
+//  r4.4 메인 로봇 보호막 고리·피해 이전 빛줄기 색(검사가 이 값으로 그리기 호출을 찾는다). 광장 보스 보호막(C.gatePos 점선)과 다른 흰 하늘색
+export const HERO_RING_COLOR = '#BFF6FF';
 
 export function bulletAngle(b) {
   const vx = b.vx || 0, vz = b.vz || 1;
@@ -1119,7 +1121,7 @@ export function createRenderer3(ctx, sprites) {
     if (rl) { ctx.textAlign = 'center'; outlinedText(rl, x, y + r + 36 * k, fs(12, k), C.hud, 'bold', 4); }
   }
 
-  //  부대: 실제 units 배열 — 히어로(units[0], M01) + 병사(SOLDIER). 그림자·행진 바운스·병력 수·중심 마커
+  //  부대: 실제 units 배열 — 히어로(hero 표시 유닛, M01 — r4.4 전에는 units[0]) + 병사(SOLDIER). 그림자·행진 바운스·병력 수·중심 마커
   //   원근(r3.20): 병사마다 부대 중심 + (dx, dz) 로 각각 투영한다 — 앞줄(d 큰 쪽)은 작게, 뒷줄(d < 0)은 부대 줄 배율 near 그대로·간격은 평면(수정 라운드 2
   //   2026-09-20 — 처음엔 뒷줄이 자라 s 1.9 → 1.5 상한, 그래도 59/40명부터 뒷줄이 화면 아래로 넘쳐 project.js 뒤쪽 갈래를 바꿨다). 아레나 ay 는 d 오프셋(−ay)
   //   병력 수는 종전 '가장 뒷줄 아래(H − 14 클램프)' 에서 **부대 중심 마커 옆**으로 옮겼다(수정 라운드 2): 뒷줄이 화면 밖일 때 병사 위에 겹치던 것을 없앤다.
@@ -1130,14 +1132,16 @@ export function createRenderer3(ctx, sprites) {
     if (!units.length) return;
     const ay = run.ay || 0;
     const order = units.map((u, i) => ({ u, i })).sort((a, b) => a.u.dy - b.u.dy || a.i - b.i);
-    for (const { u, i } of order) {
-      const hero = i === 0;
+    //  r4.4: 메인 로봇 그림은 **hero 표시**(규칙 createRun 이 첫 유닛에 붙인다)를 보고 그린다 — 종전 '배열 0번'은 로봇이 쓰러지면
+    //   다음 병사에게 그림이 넘어갔다. 이제 로봇이 쓰러지면(보호 규칙을 끈 판에서만 생기는 일) 그림 없이 병사만 남는다
+    for (const { u } of order) {
+      const hero = !!u.hero;
       const q = pj(run.x + u.dx, -(ay + u.dy));
       const size = (hero ? S.heroSize : S.soldierSize) * q.s;
       shadow(q.x, q.y + size * 0.42, size * 0.42);
     }
     for (const { u, i } of order) {
-      const hero = i === 0;
+      const hero = !!u.hero;
       const phase = now * 9 + i * 1.7;
       const bob = hero ? Math.sin(now * 9) * 2 : Math.sin(phase) * 1.6;
       const sway = hero ? Math.sin(now * 4.5) * 0.8 : Math.sin(phase * 0.5 + i) * 1.1;
@@ -1172,6 +1176,14 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillStyle = C.heroHurt;
         ctx.beginPath(); ctx.arc(px, py - size / 2 - 4 * q.s, 3 * q.s, 0, Math.PI * 2); ctx.fill();
       }
+      //  r4.4 보호막(heroGuard): 켜진 동안(run.heroShield — 규칙이 STEP 끝에 hp > 0 호위 수로 정한다) 로봇 둘레 얇은 고리. 새 그림 없이 도형으로
+      if (hero && run.heroShield) {
+        ctx.save();
+        ctx.strokeStyle = HERO_RING_COLOR; ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.55 + Math.sin(now * 5) * 0.15;
+        ctx.beginPath(); ctx.ellipse(px, py + size * 0.08, size * 0.62, size * 0.5, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
     }
     //  부대 중심 마커(삼각) — 게이트 칸 판정 기준. 중심(run.x, d −ay)의 투영점 위
     const sq = pj(run.x, -ay), ks = sq.s;
@@ -1205,6 +1217,21 @@ export function createRenderer3(ctx, sprites) {
       ctx.strokeStyle = s.color ?? C.warn;
       ctx.lineWidth = 2 + 6 * (1 - k);
       ctx.beginPath(); ctx.arc(s.x, s.y, s.r * (0.5 + 0.9 * k), 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  //  피해 이전 빛줄기(r4.4 heroGuard, 셸 fx.beams — 셸이 이벤트 heroGuard 를 받은 순간 투영한 화면 좌표): 로봇 → 대신 맞은 호위로 짧은 선.
+  //   (1 − k) 로 옅어지고 끝(호위 쪽)에 작은 점. 새 그림 없음
+  function drawBeams(list) {
+    for (const b of list) {
+      const k = Math.max(0, Math.min(1, b.t / (b.life || 0.3)));
+      ctx.globalAlpha = 0.9 * (1 - k);
+      ctx.strokeStyle = HERO_RING_COLOR;
+      ctx.lineWidth = 3 * (1 - k * 0.5);
+      ctx.beginPath(); ctx.moveTo(b.x0, b.y0); ctx.lineTo(b.x1, b.y1); ctx.stroke();
+      ctx.fillStyle = HERO_RING_COLOR;
+      ctx.beginPath(); ctx.arc(b.x1, b.y1, 4, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -1634,12 +1661,20 @@ export function createRenderer3(ctx, sprites) {
       ctx.textBaseline = 'middle';
       ctx.fillStyle = b.primary ? '#FFFFFF' : C.hero;
       if (b.sub) {
+        //  r4.4(D9′): 옛 지옥 기록 줄(prev)이 있는 스테이지 칸은 세 줄 — 이름·v4 기록을 조금 올리고 맨 아래에 작고 흐리게 '이전 기록 …'.
+        //   prev 가 없는 버튼은 종전 두 줄 자리 그대로
+        const up = b.prev ? 4 : 0;
         ctx.font = '700 17px ' + FONT;
-        ctx.fillText(b.label, cx, cy - 10);
+        ctx.fillText(b.label, cx, cy - 10 - up);
         ctx.font = '13px ' + FONT;
         ctx.fillStyle = b.primary ? 'rgba(255,255,255,0.75)' : 'rgba(243,241,232,0.75)';
         //  maxWidth: '완료 · 63명 · 0:47 · 구출✓'(r3.14) 처럼 긴 sub 가 칸을 넘치면 가로로 조금 압축, 안 넘치면 무변화
-        ctx.fillText(b.sub, cx, cy + 12, b.w - 12);
+        ctx.fillText(b.sub, cx, cy + 12 - up * 2, b.w - 12);
+        if (b.prev) {
+          ctx.font = '11px ' + FONT;
+          ctx.fillStyle = b.primary ? 'rgba(255,255,255,0.45)' : 'rgba(243,241,232,0.45)';
+          ctx.fillText(b.prev, cx, cy + 19, b.w - 12);
+        }
       } else {
         ctx.font = '700 ' + (b.small ? 15 : 19) + 'px ' + FONT;
         ctx.fillText(b.label, cx, cy);
@@ -1885,6 +1920,7 @@ export function createRenderer3(ctx, sprites) {
     drawBullets(run);
     drawEshots(run);
     drawSquad(run, fx, now);
+    drawBeams(fx.beams ?? []);
     drawRecruits(fx.recruits);
     drawShocks(fx.shocks ?? []);
     drawParts(fx.parts);
