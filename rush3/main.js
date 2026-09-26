@@ -511,7 +511,8 @@ export function canBuyAny(wallet) {
   return UP_TRACKS.some((t) => canBuy(wallet, t));
 }
 
-/** 강화 화면 한 줄의 글(순수). up = 지금 단계, track, ref = { stageId, bossHp }(직격 화력 미리보기의 기준 보스 — 없으면 보스 줄 없음).
+/** 강화 화면 한 줄의 글(순수). up = 지금 단계, track, ref = { stageId, bossHp, mid? }(직격 화력 미리보기의 기준 보스 — 없으면 보스 줄 없음.
+ *   r4.10: 대물결 판은 보스가 없어 줄 없음 · 중간 보스 판(mid)은 'N번 중간 보스(체력 …)').
  *  → { name, level, max, cost(다음 단계 비용 | null = 최대), lines: [효과 '지금 → 다음', 보조, 짧은 설명] }. 글은 모두 기본 소총(Mk I) 기준.
  *  줄은 어절 경계에서만 나눠 세 줄로 넘긴다(렌더는 줄을 더 나누지 않는다) — 480 화면 카드 글 폭 290px 안(Chromium 실측) */
 export function upgradeLines(up, track, ref = null) {
@@ -523,7 +524,7 @@ export function upgradeLines(up, track, ref = null) {
     const dmg = (j) => w.dmg * (1 + UP_EFFECT.powerStep * j);
     lines.push(top ? '최대 단계 · 로봇 직격 피해 ' + fix1(dmg(k)) : '로봇 직격 피해 ' + fix1(dmg(k)) + ' → ' + fix1(dmg(k + 1)));
     const hp = ref && ref.bossHp > 0 ? ref.bossHp : null;
-    lines.push(hp ? (ref.stageId + '번 보스(체력 ' + hp + '): ' + shotsToKill(hp, dmg(k)) + '발' + (top ? '' : ' → ' + shotsToKill(hp, dmg(k + 1)) + '발')) : null);
+    lines.push(hp ? (ref.stageId + (ref.mid ? '번 중간 보스(체력 ' : '번 보스(체력 ') + hp + '): ' + shotsToKill(hp, dmg(k)) + '발' + (top ? '' : ' → ' + shotsToKill(hp, dmg(k + 1)) + '발')) : null);
     lines.push('소총 기준 · 폭발·연쇄에는 적용 안 됨');
   } else if (track === 'rate') {
     const iv = (j) => w.interval * Math.pow(UP_EFFECT.rateMul, j);
@@ -833,11 +834,13 @@ export function boot(canvas, deps = {}) {
     let id = upgradeFrom === 'result' && result ? (result.won && result.nextId ? result.nextId : result.stageId) : lastStageId();
     if (!ALL_STAGE_IDS.includes(id)) id = ALL_STAGE_IDS[0];
     if (!bossHpCache.has(id)) {
-      let hp = null;
-      try { const st = buildStage(id, { difficulty, lotterySeed: 0 }); hp = (st.elites && st.elites[0] && st.elites[0].hp) || null; } catch { hp = null; }
-      bossHpCache.set(id, hp);
+      //  r4.10: 게임 줄 대물결 판은 보스가 없다(null — 보스 줄 없음) · 중간 보스 판은 중간 보스 체력(mid 표시)
+      let hp = null, mid = false;
+      try { const st = buildStage(id, { difficulty, lotterySeed: 0 }); const e = st.elites && st.elites[0]; hp = (e && e.hp) || null; mid = !!(e && e.mid); } catch { hp = null; }
+      bossHpCache.set(id, { hp, mid });
     }
-    return { stageId: id, bossHp: bossHpCache.get(id) };
+    const b = bossHpCache.get(id);
+    return { stageId: id, bossHp: b.hp, ...(b.mid ? { mid: true } : {}) };
   }
   /** 강화 화면 열기(from = 'title' | 'result'). 처음 살 수 있는 상태로 연 방문이면 다연발 '추천'(사용자당 1회 — 저장 seenUpRec) */
   function openUpgrade(from) {

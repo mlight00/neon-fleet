@@ -13,7 +13,7 @@ import { bossFloor, bossUpperBound } from '../rush3/firepower.js';
 import { squadFrame, shapeHitsBox } from '../rush3/bossatk.js';
 import { stageValue, runCoins } from '../rush3/coins.js';
 import { createRenderer3, MID_LOOK, ATK_DANGER } from '../rush3/render.js';
-import { makeFx, MID_BANNER_TEXT, coinBreakdown } from '../rush3/main.js';
+import { makeFx, MID_BANNER_TEXT, coinBreakdown, upgradeLines } from '../rush3/main.js';
 import { bootApp } from './lib/rush3-shell.mjs';
 
 const MID_IDS = [2, 5, 8, 11, 14, 17, 20, 23];
@@ -160,6 +160,10 @@ test('MIDBOSS 처치 = 승리 + 판 끝 목표 몫 코인(V × 0.5 — 결과 �
     assert.equal(c.boss, Math.round(stageValue(id) * 0.5), `S${id}: 판 끝 목표 몫 = V × 0.5`);
   }
   assert.equal(coinBreakdown({ enemy: 3, boss: 14, goal: 'mid' }), '적 3 · 중간 보스 14');
+  //  강화 화면 직격 화력 미리보기: 중간 보스 판은 '중간 보스' · 대물결 판(보스 없음)은 그 줄이 없다
+  const Z0 = { power: 0, rate: 0, multi: 0 };
+  assert.match(upgradeLines(Z0, 'power', { stageId: 2, bossHp: 2765, mid: true }).lines[1], /^2번 중간 보스\(체력 2765\): 2765발 → \d+발$/);
+  assert.equal(upgradeLines(Z0, 'power', { stageId: 4, bossHp: null }).lines[1], null);
   //  겹침 접촉: 중간 보스가 부대 위에 올라앉아도(돌진 밖) 접촉 피해가 없다
   const r = midRun(5, 30, 240);
   r.boss.x = r.x; r.boss.z = r.z; r.boss.chargeT = 1e9;
