@@ -161,14 +161,20 @@ export const PELLET = Object.freeze({ core: '#F7FFE6', flash: '#FFF6C8', tail: 2
 //   초록 안전 구역 표시는 없앴다(색 상수도 지웠다 — 검사가 그 색이 어디에도 없음을 확인한다). 검사가 이 색으로 그리기 호출을 찾는다
 export const ATK_DANGER = '#FF3040';
 export const ATK_CHARGE = '#FFF1B8';
-//  보스 스킨별 탄 모양(look — balance.bossAtk.skins): 구슬(B1 주황) · 바늘(B2 보라) · 레이저 줄기(B3 하늘) · 용암 포탄(B4 주홍 + 검은 껍질) · 왕관 조각(B5 금 마름모).
-//   패턴 탄(규칙 적탄의 look 칸)만 이 모양이고, 저격수 탄·배수 1 줄 보스 부채꼴은 종전 마젠타 구슬
+//  r4.9 보스 스킨별 탄 모양(look — balance.bossAtk.skins, 이사님 "각 보스마다 특색있는 패턴"): 잔해 덩어리(B1 회갈색 — 돌며 굴러온다) · 바늘(B2 보라) ·
+//   객차(B3 — 어두운 몸에 붉은 창 불빛, 사슬로 이어진다) · 쇳물 덩이(B4 주황 + 분홍 발광) · 왕관 칼날(B5 금 — 돌며 날아온다).
+//   고유 공격 탄(규칙 적탄의 look 칸)만 이 모양이고, 저격수 탄·배수 1 줄 보스 부채꼴은 종전 마젠타 구슬. 검사가 color 로 그리기 호출을 찾는다
 export const ATK_LOOK = Object.freeze({
-  orb:    Object.freeze({ shape: 'orb', color: '#FFB347', core: '#FFF1C9' }),
+  debris: Object.freeze({ shape: 'debris', color: '#9A8266', core: '#D8C6A5', dark: '#4A3C2E' }),
   needle: Object.freeze({ shape: 'needle', color: '#C77DFF', core: '#F6E9FF' }),
-  laser:  Object.freeze({ shape: 'laser', color: '#5CE1FF', core: '#EFFFFF' }),
-  magma:  Object.freeze({ shape: 'magma', color: '#FF6A2A', core: '#FFE08A', crust: '#5A1A08' }),
+  car:    Object.freeze({ shape: 'car', color: '#3B2226', core: '#FF4A3D', trim: '#7C2B2B' }),
+  slag:   Object.freeze({ shape: 'slag', color: '#FF7A2A', core: '#FFE08A', glow: '#FF5FA8' }),
   crown:  Object.freeze({ shape: 'crown', color: '#FFD447', core: '#FFFBE0' }),
+});
+//  r4.9 광역 공격이 터질 때(셸 fx.atkBlasts) 보스 특색 연출 색: 매연(B1 회색 연기 + 주황 불꽃) · 갈고리(B2 강철) · 거미줄(B2 흰 줄) · 열차(B3 검붉은 몸 + 노란 창) ·
+//   쇳물(B4 주황) · 철퇴·충격파(B5 금). 경보는 모두 ATK_DANGER 한 색(한눈에 '피해 구역')
+export const ATK_FX = Object.freeze({
+  smoke: '#5E5A57', flame: '#FF9A3D', steel: '#B9C2CC', web: '#F2F4FF', train: '#5A1E24', window: '#FFD27A', molten: '#FF7A2A', gold: '#FFD447',
 });
 
 //  r4.5 강화 화면(새 상태 'upgrade', 원본 v4 3-5 '강화 화면')의 **자리표 단일 출처** — 셸(main.js)의 [구매]·[돌아가기] 히트 상자가 이 표에서 나온다
@@ -1545,58 +1551,72 @@ export function createRenderer3(ctx, sprites) {
     }
   }
 
-  //  r4.8 보스 패턴 탄 한 발: 크기 = 판정 반지름 × 그 자리 배율, 진행 방향(화면: vx 오른쪽 · vz 아래)으로 돌려 그린다(바늘·줄기·꼬리가 날아가는 쪽을 향한다)
+  //  r4.9 보스 고유 공격 탄 한 발: 크기 = 판정 반지름 × 그 자리 배율, 진행 방향(화면: vx 오른쪽 · vz 아래)으로 돌려 그린다(바늘·객차가 날아가는 쪽을 향한다).
+  //   잔해·왕관 칼날은 날아간 시간(규칙 age — 결정적)으로 돈다
   function drawAtkShot(s, q, L) {
     const r = Math.max(3, s.r * q.s * 1.1);
     const ang = Math.atan2(s.vz || 0, s.vx || 0);
+    const age = s.age || 0;
     ctx.save();
     ctx.translate(q.x, q.y);
-    ctx.rotate(ang);
-    if (L.shape === 'needle') {
+    if (L.shape === 'debris') {
+      //  잔해 덩어리: 모난 오각 돌(회갈색) + 어두운 테 + 밝은 면 하나, 굴러가며 돈다
+      ctx.rotate(age * 7 + (s.x % 7));
+      ctx.fillStyle = L.color;
+      ctx.beginPath();
+      const k = [1.05, 0.82, 1.12, 0.9, 1.0];
+      for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; const x = Math.cos(a) * r * k[i], y = Math.sin(a) * r * k[i]; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = L.dark; ctx.lineWidth = Math.max(1.2, r * 0.22); ctx.stroke();
+      ctx.fillStyle = L.core;
+      ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.55); ctx.lineTo(r * 0.45, -r * 0.4); ctx.lineTo(r * 0.1, r * 0.05); ctx.closePath(); ctx.fill();
+    } else if (L.shape === 'needle') {
+      ctx.rotate(ang);
       ctx.globalAlpha = 0.4; ctx.strokeStyle = L.color; ctx.lineWidth = r * 0.7; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(-r * 3.2, 0); ctx.lineTo(0, 0); ctx.stroke();
       ctx.globalAlpha = 1; ctx.fillStyle = L.color;
       ctx.beginPath(); ctx.moveTo(r * 2.2, 0); ctx.lineTo(-r * 1.4, r * 0.62); ctx.lineTo(-r * 1.4, -r * 0.62); ctx.closePath(); ctx.fill();
       ctx.fillStyle = L.core;
       ctx.beginPath(); ctx.ellipse(r * 0.2, 0, r * 1.1, r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-    } else if (L.shape === 'laser') {
-      ctx.lineCap = 'round';
-      ctx.globalAlpha = 0.45; ctx.strokeStyle = L.color; ctx.lineWidth = r * 1.9;
-      ctx.beginPath(); ctx.moveTo(-r * 4, 0); ctx.lineTo(r, 0); ctx.stroke();
-      ctx.globalAlpha = 1; ctx.lineWidth = r * 1.05;
-      ctx.beginPath(); ctx.moveTo(-r * 3.4, 0); ctx.lineTo(r * 0.8, 0); ctx.stroke();
-      ctx.strokeStyle = L.core; ctx.lineWidth = r * 0.4;
-      ctx.beginPath(); ctx.moveTo(-r * 3, 0); ctx.lineTo(r * 0.7, 0); ctx.stroke();
-    } else if (L.shape === 'magma') {
-      ctx.globalAlpha = 0.35; ctx.fillStyle = L.color;
-      ctx.beginPath(); ctx.arc(-r * 1.3, 0, r * 0.7, 0, Math.PI * 2); ctx.arc(-r * 2.3, 0, r * 0.45, 0, Math.PI * 2); ctx.fill();
+    } else if (L.shape === 'car') {
+      //  객차: 진행 방향으로 긴 어두운 몸 + 테 + 창 두 칸(붉은 불빛 번짐)
+      ctx.rotate(ang);
+      const hl = r * 1.55, hw = r * 0.95;
+      ctx.fillStyle = L.color;
+      roundRect(-hl, -hw, hl * 2, hw * 2, r * 0.35); ctx.fill();
+      ctx.strokeStyle = L.trim; ctx.lineWidth = Math.max(1.2, r * 0.2); ctx.stroke();
+      for (const wx of [-hl * 0.45, hl * 0.35]) {
+        ctx.globalAlpha = 0.45; ctx.fillStyle = L.core;
+        ctx.beginPath(); ctx.arc(wx, 0, r * 0.75, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1; ctx.fillStyle = L.core;
+        ctx.fillRect(wx - r * 0.32, -r * 0.42, r * 0.64, r * 0.84);
+      }
+    } else if (L.shape === 'slag') {
+      //  쇳물 덩이: 분홍 발광 번짐 + 주황 몸 + 노란 심, 뒤로 흐린 방울 꼬리
+      ctx.rotate(ang);
+      ctx.globalAlpha = 0.35; ctx.fillStyle = L.glow;
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.75, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-r * 1.5, 0, r * 0.6, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1; ctx.fillStyle = L.color;
       ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = L.crust; ctx.lineWidth = Math.max(1.5, r * 0.28);
-      ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0.4, 2.6); ctx.stroke();
       ctx.fillStyle = L.core;
-      ctx.beginPath(); ctx.arc(r * 0.25, -r * 0.1, r * 0.38, 0, Math.PI * 2); ctx.fill();
-    } else if (L.shape === 'crown') {
-      ctx.globalAlpha = 0.35; ctx.fillStyle = L.color;
+      ctx.beginPath(); ctx.arc(r * 0.2, -r * 0.15, r * 0.45, 0, Math.PI * 2); ctx.fill();
+    } else {
+      //  왕관 칼날: 금빛 네 갈래 칼날(돈다) + 번짐 + 밝은 심
+      ctx.rotate(age * 12 * (s.spin || 1));
+      ctx.globalAlpha = 0.3; ctx.fillStyle = L.color;
       ctx.beginPath(); ctx.arc(0, 0, r * 1.7, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1; ctx.fillStyle = L.color;
-      ctx.beginPath(); ctx.moveTo(r * 1.5, 0); ctx.lineTo(0, r * 0.95); ctx.lineTo(-r * 1.5, 0); ctx.lineTo(0, -r * 0.95); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, rr = i % 2 ? r * 0.45 : r * 1.55; const x = Math.cos(a) * rr, y = Math.sin(a) * rr; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+      ctx.closePath(); ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
       ctx.fillStyle = L.core;
-      ctx.beginPath(); ctx.moveTo(r * 0.6, 0); ctx.lineTo(0, r * 0.35); ctx.lineTo(-r * 0.6, 0); ctx.lineTo(0, -r * 0.35); ctx.closePath(); ctx.fill();
-    } else {
-      //  orb(구슬): 번짐 + 몸 + 밝은 심 + 흰 테
-      ctx.globalAlpha = 0.35; ctx.fillStyle = L.color;
-      ctx.beginPath(); ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = L.core;
-      ctx.beginPath(); ctx.arc(r * 0.15, -r * 0.1, r * 0.45, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }
+
 
   //  세계 사각(x0~x1 × z0~z1)을 화면 경로로 — 원근에서 세로 가장자리는 곡선이라 n 조각으로 나눠 잇는다
   function worldBoxPath(x0, x1, z0, z1, rz, n = 8) {
@@ -1617,70 +1637,231 @@ export function createRenderer3(ctx, sprites) {
     ctx.closePath();
   }
 
-  //  r4.8 보스 공격 예고·진행(규칙 run.bossAtk.cur — 읽기만). p = 경보 진행(0 → 1, 발사 뒤 1) · 깜빡임은 now 로.
-  //  r4.9 (가): **광역 공격만** 붉은 경보 구역을 그린다 — ③ 기둥 포격 = 붉은 세로 기둥이 아래부터 차오른다 · ⑤ 산개탄 = 떨어질 자리 붉은 원(안쪽이 차오른다) + 날아오는 큰 탄.
-  //   탄 공격(① 조준 대포 · ② 탄막 벽 · ④ 쓸기)은 도로에 아무것도 그리지 않는다(조준선·빈틈·화살표·쓸 범위 없음 — 탄을 보고 피한다. 장전 번쩍임은 drawBoss).
-  //   초록 안전 구역은 어디에도 없다
+  //  세계 다각형(점 목록 [x, z])을 화면 경로로 — 긴 변은 원근 곡선이 되게 n 조각으로 나눈다
+  function worldPolyPath(pts, rz, n = 6) {
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[(i + 1) % pts.length];
+      for (let j = 0; j < n; j++) {
+        const t = j / n, q = pj(ax + (bx - ax) * t, az + (bz - az) * t - rz);
+        if (i === 0 && j === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+      }
+    }
+    ctx.closePath();
+  }
+  //  선분을 화면에 보이는 z 범위로 자른다(레일·교차 레일은 화면 밖 멀리까지 뻗는다 — 먼 점을 투영하지 않게). 반환 [ax, az, bx, bz] | null
+  function clipSegZ(ax, az, bx, bz, zlo, zhi) {
+    const dz = bz - az;
+    if (Math.abs(dz) < 1e-9) return az < zlo || az > zhi ? null : [ax, az, bx, bz];
+    let t0 = 0, t1 = 1;
+    for (const [p, q] of [[-dz, az - zlo], [dz, zhi - az]]) {
+      const t = q / p;
+      if (p < 0) { if (t > t1) return null; if (t > t0) t0 = t; } else { if (t < t0) return null; if (t < t1) t1 = t; }
+    }
+    return [ax + (bx - ax) * t0, az + dz * t0, ax + (bx - ax) * t1, az + dz * t1];
+  }
+  //  선분 띠(반폭 r)의 네 꼭짓점
+  function stripPts(ax, az, bx, bz, r) {
+    const L = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / L * r, nz = (bx - ax) / L * r;
+    return [[ax + nx, az + nz], [bx + nx, bz + nz], [bx - nx, bz - nz], [ax - nx, az - nz]];
+  }
+  //  끊긴 고리(원판에서 끊긴 틈 쐐기를 뺀 곳)의 점 목록 — 반지름 R
+  function ringPts(s, R) {
+    const pts = [[s.x, s.z]], a0 = s.ang + s.half, a1 = s.ang - s.half + Math.PI * 2;
+    for (let i = 0; i <= 36; i++) { const a = a0 + (a1 - a0) * i / 36; pts.push([s.x + Math.cos(a) * R, s.z + Math.sin(a) * R]); }
+    return pts;
+  }
+  //  광역 경보 한 구역(모두 ATK_DANGER 한 색): 흐린 바탕 + 차오르는 채움(진행 p) + 깜빡이는 테.
+  //   원 = 안쪽에서 · 사각 = 아래에서 · 줄(레일) = 달려올 쪽 끝에서 · 부채꼴 = 한쪽 끝에서 쓸며 · 끊긴 고리 = 가운데에서 퍼지며 찬다
+  function warnShape(s, p, blink, rz) {
+    ctx.fillStyle = ATK_DANGER; ctx.strokeStyle = ATK_DANGER;
+    let full = null, part = null;
+    if (s.t === 'circ') { full = () => worldCirclePath(s.x, s.z, s.R, rz); part = () => worldCirclePath(s.x, s.z, Math.max(2, s.R * p), rz); }
+    else if (s.t === 'rect') { full = () => worldBoxPath(s.x0, s.x1, s.z0, s.z1, rz); part = () => worldBoxPath(s.x0, s.x1, s.z0, s.z0 + (s.z1 - s.z0) * p, rz); }
+    else if (s.t === 'seg') {
+      const c = clipSegZ(s.ax, s.az, s.bx, s.bz, rz - 240, rz + 780);
+      if (!c) return;
+      //  달려올 쪽(앞 = z 큰 끝, 가로면 왼쪽 끝)에서 찬다
+      const [ax, az, bx, bz] = c[1] >= c[3] ? c : [c[2], c[3], c[0], c[1]];
+      full = () => worldPolyPath(stripPts(ax, az, bx, bz, s.r), rz, 8);
+      part = () => worldPolyPath(stripPts(ax, az, ax + (bx - ax) * p, az + (bz - az) * p, s.r), rz, 8);
+    } else if (s.t === 'poly') {
+      const arc = s.pts.slice(1), m = Math.max(1, Math.round((arc.length - 1) * p));
+      full = () => worldPolyPath(s.pts, rz, 3); part = () => worldPolyPath([s.pts[0], ...arc.slice(0, m + 1)], rz, 3);
+    } else if (s.t === 'ring') { full = () => worldPolyPath(ringPts(s, s.R + s.th), rz, 2); part = () => worldPolyPath(ringPts(s, Math.max(4, (s.R + s.th) * p)), rz, 2); }
+    if (!full) return;
+    ctx.globalAlpha = 0.12 * blink; full(); ctx.fill();
+    ctx.globalAlpha = 0.34; part(); ctx.fill();
+    ctx.globalAlpha = 0.9 * blink; ctx.lineWidth = 3; full(); ctx.stroke();
+  }
+  //  거미줄 무늬(사각 안 — 가운데에서 여덟 갈래 + 사각 두 겹)
+  function webLines(s, rz) {
+    const cx = (s.x0 + s.x1) / 2, cz = (s.z0 + s.z1) / 2, hx = (s.x1 - s.x0) / 2, hz = (s.z1 - s.z0) / 2;
+    const c = pj(cx, cz - rz);
+    ctx.beginPath();
+    for (const [dx, dz] of [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]]) { const q = pj(cx + dx * hx, cz + dz * hz - rz); ctx.moveTo(c.x, c.y); ctx.lineTo(q.x, q.y); }
+    ctx.stroke();
+    for (const f of [0.35, 0.7]) { worldBoxPath(cx - hx * f, cx + hx * f, cz - hz * f, cz + hz * f, rz, 3); ctx.stroke(); }
+  }
+  //  열차 몸통 질주(교차 레일·레일이 터질 때): 앞(z 큰 끝, 가로면 왼쪽)에서 반대 끝으로 k(0 → 1) — 검붉은 몸 + 노란 창 + 뒤로 흐린 바람 줄
+  function trainDash(s, k, rz) {
+    const c = clipSegZ(s.ax, s.az, s.bx, s.bz, rz - 240, rz + 780);
+    if (!c) return;
+    const [ax, az, bx, bz] = c[1] >= c[3] ? c : [c[2], c[3], c[0], c[1]];
+    const L = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / L, uz = (bz - az) / L, len = 190;
+    const head = k * (L + len), s0 = Math.max(0, head - len), s1 = Math.min(L, head);
+    if (s1 <= s0) return;
+    const P0 = [ax + ux * s0, az + uz * s0], P1 = [ax + ux * s1, az + uz * s1];
+    ctx.globalAlpha = 0.35; ctx.strokeStyle = ATK_FX.train; ctx.lineWidth = 2;
+    worldPolyPath(stripPts(ax + ux * Math.max(0, s0 - 120), az + uz * Math.max(0, s0 - 120), P0[0], P0[1], s.r * 0.5), rz, 4); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.fillStyle = ATK_FX.train;
+    worldPolyPath(stripPts(P0[0], P0[1], P1[0], P1[1], s.r * 0.8), rz, 6); ctx.fill();
+    ctx.strokeStyle = '#1C0B0E'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = ATK_FX.window;
+    for (let d = s0 + 14; d < s1 - 8; d += 26) { const q = pj(ax + ux * d, az + uz * d - rz); ctx.beginPath(); ctx.arc(q.x, q.y, 3.4 * q.s, 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  //  r4.8 보스 공격 예고 → r4.9 (가)·(나): **광역 공격만** 붉은 경보 구역(규칙 run.bossAtk.cur.zones — 읽기만. 진행 p = 경보 시작부터 그 구역이 터지기까지).
+  //   탄 공격은 도로에 아무것도 그리지 않는다(장전 번쩍임은 drawBoss). 초록 안전 구역은 어디에도 없다.
+  //   보스 특색 곁들임(경보 중): 굴뚝 매연탄이 포물선으로 날아옴(B1) · 크레인 줄에 매달린 갈고리가 내려옴 · 거미줄 무늬(B2) · 레일 침목(B3) ·
+  //   도가니에서 쏟아지는 쇳물 줄기 · 떨어지는 쇳물 방울(B4) · 치켜든 철퇴(B5). 터진 뒤 남는 쇳물(붓기)은 식을 때까지 웅덩이로
   function drawBossAtk(run, now) {
     const cur = run.bossAtk && run.bossAtk.cur;
-    if (!cur || cur.type === 'shot' || cur.state === 'charge') return;
-    const rz = run.z, tele = cur.state === 'tele';
-    const p = tele ? Math.max(0, Math.min(1, 1 - cur.t / cur.tele)) : 1;
-    const blink = 0.72 + 0.28 * Math.sin(now * 16);
-    const top = rz + 720, bot = rz - 170;
+    if (!cur || cur.type !== 'aoe' || !cur.zones) return;
+    const rz = run.z, blink = 0.72 + 0.28 * Math.sin(now * 16);
     ctx.save();
-    ctx.lineJoin = 'round';
-    if (cur.kind === 'pillar') {
-      for (const x of cur.xs) {
-        const x0 = x - cur.w / 2, x1 = x + cur.w / 2;
-        ctx.globalAlpha = 0.16 * blink; ctx.fillStyle = ATK_DANGER;
-        worldBoxPath(x0, x1, bot, top, rz); ctx.fill();
-        ctx.globalAlpha = 0.42; ctx.fillStyle = ATK_DANGER;
-        worldBoxPath(x0, x1, bot, bot + (top - bot) * p, rz); ctx.fill();
-        ctx.globalAlpha = 0.85 * blink; ctx.strokeStyle = ATK_DANGER; ctx.lineWidth = 2;
-        worldBoxPath(x0, x1, bot, top, rz); ctx.stroke();
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const z of cur.zones) if (!z.done) warnShape(z.shape, Math.max(0, Math.min(1, cur.age / z.at)), blink, rz);
+    drawAtkProps(run, cur, now);
+    for (const z of cur.zones) if (z.done && z.until > cur.age) drawPool(z.shape, z.until - cur.age, now, rz);
+    ctx.restore();
+  }
+  function drawAtkProps(run, cur, now) {
+    const rz = run.z;
+    const bo = (run.bosses ?? []).find((b) => b.id === cur.boss && !b.dead) ?? null;
+    for (const z of cur.zones) {
+      if (z.done) continue;
+      const p = Math.max(0, Math.min(1, cur.age / z.at)), s = z.shape;
+      if (cur.kind === 'smoke' && cur.from0) {
+        const gx = cur.from0.x + (s.x - cur.from0.x) * p, gz = cur.from0.z + (s.z - cur.from0.z) * p;
+        const g = pj(gx, gz - rz), h = 170 * 4 * p * (1 - p) * g.s;
+        ctx.globalAlpha = 0.3; ctx.fillStyle = 'rgba(20,25,35,1)';
+        ctx.beginPath(); ctx.ellipse(g.x, g.y, 9 * g.s, 3.5 * g.s, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.45; ctx.fillStyle = ATK_FX.smoke;
+        ctx.beginPath(); ctx.arc(g.x - 7 * g.s, g.y - h + 9 * g.s, 6 * g.s, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1; ctx.fillStyle = '#2E2B2A';
+        ctx.beginPath(); ctx.arc(g.x, g.y - h, 8 * g.s, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = ATK_FX.flame;
+        ctx.beginPath(); ctx.arc(g.x + 3 * g.s, g.y - h - 5 * g.s, 2.6 * g.s, 0, Math.PI * 2); ctx.fill();
+      } else if (cur.kind === 'hook' && bo) {
+        const g = pj(s.x, s.z - rz), top = pj(bo.x, bo.z - rz), hy = g.y - (1 - p) * 190 * g.s;
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = ATK_FX.steel; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(g.x, hy - 16 * g.s); ctx.stroke();
+        ctx.lineWidth = Math.max(2, 4 * g.s);
+        ctx.beginPath(); ctx.moveTo(g.x, hy - 16 * g.s); ctx.lineTo(g.x, hy); ctx.arc(g.x - 8 * g.s, hy, 8 * g.s, 0, Math.PI * 0.95); ctx.stroke();
+      } else if (cur.kind === 'web') {
+        ctx.globalAlpha = 0.3 + 0.3 * p; ctx.strokeStyle = ATK_FX.web; ctx.lineWidth = 1.2;
+        webLines(s, rz);
+      } else if (cur.kind === 'rail' || cur.kind === 'crossrail') {
+        const c = clipSegZ(s.ax, s.az, s.bx, s.bz, rz - 240, rz + 780);
+        if (!c) continue;
+        const [ax, az, bx, bz] = c, L = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / L, uz = (bz - az) / L;
+        ctx.globalAlpha = 0.45; ctx.strokeStyle = '#3A3530'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let d = 18; d < L; d += 40) {
+          const cx = ax + ux * d, cz = az + uz * d, a = pj(cx - uz * s.r * 0.9, cz + ux * s.r * 0.9 - rz), b = pj(cx + uz * s.r * 0.9, cz - ux * s.r * 0.9 - rz);
+          ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        }
+        ctx.stroke();
+      } else if (cur.kind === 'pour' && cur.from0 && bo) {
+        const a = pj(bo.x + bo.r * 0.5, bo.z - bo.r * 0.2 - rz), g = pj(s.x, s.z - rz);
+        ctx.globalAlpha = 0.85; ctx.strokeStyle = ATK_FX.molten; ctx.lineWidth = (3 + 8 * p) * g.s;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x + g.x) / 2, a.y - 40, g.x, g.y); ctx.stroke();
+      } else if (cur.kind === 'rain') {
+        const g = pj(s.x, s.z - rz), h = (1 - p) * 210 * g.s;
+        ctx.globalAlpha = 0.9; ctx.fillStyle = ATK_FX.molten;
+        ctx.beginPath(); ctx.arc(g.x, g.y - h, 5 * g.s, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(g.x, g.y - h - 9 * g.s, 3 * g.s, 0, Math.PI * 2); ctx.fill();
+      } else if (cur.kind === 'mace' && cur.apex) {
+        const a = cur.phi - cur.half * (cur.swing || 1), R = cur.R * 0.88;
+        const o = pj(cur.apex[0], cur.apex[1] - rz), h = pj(cur.apex[0] + Math.cos(a) * R, cur.apex[1] + Math.sin(a) * R - rz);
+        ctx.globalAlpha = 0.95; ctx.strokeStyle = ATK_FX.gold; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(h.x, h.y); ctx.stroke();
+        ctx.fillStyle = ATK_FX.gold;
+        ctx.beginPath(); ctx.arc(h.x, h.y, (9 + 3 * Math.sin(now * 18)) * h.s, 0, Math.PI * 2); ctx.fill();
       }
-    } else if (cur.kind === 'burst' && tele) {
-      //  경보 원: 흐린 바탕 + 안쪽에서 차오르는 채움(반지름 × p) + 깜빡이는 테
-      ctx.globalAlpha = 0.12 * blink; ctx.fillStyle = ATK_DANGER;
-      worldCirclePath(cur.tx, cur.tz, cur.R, rz); ctx.fill();
-      ctx.globalAlpha = 0.34; ctx.fillStyle = ATK_DANGER;
-      worldCirclePath(cur.tx, cur.tz, Math.max(2, cur.R * p), rz); ctx.fill();
-      ctx.globalAlpha = 0.9 * blink; ctx.strokeStyle = ATK_DANGER; ctx.lineWidth = 3;
-      worldCirclePath(cur.tx, cur.tz, cur.R, rz); ctx.stroke();
-      //  던진 큰 탄: 보스 → 떨어질 자리로 포물선(높이 = 화면 px), 바닥 그림자
-      const gx = cur.ox + (cur.tx - cur.ox) * p, gz = cur.oz + (cur.tz - cur.oz) * p;
-      const g = pj(gx, gz - rz), hgt = 150 * 4 * p * (1 - p) * g.s;
-      const L = ATK_LOOK[cur.look] ?? ATK_LOOK.orb;
-      ctx.globalAlpha = 0.35; ctx.fillStyle = 'rgba(20,25,35,1)';
-      ctx.beginPath(); ctx.ellipse(g.x, g.y, 11 * g.s, 4 * g.s, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 1; ctx.fillStyle = L.color;
-      ctx.beginPath(); ctx.arc(g.x, g.y - hgt, 10 * g.s, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  }
+  //  남은 쇳물 웅덩이(붓기 — 식을 때까지 들어가면 피해): 주황·분홍 발광 원 + 노란 거품(시각 now 로 끓는다). 마지막 0.5초에 흐려진다
+  function drawPool(s, left, now, rz) {
+    const fade = Math.min(1, left / 0.5);
+    ctx.globalAlpha = 0.55 * fade; ctx.fillStyle = ATK_FX.molten; worldCirclePath(s.x, s.z, s.R, rz); ctx.fill();
+    ctx.globalAlpha = 0.5 * fade; ctx.fillStyle = '#FFB347'; worldCirclePath(s.x, s.z, s.R * 0.62, rz); ctx.fill();
+    ctx.globalAlpha = 0.65 * fade; ctx.fillStyle = '#FFE08A';
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.047 + now * 0.8, rr = s.R * (0.2 + 0.12 * i), q = pj(s.x + Math.cos(a) * rr, s.z + Math.sin(a) * rr - rz);
+      ctx.beginPath(); ctx.arc(q.x, q.y, ((1 + Math.sin(now * 5 + i * 2)) * 2 + 1) * q.s, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 0.9 * fade; ctx.strokeStyle = '#FF5FA8'; ctx.lineWidth = 2.5; worldCirclePath(s.x, s.z, s.R, rz); ctx.stroke();
+  }
+  //  그물에 걸린 부대(규칙 run.slowT — 읽기만): 부대 위에 흰 거미줄(느려진 동안, 끝나 갈수록 흐려진다)
+  function drawSlowWeb(run) {
+    if (!(run.slowT > 0) || !run.units.length) return;
+    const zc = run.z - (run.ay || 0), c = pj(run.x, zc - run.z), R = 70;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, run.slowT / 0.6) * 0.75; ctx.strokeStyle = ATK_FX.web; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, q = pj(run.x + Math.cos(a) * R, zc + Math.sin(a) * R - run.z); ctx.moveTo(c.x, c.y); ctx.lineTo(q.x, q.y); }
+    ctx.stroke();
+    for (const f of [0.4, 0.75]) { worldCirclePath(run.x, zc, R * f, run.z, 16); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  //  r4.9 보스 고유 공격이 터질 때(셸 fx.atkBlasts — 규칙 좌표, 이벤트 bossBoom 이 넣는다) 보스 특색 연출:
+  //   매연(주황 불꽃 + 부푸는 회색 연기) · 갈고리(강철 번쩍 + 먼지 고리) · 거미줄(흰 줄 무늬) · 레일(열차 몸통 질주) · 쇳물(주황 튀김 고리) ·
+  //   철퇴(금빛 팔이 부채꼴을 쓸고 지나간 자리 잔상) · 충격파(끊긴 금빛 고리가 퍼진다)
+  function drawAtkBlasts(list, rz) {
+    if (!list || !list.length) return;
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const b of list) {
+      const k = Math.max(0, Math.min(1, b.t / (b.life || 0.35))), s = b.shape;
+      if (!s) continue;
+      if (b.kind === 'smoke') {
+        if (k < 0.35) { ctx.globalAlpha = 0.7 * (1 - k / 0.35); ctx.fillStyle = ATK_FX.flame; worldCirclePath(s.x, s.z, s.R * (0.5 + k), rz); ctx.fill(); }
+        ctx.globalAlpha = 0.55 * (1 - k); ctx.fillStyle = ATK_FX.smoke;
+        for (let i = 0; i < 5; i++) { const a = i * 1.2566, d = s.R * 0.45 * (0.6 + k); worldCirclePath(s.x + Math.cos(a) * d, s.z + Math.sin(a) * d, s.R * (0.35 + 0.35 * k), rz, 16); ctx.fill(); }
+      } else if (b.kind === 'hook') {
+        ctx.globalAlpha = 0.85 * (1 - k); ctx.strokeStyle = ATK_FX.steel; ctx.lineWidth = 5 * (1 - k) + 1;
+        worldCirclePath(s.x, s.z, s.R * (0.3 + 0.8 * k), rz); ctx.stroke();
+        if (k < 0.3) { ctx.globalAlpha = 0.6 * (1 - k / 0.3); ctx.fillStyle = '#FFFFFF'; worldCirclePath(s.x, s.z, s.R * 0.35, rz); ctx.fill(); }
+      } else if (b.kind === 'web') {
+        ctx.globalAlpha = 0.9 * (1 - k); ctx.strokeStyle = ATK_FX.web; ctx.lineWidth = 1.8;
+        webLines(s, rz);
+      } else if (b.kind === 'rail' || b.kind === 'crossrail') {
+        trainDash(s, k, rz);
+      } else if (b.kind === 'pour' || b.kind === 'rain') {
+        ctx.globalAlpha = 0.85 * (1 - k); ctx.strokeStyle = ATK_FX.molten; ctx.lineWidth = 4 * (1 - k) + 1;
+        worldCirclePath(s.x, s.z, s.R * (0.4 + 0.8 * k), rz); ctx.stroke();
+      } else if (b.kind === 'mace' && s.pts) {
+        const apex = s.pts[0], arc = s.pts.slice(1), m = Math.max(1, Math.round((arc.length - 1) * k));
+        const sweep = arc;
+        ctx.globalAlpha = 0.35 * (1 - 0.5 * k); ctx.fillStyle = ATK_FX.gold; worldPolyPath([apex, ...sweep.slice(0, m + 1)], rz, 3); ctx.fill();
+        const a = pj(apex[0], apex[1] - rz), h = pj(sweep[m][0], sweep[m][1] - rz);
+        ctx.globalAlpha = 1; ctx.strokeStyle = ATK_FX.gold; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(h.x, h.y); ctx.stroke();
+        ctx.fillStyle = ATK_FX.gold; ctx.beginPath(); ctx.arc(h.x, h.y, 11 * h.s, 0, Math.PI * 2); ctx.fill();
+      } else if (b.kind === 'quake' && s.t === 'ring') {
+        const R = Math.max(4, (s.R + s.th) * k);
+        ctx.globalAlpha = 0.9 * (1 - 0.6 * k); ctx.strokeStyle = ATK_FX.gold; ctx.lineWidth = 6;
+        ctx.beginPath();
+        for (let i = 0; i <= 36; i++) { const a = s.ang + s.half + (Math.PI * 2 - 2 * s.half) * i / 36, q = pj(s.x + Math.cos(a) * R, s.z + Math.sin(a) * R - rz); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
 
-  //  r4.8 보스 공격 폭발 연출(셸 fx.atkBlasts — 규칙 좌표, 이벤트 bossFire 가 넣는다): ③ 기둥 = 흰·붉은 기둥이 번쩍 사라진다 · ⑤ 산개탄 = 원이 퍼지며 사라진다
-  function drawAtkBlasts(list, rz) {
-    if (!list || !list.length) return;
-    ctx.save();
-    for (const b of list) {
-      const k = Math.max(0, Math.min(1, b.t / (b.life || 0.35)));
-      if (b.kind === 'pillar') {
-        for (const x of b.xs || []) {
-          ctx.globalAlpha = 0.75 * (1 - k); ctx.fillStyle = '#FFE6D0';
-          worldBoxPath(x - b.w / 2 * (1 - 0.4 * k), x + b.w / 2 * (1 - 0.4 * k), rz - 170, rz + 720, rz); ctx.fill();
-          ctx.globalAlpha = 0.5 * (1 - k); ctx.fillStyle = ATK_DANGER;
-          worldBoxPath(x - b.w / 2, x + b.w / 2, rz - 170, rz + 720, rz); ctx.fill();
-        }
-      } else if (b.kind === 'burst') {
-        ctx.globalAlpha = 0.8 * (1 - k); ctx.strokeStyle = b.color || ATK_DANGER; ctx.lineWidth = 4 * (1 - k) + 1;
-        worldCirclePath(b.x, b.z, b.R * (0.4 + 0.6 * k), rz); ctx.stroke();
-      }
-    }
-    ctx.restore();
-  }
 
   //  파편·플로터·팝은 셸이 만드는 시점에 투영한 **화면 좌표**를 들고 있다(main.js) — 여기서는 그대로 찍는다
   function drawParts(parts) {
@@ -2451,6 +2632,8 @@ export function createRenderer3(ctx, sprites) {
     drawBullets(run);
     drawEshots(run);
     drawSquad(run, fx, now);
+    //  r4.9 거미줄 그물에 걸린 부대(느려진 동안)
+    drawSlowWeb(run);
     drawBeams(fx.beams ?? []);
     drawRecruits(fx.recruits);
     drawShocks(fx.shocks ?? []);

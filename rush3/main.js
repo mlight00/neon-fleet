@@ -7,7 +7,7 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox, ATK_LOOK, ATK_DANGER } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox, ATK_LOOK } from './render.js';
 import { UP_TRACKS, UP_MAX, UP_EFFECT, normUp, hasUp, nextCost, canBuy } from './meta.js';
 import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
@@ -326,6 +326,8 @@ export function makeFx() {
 
 //  r4.4 피해 이전 빛줄기 수명(초)·보호막이 깨질 때 조각 수
 const BEAM_SEC = 0.3, SHIELD_SHARDS = 10;
+//  r4.9 보스 광역 공격이 터지는 연출 길이(초 — render.drawAtkBlasts 가 이 동안 그린다). 열차 질주·철퇴 휩쓸기는 짧고 굵게, 매연·거미줄은 조금 오래
+const ATK_BLAST_SEC = Object.freeze({ smoke: 0.55, hook: 0.4, web: 0.6, rail: 0.32, crossrail: 0.32, pour: 0.4, rain: 0.3, mace: 0.3, quake: 0.4 });
 
 //  쓰러진 적 등록(kill·touch 공통). 규칙은 이미 enemies 에서 뺐으므로 위치만 셸이 기억한다.
 //  r3.24: 잡졸만이 아니라 모든 적 — kind·skin·r·역할(role)과 머무는 시간(life)을 싣는다. 잡졸 = 사망 시트 + 머묾, 나머지 = 역할별 deathSec
@@ -1165,17 +1167,18 @@ export function boot(canvas, deps = {}) {
         //  r4.9 (가) 탄 공격 장전: 장전음만(도로에 안내 없음 — 번쩍임은 렌더가 보스 몸에만 그린다)
         case 'bossCharge': fx.sfx.push(['bossCharge']); break;
         //  발사: 기둥 포격 = 기둥마다 번쩍 + 흔들림 + 폭발음 · 산개탄 = 떨어진 자리 폭발 · 조준 대포·벽·쓸기 = 금속 발사음
-        case 'bossFire': {
-          const col = (ATK_LOOK[ev.look] ?? ATK_LOOK.orb).color;
-          if (ev.kind === 'pillar') {
-            fx.atkBlasts.push({ kind: 'pillar', xs: ev.xs, w: ev.w, t: 0, life: 0.35 });
-            for (const x of ev.xs || []) burstAt(x, run.z - (run.ay || 0), 18, false, ATK_DANGER);
-            fx.shakeT = FX.shakeDur; fx.sfx.push(['kill']);
-          } else if (ev.kind === 'burst') {
-            fx.atkBlasts.push({ kind: 'burst', x: ev.x, z: ev.z, R: ev.R ?? 60, color: col, t: 0, life: 0.35 });
-            burstAt(ev.x, ev.z, 16, true, col);
-            fx.sfx.push(['kill']);
-          } else fx.sfx.push(['gateClang']);
+        //  r4.9 탄 공격 발사: 발사음(금속 발사 — 탄은 이 순간부터 보인다)
+        case 'bossFire': fx.sfx.push(['gateClang']); break;
+        //  r4.9 광역 구역이 터짐: 보스 특색 연출(render.drawAtkBlasts — 매연·갈고리·거미줄·열차 질주·쇳물·철퇴·충격파) + 폭발음 + 흔들림(구역 안에 병사가 있으면 크게).
+        //   파편은 구역 가운데에 그 보스 탄 색으로
+        case 'bossBoom': {
+          const s = ev.shape;
+          fx.atkBlasts.push({ kind: ev.kind, shape: s, look: ev.look, t: 0, life: ATK_BLAST_SEC[ev.kind] ?? 0.4 });
+          const col = (ATK_LOOK[ev.look] ?? ATK_LOOK.debris).color;
+          const c = s.t === 'circ' || s.t === 'ring' ? [s.x, s.z] : s.t === 'rect' ? [(s.x0 + s.x1) / 2, (s.z0 + s.z1) / 2] : null;
+          if (c) burstAt(c[0], c[1], 14, ev.kind !== 'rain', col);
+          fx.shakeT = Math.max(fx.shakeT, FX.shakeDur * (ev.hits > 0 ? 1 : 0.5));
+          fx.sfx.push(['kill']);
           break;
         }
         case 'bossAtkEnd': break;

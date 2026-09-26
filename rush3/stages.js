@@ -454,10 +454,11 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   //   보스 등장부터 승리까지 대형 반폭 상한(combat.stepHwCap). 아래 보스 체력 바닥의 상한 화력 계산기도 **같은 대형**으로 잰다(firepower.bossDpsFor — stage.bossHw).
   //   검사용 배수 1 줄(normal)은 이 칸이 없다(종전 판 그대로)
   if (mult.bossHw && stage.elites.length) stage.bossHw = mult.bossHw;
-  //  r4.8 보스 공격 패턴(이사님 지시 2026-09-26 "모든 보스가 같은 패턴의 같은 총알만 쏟아낸다"): 줄 표의 bossPatterns 가 참인 줄(게임 화면 = brutal)에서만
-  //   보스 정의마다 atk = { seq(패턴 순서), open(처음 열린 수), gap(공격 간격 초), look(탄 모양) }(bossatk.atkPlanFor — 스킨·역할·광장으로 정한다).
-  //   combat 은 atk 가 있는 보스를 조준 부채꼴 대신 예고·안전 구역 패턴으로 돌린다. 배수 1 줄(normal)은 칸이 없다(종전 부채꼴 그대로)
-  if (mult.bossPatterns) for (const e of stage.elites) e.atk = atkPlanFor(e, !!stage.arena);
+  //  r4.8 보스 공격 패턴 → r4.9 보스별 고유 공격(이사님 실플레이 4차 2026-09-26 "각 보스마다 특색있는 패턴"): 줄 표의 bossPatterns 가 참인 줄(게임 화면 = brutal)에서만
+  //   보스 정의마다 atk = { skin(공격을 정하는 스킨 — 그림이 없는 보스는 B1 그레이더), seq(고유 공격 순서), open(처음 열린 수), gap(공격 간격 초), look(탄 모양) }
+  //   (bossatk.atkPlanFor — 스킨·역할로 정한다. 페이즈가 없는 판(1·2번)은 스킨의 early 를 처음부터 번갈아). combat 은 atk 가 있는 보스를 조준 부채꼴 대신 고유 공격으로 돌린다.
+  //   배수 1 줄(normal)은 칸이 없다(종전 부채꼴 그대로)
+  if (mult.bossPatterns) for (const e of stage.elites) e.atk = atkPlanFor(e, !!stage.arena, { phases: stage.bossPhases });
   //  r4.7 보스 체력 바닥(이사님 지시 2026-09-26 "적어도 보스와 30초는 싸울 수 있도록"): 줄 표의 bossFloor 가 참인 줄(게임 화면 = brutal)에서만.
   //   보스 체력 합 ÷ 상한 화력(rush3/firepower.js — 이 판을 가장 잘 했을 때 보스 앞 부대가 보스에 실제로 닿는 초당 피해) ≥ BAL3.bossMinFightSec.
   //   모자라면 비율을 지키며 올린다(옛 체력 아래로는 안 내려간다). 랜덤 길은 풀의 좋은 결과 중 최선으로 계산하므로 추첨 시드와 무관하게 같은 체력이다.

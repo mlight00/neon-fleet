@@ -8,8 +8,9 @@ import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlapping
 import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.js';
 //  r4.4 판 밖 로봇 강화(순수 규칙 모듈 — 비용·구매는 셸·저장 몫, 여기서는 효과 수치만 읽는다)
 import { normUp, hasUp, effects } from './meta.js';
-//  r4.8 보스 공격 패턴 설계(순수 규칙 모듈 — 안전 구역을 먼저 정한 공격 한 번의 기하). 차례·예고 시간·탄 생성·피해는 여기(bossAttackStep)
-import { planAttack, unlockedAtk, atkType } from './bossatk.js';
+//  r4.9 보스 고유 공격 설계(순수 규칙 모듈 — 위험과 안전 상자를 함께 정한 공격 한 번의 기하 · 탄 길 따라가기 · 광역 구역 × 병사 판정).
+//   차례·장전/경보 시간·탄 생성·피해는 여기(bossAttackStep)
+import { planAttack, unlockedAtk, pathAt, shapeHitsUnit } from './bossatk.js';
 
 export const STEP = BAL3.STEP;
 
@@ -20,9 +21,11 @@ const ELITES = BAL3.elites;
 const ARENA_BOSS_Z = BAL3.arena.bossZ;
 //  체력 비례 크기(r3.31) 표. 파일 상단 상수 — stepRun 이후 소스가 BAL3 를 직접 읽지 않는 규약(DIFF-6)을 지킨다
 const SIZE_BY_HP = BAL3.sizeByHp;
-//  r4.8 보스 공격 패턴 표(첫 예고까지·다시 볼 때까지 초) · 보스 페이즈 표(공격 간격 × rate). 파일 상단 상수
+//  r4.8 보스 공격 표(첫 공격까지·다시 볼 때까지·장전 초) · 보스 페이즈 표(공격 간격 × rate). 파일 상단 상수
 const BATK = BAL3.bossAtk;
 const PHASES = BAL3.bossPhases;
+//  r4.9 거미줄 그물에 걸린 부대의 이동 배수(run.slowT 초 동안 — 게임 화면 줄에서 그물이 병사를 잡았을 때만 생기는 희소 칸)
+const WEB_SLOW = BAL3.bossAtk.kinds.web.slowMul;
 const HP_BASE = Object.freeze(Object.fromEntries(Object.entries(BAL3.enemies).filter(([, d]) => d.hp != null).map(([k, d]) => [k, d.hp])));
 const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
 const DEG = Math.PI / 180;
@@ -259,12 +262,16 @@ function stepBonus(run, input, dt) {
 //   광장 밖에서는 dragDy·keyDirY 를 **읽지 않는다**(회귀 없음). x 범위는 squadOpts 로 광장 폭(40~440 → 중심 100~380)까지 넓어진다
 function steer(run, inp, dt) {
   const px = inp.pointerX;
+  const x0 = run.x, ay0 = run.ay || 0;
   //  pointerX 가 null 이면 tx 를 덮어쓰지 않는다(키·드래그로 옮긴 목표가 옛 마우스 위치로 되돌아가지 않게 — 계약서 6장 장치 우선순위)
   if (px !== null && px !== undefined && Number.isFinite(px)) run.tx = px;
   run.tx += Number.isFinite(inp.dragDx) ? inp.dragDx : 0;
   run.tx += (inp.keyDir || 0) * SQ.keySpeed * dt;
   const want = (run.tx - run.x) * (1 - Math.exp(-SQ.followRate * dt));
-  const cap = SQ.moveMax * dt;
+  //  r4.9 거미줄 그물 느려짐(run.slowT — 게임 화면 줄에서 그물이 병사를 잡았을 때만): 그동안 최고 속도(가로·세로 모두) × WEB_SLOW. 다 지나면 칸을 지운다
+  const slow = run.slowT > 0;
+  if (slow) { run.slowT -= dt; if (run.slowT <= 1e-9) delete run.slowT; }
+  const cap = SQ.moveMax * (slow ? WEB_SLOW : 1) * dt;
   run.x += Math.max(-cap, Math.min(cap, want));
   if (inArena(run)) {
     const [d0, d1] = run.arena.depth;
@@ -277,6 +284,9 @@ function steer(run, inp, dt) {
   stepHwCap(run, dt);
   const c = clampCenter(run, run.walls, squadOpts(run));
   compressUnits(run.units, c.dxLo, c.dxHi);
+  //  r4.9 부대 속도(px/s — 가로 svx · 세로 svz): 보스 공격이 있는 판(게임 화면 줄)에만 있는 희소 칸. 겨누는 공격(갈고리·그물·레일·쇳물·충격파 등)이
+  //   움직이는 부대의 **가는 쪽 앞**을 겨누게 설계가 읽는다(가만히 선 부대는 0 — 지금 자리를 겨눈다). 보스전에는 카메라가 멈춰 세로 = ay 의 변화
+  if (run.bossAtk) { run.svx = (run.x - x0) / dt; run.svz = -((run.ay || 0) - ay0) / dt; }
 }
 
 //  r4.8 보스전 밀집 대형 전환(1단계 조향 안, clampCenter 앞): run.hwCap 을 목표 쪽으로 SQ.bossHwRate px/s 씩 옮긴다 —
@@ -814,26 +824,32 @@ function bossAct(run, bo, ev, dt) {
   }
 }
 
-//  ── r4.8 보스 공격 패턴(게임 화면 줄 — run.bossAtk 가 있는 판만) ──────────────────────────────────────────
-//  이사님 지시(2026-09-26) "보스에 가면 … 피할 수가 없이 모든 총알을 맞게 된다" · "모든 보스가 같은 패턴의 같은 총알만 쏟아낸다".
-//  r4.9 (가) 안내 규칙(이사님 실플레이 4차 "날아오는 총알의 경우는 없애자. 광역 대미지가 있는 구역에 대한 경보만 주자"):
-//   탄 공격 = 장전(charge 초 — 보스 몸 번쩍임만, 도로에 안내 없음, 이벤트 bossCharge) → 장전이 끝난 STEP 의 부대 자리로 **다시 설계**해 발사(bossFire) →
-//            그 공격의 탄이 모두 사라지면 끝. 다시 설계가 안 되면(장전 동안 부대가 설계가 안 되는 곳으로 갔다) 쏘지 않고 거둔다(retry 초 뒤 다시).
-//   광역 공격 = 경보(tele 초 — 붉은 경보 구역, 이벤트 bossTele) → 터짐 → 끝.
-//  끝 → 보스 간격 gap × 페이즈 rate 뒤 다음 공격. 전체에 공격 1개(보스가 여럿이면 번호 순으로 차례). 설계(안전 구역 보장)는 bossatk.planAttack — 보장이 안 되는 패턴은 고르지 않는다. 난수 없음.
-//  탄의 판정·피해 기록(lossByShot)·이벤트는 기존 적탄 경로(moveEshots → damageUnit)를 그대로 지난다. 탄 칸 atk(공격 번호)·pat(패턴)·look(보스 탄 모양)·life(수명)는 희소 칸
+//  ── r4.9 보스 고유 공격(게임 화면 줄 — run.bossAtk 가 있는 판만) ──────────────────────────────────────────
+//  이사님 지시(2026-09-26) r4.8 "보스에 가면 … 피할 수가 없이 모든 총알을 맞게 된다" → r4.9 실플레이 4차 "각 보스마다 특색있는 패턴" ·
+//   "날아오는 총알의 경우는 (안내를) 없애자. 광역 대미지가 있는 구역에 대한 경보만 주자".
+//  탄 공격 = 장전(charge 초 — 보스 몸 번쩍임만, 도로에 안내 없음, 이벤트 bossCharge) → 장전이 끝난 STEP 의 부대 자리로 **다시 설계**해 발사(bossFire) —
+//            설계의 탄 길(shots[].path)대로 때가 된 탄을 내고(줄기·연발은 늦게 나오는 탄이 있다) 그 공격의 탄이 모두 사라지면 끝.
+//            다시 설계가 안 되면(장전 동안 부대가 설계가 안 되는 곳으로 갔다) 쏘지 않고 거둔다(retry 초 뒤 다시).
+//  광역 공격 = 경보(tele 초 — 붉은 경보 구역, 이벤트 bossTele) → 구역마다 제 시각(at)에 터짐(bossBoom — 그 구역 안 병사 모두 피해) →
+//            남는 쇳물(linger)은 tick 초마다 안의 병사에게 피해 · 그물(slow)은 걸린 병사가 있으면 부대 느려짐(run.slowT) → 모든 구역이 끝나면 끝.
+//  끝 → 보스 간격 gap × 페이즈 rate 뒤 다음 공격. 전체에 공격 1개(보스가 여럿이면 번호 순으로 차례). 설계(안전 상자 보장)는 bossatk.planAttack — 보장이 안 되는 공격은 고르지 않는다. 난수 없음.
+//  탄의 판정·피해 기록(lossByShot)·이벤트는 기존 적탄 경로(moveEshots → damageUnit)를 그대로 지난다. 탄 칸 atk(공격 번호)·pat(공격)·look(보스 탄 모양)·path·age·seg 는 희소 칸.
+//  광역 피해도 같은 damageUnit(손실 원인 'shot' — 보스 공격) · 로봇 보호(heroGuard)는 착지 충격과 같은 꼴(로봇 몫은 구역 **밖**의 가장 가까운 호위에게)
 
-//  이 보스가 공격 때문에 멈춰 있어야 하는가: 공격이 멈춤(pause — 조준 대포·쓸기)이면 장전·경보 중 + 쓸기 발사 중(출발점이 설계 그대로)
+//  이 보스가 공격 때문에 멈춰 있어야 하는가(설계 pause — 보스 몸에서 나오거나 보스 둘레를 치는 공격): 장전·경보 중 + 탄을 다 낼 때까지 · 광역은 다 터질 때까지
 function atkPaused(run, bo) {
   const c = run.bossAtk && run.bossAtk.cur;
-  return !!(c && c.pause && c.boss === bo.id && (c.state === 'tele' || c.state === 'charge' || (c.kind === 'sweep' && c.fired < c.xs.length)));
+  if (!(c && c.pause && c.boss === bo.id)) return false;
+  if (c.state === 'charge' || c.state === 'tele') return true;
+  if (c.type === 'shot') return c.spawned < c.shots.length;
+  return c.zones.some((z) => !z.done);
 }
 
 //  6단계 끝(보스가 움직인 뒤): 진행 중인 공격을 한 STEP 진행하거나, 없으면 준비된 보스가 있을 때만 대기 시계를 돌려 다음 공격을 고른다.
 //   준비 = 도로 하강을 마친 hold · 광장 추격 chase(예고·돌진·회복 중에는 시작하지 않는다 — 돌진 시계도 공격 동안 멈춘다).
-//   고르기 = 번호(index)가 turn 이상인 첫 보스부터 돌아가며, 그 보스의 열린 패턴(bossatk.unlockedAtk — 페이즈마다 하나씩 더)을 공격 횟수 atkN 순서로 보고
-//   설계가 되는 첫 패턴. 아무것도 안 되면 retry 초 뒤 다시.
-//   r4.9 (가): 탄 공격은 여기서 '설계가 되는가'만 보고 장전(state 'charge')으로 들어간다 — 실제 설계는 장전이 끝난 STEP(advanceAttack)
+//   고르기 = 번호(index)가 turn 이상인 첫 보스부터 돌아가며, 그 보스의 열린 공격(bossatk.unlockedAtk — 페이즈마다 하나씩 더)을 공격 횟수 atkN 순서로 보고
+//   설계가 되는 첫 공격. 아무것도 안 되면 retry 초 뒤 다시.
+//   탄 공격은 여기서 '설계가 되는가'만 보고 장전(state 'charge')으로 들어간다 — 실제 설계는 장전이 끝난 STEP(advanceAttack)
 function bossAttackStep(run, ev, dt) {
   const A = run.bossAtk;
   if (A.cur) { advanceAttack(run, A, ev, dt); return; }
@@ -855,11 +871,11 @@ function bossAttackStep(run, ev, dt) {
       A.turn = bo.index + 1; A.n++;
       if (plan.type === 'shot') {
         //  장전: 도로에 그릴 것이 없다(설계 칸을 싣지 않는다 — 렌더는 보스 몸 번쩍임만). k 는 발사 때 다시 설계할 때 쓴다
-        A.cur = { kind, type: 'shot', boss: bo.id, serial: A.n, look: bo.atk.look, state: 'charge', t: BATK.charge, charge: BATK.charge, k, pause: !!plan.pause, age: 0, fired: 0 };
+        A.cur = { kind, type: 'shot', boss: bo.id, serial: A.n, look: bo.atk.look, state: 'charge', t: BATK.charge, charge: BATK.charge, k, pause: !!plan.pause, age: 0 };
         ev.push({ type: 'bossCharge', id: bo.id, kind, serial: A.n, charge: BATK.charge, x: bo.x, z: bo.z });
       } else {
-        A.cur = { ...plan, boss: bo.id, serial: A.n, look: bo.atk.look, state: 'tele', t: plan.tele, age: 0, fired: 0 };
-        ev.push({ type: 'bossTele', id: bo.id, kind, serial: A.n, tele: plan.tele, x: bo.x, z: bo.z });
+        A.cur = { ...plan, zones: plan.zones.map((z) => ({ ...z, done: false })), boss: bo.id, serial: A.n, look: bo.atk.look, state: 'tele', age: 0 };
+        ev.push({ type: 'bossTele', id: bo.id, kind, serial: A.n, tele: plan.tele, zones: plan.zones.length, x: bo.x, z: bo.z });
       }
       return;
     }
@@ -867,74 +883,77 @@ function bossAttackStep(run, ev, dt) {
   A.wait = BATK.retry;
 }
 
-//  진행: 장전(탄 — t 가 0 이 되면 그 순간의 부대 자리로 다시 설계해 발사) · 경보(광역 — t 가 0 이 되면 터짐) →
-//   발사 뒤(쓸기는 every 초마다 한 발씩 dur 동안) → 그 공격 번호의 탄이 하나도 없으면 끝
+//  진행: 탄 = 장전(t 가 0 이 되면 그 순간의 부대 자리로 다시 설계해 발사) → 때가 된 탄을 낸다(보스가 쓰러지면 더 내지 않는다) → 그 공격 번호의 탄이 하나도 없으면 끝 /
+//   광역 = 구역마다 제 시각에 터지고(첫 구역이 터지면 state 'act') 남는 쇳물이 식으면 끝. 경보·쇳물 중에 그 보스가 쓰러지면 공격을 거둔다
 function advanceAttack(run, A, ev, dt) {
   let cur = A.cur;
   const bo = run.bosses.find((b) => b.id === cur.boss) ?? null;
+  const alive = !!(bo && !bo.dead);
   cur.age += dt;
-  if (cur.state === 'charge' || cur.state === 'tele') {
-    //  장전·경보 중에 그 보스가 쓰러지면 공격을 거둔다(쏘지 않는다)
-    if (!bo || bo.dead) { endAttack(A, bo, ev, true); return; }
+  if (cur.type === 'aoe') {
+    if (!alive) { endAttack(A, bo, ev, true); return; }
+    stepZones(run, cur, ev);
+    if (cur.zones.every((z) => z.done && !(z.until > cur.age + 1e-9))) endAttack(A, bo, ev, false);
+    return;
+  }
+  if (cur.state === 'charge') {
+    if (!alive) { endAttack(A, bo, ev, true); return; }
     cur.t -= dt;
     if (cur.t > 1e-9) return;
-    if (cur.state === 'charge') {
-      const plan = planAttack(run, bo, cur.kind, cur.k);
-      if (!plan) { endAttack(A, bo, ev, true); return; }
-      cur = A.cur = { ...plan, boss: cur.boss, serial: cur.serial, look: cur.look, state: 'act', t: 0, age: cur.age, fired: 0 };
-    } else { cur.state = 'act'; cur.t = 0; }
-    fireAttack(run, cur, ev);
+    const plan = planAttack(run, bo, cur.kind, cur.k);
+    if (!plan) { endAttack(A, bo, ev, true); return; }
+    //  탄은 나오는 시각 순서로(같은 시각은 설계 순서 그대로 — 안정 정렬)
+    const shots = [...plan.shots].sort((p, q) => p.path[0][0] - q.path[0][0]);
+    cur = A.cur = { ...plan, shots, boss: cur.boss, serial: cur.serial, look: cur.look, state: 'act', t: 0, age: cur.age, spawned: 0 };
+    ev.push({ type: 'bossFire', id: cur.boss, kind: cur.kind, serial: cur.serial, x: bo.x, z: bo.z, look: cur.look, n: shots.length });
   } else cur.t += dt;
-  if (cur.kind === 'sweep') sweepShots(run, cur, bo);
-  const firing = cur.kind === 'sweep' && cur.fired < cur.xs.length;
-  if (!firing && !run.eshots.some((s) => s.atk === cur.serial && !s.dead)) endAttack(A, bo, ev, false);
+  if (alive) spawnShots(run, cur);
+  else cur.spawned = cur.shots.length;
+  if (cur.spawned >= cur.shots.length && !run.eshots.some((s) => s.atk === cur.serial && !s.dead)) endAttack(A, bo, ev, false);
 }
 
-//  발사(장전·경보가 끝난 STEP): ① 조준 대포 1발 · ② 벽 한 줄 · ⑤ 산개탄 n 발(떨어질 자리에서 퍼진다 — 수명 = 퍼질 거리 ÷ 속도) · ③ 기둥 = 탄 없이 즉시 피해. 쓸기는 sweepShots
-function fireAttack(run, cur, ev) {
+//  때가 된 탄(길의 첫 시각 ≤ 발사 뒤 경과 cur.t)을 낸다 — 자리 = 길 위 지금 시각(bossatk.pathAt). 적탄 규약(vz 양수 = z 감소) 그대로
+function spawnShots(run, cur) {
   const dmg = run.enemyDefs.elite.shot.dmg;
-  if (cur.kind === 'aim') shotFrom(run, cur, cur.ox, cur.oz, cur.ux, cur.uz, dmg);
-  else if (cur.kind === 'wall') for (const x of cur.xs) shotFrom(run, cur, x, cur.z, 0, -1, dmg);
-  else if (cur.kind === 'burst') {
-    for (let i = 0; i < cur.n; i++) {
-      const a = (i + (cur.spin ? 0.5 : 0)) * 2 * Math.PI / cur.n;
-      shotFrom(run, cur, cur.tx, cur.tz, Math.sin(a), Math.cos(a), dmg).life = cur.reach / cur.v;
-    }
-  } else if (cur.kind === 'pillar') pillarBlast(run, cur, dmg, ev);
-  ev.push({ type: 'bossFire', id: cur.boss, kind: cur.kind, serial: cur.serial, x: cur.tx ?? cur.ox ?? null, z: cur.tz ?? cur.oz ?? null,
-            xs: cur.xs ? [...cur.xs] : null, w: cur.w ?? null, R: cur.R ?? null, look: cur.look, band: [cur.band[0], cur.band[1]] });
-}
-
-//  ④ 쓸기: 발사 뒤 every 초마다 한 발 — 출발점(멈춘 보스)에서 부대 중심 z 의 x 들(xs, 부대 쪽 끝 → 안전 구역 앞)로. 보스가 쓰러지면 멈춘다
-function sweepShots(run, cur, bo) {
-  if (!bo || bo.dead) { cur.fired = cur.xs.length; return; }
-  const dmg = run.enemyDefs.elite.shot.dmg;
-  while (cur.fired < cur.xs.length && cur.fired * cur.every <= cur.t + 1e-9) {
-    const dx = cur.xs[cur.fired++] - cur.ox, dz = cur.tz - cur.oz, L = Math.hypot(dx, dz);
-    shotFrom(run, cur, cur.ox, cur.oz, dx / L, dz / L, dmg);
+  while (cur.spawned < cur.shots.length && cur.shots[cur.spawned].path[0][0] <= cur.t + 1e-9) {
+    const sh = cur.shots[cur.spawned++];
+    const p = pathAt(sh.path, cur.t);
+    run.eshots.push({ x: p.x, z: p.z, px: p.x, pz: p.z, vx: p.vx, vz: p.vz, dmg, r: sh.r, dead: false,
+                      atk: cur.serial, pat: cur.kind, look: cur.look, path: sh.path, age: cur.t, seg: p.i });
   }
 }
 
-//  패턴 탄 1발: 출발 (x, z) · 단위 방향 (ux, uz)(uz < 0 = 부대 쪽 아래) · 반지름·속도 = 설계 값. 적탄 규약(vz 양수 = z 감소) 그대로.
-//   아래로 나는 탄의 수명 = 부대가 있을 수 있는 가장 낮은 z(설계 zFloor) 아래로 다 지나갈 때까지(그 뒤로는 아무도 맞힐 수 없다)
-function shotFrom(run, cur, x, z, ux, uz, dmg) {
-  const s = { x, z, px: x, pz: z, vx: ux * cur.v, vz: -uz * cur.v, dmg, r: cur.r, dead: false, atk: cur.serial, pat: cur.kind, look: cur.look };
-  if (uz < -1e-6) s.life = (z - (cur.zFloor - cur.r - 4)) / (-uz * cur.v);
-  run.eshots.push(s);
-  return s;
+//  광역 구역 진행: 제 시각이 된 구역은 터진다(안의 병사 모두 피해 · 그물은 걸린 병사가 있으면 부대 느려짐 · 쇳물은 linger 초 남는다) → 이벤트 bossBoom.
+//   남은 쇳물은 tick 초마다 안의 병사에게 피해(들어가면 맞는다)
+function stepZones(run, cur, ev) {
+  for (let i = 0; i < cur.zones.length; i++) {
+    const z = cur.zones[i];
+    if (!z.done) {
+      if (cur.age + 1e-9 < z.at) continue;
+      z.done = true;
+      cur.state = 'act';
+      const hits = zoneHit(run, z, ev);
+      if (z.linger) { z.until = z.at + z.linger; z.nextTick = z.at + z.tick; }
+      if (z.slow && hits > 0) run.slowT = z.slow.sec;
+      ev.push({ type: 'bossBoom', id: cur.boss, kind: cur.kind, serial: cur.serial, zone: i, look: cur.look, shape: { ...z.shape }, hits });
+    } else if (z.until > cur.age + 1e-9 && cur.age + 1e-9 >= z.nextTick) {
+      z.nextTick += z.tick;
+      zoneHit(run, z, ev);
+    }
+  }
 }
-
-//  ③ 기둥 포격 폭발: 기둥(폭 w, 세로로 끝없는 띠)과 원이 겹치는 병사 전부 피해(손실 원인 = 적탄과 같은 'shot').
-//   로봇 보호(heroGuard)는 착지 충격과 같은 꼴 — 로봇 몫은 기둥 **밖**의 가장 가까운 호위에게(기둥 안 호위는 제 몫을 받으므로 후보에서 뺀다)
-function pillarBlast(run, cur, dmg, ev) {
-  const R = cur.w / 2 + SQ.unitR;
+//  구역 안 병사 모두 피해(로봇 몫은 구역 밖 가장 가까운 호위에게). 남는 쇳물(linger)은 병사마다 한 번만 — z.hit(맞은 유닛 id 목록, 희소 칸)에 든 병사는 다시 맞지 않는다
+function zoneHit(run, z, ev) {
+  const dmg = run.enemyDefs.elite.shot.dmg;
   const oz = squadZ(run);
-  const hits = run.units.filter((u) => u.hp > 0 && cur.xs.some((p) => Math.abs(run.x + u.dx - p) <= R));
+  let hits = run.units.filter((u) => u.hp > 0 && shapeHitsUnit(z.shape, run.x + u.dx, oz - u.dy, SQ.unitR));
+  if (z.linger) { const seen = z.hit || (z.hit = []); hits = hits.filter((u) => !seen.includes(u.id)); for (const u of hits) seen.push(u.id); }
   const inside = run.heroGuard ? new Set(hits) : null;
   for (const u of hits) damageUnit(run, u, dmg, 'shot', ev, run.x + u.dx, oz - u.dy, inside);
+  return hits.length;
 }
 
-//  공격 끝: 다음 예고까지 = 그 보스의 간격 × 페이즈 rate(페이즈는 간격만 줄이고 예고 시간은 줄이지 않는다). 거둔 공격은 retry 초
+//  공격 끝: 다음 공격까지 = 그 보스의 간격 × 페이즈 rate(페이즈는 간격만 줄이고 경보 시간은 줄이지 않는다). 거둔 공격은 retry 초
 function endAttack(A, bo, ev, cancelled) {
   const cur = A.cur;
   A.cur = null;
@@ -983,12 +1002,18 @@ function damageUnit(run, u, dmg, cause, ev, x, z, skip = null) {
 function moveEshots(run, ev, dt) {
   for (const s of run.eshots) {
     if (s.dead) continue;
-    //  r4.8 보스 패턴 탄의 수명(희소 칸 life, 초): 부대가 있을 수 있는 가장 낮은 z 아래로 지나갔거나(아래로 나는 탄) 퍼질 거리를 다 간(산개탄) 탄은 사라진다.
-    //   수명이 없는 탄(부채꼴·저격수)은 종전 그대로 화면 밖 정리(cleanup)만
-    if (s.life != null) { s.life -= dt; if (s.life <= 0) { s.dead = true; continue; } }
     s.px = s.x; s.pz = s.z;
-    s.z -= s.vz * dt;
-    s.x += s.vx * dt;
+    if (s.path) {
+      //  r4.9 보스 고유 공격 탄: 설계의 길(path) 그대로 — 발사 뒤 경과(age)의 자리. 길 끝(부대가 있을 수 있는 가장 낮은 z 아래·가장자리 밖)을 지나면 사라진다.
+      //   길이 없는 탄(부채꼴·저격수)은 종전 그대로 곧게 + 화면 밖 정리(cleanup)만
+      s.age += dt;
+      const p = pathAt(s.path, s.age, s.seg);
+      if (p.done) { s.dead = true; continue; }
+      s.x = p.x; s.z = p.z; s.vx = p.vx; s.vz = p.vz; s.seg = p.i;
+    } else {
+      s.z -= s.vz * dt;
+      s.x += s.vx * dt;
+    }
     let wall = false;
     for (const w of run.walls) if (segHitsRect(s.px, s.pz, s.x, s.z, w)) { wall = true; break; }
     if (!wall) for (const w of run.covers) if (segHitsRect(s.px, s.pz, s.x, s.z, w)) { wall = true; break; }
@@ -1099,7 +1124,7 @@ function cleanup(run, ev) {
     run.bossDefeated = true;
     run.enemies.length = 0;
     run.eshots.length = 0;
-    //  r4.8 진행 중인 보스 공격(예고 포함)도 거둔다
+    //  r4.8 진행 중인 보스 공격(장전·경보·남은 쇳물 포함)도 거둔다
     if (run.bossAtk) run.bossAtk.cur = null;
   }
   //  탄 정리(r3.17): 아래·옆으로 조준된 탄이 영원히 남지 않게 behind·x 범위를 더한다. 도로 탄은 출발 z ≥ run.z − 159 에서 +z 로만 가고

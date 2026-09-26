@@ -61,7 +61,8 @@ test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 �
     //  r4.7 몫이 실제로 들어 있다: 보스 체력 바닥(옛 값 이상) · 보스 탄 1 · r4.8 보스전 밀집 대형 64
     assert.ok(st.bossFloor && st.elites.every((e, i) => e.hp >= st.bossFloor.base[i]), `S${id} 보스 체력 바닥`);
     assert.equal(st.bossHw, 64, `S${id} 보스전 밀집 대형(r4.8)`);
-    assert.ok(st.elites.every((e) => e.atk && e.atk.seq.length >= 3), `S${id} 보스 패턴 배정(r4.8)`);
+    //  r4.9 보스별 고유 공격: 스킨마다 3종(페이즈 없는 1·2번은 처음 두 가지) · 역할 보스는 자기 스킨 공격 중 역할에 맞는 것만(23번 포격 = 1종, 소환 = 광역 1종)
+    assert.ok(st.elites.every((e) => e.atk && e.atk.seq.length >= 1 && e.atk.skin), `S${id} 보스 고유 공격 배정(r4.9)`);
     assert.equal(S(undoR47Stage(st)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
     const rp = runPart(createRun(buildStage(id, { difficulty: 'brutal' })));
     assert.equal(rp.enemyDefs.elite.shot.dmg, 1, `S${id} 보스 탄 1`);

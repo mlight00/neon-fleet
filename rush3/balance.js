@@ -138,49 +138,80 @@ export const BAL3 = deepFreeze({
   //            r4.7 보정(이사님 실플레이 2026-09-26 "보스는 괜찮은데 현상금 적이 너무 셈"): 0.9 → 0.45(절반). 상한 부대는 창의 절반쯤에 잡고,
   //            상한의 절반쯤 되는 부대가 끝까지 쏴야 깨는 정도(난이도는 봇이 아니라 이사님 실플레이 기준)
   bounty: { label: '현상금', r: 34, vz: 130, track: 120, touchDmg: 6, hpFactor: 0.45 },
-  //  보스 공격 패턴(r4.8 — 이사님 지시 2026-09-26 "적 보스의 공격 쏘는 패턴을 다양하게 만들자. 모든 보스가 같은 패턴의 같은 총알만 쏟아낸다" ·
-  //   "병사를 아무리 많이 모아도 보스에 가면 … 피할 수가 없이 모든 총알을 맞게 된다"). 게임 화면 줄(difficulty 표의 bossPatterns 가 참인 줄)에서만
-  //   buildStage 가 보스 정의에 atk(패턴 순서·처음 열린 수·간격·탄 모양)를 싣고, 그 보스는 조준 부채꼴 대신 이 패턴을 쓴다(rush3/bossatk.js 설계 · combat.js 진행).
-  //  공통 규칙(r4.9 (가) 개정): 광역만 경보(tele 초, 붉은 구역)를 보이고 탄은 장전 번쩍임 뒤 바로 날아온다(도로에 안내 없음). 안전 구역 폭 ≥ 부대 폭(2 × 반폭) + margin 이고,
-  //   부대 중심이 moveMax × 닿는 시간(광역 = 경보 · 탄 = 비행 시간) × reachK 안에서 닿는다. 보장이 안 되면 그 패턴을 고르지 않는다(다음 패턴). 전체에 공격 1개(보스가 여럿이면 차례로).
-  //   공격이 끝나면(그 공격의 탄이 모두 사라지면) 다음 예고까지 gap × 페이즈 rate 초. 페이즈(체력 50%·20%)마다 패턴이 하나씩 더 열린다.
-  //   피해 = 탄·포격 모두 병사 1명에게 적 표의 보스 탄 피해(게임 줄 1 — r4.7). ⚠️enemies 에 넣지 않는다(kind 4종 표)
+  //  보스 공격(r4.8 패턴 → **r4.9 보스별 고유 공격** — 이사님 실플레이 4차 2026-09-26 "모든 보스를 같은 패턴으로 만들지 말고 각 보스마다 특색있는 패턴을
+  //   만들어주자"). 게임 화면 줄(difficulty 표의 bossPatterns 가 참인 줄)에서만 buildStage 가 보스 정의에 atk(스킨·공격 순서·처음 열린 수·간격·탄 모양)를 싣고,
+  //   그 보스는 조준 부채꼴 대신 자기 스킨의 고유 공격을 쓴다(rush3/bossatk.js 설계 · combat.js 진행). r4.8 의 공용 5종(조준 대포·탄막 벽·기둥 포격·쓸기·산개탄)은 지웠다.
+  //  공통 규칙(r4.9 (가)): 광역만 경보(tele 초, 붉은 구역 — 차오르는 채움 + 경보음)를 보이고, 탄은 장전 번쩍임(charge 초, 보스 몸에만) 뒤 바로 날아온다(도로에 안내 없음).
+  //   안전 상자 = 부대(반폭 × 대형 깊이) + 사방 margin/2 — 폭 ≥ 부대 폭 + margin. 부대 중심이 moveMax × 닿는 시간(광역 = 경보 · 탄 = 첫 탄이 부대 띠에 닿기까지) × reachK
+  //   안에서 그 상자에 닿는다(그물 느려짐 중이면 느려진 속도로 잰다). 보장이 안 되면 그 공격을 고르지 않는다(다음 공격). 전체에 공격 1개(보스가 여럿이면 차례로).
+  //   공격이 끝나면(탄이 모두 사라지고 광역 구역이 모두 터지고 남는 쇳물이 식으면) 다음 공격까지 gap × 페이즈 rate 초. 페이즈(체력 50%·20%)마다 공격이 하나씩 더 열린다.
+  //   피해 = 탄 한 발 = 병사 1명 · 광역 = 그 구역 안 병사 모두, 각각 적 표의 보스 탄 피해(게임 줄 1 — r4.7). ⚠️enemies 에 넣지 않는다(kind 4종 표)
   bossAtk: {
     first: 1.2,   // 보스가 자리를 잡은 뒤(도로 = 하강 끝, 광장 = 추격 중) 첫 공격(탄 = 장전 · 광역 = 경보)까지(초)
-    retry: 0.25,  // 고를 수 있는 패턴이 없을 때 다시 볼 때까지(초)
-    margin: 48,   // 안전 구역 여유(px) — 부대 양옆에 24 씩
-    reachK: 0.8,  // 닿는 거리 = 부대 최고 횡속도(squad.moveMax) × 닿는 시간(광역 = 경보 초 · 탄 = 첫 탄이 부대 띠에 닿기까지 초) × 이 값
+    retry: 0.25,  // 고를 수 있는 공격이 없을 때 다시 볼 때까지(초)
+    margin: 48,   // 안전 상자 여유(px) — 부대 사방에 24 씩
+    reachK: 0.8,  // 닿는 거리 = 부대 최고 속도(squad.moveMax, 축마다) × 닿는 시간 × 이 값
     //  r4.9 (가) 안내 규칙(이사님 실플레이 4차 2026-09-26 "날아오는 총알의 경우는 없애자. 광역 대미지가 있는 구역에 대한 경보만 주자"):
-    //   type 'shot'(날아오는 탄) = 도로에 예고·조준선·화살표·안전 구역을 **그리지 않는다** — 보스 몸의 짧은 장전 번쩍임(charge 초)과 발사음만.
-    //     공격 설계는 발사 순간(장전 끝)의 부대 자리로 하고, 피할 수 있음은 **탄 속도·빈틈 폭**으로 보장한다(빈틈 폭 ≥ 부대 폭 + margin,
-    //     첫 탄이 부대 띠에 닿기까지 moveMax × 그 시간 × reachK 안에 빈틈이 있다).
-    //   type 'aoe'(광역 — 바닥에 떨어져 그 구역 안 병사가 한꺼번에 맞는 것) = 붉은 경보 구역만 tele 초 먼저(차오르는 채움 + 경보음). 초록 안전 구역 표시는 없다
+    //   type 'shot'(날아오는 탄) = 도로에 예고·조준선·화살표·안전 구역을 **그리지 않는다** — 보스 몸의 짧은 장전 번쩍임(charge 초)과 장전음·발사음만.
+    //     공격 설계는 발사 순간(장전 끝)의 부대 자리로 하고, 피할 수 있음은 **탄 속도·빈틈 폭**으로 보장한다.
+    //   type 'aoe'(광역 — 바닥에 떨어져 그 구역 안 병사가 한꺼번에 맞는 것) = 붉은 경보 구역만 tele 초 먼저. 초록 안전 구역 표시는 없다
     charge: 0.3,
-    //  ① 조준 대포(탄): 부대 몸통 안 한 점을 겨눈 크고 느린 탄 1발(반지름 r · 속도 v). 보스는 장전 동안 멈춘다
-    aim:    { type: 'shot', r: 10, v: 200 },
-    //  ② 탄막 벽(탄): 도로(광장) 전체를 가로지르는 작은 탄 한 줄이 내려온다 — 빈틈 한 곳만 비어 있다. gap = 탄 사이 간격(px, 병사 원이 빠져나갈 수 없게 좁게)
-    wall:   { type: 'shot', r: 6, v: 180, gap: 20 },
-    //  ③ 기둥 포격(광역): 붉은 세로 기둥(폭 w)이 경보 동안 차오르다 터진다 — 기둥 안 병사 모두 피해(탄 없이 즉시). 기둥 사이 최소 간격 space · 최대 max 개
-    pillar: { type: 'aoe', tele: 0.9, w: 44, space: 14, max: 3 },
-    //  ④ 쓸기(탄): 보스가 멈춰 탄 줄기를 부대 쪽 끝에서 반대쪽으로 dur 초 동안 쓸어 간다(every 초마다 1발). 줄기는 안전 구역 앞에서 멈춘다 — 끝 쪽으로 건너가 기다리면 된다
-    sweep:  { type: 'shot', dur: 1.4, every: 0.07, r: 5, v: 320, minSpan: 60 },
-    //  ⑤ 산개탄(광장, 광역): 떨어질 자리에 붉은 경보 원 → 보스가 던진 큰 탄이 그 자리에서 터져 n 방향 작은 탄이 reach 까지 퍼진다
-    burst:  { type: 'aoe', tele: 0.9, reach: 55, n: 8, r: 5, v: 160 },
-    //  보스 그림(스킨)별 패턴 순서(앞 open 개가 처음부터 열려 있고 50%·20% 에서 하나씩 더) · 공격 간격 gap(초, × 페이즈 rate — 1.95 × 0.62 ≥ 1.2) · 탄 모양 look.
-    //   road = 도로 단수 보스(역할 정예) · arena = 광장 보스(⑤·② 가 먼저). 역할이 있는 보스(복수 보스 판 10·23)는 roles 가 순서·여는 수를 정한다(간격·탄 모양은 스킨)
-    open: 2,
-    skins: {
-      B1_grader:        { road: ['aim', 'wall', 'pillar', 'sweep'], gap: 2.0, look: 'orb' },
-      B2_gantrywidow:   { road: ['pillar', 'wall', 'sweep', 'aim'], gap: 1.95, look: 'needle' },
-      B3_railleviathan: { road: ['sweep', 'aim', 'wall', 'pillar'], arena: ['burst', 'wall', 'pillar', 'aim'], gap: 2.0, look: 'laser' },
-      B4_smelter:       { road: ['pillar', 'sweep', 'aim', 'wall'], arena: ['wall', 'burst', 'aim', 'pillar'], gap: 1.95, look: 'magma' },
-      B5_crownbreaker:  { arena: ['burst', 'wall', 'aim', 'pillar'], gap: 1.95, look: 'crown' },
+    //  r4.9 겨누는 공격의 앞질러 겨누기: 부대 한가운데 대신 '지금 속도 × 닿는 시간'(최대 leadMax px) 앞을 겨눈다 — 보스를 따라 움직이기만 하는 부대가
+    //   우연히 늘 비켜 가 보스전이 끝없이 늘어지지 않게(가만히 선 부대는 지금 자리). 피할 곳 보장은 지금 자리에서 잰다(설 곳 찾기는 그대로)
+    leadMax: 90,
+    //  r4.9 (나) 고유 공격 15종(스킨마다 3종 — 다른 보스와 같은 공격 없음). skin = 주인 보스 · type · 수치(px·초·px/s). name = 보고용 이름(화면에 쓰지 않는다)
+    kinds: {
+      //  ── B1 그레이더(불도저 — 삽날·굴뚝) ──
+      //  삽날 밀기(탄): 삽날 앞에서 잔해 덩어리 한 줄(gap 간격)이 밀려 내려온다 — 빈틈 한 곳(부대 폭 + 48)
+      blade:    { skin: 'B1_grader', type: 'shot', name: '삽날 밀기', r: 9, v: 150, gap: 22 },
+      //  굴뚝 매연탄(광역): 매연 폭탄이 경보 원 자리(2~3개, 반지름 Rmin~Rmax)에 떨어져 터진다
+      smoke:    { skin: 'B1_grader', type: 'aoe', name: '굴뚝 매연탄', tele: 0.85, Rmin: 26, Rmax: 60, max: 3, stagger: 0.06 },
+      //  잔해 튕기기(탄): 잔해가 보스에서 좌우 벽으로 날아가(v1) 한 번 튕긴 뒤 안쪽 아래로(v2, 기울기 ≤ slopeMax) — n 개가 every 초 간격으로 한 줄기(지그재그)
+      ricochet: { skin: 'B1_grader', type: 'shot', name: '잔해 튕기기', r: 9, v1: 230, v2: 180, n: 4, every: 0.1, slopeMax: 0.42 },
+      //  ── B2 갠트리 위도우(거미 크레인 — 갈고리·거미줄) ──
+      //  갈고리 낙하(광역): 부대 쪽 한 점에 경보 원(반지름 R) → 크레인 갈고리가 내리꽂힌다
+      hook:     { skin: 'B2_gantrywidow', type: 'aoe', name: '갈고리 낙하', tele: 0.8, R: 36 },
+      //  거미다리 바늘(탄): 다리 끝 legs 곳에서 바늘이 부채처럼(±spread rad) volleys 번(every 초 간격, 다음 번은 반 칸 어긋나게) — 다리 사이 빈틈
+      needles:  { skin: 'B2_gantrywidow', type: 'shot', name: '거미다리 바늘', r: 5, v: 235, legs: 8, spread: 0.5, volleys: 3, every: 0.14 },
+      //  거미줄 그물(광역): 경보 사각(폭 w × 깊이 d — 부대 한가운데 z 둘레) — 안에 있으면 피해 + slowSec 초 동안 부대 이동 × slowMul
+      web:      { skin: 'B2_gantrywidow', type: 'aoe', name: '거미줄 그물', tele: 0.9, w: 52, d: 120, slowSec: 2, slowMul: 0.5 },
+      //  ── B3 레일 리바이어던(열차 뱀) ──
+      //  레일 돌진(광역): 한 줄(레일, 폭 w) 경보 → 열차 몸통이 그 줄을 질주. 광장은 세로·가로 번갈아
+      rail:     { skin: 'B3_railleviathan', type: 'aoe', name: '레일 돌진', tele: 0.8, w: 28 },
+      //  객차 연결탄(탄): 객차 cars 개가 carGap 간격으로 이어진 사슬이 물결 길(진폭 amp · 파장 wave)을 따라 내려온다
+      chain:    { skin: 'B3_railleviathan', type: 'shot', name: '객차 연결탄', r: 8, v: 175, cars: 7, carGap: 28, amp: 32, wave: 220 },
+      //  교차 레일(광역): 대각선 두 줄(폭 w, 기울기 slope = 가로 ÷ 세로) 경보 → 동시에 질주. 광장은 가파른 X · 누운 X 번갈아
+      crossrail:{ skin: 'B3_railleviathan', type: 'aoe', name: '교차 레일', tele: 0.9, w: 12, slope: 0.3 },
+      //  ── B4 스멜터(쇳물 거인 — 도가니 손) ──
+      //  쇳물 붓기(광역): 경보 원(반지름 R)에 쇳물 웅덩이 — 떨어질 때 피해, linger 초 동안 남아 들어가면 피해(tick 초마다 살핀다 — 병사마다 웅덩이 하나에 한 번만)
+      pour:     { skin: 'B4_smelter', type: 'aoe', name: '쇳물 붓기', tele: 0.85, R: 42, linger: 3, tick: 0.5 },
+      //  슬래그 산탄(탄): 무겁고 느린 쇳물 덩이 n 발이 넓게(±spread rad, 발마다 속도 배수 vm)
+      slag:     { skin: 'B4_smelter', type: 'shot', name: '슬래그 산탄', r: 12, v: 120, n: 11, spread: 0.62, vm: [1, 0.9, 1.06, 0.94, 1.1, 0.92, 1.04, 0.96, 1.08, 0.98, 1.02] },
+      //  쇳물 비(광역): 작은 경보 원(반지름 R) 여러 개(최대 max)가 every 초 간격으로 차례로 떨어진다(첫 방울 = tele). 자리 = 부대 둘레 세 줄 격자(줄 간격 row)
+      rain:     { skin: 'B4_smelter', type: 'aoe', name: '쇳물 비', tele: 0.75, R: 26, every: 0.1, max: 8, row: 52 },
+      //  ── B5 크라운브레이커(왕관 요새 — 집게·철퇴) ──
+      //  철퇴 휘두르기(광역): 보스 둘레 부채꼴(반각 half°, 반지름 = 부대 앞줄 + bite, Rmin~Rmax) 경보 → 철퇴가 휩쓴다
+      mace:     { skin: 'B5_crownbreaker', type: 'aoe', name: '철퇴 휘두르기', tele: 0.9, half: 40, bite: 60, Rmin: 150, Rmax: 320 },
+      //  왕관 칼날 회전(탄): 칼날 팔 arms 개(90° 간격)가 volleys 번(every 초 간격) turn° 씩 돌며 나간다 — 팔마다 칼날 per 배 속도 3개. 팔 사이로 피한다
+      blades:   { skin: 'B5_crownbreaker', type: 'shot', name: '왕관 칼날 회전', r: 9, v: 190, arms: 4, volleys: 3, every: 0.12, turn: 12, per: [1, 0.8, 0.62] },
+      //  집게 충격파(광역): 집게로 내려찍은 자리(부대 쪽 한 점)에서 고리가 반지름 R 까지 퍼진다 — 한 곳(반각 gapHalf°)이 끊긴 고리. 고리 두께 th
+      quake:    { skin: 'B5_crownbreaker', type: 'aoe', name: '집게 충격파', tele: 0.85, R: 44, gapHalf: 30, th: 12 },
     },
-    //  역할 = 포격(②④ — 탄만) · 소환(③ + 소환) · 장갑(①③)
+    //  보스 그림(스킨)별 고유 공격 순서(앞 open 개가 처음부터 열려 있고 체력 50%·20% 에서 하나씩 더) · 공격 간격 gap(초, × 페이즈 rate) · 탄 모양 look.
+    //   early = 페이즈가 없는 판(1·2번 학습 구간 — bossPhases.from 3)에서 처음부터 번갈아 쓰는 공격(그레이더다움이 삽날 하나로 단조롭지 않게 — 계약서 r4.9)
+    open: 1,
+    skins: {
+      B1_grader:        { seq: ['blade', 'smoke', 'ricochet'], early: ['blade', 'ricochet'], gap: 2.0, look: 'debris' },
+      B2_gantrywidow:   { seq: ['hook', 'needles', 'web'], gap: 1.95, look: 'needle' },
+      B3_railleviathan: { seq: ['rail', 'chain', 'crossrail'], gap: 2.0, look: 'car' },
+      B4_smelter:       { seq: ['pour', 'slag', 'rain'], gap: 1.95, look: 'slag' },
+      B5_crownbreaker:  { seq: ['mace', 'blades', 'quake'], gap: 1.95, look: 'crown' },
+    },
+    //  역할(복수 보스 판 10·23) = 그 보스 스킨의 고유 공격 중 역할에 맞는 것만: 포격 = 탄 공격 · 소환 = (소환 그대로 +) 광역 하나 · 장갑 = 광역만
     roles: {
-      gunner:   { seq: ['wall', 'sweep', 'aim', 'pillar'], open: 2 },
-      summoner: { seq: ['pillar', 'wall', 'aim'], open: 1 },
-      tank:     { seq: ['aim', 'pillar', 'sweep', 'wall'], open: 2 },
+      gunner:   { type: 'shot' },
+      summoner: { type: 'aoe', max: 1 },
+      tank:     { type: 'aoe' },
     },
   },
 
@@ -233,7 +264,7 @@ export const BAL3 = deepFreeze({
   //   bossHw       (r4.8) 이 줄에서만 보스전(보스 등장 ~ 승리) 부대 대형 반폭 상한(px) — 이사님 지시(2026-09-26) "병사를 아무리 많이 모아도 보스에 가면
   //                총알을 많이 쏟아부으니까 피할 수가 없이 모든 총알을 맞게 된다". 100명 대형(반폭 약 130 = 도로 폭의 80%)을 64 로 모아 피할 자리를 만든다.
   //                buildStage 가 stage.bossHw 로 싣고(상한 화력 계산기도 같은 대형), createRun·stepRun 은 run.bossHw·run.hwCap 만 읽는다. null = 제한 없음(종전)
-  //   bossPatterns (r4.8) 이 줄에서만 보스가 조준 부채꼴 대신 예고·안전 구역이 있는 패턴(BAL3.bossAtk)을 쓴다 — buildStage 가 보스 정의에 atk 를 싣는다
+  //   bossPatterns (r4.8 → r4.9) 이 줄에서만 보스가 조준 부채꼴 대신 자기 스킨의 고유 공격(BAL3.bossAtk — 탄은 안내 없이, 광역은 붉은 경보)을 쓴다 — buildStage 가 보스 정의에 atk 를 싣는다
   //  화면 이름(label·short)은 r4.2 에서 지웠다 — 어디에도 표시하지 않는다.
   difficulty: {
     //  r3.9(2026-09-18 이사 결정 2)는 위협을 **출현 빈도**로만 올렸다(enemyHp·eliteHp 1 고정). → **r3.21(2026-09-20 이사 결정 B안)로 뒤집음**:

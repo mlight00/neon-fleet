@@ -158,7 +158,8 @@ test('COIN-2: 보스 소환 적은 0 코인 — kill 이벤트 summoned(도로 �
   const kills = r.events.filter((e) => e.type === 'kill');
   const summoned = kills.filter((e) => e.summoned === true), sched = kills.filter((e) => e.summoned === false);
   //  r4.8: 게임 줄 보스가 예고·안전 구역 패턴을 쓰게 되어(안전 구역을 모르는) 이 봇의 보스전이 짧아졌다 — 소환 처치 표본 문턱 50 → 20(표본이 있는지만 본다, 난이도 판단 아님)
-  assert.ok(summoned.length > 20, '소환 잡졸 처치가 있다: ' + summoned.length);
+  //  r4.9: 보스별 고유 공격(10번 = 그레이더 삽날·잔해 + 갠트리 갈고리)으로 이 봇의 보스전이 또 짧아졌다(실측 15) — 문턱 20 → 10(표본이 있는지만 본다, 난이도 판단 아님)
+  assert.ok(summoned.length > 10, '소환 잡졸 처치가 있다: ' + summoned.length);
   assert.equal(summoned.length + sched.length, kills.length, 'summoned 는 늘 불리언');
   assert.ok(kills.every((e) => Number.isFinite(e.hpMax) && e.hpMax > 0), 'kill 이벤트에 hpMax');
   const all = runCoins(r.stage, r.events, { cleared: r.run.won });
