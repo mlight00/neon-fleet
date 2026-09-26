@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRenderer3, enemyMotionPose, ENEMY_MOTION, WALK, artBase3 } from '../rush3/render.js';
-import { SHEETS3, ENEMY_ART3 } from '../rush3/sprites.js';
+import { SHEETS3, ENEMY_ART3, loadSprites3 } from '../rush3/sprites.js';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 import { buildStage, ALL_STAGE_IDS } from '../rush3/stages.js';
 import { makeFx } from '../rush3/main.js';
@@ -62,8 +62,19 @@ test('MOTION-1: 움직임 표 — 다리 달린 적 = 걷기(E1·E3·E8) · 바�
   for (const id of ALL_STAGE_IDS) for (const row of ['normal', 'brutal']) for (const sp of buildStage(id, { difficulty: row }).spawns) if (sp.kind !== 'bounty') used.add(artBase3(sp.kind, sp.skin));
   for (const a of used) assert.ok(ENEMY_MOTION[a], a + ' 움직임 종류');
   for (const a of ENEMY_ART3.filter((n) => n.startsWith('B'))) assert.equal(ENEMY_MOTION[a], undefined, a + ' 보스는 움직임 표 밖');
-  //  걷기 시트 자리(파일은 아직 없다 — 들어오면 코드 움직임 대신 쓴다)
+  //  걷기 시트 자리(파일은 아직 없다 — 들어오면 코드 움직임 대신 쓴다). 파일이 없는 동안(pending)은 불러오지 않는다 — 콘솔 404 없음
   assert.equal(SHEETS3.e_grunt_walk.file, 'E1_walk');
+  assert.equal(SHEETS3.e_grunt_walk.pending, true);
+});
+
+test('MOTION-1b: 그림 불러오기 — 파일이 아직 없는 걷기 시트 자리(pending)는 요청하지 않는다(나머지 시트는 그대로 요청)', async () => {
+  const requested = [];
+  globalThis.Image = class { set src(v) { requested.push(v); setTimeout(() => this.onerror && this.onerror(), 0); } };
+  try {
+    await loadSprites3('assets/rush/', 'assets/rush3/');
+  } finally { delete globalThis.Image; }
+  assert.ok(!requested.some((s) => s.includes('E1_walk')), '걷기 시트 자리는 요청하지 않는다');
+  assert.ok(requested.some((s) => s.includes('E1_hit')) && requested.some((s) => s.includes('E1_death')), '다른 시트는 그대로');
 });
 
 test('WALK-1: 걷는 잡졸 자세 — 걸음마다 한 번 튀고(발 디딤 = 튐 0 · 눌림 최대) · 기울기는 걸음마다 좌우가 바뀌어 두 걸음에 한 주기(±4°, 3~5°) · 박자 = 다가온 거리 ÷ 보폭(빠르기에 비례) · 위상은 id 로 어긋남 · 피격 중엔 흔들림 ×0.25 · 기절 중엔 멈춤', () => {

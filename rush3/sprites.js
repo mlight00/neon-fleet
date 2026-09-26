@@ -53,8 +53,9 @@ export const SHEETS3 = Object.freeze({
   e_grunt_death: Object.freeze({ file: 'E1_death',  cols: 6, frames: 12, fw: 365, fh: 294, fps: 12, loop: false, refH: 200 }),
   //  r4.8 걷기 동작 시트 **자리**(이사님 지시 2026-09-26 "적들이 걸어서 내려오는 듯한 스프라이트도 추가하자") — 파일은 아직 없다(그림 제작은 따로).
   //   assets/rush3/E1_walk.png 가 들어오면 render.drawEnemy 가 코드 움직임(enemyMotionPose) 대신 이 시트를 쓴다(칸 = 걸음 박자 — 두 걸음에 시트 한 바퀴, fps 는 쓰지 않는다).
-  //   ⚠️cols·frames·fw·fh·refH 는 들어오는 시트에 맞춰 고친다(지금 값은 같은 잡졸의 피격 시트 E1_hit 꼴 — 자리만). 없는 동안은 조용히 코드 움직임(브라우저 콘솔에 404 한 줄)
-  e_grunt_walk:  Object.freeze({ file: 'E1_walk',   cols: 6, frames: 12, fw: 244, fh: 255, fps: 12, loop: true,  refH: 200 }),
+  //   pending: true = 파일이 아직 없어 **불러오지 않는다**(없는 파일을 매번 요청하면 브라우저 콘솔에 404 오류가 남는다) — 그동안은 코드 움직임.
+  //   ⚠️파일을 넣을 때: ① pending 을 지운다 ② cols·frames·fw·fh·refH 를 그 시트에 맞춰 고친다(지금 값은 같은 잡졸의 피격 시트 E1_hit 꼴 — 자리값)
+  e_grunt_walk:  Object.freeze({ file: 'E1_walk',   cols: 6, frames: 12, fw: 244, fh: 255, fps: 12, loop: true,  refH: 200, pending: true }),
 });
 export const SHEET_BASE3 = 'assets/rush3/';
 //  무기 아이콘(2026-09-19 Gemini 생성, 이미지프롬프트_v5): 6종 × Mk I~III, 옆모습·투명. HUD 칩·보급 통 내용물이 쓴다.
@@ -78,6 +79,8 @@ export function loadSprites3(base = 'assets/rush/', sheetBase = SHEET_BASE3) {
   });
   const jobs = Object.entries(SPRITE_KEYS3).map(([key, name]) => load(base + name + '.png', (im) => { imgs.set(key, im); ready.add(key); }));
   for (const [key, meta] of Object.entries(SHEETS3)) {
+    //  r4.8: 아직 파일이 없는 자리(pending)는 요청하지 않는다(콘솔 404 없이 코드 움직임으로)
+    if (meta.pending) continue;
     jobs.push(load(sheetBase + meta.file + '.png', (im) => { sheets.set(key, { img: im, ...meta }); ready.add(key); }));
   }
   for (const id of WEAPON_ICON_IDS3) for (const mk of [1, 2, 3]) {
