@@ -14,7 +14,7 @@ import { createSave3, KEY3, WALLET_KEY, TAB_KEY, COIN_MAX, PAID_KEEP, normWallet
 import { createRenderer3, HUD_ROW, SAVE_WARN } from '../rush3/render.js';
 import { boot, HUD_BTN, TITLE_GRID, LOCK_NOTICE, ALL_CLEAR_LINE, unlockedThrough, causeLine, coinBreakdown } from '../rush3/main.js';
 import { ADVICE_DEFAULT } from '../rush3/advice.js';
-import { pickInput, weakenBosses, weakenBounties } from './lib/rush3-policies.mjs';
+import { pickInput, weakenBosses, weakenBounties, wipeSquad } from './lib/rush3-policies.mjs';
 import { seedOldClears } from './lib/rush3-unlock.mjs';
 
 const C = BAL3.colors;
@@ -28,9 +28,25 @@ function playEvents(id, policy, difficulty = 'brutal', maxSteps = 14400, opts = 
   const events = [];
   let n = 0;
   //  opts.weakBounty = 현상금 적이 나오면 체력 1(weakenBounties — r4.7 현상금 적이 없던 판 흐름을 보는 검사용, 난이도와 무관)
-  while (!run.over && n < maxSteps) { if (opts.win) weakenBosses(run); if (opts.weakBounty) weakenBounties(run); stepRun(run, pickInput(policy, run), STEP); events.push(...drainEvents(run)); n++; }
+  //  opts.loseAt = 일정 스폰 처치(소환·현상금 제외)가 이 수에 닿으면 부대 전멸(wipeSquad — r4.10 셸·공식 검사가 '진 판'을 만드는 도구, 난이도와 무관)
+  const sched = () => events.filter((e) => e.type === 'kill' && !e.summoned && !e.bounty).length;
+  while (!run.over && n < maxSteps) {
+    if (opts.win) weakenBosses(run); if (opts.weakBounty) weakenBounties(run);
+    if (opts.loseAt != null && sched() >= opts.loseAt) wipeSquad(run);
+    //  opts.keepAlive = 병사가 쓰러지지 않게(표본을 모으는 검사 도구 — 소환 처치 표본을 보스전 끝까지 모은다, 난이도와 무관)
+    if (opts.keepAlive) for (const u of run.units) u.hp = 1e9;
+    stepRun(run, pickInput(policy, run), STEP); events.push(...drainEvents(run)); n++;
+  }
   return { stage, run, events };
 }
+
+//  r4.10(이사님 실플레이 5차 — 보스는 3의 배수 판에만): 게임 줄 1번 = 대물결 판(보스 대신 대물결 + 결승선 돌파 — 판 끝 목표 몫 V × 0.5 = 13 은 돌파에).
+//   evLead 한 판(규칙 계층)의 첫 승리·재승리·정산 전 누계 — 셸 판도 입력 타이밍이 같아 같은 값이어야 한다(종전 보스 판 시절 54 · 33 · 28 → 대물결 판 53 · 32 · 27)
+const EV1 = playEvents(1, 'evLead', 'brutal', 14400, { win: true });
+const EV1_FIRST = runCoins(EV1.stage, EV1.events, { cleared: true, firstClear: true }).total;
+const EV1_REPLAY = runCoins(EV1.stage, EV1.events, { cleared: true, firstClear: false }).total;
+const EV1_MAIN = runCoins(EV1.stage, EV1.events, { cleared: false }).total;
+const N1 = scheduledEnemyCount(buildStage(1, { difficulty: 'brutal' }));
 
 // ─────────────────────────────── 셸 하네스 ───────────────────────────────
 function memStorage(init = {}) {
@@ -97,11 +113,13 @@ async function bootApp({ storage = memStorage(), search = '', BroadcastChannel, 
 //  봇 입력을 셸 입력 칸에 넣으며 조건까지 진행(도로 x + 광장 dragDy)
 //  r4.7: opts.win = 보스가 나오면 체력 1(weakenBosses) — 보스 체력 바닥으로 봇이 게임 줄 1번을 못 이겨, 이긴 판이 필요한 셸 흐름 검사가 이 칸을 켠다(난이도와 무관)
 const WIN = Object.freeze({ win: true });
+//  r4.10: opts.loseAt = 처치 수(run.kills)가 이 수에 닿으면 부대 전멸(wipeSquad — 패배 흐름을 보는 셸 검사 도구, 난이도와 무관)
 function drive(h, policy, cond, max = 20000, opts = {}) {
   let n = 0;
   while (!cond() && n < max) {
     const run = h.app.getRun();
     if (opts.win && run && h.app.getState() === 'run') weakenBosses(run);
+    if (opts.loseAt != null && run && h.app.getState() === 'run' && run.kills >= opts.loseAt) wipeSquad(run);
     if (run && h.app.getState() === 'run') {
       const inp = pickInput(policy, run);
       h.app.input.state.pointerX = inp.pointerX;
@@ -120,23 +138,34 @@ const rawWallet = (h) => JSON.parse(h.storage.getItem(WALLET_KEY));
 test('COIN-1: 공식 P2 — V(s) = 24 + 2s, 일정 스폰 1마리 = V ÷ 일정 스폰 총수, 보스 = V × 0.5 ÷ 보스 수, 첫 클리어 V · 재클리어 5, 한 단위 한 번 반올림 — 1번 evLead 첫 승리 54 · 재승리 33(F_summary 계산 예)', () => {
   assert.deepEqual([stageValue(1), stageValue(12), stageValue(24)], [26, 48, 72]);
   assert.equal(stageValue('proto3'), 0, '공개 판 번호가 아니면 0');
-  //  일정 스폰 총수 = buildStage 의 spawns n 합(물결·무리 수·extraSpawns 포함) — 1번 기본 줄 44(F 계산 예의 분모), 2번 38
-  assert.equal(scheduledEnemyCount(buildStage(1, { difficulty: 'brutal' })), 44);
+  //  일정 스폰 총수 = buildStage 의 spawns n 합(물결·무리 수·extraSpawns 포함) — 1번 기본 줄 44(F 계산 예의 분모), 2번 38.
+  //   r4.10: 게임 줄 1번은 대물결 판 — 대물결 겹(잡졸 8 × 1.8 = 14)도 일정 스폰이라 분모 44 + 14 = 58(적 몫 합계 V 는 그대로)
+  const st1 = buildStage(1, { difficulty: 'brutal' });
+  const hordeN = st1.spawns.filter((sp) => sp.horde).reduce((a, sp) => a + sp.n, 0);
+  assert.equal(hordeN, 14, '1번 대물결 = 가벼운 잡졸 무리 14');
+  assert.equal(scheduledEnemyCount(st1) - hordeN, 44);
+  assert.equal(scheduledEnemyCount(st1), N1);
   assert.equal(scheduledEnemyCount(buildStage(2, { difficulty: 'brutal' })), 38);
   assert.ok(scheduledEnemyCount(buildStage(1, { difficulty: 'brutal' })) > scheduledEnemyCount(buildStage(1)), '기본 줄은 extraSpawns 가 붙어 배수 1 줄보다 많다');
-  assert.deepEqual([1, 10, 23, 24].map((id) => bossCount(buildStage(id, { difficulty: 'brutal' }))), [1, 2, 3, 1], '보스 수(도로 정예 배열 · 광장 1)');
-  //  1번 evLead(기본 줄) 첫 승리: 일정 스폰 26마리 × 26/44 = 15.36 + 보스 13 = 28.36 → 28, 첫 클리어 26 → 54. 재승리 28 + 5 = 33
-  //  r4.7: 보스 체력 바닥(30초 × 상한 화력)으로 봇이 1번을 못 이겨 보스가 나오면 체력 1 로 깎아 '이긴 판'을 만든다(보스 전 처치 26마리는 종전 판 그대로)
-  const r = playEvents(1, 'evLead', 'brutal', 14400, { win: true });
-  assert.equal(r.run.won, true, 'evLead + 보스 체력 1 = 이긴 판');
+  //  r4.10: 판 끝 목표 수 = 보스 판은 보스 수(18 합동전 2 · 21·24 광장 1 · 3 도로 1), 대물결 판(1·10)은 결승선 돌파 1건
+  assert.deepEqual([1, 3, 10, 18, 21, 24].map((id) => bossCount(buildStage(id, { difficulty: 'brutal' }))), [1, 1, 1, 2, 1, 1], '판 끝 목표 수(보스 · 결승선 돌파)');
+  //  1번 evLead(기본 줄) 첫 승리: 종전(보스 판) 일정 스폰 26마리 × 26/44 = 15.36 + 보스 13 → 28, 첫 클리어 26 → 54 · 재승리 33.
+  //   r4.10 대물결 판: 처치 k 마리 × 26/58 + 돌파 13 → 한 번 반올림, 첫 클리어 26(실측 k 32 → 14 + 13 + 26 = 53 · 재승리 32)
+  const r = EV1;
+  assert.equal(r.run.won, true, 'evLead = 결승선을 넘어 이긴 판');
+  assert.equal(r.events.filter((e) => e.type === 'finish').length, 1, '결승선 돌파 이벤트 1회');
   const kills = r.events.filter((e) => e.type === 'kill');
-  assert.equal(kills.filter((e) => !e.summoned).length, 26, '일정 스폰 26마리 처치(F 계산 예)');
-  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: true }), { enemy: 15, boss: 13, bounty: 0, clear: 26, bonus: 0, total: 54 });
-  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: false }), { enemy: 15, boss: 13, bounty: 0, clear: 5, bonus: 0, total: 33 });
-  //  2번 evLead 패배 = 일정 스폰 10마리 × V(2) 28 ÷ 38 = 7.37 → 7(F '2번에서 한 번 지면 7코인')
-  const r2 = playEvents(2, 'evLead');
+  const k = kills.filter((e) => !e.summoned && !e.bounty).length;
+  assert.ok(k > 26, '대물결까지 잡아 종전(26)보다 많이 잡는다: ' + k);
+  const main = Math.round(k * stageValue(1) / N1 + stageValue(1) * 0.5);
+  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: true }), { enemy: main - 13, boss: 13, bounty: 0, clear: 26, bonus: 0, total: main + 26 });
+  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: false }), { enemy: main - 13, boss: 13, bounty: 0, clear: 5, bonus: 0, total: main + 5 });
+  assert.deepEqual([EV1_FIRST, EV1_REPLAY, EV1_MAIN], [main + 26, main + 5, main]);
+  //  2번 패배 = 일정 스폰 10마리 × V(2) 28 ÷ 38 = 7.37 → 7(F '2번에서 한 번 지면 7코인') — r4.10: 패배는 10마리째에 부대 전멸로 만든다(검사 도구)
+  const r2 = playEvents(2, 'evLead', 'brutal', 14400, { loseAt: 10 });
   assert.equal(r2.run.won, false);
-  assert.equal(runCoins(r2.stage, r2.events, { cleared: false }).total, 7);
+  assert.equal(r2.events.filter((e) => e.type === 'kill' && !e.summoned && !e.bounty).length, 10);
+  assert.deepEqual([runCoins(r2.stage, r2.events, { cleared: false }).enemy, runCoins(r2.stage, r2.events, { cleared: false }).boss], [7, 0]);
   //  반올림은 한 단위에 한 번: 보스 1체 몫 11.67 + 적 1마리 1 = 12.67 → 13(따로 반올림해 더해도 합은 한 번 반올림과 같게 — 보스 몫을 먼저 반올림하고 나머지를 적에 둔다)
   const t = createTally({ id: 23, spawns: [{ n: 70 }], elites: [{}, {}, {}] });
   assert.equal(t.perBoss, 70 * 0.5 / 3);
@@ -152,9 +181,10 @@ test('COIN-1: 공식 P2 — V(s) = 24 + 2s, 일정 스폰 1마리 = V ÷ 일정 
 });
 
 test('COIN-2: 보스 소환 적은 0 코인 — kill 이벤트 summoned(도로 정예·광장 소환 모두), 일정 스폰 적 객체엔 표식 키가 없다, hpMax 는 스폰 체력', () => {
-  //  10번(도로 정예 2체, 소환형 포함): evLead 는 소환 잡졸을 많이 잡는다 — 코인 셈은 소환 처치를 빼도 같아야 한다
-  //  r4.7: 게임 줄 10번 현상금 적(z 7150)이 이 봇 부대를 덮으면 보스전이 짧아져 소환 처치가 줄어든다 — 나오면 체력 1(weakBounty, 검사 도구)
-  const r = playEvents(10, 'evLead', 'brutal', 14400, { weakBounty: true });
+  //  18번(r4.10 합동전 — 도로 보스 2체, 소환형 포함. 옛 10번의 보스): evLead 는 소환 잡졸을 잡는다 — 코인 셈은 소환 처치를 빼도 같아야 한다
+  //  r4.7: 게임 줄 현상금 적이 이 봇 부대를 덮으면 보스전이 짧아져 소환 처치가 줄어든다 — 나오면 체력 1(weakBounty, 검사 도구)
+  //  r4.10: 18번 보스 체력(30초 바닥)이 이 봇 부대에 커서 보스전 중 전멸하면 표본이 모자란다 — 병사가 쓰러지지 않게(keepAlive, 검사 도구)
+  const r = playEvents(18, 'evLead', 'brutal', 14400, { weakBounty: true, keepAlive: true });
   const kills = r.events.filter((e) => e.type === 'kill');
   const summoned = kills.filter((e) => e.summoned === true), sched = kills.filter((e) => e.summoned === false);
   //  r4.8: 게임 줄 보스가 예고·안전 구역 패턴을 쓰게 되어(안전 구역을 모르는) 이 봇의 보스전이 짧아졌다 — 소환 처치 표본 문턱 50 → 20(표본이 있는지만 본다, 난이도 판단 아님)
@@ -168,13 +198,14 @@ test('COIN-2: 보스 소환 적은 0 코인 — kill 이벤트 summoned(도로 �
   assert.equal(runCoins(r.stage, summoned, {}).total, 0, '소환 처치만 넣으면 0');
   //  D 방식(한 STEP 안에서 spawn 이 summon 보다 먼저 번호를 받는다) 판별과 규칙 표식이 같다
   {
-    const stage = buildStage(10, { difficulty: 'brutal' });
+    const stage = buildStage(18, { difficulty: 'brutal' });
     const run = createRun(stage);
     const byId = new Map();
     let n = 0, mismatch = 0, checked = 0;
     while (!run.over && n < 14400) {
       const id0 = run.nextEnemyId;
       weakenBounties(run);
+      for (const u of run.units) u.hp = 1e9;   // r4.10: 표본을 보스전 끝까지 모은다(검사 도구)
       stepRun(run, pickInput('evLead', run), STEP); n++;
       const ev = drainEvents(run);
       let nSched = 0;
@@ -185,9 +216,9 @@ test('COIN-2: 보스 소환 적은 0 코인 — kill 이벤트 summoned(도로 �
     //  r4.8: 게임 줄 보스 패턴으로 이 봇(안전 구역을 모름)의 보스전이 짧아져 처치 표본 문턱 100 → 50(표본이 있는지만 본다 — 실측 67, 난이도 판단 아님)
     assert.ok(checked > 50, '처치 표본 ' + checked); assert.equal(mismatch, 0, 'ID 순서 판별과 summoned 표식 불일치 0');
   }
-  //  광장(20번) 소환도 summoned — 무입력으로 광장에 들어가 소환이 난 STEP 의 새 적은 표식이 있고, 죽으면 kill 에 실린다
+  //  광장(21번 — r4.10 옛 20번 광장 보스 B4 가 옮겨 왔다) 소환도 summoned — 무입력으로 광장에 들어가 소환이 난 STEP 의 새 적은 표식이 있고, 죽으면 kill 에 실린다
   {
-    const run = createRun(buildStage(20, { difficulty: 'brutal' }));
+    const run = createRun(buildStage(21, { difficulty: 'brutal' }));
     let n = 0, got = null;
     while (!run.over && n < 14400 && !got) {
       stepRun(run, { pointerX: 240, dragDx: 0, keyDir: 0 }, STEP); n++;
@@ -243,7 +274,7 @@ test('COIN-5: 포기·패배도 그때까지의 처치분을 받는다(클리어
   h.app.startRun(1);
   drive(h, 'evLead', () => h.app.getRun().kills >= 6, 4000);
   const kills = h.app.getRun().kills;
-  const want = Math.round(kills * stageValue(1) / 44);
+  const want = Math.round(kills * stageValue(1) / N1);
   assert.equal(h.app.dbg().coins, want, 'HUD 누계 = 정산 전 값');
   h.app.pause();
   h.frames(1);                   // 일시정지 화면의 버튼 목록이 잡히는 프레임
@@ -253,11 +284,11 @@ test('COIN-5: 포기·패배도 그때까지의 처치분을 받는다(클리어
   assert.equal(res.aborted, true); assert.equal(res.won, false);
   assert.deepEqual({ gained: res.coins.gained, clear: res.coins.clear, balance: res.coins.balance }, { gained: want, clear: 0, balance: want });
   assert.deepEqual(wallet(h).paid, ['1:main']);
-  //  패배: 2번(옛 기록 1번 시드)을 evLead 로 — 2번 보스 전에 진다(봇). 적분만
+  //  패배: 2번(옛 기록 1번 시드)을 evLead 로 — r4.10: 6마리 잡으면 부대 전멸(loseAt — 패배 흐름 검사 도구, 난이도와 무관). 적분만
   const h2 = await bootApp();
   seedOldClears(h2.save, 1);
   h2.app.startRun(2);
-  drive(h2, 'evLead', () => h2.app.getState() === 'result', 20000);
+  drive(h2, 'evLead', () => h2.app.getState() === 'result', 20000, { loseAt: 6 });
   const r2 = h2.app.getResult();
   assert.equal(r2.won, false); assert.equal(r2.aborted, false);
   assert.equal(r2.coins.gained, Math.round(h2.app.getRun().kills * stageValue(2) / 38), '패배 = 처치분(보스 0)');
@@ -290,9 +321,9 @@ test('COIN-6: 첫 클리어 보너스는 판마다 1회 — 옛 지옥 칸 클�
   assert.equal(r2.coins.clearKind, 'replay'); assert.equal(r2.coins.clear, 5);
   assert.deepEqual(wallet(h).firstClears, [1], '첫 클리어 표식은 한 번');
   assert.equal(wallet(h).coins, r1.coins.gained + r2.coins.gained);
-  //  공식의 첫 승리 기대값(봇 셸 판은 입력 타이밍이 규칙 검사와 같아 54)
-  assert.equal(r1.coins.gained, 54, '1번 evLead 첫 승리 54(COIN-1 과 같은 값)');
-  assert.equal(r2.coins.gained, 33, '재승리 33');
+  //  공식의 첫 승리 기대값(봇 셸 판은 입력 타이밍이 규칙 검사와 같다 — r4.10 대물결 판 53 · 재승리 32)
+  assert.equal(r1.coins.gained, EV1_FIRST, '1번 evLead 첫 승리(COIN-1 과 같은 값)');
+  assert.equal(r2.coins.gained, EV1_REPLAY, '재승리');
 });
 
 // ═══════════════════════════════ WALLET — 지급·저장 ═══════════════════════════════
@@ -324,16 +355,16 @@ test('WALLET-2: 여운(승리 1.3초·패배 1.0초) 중 이탈해도 지급은 
   drive(h, 'evLead', () => h.app.getRun().over, 20000, WIN);
   assert.equal(h.app.getState(), 'run', '여운 중');
   const paid = wallet(h).coins;
-  assert.equal(paid, 54);
+  assert.equal(paid, EV1_FIRST);
   h.app.toTitle();
   assert.equal(h.app.getState(), 'title');
-  assert.deepEqual({ coins: wallet(h).coins, paid: wallet(h).paid }, { coins: 54, paid: ['1:main'] });
-  //  패배 여운 중 이탈: 1번 center 봇(지고, 적을 몇 마리 잡는다)
+  assert.deepEqual({ coins: wallet(h).coins, paid: wallet(h).paid }, { coins: EV1_FIRST, paid: ['1:main'] });
+  //  패배 여운 중 이탈: 1번 center 봇(적을 몇 마리 잡고 진다 — r4.10: 대물결 판은 center 도 결승선을 넘어 이겨 4마리째에 부대 전멸 loseAt, 검사 도구)
   const h2 = await bootApp();
   h2.app.startRun(1);
-  drive(h2, 'center', () => h2.app.getRun().over, 20000);
+  drive(h2, 'center', () => h2.app.getRun().over, 20000, { loseAt: 4 });
   assert.equal(h2.app.getRun().won, false);
-  const lossCoins = Math.round(h2.app.getRun().kills * stageValue(1) / 44);
+  const lossCoins = Math.round(h2.app.getRun().kills * stageValue(1) / N1);
   assert.equal(wallet(h2).coins, lossCoins, '패배 이벤트에서 이미 지급');
   h2.app.toTitle();
   assert.equal(wallet(h2).coins, lossCoins);
@@ -443,9 +474,9 @@ test('WALLET-5: 판 도중 새로고침 — 정산 전 코인만 사라지고(�
   assert.deepEqual(wallet(b).paid, ['2:main'], '새 출격 번호 2');
   //  승리 여운 중 새로고침: 이미 지급 — 새 앱에서도 한 번뿐
   const c = await bootApp({ storage: st });
-  assert.equal(wallet(c).coins, 54); assert.deepEqual(wallet(c).paid, ['2:main']);
+  assert.equal(wallet(c).coins, EV1_FIRST); assert.deepEqual(wallet(c).paid, ['2:main']);
   c.frames(10);
-  assert.equal(wallet(c).coins, 54);
+  assert.equal(wallet(c).coins, EV1_FIRST);
 });
 
 test('WALLET-6: 쓰기 실패·localStorage 차단 환경 — 결과·타이틀에 "코인이 저장되지 않습니다"(종전 "기록 저장 안 됨" 자리)', async () => {
@@ -555,11 +586,11 @@ test('WALLET-10: 승리·패배 여운 중 ⏸ 는 [결과 보기] → 원래 �
   h.app.giveUp();
   const r = h.app.getResult();
   assert.equal(r.won, true); assert.equal(r.aborted, false);
-  assert.equal(r.coins.gained, 54); assert.equal(wallet(h).coins, 54);
+  assert.equal(r.coins.gained, EV1_FIRST); assert.equal(wallet(h).coins, EV1_FIRST);
   assert.ok(h.textNow().includes('작전 성공!'));
   const h2 = await bootApp();
   h2.app.startRun(1);
-  drive(h2, 'center', () => h2.app.getRun().over, 20000);
+  drive(h2, 'center', () => h2.app.getRun().over, 20000, { loseAt: 4 });
   h2.app.pause(); h2.app.giveUp();
   const r2 = h2.app.getResult();
   assert.equal(r2.won, false); assert.equal(r2.aborted, false, '패배 여운 중 ⏸ 는 "작전 실패"(중단 아님)');
@@ -684,8 +715,8 @@ test('RESULT-ENTER: 결과 화면 Enter — 승리 = [다음 작전], 패배·�
   assert.equal(h.app.getResult().won, true);
   h.key('Enter');
   assert.equal(h.app.getRun().stageId, 2, '승리 Enter = 다음 작전');
-  //  2번 패배(evLead) → Enter = 2번 다시
-  drive(h, 'evLead', () => h.app.getState() === 'result', 20000);
+  //  2번 패배(evLead — r4.10: 5마리째에 부대 전멸 loseAt, 검사 도구) → Enter = 2번 다시
+  drive(h, 'evLead', () => h.app.getState() === 'result', 20000, { loseAt: 5 });
   assert.equal(h.app.getResult().won, false);
   const runNo = wallet(h).runNo;
   h.key('Enter');
@@ -713,11 +744,14 @@ test('RESULT 3-9 글자·배치: 맨 위 제목(성공/실패/중단) → 획득
   drive(h, 'evLead', () => h.app.getState() === 'result', 20000, WIN);
   const r = h.app.getResult();
   assert.equal(r.advice, ADVICE_DEFAULT.won);
-  assert.equal(r.coinLine, '적 15 · 보스 13 · 첫 클리어 26');
+  //  r4.10: 1번 = 대물결 판 — 판 끝 목표 몫의 이름은 '돌파'(보스 판 '보스' · 중간 보스 판 '중간 보스')
+  assert.equal(r.coins.goal, 'horde');
+  assert.equal(r.coinLine, '적\u00a0' + (EV1_MAIN - 13) + ' · 돌파\u00a013 · 첫\u00a0클리어\u00a026');
   h.texts.length = 0; h.frames(1);
   const y = (s) => { const o = h.texts.find((x) => x.text === s); assert.ok(o, '글자 ' + s + ': ' + h.texts.map((x) => x.text).slice(0, 12).join(' | ')); return o.y; };
-  assert.ok(y('작전 성공!') < y('획득 코인 +54') && y('획득 코인 +54') < y(r.coinLine) && y(r.coinLine) < y('보유 코인 54') && y('보유 코인 54') < 212, '맨 위 순서');
-  assert.equal(h.texts.find((x) => x.text === '획득 코인 +54').fill, C.gold);
+  const G = '획득 코인 +' + EV1_FIRST, B = '보유 코인 ' + EV1_FIRST;
+  assert.ok(y('작전 성공!') < y(G) && y(G) < y(r.coinLine) && y(r.coinLine) < y(B) && y(B) < 212, '맨 위 순서');
+  assert.equal(h.texts.find((x) => x.text === G).fill, C.gold);
   //  포기: 원인(인원 손실 + 놓친 통) → 제안
   const h2 = await bootApp();
   h2.app.startRun(1);
@@ -739,6 +773,11 @@ test('RESULT 3-9 글자·배치: 맨 위 제목(성공/실패/중단) → 획득
   assert.equal(causeLine({ lossByGate: 3, lossByShot: 0, lossByShock: 1, lossByTouch: 2, missedSupplies: 1 }), '인원 손실 게이트 3 · 충격 1 · 접촉 2 · 놓친 통 1개');
   assert.equal(causeLine({}), '인원 손실 없음 · 놓친 통 없음');
   assert.equal(coinBreakdown({ enemy: 7, boss: 0, clear: 5, clearKind: 'replay', bonus: 20 }), '적 7 · 재클리어 5 · 보너스 20');
+  //  r4.10 판 끝 목표 이름: 보스 · 중간 보스(띄어쓰기도 줄바꿈 없는 공백) · 돌파 — 칸이 없는 옛 꼴은 보스
+  assert.equal(coinBreakdown({ enemy: 7, boss: 14, goal: 'boss' }), '적\u00a07 · 보스\u00a014');
+  assert.equal(coinBreakdown({ enemy: 7, boss: 14, goal: 'mid' }), '적\u00a07 · 중간\u00a0보스\u00a014');
+  assert.equal(coinBreakdown({ enemy: 7, boss: 14, goal: 'horde' }), '적\u00a07 · 돌파\u00a014');
+  assert.equal(coinBreakdown({ enemy: 7, boss: 14 }), '적\u00a07 · 보스\u00a014');
   assert.equal(coinBreakdown({ dev: true }), '개발용 판 — 코인 없음');
 });
 
@@ -762,7 +801,7 @@ test('HUD 코인: 난이도 칩이 있던 자리(무기 칩 왼쪽)에 이번 �
   assert.equal(chips[1].left - chips[0].right, HUD_ROW.gap); assert.equal(chips[0].top, chips[1].top); assert.equal(chips[0].bottom, chips[2].bottom);
   const num = ops.find((o) => o.op === 'fillText' && o.args[0] === '12');
   assert.ok(num && num.fill === C.gold && num.args[2] === HUD_ROW.cy, '코인 숫자(금색, 칩 중심선)');
-  //  셸: 출격 중 HUD 에 누계, 일반 적 처치에는 '+n' 글자가 없고 보스 처치 때만 '+13 코인'
+  //  셸: 출격 중 HUD 에 누계, 일반 적 처치에는 '+n' 글자가 없고 판 끝 목표 때만 '+13 코인'(r4.10: 1번 = 대물결 판 — 결승선 돌파 때)
   const h = await bootApp();
   h.app.startRun(1);
   const seen = new Set();
@@ -774,10 +813,10 @@ test('HUD 코인: 난이도 칩이 있던 자리(무기 칩 왼쪽)에 이번 �
     h.texts.length = 0; h.frames(1);
     for (const x of h.texts) seen.add(x.text);
   }
-  assert.ok(seen.has('+13 코인'), '보스 처치 "+13 코인"(V(1) × 0.5)');
-  //  코인 글자는 보스 처치의 그 하나뿐(일반 적 처치마다 '+n 코인' 을 띄우지 않는다 — '+n' 숫자 글자는 게이트·발판 연출의 것)
-  assert.deepEqual([...seen].filter((s) => /코인$/.test(s)), ['+13 코인'], '코인 글자 = 보스 처치뿐');
-  assert.ok(seen.has('28'), 'HUD 누계가 정산 전 값(28 = 15 + 13)까지 올라간다');
+  assert.ok(seen.has('+13 코인'), '결승선 돌파 "+13 코인"(V(1) × 0.5 — 판 끝 목표 몫)');
+  //  코인 글자는 판 끝 목표의 그 하나뿐(일반 적 처치마다 '+n 코인' 을 띄우지 않는다 — '+n' 숫자 글자는 게이트·발판 연출의 것)
+  assert.deepEqual([...seen].filter((s) => /코인$/.test(s)), ['+13 코인'], '코인 글자 = 판 끝 목표뿐');
+  assert.ok(seen.has(String(EV1_MAIN)), 'HUD 누계가 정산 전 값(적 몫 + 돌파 13 = ' + EV1_MAIN + ')까지 올라간다');
 });
 
 test('V3-PURE-COIN: 규칙 모듈은 코인·저장을 모른다 — combat/gates/supply/squad/weapons/bonus/advice/motion/stages/courses/balance 에 save·coins import·localStorage·wallet 없음, coins.js 는 순수(난수·시계·저장·화면 없음)', () => {

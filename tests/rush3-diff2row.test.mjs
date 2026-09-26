@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildStage, ALL_STAGE_IDS } from '../rush3/stages.js';
+import { buildStage, ALL_STAGE_IDS, stageKindOf } from '../rush3/stages.js';
 import { createRun } from '../rush3/combat.js';
 import { BAL3 } from '../rush3/balance.js';
 
@@ -48,23 +48,46 @@ function undoR47Stage(st) {
   for (const e of st.elites) delete e.atk;
   return st;
 }
+//  r4.10(이사님 실플레이 5차 2026-09-26 "보스 등장 횟수를 3, 6, 9, 12, 15, 18, 21, 24 스테이지로 줄이고 일반 스테이지는 많은 수의 일반 적이나 좀 더 강한 중간 보스로"):
+//   게임 줄의 판 종류 칸(endKind)·대물결(hordeZ·finishZ·대물결 겹 스폰 horde)·보스 배정(9 B3 · 12 B4 · 18 합동전 · 21 광장)·보스 없는 판을 되돌린다.
+//   보스·광장·판 길이·정예 z 는 배수 1 줄 판(정의 그대로)에서 가져오고 보스 체력만 기본 줄 배수(eliteHp — 1~3 도 배수 1 줄은 ×1 이라 같은 식)로.
+//   r4.7 되돌리기(보스 체력 바닥 → base) **뒤에** 부른다
+function undoR410Stage(st, id, row) {
+  const nb = buildStage(id);
+  st.elites = nb.elites.map((e) => ({ ...e, hp: Math.round(e.hp * row.eliteHp) }));
+  st.elite = st.elites[0] ?? null;
+  st.arena = nb.arena;
+  st.eliteZ = nb.eliteZ;
+  st.length = nb.length;
+  st.spawns = st.spawns.filter((sp) => !sp.horde);
+  delete st.endKind; delete st.hordeZ; delete st.finishZ;
+  return st;
+}
 function undoR47Run(rp, row) {
   const { bounty, ...defs } = rp.enemyDefs;
   const E = defs.elite;
   return { ...rp, enemyDefs: { ...defs, elite: { ...E, shot: { ...E.shot, dmg: Math.round(1 * row.eshotDmg) } } } };
 }
 
-test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 지옥 판과 — r4.7 의 보스 체력·보스 탄·현상금 적 몫과 r4.8 의 밀집 대형·보스 패턴 칸만 되돌리면 — 바이트 단위로 같다(1~24, 추가 배치 S1·S5·S8 포함) · createRun 파생값도 같다", () => {
+test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 지옥 판과 — r4.7 의 보스 체력·보스 탄·현상금 적 몫, r4.8 의 밀집 대형·보스 패턴 칸, r4.10 의 판 종류(보스 3의 배수 판만 · 대물결·중간 보스)만 되돌리면 — 바이트 단위로 같다(1~24, 추가 배치 S1·S5·S8 포함) · createRun 파생값도 같다", () => {
   const row = BAL3.difficulty.brutal;
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
-    //  r4.7 몫이 실제로 들어 있다: 보스 체력 바닥(옛 값 이상) · 보스 탄 1 · r4.8 보스전 밀집 대형 64
-    assert.ok(st.bossFloor && st.elites.every((e, i) => e.hp >= st.bossFloor.base[i]), `S${id} 보스 체력 바닥`);
-    assert.equal(st.bossHw, 64, `S${id} 보스전 밀집 대형(r4.8)`);
-    //  r4.9 보스별 고유 공격: 스킨마다 3종(페이즈 없는 1·2번은 처음 두 가지) · 역할 보스는 자기 스킨 공격 중 역할에 맞는 것만(23번 포격 = 1종, 소환 = 광역 1종)
-    assert.ok(st.elites.every((e) => e.atk && e.atk.seq.length >= 1 && e.atk.skin), `S${id} 보스 고유 공격 배정(r4.9)`);
-    assert.equal(S(undoR47Stage(st)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
-    const rp = runPart(createRun(buildStage(id, { difficulty: 'brutal' })));
+    const kind = stageKindOf(id, 'brutal');
+    assert.equal(st.endKind, kind, `S${id} 판 종류 칸(r4.10)`);
+    if (st.elites.length) {
+      //  r4.7 몫이 실제로 들어 있다: 보스 체력 바닥(옛 값 이상) · 보스 탄 1 · r4.8 보스전 밀집 대형 64
+      assert.ok(st.bossFloor && st.elites.every((e, i) => e.hp >= st.bossFloor.base[i]), `S${id} 보스 체력 바닥`);
+      assert.equal(st.bossHw, 64, `S${id} 보스전 밀집 대형(r4.8)`);
+      //  r4.9 보스별 고유 공격: 스킨마다 3종 · 역할 보스는 자기 스킨 공격 중 역할에 맞는 것만(18번 포격 = 탄 2종, 소환 = 광역 1종)
+      assert.ok(st.elites.every((e) => e.atk && e.atk.seq.length >= 1 && e.atk.skin), `S${id} 보스 고유 공격 배정(r4.9)`);
+    } else {
+      assert.ok(kind === 'horde' || kind === 'mid', `S${id} 보스 없는 판 = 대물결·중간 보스(r4.10)`);
+      assert.ok(!('bossFloor' in st) && !('bossHw' in st), `S${id} 보스 없는 판에 보스 칸 없음`);
+    }
+    assert.equal(S(undoR410Stage(undoR47Stage(st), id, row)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
+    //  createRun 파생값(적 표·광장 보스 배수 등): 판 종류를 되돌린 판으로 만든 run(광장이 20 → 21 로 옮겨 가 광장 배수가 판을 따라간다)
+    const rp = runPart(createRun(undoR410Stage(undoR47Stage(buildStage(id, { difficulty: 'brutal' })), id, row)));
     assert.equal(rp.enemyDefs.elite.shot.dmg, 1, `S${id} 보스 탄 1`);
     assert.equal(rp.enemyDefs.shooter.shot.dmg, 3, `S${id} 저격수 탄 3 그대로`);
     assert.equal(S(undoR47Run(rp, row)), S(SNAP.run_brutal[id]), `S${id} 기본 줄(옛 지옥) createRun`);

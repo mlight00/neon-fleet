@@ -17,10 +17,14 @@ const HW = 64;
 const halfW = (run) => run.units.reduce((m, u) => Math.max(m, Math.abs(u.dx)), 0) + BAL3.squad.unitR;
 const inp = (x) => ({ pointerX: x, dragDx: 0, keyDir: 0 });
 
+//  r4.10(이사님 실플레이 5차 — 보스는 3·6·9·12·15·18·21·24 판에만): 게임 줄 보스 판 = 줄 표의 bossStages. 보스 없는 대물결 판에는 밀집 대형 칸이 없다
+const BOSS_IDS = BAL3.difficulty.brutal.bossStages;
 //  보스전만 떼어 낸 판(게이트·통·스폰·벽 없음): n 명으로 보스 등장 직전에서 시작. 보스 공격·소환·접촉은 끈다(대형만 본다)
-function fightRun(id, n, difficulty = 'brutal', keepBonus = false) {
+//   bonusFrom = 보너스전 정의를 가져올 판(보스 판 정의에 붙여 '승리 뒤 보너스전'을 본다 — r4.10 에서 8번 보너스 판이 보스 판이 아니게 되어서)
+function fightRun(id, n, difficulty = 'brutal', keepBonus = false, bonusFrom = null) {
   const st = buildStage(id, { difficulty });
-  const stage = { ...st, startUnits: n, gateRows: [], supplies: [], spawns: [], walls: [], lottery: null, bonus: keepBonus ? st.bonus : null };
+  const bonus = bonusFrom != null ? buildStage(bonusFrom, { difficulty }).bonus : keepBonus ? st.bonus : null;
+  const stage = { ...st, startUnits: n, gateRows: [], supplies: [], spawns: [], walls: [], lottery: null, bonus };
   const run = createRun(stage);
   run.z = run.prevZ = stage.eliteZ - 2;
   return run;
@@ -31,19 +35,22 @@ function quiet(run) {
   for (const u of run.units) u.hp = 1e9;
 }
 
-test('BOSS-HW-1: 표 — 게임 줄 bossHw 64 · 배수 1 줄 null · buildStage 는 게임 줄 24판에만 stage.bossHw(배수 1 줄은 키 없음)', () => {
+test('BOSS-HW-1: 표 — 게임 줄 bossHw 64 · 배수 1 줄 null · buildStage 는 게임 줄에서 보스가 있는 판(보스 판 8개 — r4.10)에만 stage.bossHw(대물결 판·배수 1 줄은 키 없음)', () => {
   assert.equal(BAL3.difficulty.brutal.bossHw, HW);
   assert.equal(BAL3.difficulty.normal.bossHw, null);
   assert.ok(BAL3.squad.bossHwRate > 0);
+  for (const id of BOSS_IDS) assert.equal(buildStage(id, { difficulty: 'brutal' }).bossHw, HW, `S${id} 게임 줄 보스 판`);
   for (const id of ALL_STAGE_IDS) {
-    assert.equal(buildStage(id, { difficulty: 'brutal' }).bossHw, HW, `S${id} 게임 줄`);
+    const st = buildStage(id, { difficulty: 'brutal' });
+    if (st.elites.length) assert.equal(st.bossHw, HW, `S${id} 게임 줄(보스가 있는 판)`);
+    else assert.ok(!('bossHw' in st), `S${id} 게임 줄 보스 없는 판은 칸이 없다`);
     assert.ok(!('bossHw' in buildStage(id)), `S${id} 배수 1 줄은 칸이 없다`);
     assert.ok(!('bossHw' in createRun(buildStage(id))) && !('hwCap' in createRun(buildStage(id))), `S${id} 배수 1 줄 run 에도 없다`);
   }
 });
 
 test('BOSS-HW-2: 게임 줄 보스전 — 보스가 나온 STEP 부터 반폭 상한이 bossHwRate 로 줄고(한 번에 뭉개지지 않는다) 전환 뒤 반폭 ≤ 64 · 중심 범위는 지금 규칙 그대로(140~340, 광장 100~380)', () => {
-  for (const [id, n] of [[22, 100], [1, 100], [23, 60], [10, 30], [24, 100], [15, 60]]) {
+  for (const [id, n] of [[12, 100], [3, 100], [18, 60], [9, 30], [24, 100], [15, 60]]) {
     const run = fightRun(id, n);
     let steps = 0;
     while (!run.bosses.length && steps < 600) { stepRun(run, inp(240), STEP); drainEvents(run); steps++; }
@@ -85,7 +92,7 @@ test('BOSS-HW-3: 배수 1 줄은 그대로 — 같은 보스전에서 상한이 
 
 test('BOSS-HW-4: 계산기 = 게임 대형 — firepower.squadOffsets(n, 중심, 64) 가 전환 뒤 실제 유닛 자리(dx·dy)와 같다(1·30·60·100명 × 중심 5곳)', () => {
   for (const n of [1, 30, 60, 100]) {
-    const run = fightRun(22, n);
+    const run = fightRun(12, n);
     let steps = 0;
     while ((!run.bosses.length || run.hwCap > HW) && steps < 2000) { stepRun(run, inp(240), STEP); drainEvents(run); steps++; if (run.bosses.length) quiet(run); }
     const [lo, hi] = squadCenterRange(n, HW);
@@ -128,15 +135,16 @@ function leadFight(id) {
 }
 
 test('BOSS-HW-6: 계산(상한)은 밀집 대형에서도 닿을 수 있는 값 — 보스가 탄 도착 때 있을 자리에 앞질러 선 상한 부대는 30초 안팎(27~36초)', (t) => {
-  for (const id of [1, 2, 6, 12, 22]) {
+  for (const id of [3, 6, 9, 12]) {
     const r = leadFight(id);
     assert.ok(r.won && r.sec >= 27 && r.sec <= 36, `S${id}: ${r.sec.toFixed(1)}초`);
     t.diagnostic(`BOSS-LEAD S${id} → ${r.sec.toFixed(1)}초`);
   }
 });
 
-test('BOSS-HW-5: 승리 뒤(8번 보너스전)에는 같은 빠르기로 상한을 풀고 칸을 지운다 — 표적전은 종전 대형', () => {
-  const run = fightRun(8, 100, 'brutal', true);
+test('BOSS-HW-5: 승리 뒤(보너스전 — 8번의 표적전 정의)에는 같은 빠르기로 상한을 풀고 칸을 지운다 — 표적전은 종전 대형', () => {
+  //  r4.10: 게임 줄 8번은 보스 판이 아니다 — 보스 판(3번)에 8번의 보너스전 정의를 붙여 '보스 격파 → 보너스전'을 본다(규칙 경로는 같다)
+  const run = fightRun(3, 100, 'brutal', false, 8);
   assert.ok(run.bonusDef, '8번 = 보너스전 판');
   let steps = 0;
   while ((!run.bosses.length || run.hwCap > HW) && steps < 2000) { stepRun(run, inp(240), STEP); drainEvents(run); steps++; if (run.bosses.length && run.bosses[0].hp > 1) quiet(run); }

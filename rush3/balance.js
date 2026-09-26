@@ -125,6 +125,15 @@ export const BAL3 = deepFreeze({
   //   상한 화력 = rush3/firepower.js(그 판을 가장 잘 했을 때 보스 앞 부대가 보스에 **실제로 닿는** 초당 피해 — 강화 0). 보스 여럿은 합으로, 비율 유지.
   //   이 숫자 하나만 바꾸면 24판 보스 체력이 함께 따라간다
   bossMinFightSec: 30,
+  //  r4.10 판 끝맺음(이사님 실플레이 5차 2026-09-26 "보스가 모든 스테이지에 나오다보니 지루한 느낌이 든다 … 보스 등장 횟수를 3, 6, 9, 12, 15, 18, 21, 24 스테이지로
+  //   줄이고 일반 스테이지는 많은 수의 일반 적이나 좀 더 강한 중간 보스로 대체하자"). 게임 화면 줄(difficulty 표의 bossStages 가 있는 줄 = brutal)에서만
+  //   buildStage 가 보스 없는 판의 끝을 **대물결**(결승선 돌파) 또는 **중간 보스**로 바꾼다(판 종류 표 = courses.STAGE_END). 검사용 배수 1 줄(normal)은 모든 판 보스 그대로.
+  //  중간 보스 체력 = 상한 화력(rush3/firepower.js — 보스와 같은 계산) × 이 초. 이 숫자 하나만 바꾸면 8판 중간 보스 체력이 함께 따라간다
+  midBossSec: 12,
+  //  r4.10 대물결 판(1·4·7·10·13·16·19·22 — 게임 화면 줄): 보스가 나오던 자리(eliteZ)에서 대물결이 겹겹이 들어오고, 부대가 **결승선**을 넘는 STEP 에 승리.
+  //   finishAfter = 결승선 z − 대물결 시작 z(eliteZ). 대물결의 가장 뒤 겹(시작 + 240 에서 나와 +760 에 놓인다 = eliteZ + 1000)을 지나 200px 뒤 —
+  //   대물결을 다 지나야 결승선에 닿는다(판 길이 length 도 이 결승선으로 늘어난다 — 게임 줄만). label = 결승선 표지 글(한 어절)
+  horde: { finishAfter: 1200, label: '결승' },
   //  현상금 적(r4.7 — 이사님 지시 2026-09-26 "체력이 특수한 높은 일반 적을 배치해서 내가 가진 최대의 무기로 끝까지 쏴야 깰 수 있는 긴장감을 주자.
   //   대신 코인 같은 보상을 주자"). 게임 화면 줄(difficulty 표의 bounty 가 참인 줄 = brutal)에서만 판 정의의 bounties(z·x)로 나온다.
   //  ⚠️enemies 에 넣지 않는다(enemies 는 kind 4종 표 — enemyDefsFor·HP_BASE·검사용 배수 1 줄 표가 그대로여야 한다). combat.enemyDefsFor 가 bounty 줄에서만 표에 붙인다.
@@ -272,6 +281,9 @@ export const BAL3 = deepFreeze({
   //                총알을 많이 쏟아부으니까 피할 수가 없이 모든 총알을 맞게 된다". 100명 대형(반폭 약 130 = 도로 폭의 80%)을 64 로 모아 피할 자리를 만든다.
   //                buildStage 가 stage.bossHw 로 싣고(상한 화력 계산기도 같은 대형), createRun·stepRun 은 run.bossHw·run.hwCap 만 읽는다. null = 제한 없음(종전)
   //   bossPatterns (r4.8 → r4.9) 이 줄에서만 보스가 조준 부채꼴 대신 자기 스킨의 고유 공격(BAL3.bossAtk — 탄은 안내 없이, 광역은 붉은 경보)을 쓴다 — buildStage 가 보스 정의에 atk 를 싣는다
+  //   bossStages   (r4.10) 이 줄에서 보스가 나오는 판 번호(1~24 공개 판). 나머지 판은 판 종류 표(courses.STAGE_END)대로 대물결(결승선 돌파) 또는 중간 보스로 끝난다.
+  //                이사님 지시(2026-09-26) "보스 등장 횟수를 3, 6, 9, 12, 15, 18, 21, 24 스테이지로 줄이고 일반 스테이지는 많은 수의 일반 적이나 좀 더 강한 중간 보스로 대체하자".
+  //                null = 모든 판이 정의 그대로(검사용 배수 1 줄 — 모든 판 보스)
   //  화면 이름(label·short)은 r4.2 에서 지웠다 — 어디에도 표시하지 않는다.
   difficulty: {
     //  r3.9(2026-09-18 이사 결정 2)는 위협을 **출현 빈도**로만 올렸다(enemyHp·eliteHp 1 고정). → **r3.21(2026-09-20 이사 결정 B안)로 뒤집음**:
@@ -279,12 +291,13 @@ export const BAL3 = deepFreeze({
     //   빈도 배수(waves·waveGap·spawnCount·eliteSummonRate)와 적탄·접촉 피해 배수는 r3.9 그대로 둔다. 스테이지 구간 배율(enemyHpByStage)은 여기에 곱해진다.
     //   ⚠️1~3 기준 코스(enemyHpByStage difficultyHp: ['brutal'])에서는 배수 1 줄의 enemyHp·eliteHp 가 ×1 이다(stages.buildStage·combat.createRun).
     normal: { id: 'normal', enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1, extraSpawns: false,
-              bossShotDmg: 1, bossFloor: false, bounty: false, bossHw: null, bossPatterns: false },
+              bossShotDmg: 1, bossFloor: false, bounty: false, bossHw: null, bossPatterns: false, bossStages: null },
     //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다. brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반).
     //   지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
     //   r4.7(이사님 실플레이 뒤 지시 2026-09-26 — 결정 D2′ '지옥 값 그대로'를 **보스 체력·보스 탄 피해·현상금 적에 한해** 푼다): bossShotDmg 1/3 · bossFloor true · bounty true
+    //   r4.10(이사님 실플레이 5차 2026-09-26): 보스는 3의 배수 판에만(bossStages) — 나머지는 대물결·중간 보스
     brutal: { id: 'brutal', enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2, extraSpawns: true,
-              bossShotDmg: 1 / 3, bossFloor: true, bounty: true, bossHw: 64, bossPatterns: true },
+              bossShotDmg: 1 / 3, bossFloor: true, bounty: true, bossHw: 64, bossPatterns: true, bossStages: [3, 6, 9, 12, 15, 18, 21, 24] },
   },
   //  적 체력 스테이지 배율(r3.21, 이사 결정 2026-09-20 B안 ①): 스테이지 번호 구간별 배수. 잡졸·돌격체·저격수(스폰 정의 hp 명시 포함)와
   //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).
@@ -339,6 +352,8 @@ export const BAL3 = deepFreeze({
         bossKillBannerSec: 1.2,
         //  r4.9 (다) 광분 배너('광분!' — 화면 가운데, 광분에 들어가는 순간 1회) 표시 시간
         rageBannerSec: 1.0,
+        //  r4.10 결승선 돌파 배너('결승선 돌파!' — 대물결 판에서 결승선을 넘는 순간 1회, 슬롯 A 금색 띠) 표시 시간(결과 화면까지 여운 1.3초 안)
+        finishBannerSec: 1.2,
         //  아레나(r3.17): arenaOpenSec = 도로가 광장으로 열리는 연출 초 · arenaGuideSec = '드래그로 피하세요' 배너(판마다 진입 시 1회) · shockRingSec = 착지 충격 확장 링
         arenaOpenSec: 0.6, arenaGuideSec: 2.4, shockRingSec: 0.45,
         //  동작 시트(6장, 2026-09-18 파일럿): 히어로는 걷기 heroWalkMinSec 뒤 발사 이벤트에 사격 시트 1회,

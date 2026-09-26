@@ -15,7 +15,7 @@ import { createRenderer3, UPGRADE_UI, upgradeCard, upgradeBuyBox, HERO_BULLET_RI
 import { boot, hitButton, TITLE_UPGRADE_BTN, RESULT_UPGRADE_SLOT, UPGRADE_HEAD, UP_BLOCK_TEXT, UP_HINT_LINE, UP_REC_TEXT, UP_TRACK_NAME,
          upgradeLines, shotsToKill, canBuyAny } from '../rush3/main.js';
 import { UP_TRACKS, UP_COST, effects } from '../rush3/meta.js';
-import { pickInput, weakenBosses } from './lib/rush3-policies.mjs';
+import { pickInput, weakenBosses, wipeSquad } from './lib/rush3-policies.mjs';
 
 const Z0 = { power: 0, rate: 0, multi: 0 };
 
@@ -83,11 +83,13 @@ async function bootApp({ storage = memStorage(), search = '', BroadcastChannel, 
 }
 //  r4.7: opts.win = 보스가 나오면 체력 1(weakenBosses — 보스 체력 바닥으로 봇이 게임 줄 1번을 못 이긴다. 이긴 판이 필요한 셸 흐름 검사용, 난이도와 무관)
 const WIN = Object.freeze({ win: true });
+//  r4.10: opts.loseAt = 처치 수가 이 수에 닿으면 부대 전멸(wipeSquad — 게임 줄 1번 대물결 판은 center 봇도 결승선을 넘어 이겨, 패배 흐름을 이 도구로 만든다. 난이도와 무관)
 function drive(h, policy, cond, max = 20000, opts = {}) {
   let n = 0;
   while (!cond() && n < max) {
     const run = h.app.getRun();
     if (opts.win && run && h.app.getState() === 'run') weakenBosses(run);
+    if (opts.loseAt != null && run && h.app.getState() === 'run' && run.kills >= opts.loseAt) wipeSquad(run);
     if (run && h.app.getState() === 'run') h.app.input.state.pointerX = pickInput(policy, run).pointerX;
     h.frames(1);
     n++;
@@ -101,12 +103,14 @@ const walletWrites = (h) => h.storage.writes.filter((k) => k === WALLET_KEY).len
 // ═══════════════════════════════ SHELL-FLOW ═══════════════════════════════
 
 test('SHELL-FLOW: 결과 → [로봇 강화] → [돌아가기] = 방금 판 결과 화면(같은 결과·기본 버튼 유지) — 승리 = [다음 작전](Enter), 패배·포기 = [다시 도전](Enter)', async () => {
-  //  ① 승리(1번 evLead — 새 사용자의 첫 승리, 54 코인) → [로봇 강화] 보조 버튼 → 강화 화면에서 다연발 구매 → [돌아가기]
+  //  ① 승리(1번 evLead — 새 사용자의 첫 승리, 53 코인(r4.10 대물결 판 — 종전 보스 판 54)) → [로봇 강화] 보조 버튼 → 강화 화면에서 다연발 구매 → [돌아가기]
   const h = await bootApp();
   h.app.startRun(1);
   drive(h, 'evLead', () => h.app.getState() === 'result', 20000, WIN);
   const r = h.app.getResult();
   assert.equal(r.won, true); assert.equal(r.nextId, 2);
+  const g = r.coins.gained;
+  assert.ok(g >= 40 && g - 40 < 40, '첫 승리 코인으로 다연발 1단계(40)만 살 수 있다: ' + g);
   h.frames(1);
   const up = h.btn('upgrade');
   assert.ok(up, '살 수 있는 단계가 있으면 보조 버튼 [로봇 강화]');
@@ -120,17 +124,17 @@ test('SHELL-FLOW: 결과 → [로봇 강화] → [돌아가기] = 방금 판 결
   h.frames(1);
   h.tapId('buy_multi');
   assert.deepEqual(h.save.wallet.get().up, { power: 0, rate: 0, multi: 1 });
-  assert.equal(h.save.wallet.get().coins, 54 - 40);
+  assert.equal(h.save.wallet.get().coins, g - 40);
   h.frames(1);
   h.tapId('back');
   assert.equal(h.app.getState(), 'result', '돌아가기 → 결과 화면');
   assert.equal(h.app.getResult(), r, '방금 판의 결과 그대로(새 판·새 결과가 아니다)');
   assert.equal(h.app.getRun().stageId, 1);
   const t = h.textNow();
-  assert.ok(t.includes('작전 성공!') && t.includes('획득 코인 +54'), '같은 결과 화면: ' + t.slice(0, 6).join(' | '));
-  assert.ok(t.includes('보유 코인 14'), '보유 코인은 산 뒤 값으로');
+  assert.ok(t.includes('작전 성공!') && t.includes('획득 코인 +' + g), '같은 결과 화면: ' + t.slice(0, 6).join(' | '));
+  assert.ok(t.includes('보유 코인 ' + (g - 40)), '보유 코인은 산 뒤 값으로');
   assert.ok(h.btn('next').primary, '기본 버튼 [다음 작전] 유지');
-  assert.equal(h.btn('upgrade'), null, '더 살 수 있는 단계가 없으면(14 < 40) 보조 버튼은 사라진다');
+  assert.equal(h.btn('upgrade'), null, '더 살 수 있는 단계가 없으면(' + (g - 40) + ' < 40) 보조 버튼은 사라진다');
   h.key('Enter');
   assert.equal(h.app.getState(), 'run'); assert.equal(h.app.getRun().stageId, 2, '승리 Enter = 다음 작전(2번)');
   assert.deepEqual(h.app.getRun().up, { power: 0, rate: 0, multi: 1 }, '다음 판은 산 강화로');
@@ -138,7 +142,7 @@ test('SHELL-FLOW: 결과 → [로봇 강화] → [돌아가기] = 방금 판 결
   //  ② 패배(1번 center — 진다) + 코인 넉넉 → [로봇 강화] → ESC(= 돌아가기) → 결과 → Enter = 다시 도전(1번)
   const h2 = await bootApp({ storage: walletStore(100) });
   h2.app.startRun(1);
-  drive(h2, 'center', () => h2.app.getState() === 'result', 20000);
+  drive(h2, 'center', () => h2.app.getState() === 'result', 20000, { loseAt: 4 });
   const r2 = h2.app.getResult();
   assert.equal(r2.won, false); assert.equal(r2.aborted, false);
   h2.frames(1);
@@ -220,7 +224,7 @@ test('UP-HINT: 잔액이 처음으로 1단계 비용(40) 이상이 된 **승리*
   hA.app.pause(); hA.app.giveUp();
   assert.equal(hA.app.getResult().upHint, null, '포기 결과엔 안내 없음');
   assert.equal(hA.save.get().seenUpHint, false);
-  //  ② 새 사용자 1번 첫 승리(54 코인) — 안내 + 보조 버튼 바로 아래 금색 한 줄
+  //  ② 새 사용자 1번 첫 승리(53 코인 — r4.10 대물결 판) — 안내 + 보조 버튼 바로 아래 금색 한 줄
   const h = await bootApp();
   assert.equal(h.save.get().seenUpHint, false); assert.equal(h.save.get().seenUpRec, false);
   h.app.startRun(1);

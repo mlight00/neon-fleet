@@ -26,8 +26,10 @@ const SKINS = Object.keys(BA.skins);
 const OLD_KINDS = ['aim', 'wall', 'pillar', 'sweep', 'burst'];
 //  r4.9 (가) 옛 초록 안전 구역 색(r4.8 ATK_SAFE) — 이제 어디에도 그려지지 않아야 한다
 const OLD_GREEN = '#5CFF8A';
-//  공격마다 그 공격을 쓰는 판 하나(그림 검사·느려짐 검사용)
-const STAGE_OF = { blade: 3, smoke: 3, ricochet: 3, hook: 6, needles: 6, web: 6, rail: 11, chain: 11, crossrail: 11, pour: 16, slag: 16, rain: 16, mace: 24, blades: 24, quake: 24 };
+//  공격마다 그 공격을 쓰는 판 하나(그림 검사·느려짐 검사용). r4.10: 게임 줄 보스 판(3·6·9·12·15·18·21·24)에서 — 9번 = B3 레일 리바이어던 · 12번 = B4 스멜터
+const STAGE_OF = { blade: 3, smoke: 3, ricochet: 3, hook: 6, needles: 6, web: 6, rail: 9, chain: 9, crossrail: 9, pour: 12, slag: 12, rain: 12, mace: 24, blades: 24, quake: 24 };
+//  r4.10(이사님 실플레이 5차 — 보스는 3·6·9·12·15·18·21·24 판에만): 게임 줄 보스 판
+const BOSS_IDS = BAL3.difficulty.brutal.bossStages;
 
 test('BOSS-UNIQUE 배정표: 스킨 5종 × 고유 공격 3종 = 15종이 서로 겹치지 않는다 · 스킨마다 탄·광역이 섞여 있다 · r4.8 공용 5종은 없다 · 판 정의(1~24)의 배정은 자기 스킨 공격만', () => {
   assert.equal(SKINS.length, 5);
@@ -58,7 +60,9 @@ test('BOSS-UNIQUE 배정표: 스킨 5종 × 고유 공격 3종 = 15종이 서로
   }
 });
 
-test('BOSS-UNIQUE 페이즈·역할: 체력 50%·30%(r4.9 (다) 게임 줄 문턱) 마다 새 고유 공격이 하나씩 열린다(3번부터) · 1·2번은 삽날 밀기·잔해 튕기기를 처음부터 번갈아 · 포격 = 자기 스킨 탄 · 소환 = 광역 하나 · 장갑 = 광역 · 10번 포격은 B1 그레이더(그림 키 elite = B1_grader)', () => {
+test('BOSS-UNIQUE 페이즈·역할: 체력 50%·30%(r4.9 (다) 게임 줄 문턱) 마다 새 고유 공격이 하나씩 열린다(보스 판 8개 — 모두 페이즈 있음) · 페이즈 없는 판의 배정(early)은 삽날 밀기·잔해 튕기기를 처음부터 번갈아 · 포격 = 자기 스킨 탄 · 소환 = 광역 하나 · 장갑 = 광역 · 18번 포격은 B1 그레이더(그림 키 elite = B1_grader)', () => {
+  //  r4.10: 게임 줄 보스 판(3~24 의 3의 배수)은 모두 페이즈가 있다(bossPhases.from 3) — 페이즈 없는 1·2번에는 이제 보스가 없다
+  for (const id of BOSS_IDS) assert.equal(buildStage(id, { difficulty: 'brutal' }).bossPhases, true, `S${id} 보스 판은 페이즈 있음`);
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
     for (const e of st.elites) {
@@ -77,26 +81,27 @@ test('BOSS-UNIQUE 페이즈·역할: 체력 50%·30%(r4.9 (다) 게임 줄 문�
       }
     }
   }
-  assert.deepEqual(atkPlanFor({ role: 'gunner' }).seq, ['blade', 'ricochet'], '10번 포격(그림 없음) = B1 탄 공격');
+  //  페이즈 없는 판의 배정(학습 구간 early — 배정 함수는 그대로): 삽날 밀기·잔해 튕기기를 처음부터 둘 다 연다
+  assert.deepEqual(unlockedAtk(atkPlanFor({}, false, { phases: false }), 0), ['blade', 'ricochet'], '페이즈 없음: 삽날 밀기·잔해 튕기기 번갈아');
+  assert.deepEqual(atkPlanFor({ role: 'gunner' }).seq, ['blade', 'ricochet'], '18번 포격(그림 없음) = B1 탄 공격');
   assert.equal(atkPlanFor({ role: 'gunner' }).skin, 'B1_grader');
   assert.equal(SPRITE_KEYS3.elite, 'B1_grader', '그림 없는 보스의 그림 = B1 그레이더');
   assert.deepEqual(atkPlanFor({ role: 'gunner', skin: 'B3_railleviathan' }).seq, ['chain'], '23번 포격 = B3 탄(객차 연결탄)');
   assert.deepEqual(atkPlanFor({ role: 'summoner', skin: 'B2_gantrywidow' }).seq, ['hook'], '소환 = 광역 하나(갈고리 낙하)');
   assert.deepEqual(atkPlanFor({ role: 'tank', skin: 'B4_smelter' }).seq, ['pour', 'rain'], '장갑 = 광역만(쇳물 붓기·쇳물 비)');
-  //  실제 판의 역할 배정
-  const s10 = buildStage(10, { difficulty: 'brutal' }), s23 = buildStage(23, { difficulty: 'brutal' });
-  assert.deepEqual(s10.elites.map((e) => [e.role, e.atk.skin, e.atk.seq.join(',')]), [['gunner', 'B1_grader', 'blade,ricochet'], ['summoner', 'B2_gantrywidow', 'hook']]);
-  assert.deepEqual(s23.elites.map((e) => [e.role, e.atk.skin, e.atk.seq.join(',')]),
-    [['gunner', 'B3_railleviathan', 'chain'], ['summoner', 'B2_gantrywidow', 'hook'], ['tank', 'B4_smelter', 'pour,rain']]);
-  for (const e of s10.elites.concat(s23.elites)) {
+  //  실제 판의 역할 배정(r4.10: 복수 보스 판 = 18번 합동전 — 옛 10번의 B1 포격 + B2 소환. 옛 23번 3체는 게임 줄에서 중간 보스 판이 되었다)
+  const s18 = buildStage(18, { difficulty: 'brutal' });
+  assert.deepEqual(s18.elites.map((e) => [e.role, e.atk.skin, e.atk.seq.join(',')]), [['gunner', 'B1_grader', 'blade,ricochet'], ['summoner', 'B2_gantrywidow', 'hook']]);
+  for (const e of s18.elites) {
     const want = e.role === 'gunner' ? 'shot' : 'aoe';
     for (const k of e.atk.seq) assert.equal(atkType(k), want, `${e.role}: ${k}`);
   }
 });
 
-test('BOSS-UNIQUE 실제 판: 게임 줄 1~24 보스는 조준 부채꼴(eshot n ≥ 3)을 쏘지 않고, 쏜 탄·터진 구역은 모두 **자기 스킨의 고유 공격**(r4.8 공용 5종 없음) · 배수 1 줄 보스는 종전 부채꼴 그대로', () => {
+test('BOSS-UNIQUE 실제 판: 게임 줄 보스 판 8개의 보스는 조준 부채꼴(eshot n ≥ 3)을 쏘지 않고, 쏜 탄·터진 구역은 모두 **자기 스킨의 고유 공격**(r4.8 공용 5종 없음) · 배수 1 줄 보스(1~24)는 종전 부채꼴 그대로', () => {
   for (const id of ALL_STAGE_IDS) {
     for (const row of ['brutal', 'normal']) {
+      if (row === 'brutal' && !BOSS_IDS.includes(id)) continue;
       const st = buildStage(id, { difficulty: row });
       const stage = { ...st, startUnits: 30, gateRows: [], supplies: [], spawns: [], walls: [], lottery: null, bonus: null };
       const run = createRun(stage, { heroGuard: true });
@@ -128,9 +133,11 @@ test('BOSS-UNIQUE 실제 판: 게임 줄 1~24 보스는 조준 부채꼴(eshot n
   }
 });
 
-test('BOSS-UNIQUE 페이즈 실제: 4번 B1 — 체력 90% 는 삽날 밀기만, 45% 에 굴뚝 매연탄, 29%(30% 문턱 바로 아래 — 광분) 에 잔해 튕기기가 실제로 나온다 · 1번(페이즈 없음)은 삽날 밀기·잔해 튕기기가 처음부터 번갈아', () => {
-  const run0 = (id) => {
-    const st = buildStage(id, { difficulty: 'brutal' });
+test('BOSS-UNIQUE 페이즈 실제: 3번 B1 — 체력 90% 는 삽날 밀기만, 45% 에 굴뚝 매연탄, 29%(30% 문턱 바로 아래 — 광분) 에 잔해 튕기기가 실제로 나온다 · 페이즈 없는 판(3번을 페이즈 없이 세운 판 — r4.10 게임 줄에는 없다)은 삽날 밀기·잔해 튕기기가 처음부터 번갈아', () => {
+  const run0 = (id, noPhase = false) => {
+    const st0 = buildStage(id, { difficulty: 'brutal' });
+    //  페이즈 없는 판: 옛 1·2번 학습 구간과 같은 배정(early)·페이즈 끔(규칙 경로 그대로 — 판 정의 칸만 바꾼 합성 판)
+    const st = noPhase ? { ...st0, bossPhases: false, elites: st0.elites.map((e) => ({ ...e, atk: atkPlanFor(e, false, { phases: false }) })) } : st0;
     const stage = { ...st, startUnits: 60, gateRows: [], supplies: [], spawns: [], walls: [], lottery: null, bonus: null };
     const run = createRun(stage, { heroGuard: true });
     run.z = run.prevZ = stage.eliteZ - 2;
@@ -146,20 +153,20 @@ test('BOSS-UNIQUE 페이즈 실제: 4번 B1 — 체력 90% 는 삽날 밀기만,
     }
     return kinds;
   };
-  const r4 = run0(4);
+  const r4 = run0(3);
   assert.deepEqual([...new Set(attacks(r4, 3, 0.9))], ['blade']);
   const p1 = attacks(r4, 4, 0.45);
   assert.ok(p1.includes('smoke') && !p1.includes('ricochet'), '50% 아래: 굴뚝 매연탄이 열린다 ' + p1);
   const p2 = attacks(r4, 5, 0.29);
   assert.ok(p2.includes('ricochet'), '30% 아래(광분): 잔해 튕기기가 열린다 ' + p2);
-  const r1 = run0(1);
+  const r1 = run0(3, true);
   const k1 = attacks(r1, 4, 0.9);
-  assert.deepEqual([...new Set(k1)].sort(), ['blade', 'ricochet'], '1번: 두 공격 번갈아 ' + k1);
-  for (let i = 1; i < k1.length; i++) assert.notEqual(k1[i], k1[i - 1], '1번: 번갈아 나온다');
+  assert.deepEqual([...new Set(k1)].sort(), ['blade', 'ricochet'], '페이즈 없음: 두 공격 번갈아 ' + k1);
+  for (let i = 1; i < k1.length; i++) assert.notEqual(k1[i], k1[i - 1], '페이즈 없음: 번갈아 나온다');
 });
 
-test('BOSS-SAFE 한 번에 한 공격: 복수 보스 판(10·23)과 광장(24) — 60초 동안 시작~끝 사이에 새 공격이 없고, 보스가 번갈아 공격하며, 봇은 피해 0', () => {
-  for (const id of [10, 23, 24]) {
+test('BOSS-SAFE 한 번에 한 공격: 복수 보스 판(18 합동전 — r4.10)과 광장(21·24) — 60초 동안 시작~끝 사이에 새 공격이 없고, 보스가 번갈아 공격하며, 봇은 피해 0', () => {
+  for (const id of [18, 21, 24]) {
     const st = buildStage(id, { difficulty: 'brutal' });
     const stage = { ...st, startUnits: 60, gateRows: [], supplies: [], spawns: [], walls: [], lottery: null, bonus: null };
     const run = createRun(stage, { heroGuard: true });
@@ -263,9 +270,10 @@ test('BOSS-TELE 그림(안내 규칙): 탄 공격 6종은 장전 동안 보스 �
   assert.ok(!src.includes('ATK_SAFE') && !src.includes(OLD_GREEN), 'render.js: 초록 안전 구역 상수·색 없음');
 });
 
-test('V3-SHELL-BOSSATK: 게임 화면(셸) — 1번 B1 탄 공격 = 장전음(bossCharge) + 보스 몸 번쩍임 · 도로에 붉은·초록 안내 없음 · 잔해 덩어리 탄 / 6번 B2 광역(갈고리 낙하) = 경보음(lotWarn) + 붉은 경보 + 터지는 소리·강철 연출', async () => {
-  const h = await bootApp({ withOps: true });
-  h.app.startRun(1);
+test('V3-SHELL-BOSSATK: 게임 화면(셸) — 3번 B1 탄 공격 = 장전음(bossCharge) + 보스 몸 번쩍임 · 도로에 붉은·초록 안내 없음 · 잔해 덩어리 탄 / 6번 B2 광역(갈고리 낙하) = 경보음(lotWarn) + 붉은 경보 + 터지는 소리·강철 연출', async () => {
+  //  r4.10: 게임 줄 첫 보스 판 = 3번(1번은 대물결 판)
+  const h = await bootApp({ withOps: true, unlockThrough: 2 });
+  h.app.startRun(3);
   h.frames(2);
   const run = h.app.getRun();
   run.z = run.prevZ = run.eliteZ - 4;
@@ -273,6 +281,7 @@ test('V3-SHELL-BOSSATK: 게임 화면(셸) — 1번 B1 탄 공격 = 장전음(bo
   let charge = false, flash = false, road = false, debris = false, chargeSfx = false, n = 0;
   while (h.app.getState() === 'run' && n++ < 60 * 40 && !(charge && debris && flash)) {
     const r = h.app.getRun();
+    //  3번 보스는 페이즈가 있다 — 체력 1e9 로 두면 페이즈 0(삽날 밀기 = 탄 공격만)이라 1번 시절과 같은 탄 공격만 본다
     for (const b of r.bosses) { b.hp = b.max = 1e9; }
     for (const u of r.units) u.hp = 1e9;
     h.app.input.state.pointerX = botInput(r, 240).pointerX;
@@ -285,7 +294,7 @@ test('V3-SHELL-BOSSATK: 게임 화면(셸) — 1번 B1 탄 공격 = 장전음(bo
     if (hasColor(h.ops, ATK_LOOK.debris.color)) debris = true;
   }
   assert.ok(charge && chargeSfx && flash, '장전 + 장전음 + 보스 몸 번쩍임');
-  assert.ok(!road, '1번 보스(탄 공격만)의 공격 내내 도로에 붉은·초록 안내 없음');
+  assert.ok(!road, '3번 보스(페이즈 0 = 탄 공격만)의 공격 내내 도로에 붉은·초록 안내 없음');
   assert.ok(debris, 'B1 보스 탄 = 잔해 덩어리');
   const g = await bootApp({ withOps: true, unlockThrough: 5 });
   g.app.startRun(6);
@@ -378,8 +387,8 @@ test('BOSS-POOL 쇳물 붓기: 붓는 순간 원 안 병사 피해 · 쇳물이 
   const ticks = [...new Set(hurtT.map((x) => Math.round((x - boomAt) / STEP)))];
   for (let i = 1; i < ticks.length; i++) assert.equal(ticks[i] - ticks[i - 1], Math.round(P.tick / STEP), '쇳물 피해 간격 = tick');
   assert.ok(end != null && end >= boomAt + P.linger - STEP * 2 && end <= boomAt + P.linger + STEP * 2, `쇳물이 식을 때(${P.linger}초) 공격이 끝난다`);
-  //  보스가 쓰러지면(복수 보스 판의 한 보스) 남은 쇳물도 거둔다
-  const s23 = atkRun(23, 30, 2, 'pour', 240, 0);
+  //  보스가 쓰러지면(복수 보스 판의 한 보스) 남은 쇳물도 거둔다 — r4.10: 복수 보스 판 = 18번(둘째 보스에게 쇳물 붓기를 시킨 합성 공격, 규칙 경로는 같다)
+  const s23 = atkRun(18, 30, 1, 'pour', 240, 0);
   for (let i = 0; i < 60 * 1.2; i++) { stepRun(s23.run, botInput(s23.run, 240), STEP); drainEvents(s23.run); }
   assert.ok(s23.run.bossAtk.cur && s23.run.bossAtk.cur.zones.some((z) => z.until > s23.run.bossAtk.cur.age), '쇳물이 남아 있다');
   s23.bo.hp = 0; s23.bo.dead = true;

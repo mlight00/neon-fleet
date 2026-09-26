@@ -37,7 +37,8 @@ test('V3-BRUTAL 지옥 전용 추가 배치: extraSpawns(옛 brutalSpawns)는 �
   const withExtra = [1, 5, 8];
   for (const id of withExtra) {
     const def = id <= 3 ? DEFS[id] : null;
-    const extraN = buildStage(id, { difficulty: 'brutal' }).spawns.length - buildStage(id, { difficulty: 'normal' }).spawns.length;
+    //  r4.10 대물결 겹(horde — 게임 줄 대물결 판 1·4·7·…)·현상금 적(bounty)은 추가 배치가 아니다(따로 센다)
+    const extraN = buildStage(id, { difficulty: 'brutal' }).spawns.filter((s) => s.kind !== 'bounty' && !s.horde).length - buildStage(id, { difficulty: 'normal' }).spawns.length;
     assert.ok(extraN > 0, `S${id} 기본 줄에 추가 무리`);
     if (def) assert.equal(extraN, def.extraSpawns.length, `S${id} 추가 무리 수 = 정의`);
     if (def) assert.equal(def.brutalSpawns, undefined, `S${id} 옛 키 이름(brutalSpawns)은 남지 않는다`);
@@ -46,12 +47,13 @@ test('V3-BRUTAL 지옥 전용 추가 배치: extraSpawns(옛 brutalSpawns)는 �
   }
   //  추가 무리는 저격수 중심(원거리에서 병력을 깎는다 — 체력만으로는 부대에 닿기 전에 녹았다)
   for (const id of withExtra) {
-    const base = buildStage(id, { difficulty: 'normal' }).spawns, brutal = buildStage(id, { difficulty: 'brutal' }).spawns.filter((s) => s.kind !== 'bounty');
+    const base = buildStage(id, { difficulty: 'normal' }).spawns, brutal = buildStage(id, { difficulty: 'brutal' }).spawns.filter((s) => s.kind !== 'bounty' && !s.horde);
     const added = brutal.filter((b) => !base.some((h) => h.z === b.z && h.kind === b.kind));
     assert.ok(added.some((s) => s.kind === 'shooter'), `S${id} 추가 무리에 저격수`);
   }
   //  나머지 21판은 추가 배치가 없다(이미 어려운 판을 더 올리지 않는다). r4.7 현상금 적(kind 'bounty' — 게임 줄 전용, V3-R47 BOUNTY)은 따로 센다
-  const noBounty = (list) => list.filter((s) => s.kind !== 'bounty');
+  //  r4.10 대물결 겹(horde — 게임 줄 대물결 판의 끝맺음, 검사 HORDE)도 따로 센다
+  const noBounty = (list) => list.filter((s) => s.kind !== 'bounty' && !s.horde);
   for (const id of ALL_STAGE_IDS) {
     if (withExtra.includes(id)) continue;
     assert.equal(noBounty(buildStage(id, { difficulty: 'brutal' }).spawns).length, buildStage(id, { difficulty: 'normal' }).spawns.length, `S${id} 추가 배치 없음`);

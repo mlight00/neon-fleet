@@ -164,6 +164,8 @@ export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard =
   //  r4.8 보스전 밀집 대형(희소 — 게임 화면 줄의 buildStage 만 stage.bossHw 를 싣는다. 배수 1 줄·검사 합성 판의 run 에는 키가 없다).
   //   보스가 나오는 STEP 에 run.hwCap(지금 반폭)을 세우고 STEP 마다 bossHw 쪽으로 줄인다(stepHwCap)
   if (stage.bossHw) run.bossHw = stage.bossHw;
+  //  r4.10 결승선(희소 — 게임 화면 줄의 대물결 판만 stage.finishZ 를 싣는다): 부대 중심이 이 z 를 넘는 STEP 에 승리(verdict). 보스가 있는 판·배수 1 줄의 판에는 키가 없다
+  if (stage.finishZ != null) run.finishZ = stage.finishZ;
   //  r4.8 보스 공격 차례(희소 — 보스 정의에 atk 가 있는 판 = 게임 화면 줄만): wait = 다음 예고까지 초 · cur = 진행 중인 공격(전체에 1개) ·
   //   turn = 다음 차례 보스 번호 · n = 공격 일련번호(탄의 atk 칸 — 그 공격의 탄이 모두 사라지면 공격이 끝난다)
   if (elites.some((e) => e.atk)) run.bossAtk = { wait: BATK.first, cur: null, turn: 0, n: 0 };
@@ -308,7 +310,8 @@ function spawnDue(run, ev) {
   while (run.spawnCursor < sp.length && sp[run.spawnCursor].z <= run.z) {
     const e = sp[run.spawnCursor++];
     for (let i = 0; i < e.n; i++) spawnEnemy(run, e.kind, e.xs[i], e.zs[i], e.hp, e.skin);
-    ev.push({ type: 'spawn', kind: e.kind, n: e.n, x: e.xs[0], z: e.z });
+    //  r4.10 대물결 겹(희소 표시 horde — 게임 화면 줄 대물결 판만): 이벤트에도 싣는다(셸의 '대물결 접근!' 배너). 그 밖의 스폰 이벤트는 종전 그대로
+    ev.push({ type: 'spawn', kind: e.kind, n: e.n, x: e.xs[0], z: e.z, ...(e.horde ? { horde: true } : {}) });
   }
   //  정예(r3.16 복수 정예): 정의 배열 전원이 **같은 STEP** 에 등장(z 는 전원 run.z + spawnAhead, x 는 정의 x ?? 도로 중앙). 이벤트 elite 는 index 순으로 하나씩
   //   아레나(r3.17): 같은 발동 조건에서 광장 전환 + 아레나 보스 1체(enterArena)
@@ -1164,10 +1167,19 @@ function guardStep(run, ev) {
 // 11단계 승패: 승리 우선. 정예 스테이지 = 정예 격파 && 적 없음, 아니면 z >= length && 적 없음. 패배 = 유닛 0
 //  r3.15: 승리는 여기서 **확정**(won·wonAt·mainResult·win 이벤트). over 는 보너스가 없을 때만 여기서 — 있으면 startBonus 로 넘어가고
 //   bonusEnd(시간 소진)가 over 를 세운다. 보너스를 다 못 깼다고 이미 확정한 승리·기록(mainResult)은 되돌리지 않는다
+//  r4.10 결승선(대물결 판 — run.finishZ 가 있고 보스가 없는 판): 부대 중심이 결승선을 넘는 **그 STEP 에** 승리 — 남은 적과 상관없이(적이 남아 있어도 돌파).
+//   같은 STEP 에 이벤트 finish(돌파 — 셸의 코인 셈이 판 끝 목표 몫을 준다)를 먼저 내고, 남은 적·적탄은 거둔다(보스 격파 즉시 승리와 같은 꼴 — 처치 수에는 넣지 않는다)
 function verdict(run, ev) {
   const noEnemies = run.enemies.length === 0;
-  const win = run.elites.length ? (run.bossDefeated && noEnemies) : (run.z >= run.length && noEnemies);
+  const finish = run.finishZ != null && !run.elites.length && run.z >= run.finishZ && run.units.length > 0;
+  //  결승선이 있는 판은 결승선 판정만 쓴다(판 길이 = 결승선이라 종전 '길이 끝 + 적 없음' 줄이 병력 0 인 부대를 이기게 하지 않게)
+  const win = finish || (run.elites.length ? (run.bossDefeated && noEnemies) : (run.finishZ == null && run.z >= run.length && noEnemies));
   if (win) {
+    if (finish) {
+      ev.push({ type: 'finish', x: run.x, z: run.z, finishZ: run.finishZ, units: run.units.length });
+      run.enemies.length = 0;
+      run.eshots.length = 0;
+    }
     run.won = true; run.wonAt = run.time;
     run.mainResult = { wonAt: run.time, survivors: run.units.length, peak: run.peak, kills: run.kills };
     ev.push({ type: 'win', time: run.time, units: run.units.length, x: run.x, z: run.z });

@@ -9,8 +9,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BAL3, enemyHpMulFor, difficultyHpFor, difficultyMult } from '../rush3/balance.js';
-import { buildStage, ALL_STAGE_IDS, STAGE_IDS, MAX_DY, DEFS } from '../rush3/stages.js';
-import { COURSE_IDS, gainFor } from '../rush3/courses.js';
+import { buildStage, ALL_STAGE_IDS, STAGE_IDS, MAX_DY, DEFS, stageKindOf } from '../rush3/stages.js';
+import { COURSE_IDS, gainFor, STAGE_END } from '../rush3/courses.js';
 import { createRun, stepRun, drainEvents, enemyDefsFor, STEP } from '../rush3/combat.js';
 import { SQUAD_DEFAULTS, formation } from '../rush3/squad.js';
 import { createRenderer3, HUD_ROW, HP_TAG_MIN_Y } from '../rush3/render.js';
@@ -86,8 +86,13 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = roun
       }
       //  정예: 구간 배율 없음 — normal 값 × eliteHp(1~3 은 ×1)
       //  r4.7: 기본 줄은 그 값이 보스 체력 바닥의 base(stage.bossFloor.base)이고 실제 체력은 30초 × 상한 화력까지 오른다(옛 값 아래로는 안 내려간다)
-      for (let k = 0; k < st.elites.length; k++) {
-        const want = Math.round(base.elites[k].hp * bh);
+      //  r4.10: 게임 줄은 판 종류 표(STAGE_END)가 보스를 정한다 — 보스 판의 복수 보스·광장(18 합동전 · 21 광장)은 표의 정의 체력이 원값, 보스 없는 판(대물결·중간 보스)은 이 대조 밖(검사 STAGE-KIND·MIDBOSS)
+      const kind = stageKindOf(id, d);
+      if (kind === 'horde') assert.equal(st.elites.length, 0, `S${id} ${d}: 대물결 판에는 보스 정의가 없다`);
+      const E = kind === 'boss' ? STAGE_END[id] : null;
+      const defHps = E && E.elites ? E.elites.map((e) => e.hp) : E && E.arena ? [E.arena.boss.hp] : base.elites.map((e) => e.hp);
+      for (let k = 0; k < st.elites.length && !st.elites[k].mid; k++) {
+        const want = Math.round(defHps[k] * bh);
         if (st.bossFloor) { assert.equal(st.bossFloor.base[k], want, `S${id} ${d} 정예 ${k} base`); assert.ok(st.elites[k].hp >= want, `S${id} ${d} 정예 ${k} 바닥 ≥ 옛 값`); }
         else assert.equal(st.elites[k].hp, want, `S${id} ${d} 정예 ${k}`);
       }

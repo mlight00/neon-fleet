@@ -46,6 +46,17 @@ export const VEHICLE_GUIDE_TEXT = Object.freeze(['움직이는 통은 앞을 보
 export const OBJECTIVE_BANNER_TEXT = Object.freeze(['작전 목표: 캡슐 구출', '놓쳐도 실패는 아닙니다']);
 //  아레나 안내 배너(r3.17): 광장 전환 시 판마다 1회(fx.arenaText/arenaT, BAL3.fx.arenaGuideSec). 슬롯 C(셔터·목표 아래). 줄은 어절 경계에서만 나눈다
 export const ARENA_GUIDE_TEXT = Object.freeze(['드래그로 피하세요', '광장에서는 위아래로도 움직입니다']);
+//  r4.10 대물결 판(게임 화면 줄 1·4·7·…): 대물결 첫 겹이 들어올 때 정예 경고와 같은 슬롯 A 붉은 띠 · 결승선을 넘는 순간 금색 띠(한 줄 — 줄바꿈 없음)
+export const HORDE_BANNER_TEXT = '대물결 접근!';
+export const FINISH_TEXT = '결승선 돌파!';
+//  r4.10 판 끝 목표 이름(결과 화면 코인 내역 — 보스 몫 V × 0.5 를 받는 목표): 보스 판 '보스' · 중간 보스 판 '중간 보스' · 대물결 판 '돌파'
+export const GOAL_NAME = Object.freeze({ boss: '보스', mid: '중간 보스', horde: '돌파' });
+/** 판 끝 목표 종류(순수 — 판 정의만 본다): 결승선이 있으면 'horde' · 중간 보스(보스 정의의 mid 표시)면 'mid' · 그 밖(보스·배수 1 줄·시제품) 'boss' */
+export function goalKind(stage) {
+  if (!stage) return 'boss';
+  if (stage.finishZ != null) return 'horde';
+  return (stage.elites ?? []).some((e) => e.mid) ? 'mid' : 'boss';
+}
 
 /** 결과 화면의 작전 목표 한 줄(r3.14). 순수 — run.objective 만 읽는다. 목표가 없는 판은 null.
  *  성공 = 실제 합류 수(n) · 그 밖(놓쳤든 닿기 전에 끝났든)은 '열지 못했다'. 승패(run.won)와는 별개다 */
@@ -568,7 +579,8 @@ export function coinBreakdown(c) {
   if (c.dev) return '개발용 판 — 코인 없음';
   const NB = ' ';
   const parts = ['적' + NB + (c.enemy | 0)];
-  if (c.boss > 0) parts.push('보스' + NB + c.boss);
+  //  r4.10: 판 끝 목표 몫의 이름 = 판 종류(c.goal — '보스' · '중간 보스' · '돌파' — 이름 안의 띄어쓰기도 줄바꿈 없는 공백). 칸이 없는 옛 꼴은 '보스'
+  if (c.boss > 0) parts.push((GOAL_NAME[c.goal] ?? GOAL_NAME.boss).replace(/ /g, NB) + NB + c.boss);
   if (c.bounty > 0) parts.push('현상금' + NB + '+' + c.bounty);
   if (c.clear > 0) parts.push((c.clearKind === 'first' ? '첫' + NB + '클리어' : '재클리어') + NB + c.clear);
   if (c.bonus > 0) parts.push('보너스' + NB + c.bonus);
@@ -728,7 +740,8 @@ export function boot(canvas, deps = {}) {
     save.patch({ lastStage: id });
     //  r4.3 코인: 출격 번호(지갑 runNo +1, 출격 시작 쓰기와 함께 — 지갑은 별도 키라 쓰기 1회 더) → 지급 식별자 `${runNo}:main`·`${runNo}:bonus`.
     //   판 안 누계(tally)는 셸 변수 coin 에 둔다(규칙 모듈은 모른다). settled = 정산 결과(판당 kind 마다 1회)
-    coin = { runNo: save.wallet.startRun(), tally: createTally(stage, { dev: run.devWeapon }), settled: { main: null, bonus: null } };
+    //  r4.10 goal = 판 끝 목표 종류(결과 화면 내역 이름 '보스'·'중간 보스'·'돌파' — goalKind)
+    coin = { runNo: save.wallet.startRun(), tally: createTally(stage, { dev: run.devWeapon }), settled: { main: null, bonus: null }, goal: goalKind(stage) };
     state = 'run';
     loop.start(nowSec());
     au.bgmPlay(BGM.stage[Math.max(0, Math.min(2, id - 1))]);
@@ -927,7 +940,7 @@ export function boot(canvas, deps = {}) {
     const c = coin, sm = c && c.settled.main, sb = c && c.settled.bonus;
     const coins = c ? {
       gained: (sm ? sm.total : 0) + (sb ? sb.total : 0),
-      enemy: sm ? sm.enemy : 0, boss: sm ? sm.boss : 0, bounty: sm ? (sm.bounty || 0) : 0, clear: sm ? sm.clear : 0, clearKind: sm ? sm.clearKind : null, bonus: sb ? sb.bonus : 0,
+      enemy: sm ? sm.enemy : 0, boss: sm ? sm.boss : 0, goal: c.goal ?? 'boss', bounty: sm ? (sm.bounty || 0) : 0, clear: sm ? sm.clear : 0, clearKind: sm ? sm.clearKind : null, bonus: sb ? sb.bonus : 0,
       balance: save.wallet.get().coins, dev: !!run.devWeapon,
     } : null;
     const nextId = won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null;
@@ -1130,6 +1143,20 @@ export function boot(canvas, deps = {}) {
           trimParts(fx);
           break;
         }
+        //  r4.10 대물결 첫 겹(게임 화면 줄 대물결 판 — 스폰 이벤트의 horde 표시): 판당 1회 정예 경고 슬롯에 '대물결 접근!' + 경고음 + 보스 BGM(판 끝 긴장)
+        case 'spawn':
+          if (ev.horde && !fx.hordeSeen) {
+            fx.hordeSeen = true;
+            fx.eliteT = FX.eliteBannerSec; fx.eliteText = HORDE_BANNER_TEXT;
+            fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]);
+          }
+          break;
+        //  r4.10 결승선 돌파(대물결 판 — 같은 STEP 에 win 이 뒤따른다): 금색 띠 '결승선 돌파!' + 승리음 + 부대 위 '+N 코인'(판 끝 목표 몫 — 보스 처치와 같은 값)
+        case 'finish':
+          fx.finishT = FX.finishBannerSec; fx.finishText = FINISH_TEXT;
+          fx.sfx.push(['win']);
+          if (coin && !run.devWeapon && coin.tally.perBoss > 0) floaterSquad(-150, '+' + Math.round(coin.tally.perBoss) + ' 코인', C.gold, true);
+          break;
         //  정예 등장(r3.16 복수 정예): 2~3체가 같은 프레임에 나오므로 index 0 에서만 배너·효과음·BGM(소리가 겹치지 않게). 문구는 체 수를 붙인다
         case 'elite':
           if ((ev.index ?? 0) > 0) break;
@@ -1236,6 +1263,7 @@ export function boot(canvas, deps = {}) {
     fx.bonusT = Math.max(0, fx.bonusT - dt);
     fx.bossBannerT = Math.max(0, (fx.bossBannerT ?? 0) - dt);
     fx.rageT = Math.max(0, (fx.rageT ?? 0) - dt);
+    fx.finishT = Math.max(0, (fx.finishT ?? 0) - dt);
     fx.arenaOpen = Math.max(0, (fx.arenaOpen ?? 0) - dt);
     fx.arenaT = Math.max(0, (fx.arenaT ?? 0) - dt);
     for (const s of fx.shocks) s.t += dt;

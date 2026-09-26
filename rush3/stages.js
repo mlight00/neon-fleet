@@ -1,7 +1,7 @@
 // rush3/stages.js — 기준 전투 3개 고정 배치(계약서 5장). buildStage 는 호출마다 새 객체(구조 공유 금지).
 // 난수는 빌드 시점 좌표 확정용 hashSeed/mulberry32 만(규칙 진행 중 난수 없음).
 import { BAL3, DEFAULT_DIFFICULTY, difficultyMult, enemyHpMulFor, difficultyHpFor } from './balance.js';
-import { makeCourses, COURSE_IDS } from './courses.js';
+import { makeCourses, COURSE_IDS, STAGE_END } from './courses.js';
 import { WEAPONS } from './weapons.js';
 import { formation } from './squad.js';
 import { CAPSULE_N_DEFAULT } from './supply.js';
@@ -194,6 +194,37 @@ function def(id) {
   return d;
 }
 
+/** r4.10 판 종류(게임 화면 줄): 'boss'(보스 판) | 'mid'(중간 보스 판) | 'horde'(대물결 판 — 결승선 돌파).
+ *  줄 표에 bossStages 가 없는 줄(검사용 배수 1 줄 normal)·공개 판 번호가 아닌 판(시제품·검사 합성 id)은 null = 정의 그대로(모든 판 보스).
+ *  판 종류 표(courses.STAGE_END)의 boss 칸과 줄의 bossStages 가 어긋나면 데이터 오류(throw) — 두 곳이 같은 판을 가리켜야 한다 */
+export function stageKindOf(id, difficulty = DEFAULT_DIFFICULTY) {
+  const m = difficultyMult(difficulty);
+  if (!m.bossStages || !ALL_STAGE_IDS.includes(id)) return null;
+  const end = STAGE_END[id];
+  if (!end) throw new Error('stage ' + id + ': 판 종류 표(STAGE_END)에 없다');
+  if ((end.kind === 'boss') !== m.bossStages.includes(id)) throw new Error('stage ' + id + ': 판 종류 표(' + end.kind + ')와 bossStages 가 다르다');
+  return end.kind;
+}
+
+/** r4.10 게임 화면 줄의 판 정의(정의 d 의 **사본** — makeCourses 객체는 호출마다 새로 만들지만 DEFS 는 공유라 고치지 않는다).
+ *  boss  = 표의 칸이 있을 때만 보스를 바꾼다: skin(단수 보스 그림) · elites(복수 보스) · arena(광장 — 정의의 elite 를 빼고 광장으로, z = 정의의 eliteZ)
+ *  horde = 보스를 빼고(elite·elites·arena 없음) 정의의 eliteZ 를 대물결 시작(hordeZ)으로, 판 길이 = 결승선(hordeZ + BAL3.horde.finishAfter).
+ *          대물결 겹(parts)은 스폰에 붙인다(z = hordeZ + 겹의 z, horde 표시 — 스폰 지터 시드·체력 배율은 다른 스폰과 같은 makeSpawn)
+ *  mid   = (r4.10 (b) 전까지) 정의의 보스 그대로 */
+function playDef(d, end) {
+  if (end.kind === 'boss') {
+    if (end.arena) { const { elite: _e, elites: _es, ...rest } = d; return { ...rest, arena: end.arena }; }
+    if (end.elites) { const { elite: _e, ...rest } = d; return { ...rest, elites: end.elites }; }
+    if (end.skin) return { ...d, elite: { ...d.elite, skin: end.skin } };
+    return d;
+  }
+  if (end.kind === 'mid') return d;
+  const { elite: _e, elites: _es, arena: _a, ...rest } = d;
+  const hordeZ = d.eliteZ;
+  const parts = end.kind === 'horde' ? end.parts.map((p) => ({ ...p, z: hordeZ + p.z, horde: true })) : [];
+  return { ...rest, eliteZ: null, hordeZ, length: hordeZ + BAL3.horde.finishAfter, spawns: d.spawns.concat(parts) };
+}
+
 // 코스 배치 버전(계약서 7장). 배치를 고치면 이 값을 올린다 → 저장 기록이 버전별로 따로 쌓인다.
 export function stageVersion(id) {
   return def(id).version ?? 1;
@@ -301,6 +332,8 @@ function makeSpawn(id, sp, walls, mult, hpMul) {
                hp: Math.round((sp.hp ?? BAL3.enemies[sp.kind].hp) * hpMul * mult.enemyHp) };
   //  역할 근사용 그림 교체(B-3): 규칙은 읽지 않고 렌더만 본다
   if (sp.skin) ev.skin = sp.skin;
+  //  r4.10 대물결 겹 표시(희소 — 게임 화면 줄의 대물결 판만). 규칙은 다른 스폰과 똑같이 다루고, 셸(대물결 배너)·검사가 읽는다
+  if (sp.horde) ev.horde = true;
   return ev;
 }
 
@@ -396,8 +429,10 @@ function makeArena(a) {
 }
 
 export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } = {}) {
-  const d = def(id);
   const mult = difficultyMult(difficulty);
+  //  r4.10 판 종류(게임 화면 줄만 — 줄 표의 bossStages): 보스 판은 표의 보스로, 보스 없는 판은 대물결·중간 보스 끝으로 바꾼 정의 사본. 배수 1 줄은 정의 그대로
+  const endKind = stageKindOf(id, difficulty);
+  const d = endKind ? playDef(def(id), STAGE_END[id]) : def(id);
   //  빌드 시점 정합성 guard(r3.17): 아레나 정의는 elite/elites 와 함께 쓸 수 없다(보스가 둘로 갈라진다). eliteZ 는 arena.z 와 같아야 한다(stageMeta 가 eliteZ 를 읽는다)
   if (d.arena && (d.elite || d.elites)) throw new Error('stage ' + id + ': arena 와 elite/elites 를 함께 정의할 수 없다');
   if (d.arena && d.eliteZ != null && d.eliteZ !== d.arena.z) throw new Error('stage ' + id + ': eliteZ(' + d.eliteZ + ')가 arena.z(' + d.arena.z + ')와 다르다');
@@ -444,6 +479,10 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   };
   //  stage.elite = 첫 원소의 별칭(같은 객체 — verdict·기존 읽기용). 정예 없는 스테이지는 null
   stage.elite = stage.elites[0] ?? null;
+  //  r4.10 판 종류(게임 화면 줄만 — 희소 칸. 배수 1 줄의 판에는 키가 없다): endKind = 'boss' | 'mid' | 'horde' ·
+  //   결승선이 있는 판(대물결)은 hordeZ(대물결 시작 = 정의의 eliteZ) · finishZ(결승선 = 판 길이 — combat 이 넘는 STEP 에 승리)
+  if (endKind) stage.endKind = endKind;
+  if (d.hordeZ != null) { stage.hordeZ = d.hordeZ; stage.finishZ = d.length; }
   //  빌드 시점 정합성 guard(unknown stage 와 같은 계열의 데이터 오류): 목표가 가리키는 통은 반드시 capsule 이어야 한다
   if (stage.objective && stage.objective.kind === 'capsule'
       && !stage.supplies.some((s) => s.id === stage.objective.supplyId && s.kind === 'capsule')) {

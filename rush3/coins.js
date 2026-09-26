@@ -6,7 +6,7 @@
 //  공식 P2(판 번호 s 하나로 정한다 — 적 체력·적 수를 바꿔도 그 판의 최대치는 그대로):
 //   판 가치          V(s) = 24 + 2s  (1번 26 · 12번 48 · 24번 72)
 //   일정 스폰 적 1마리 = V(s) ÷ 그 판의 일정 스폰 총수(buildStage 의 spawns — 물결·무리 수·extraSpawns 포함). 소수로 누적
-//   보스 1체          = V(s) × 0.5 ÷ 보스 수
+//   보스 1체          = V(s) × 0.5 ÷ 보스 수(r4.10: 판 끝 목표 몫 — 보스 판 = 보스 처치 · 중간 보스 판 = 중간 보스 처치 · 대물결 판 = 결승선 돌파)
 //   정산 단위(본전투) = round(적 소수 합 + 보스 소수 합) — 한 단위마다 **한 번만** 반올림
 //   첫 클리어        = V(s)(판마다 한 번 — 판정은 셸이 지갑의 첫 클리어 표식으로) · 재클리어 = 5
 //   8번 보너스전      = 보상 단계 K × round(V(s) × 0.25)(8번이면 10) — 보너스 종료 때 한 번
@@ -38,10 +38,13 @@ export function bountyCoins(stageId, { dev = false } = {}) {
   return dev ? 0 : Math.round(stageValue(stageId) * COIN.bountyShare);
 }
 
-/** 그 판의 보스 수(도로 정예 배열 · 광장은 1). 없으면 0 */
+/** 그 판의 보스 수(도로 정예 배열 · 광장은 1). 없으면 0.
+ *  r4.10: 보스 몫(V × 0.5)은 **판 끝 목표**에 준다 — 보스 판 = 보스 처치(여럿이면 나눔) · 중간 보스 판 = 중간 보스 처치 · 대물결 판(보스 없음, 결승선 finishZ) = 결승선 돌파 1건.
+ *   판 종류와 상관없이 합계(적 V + 목표 V × 0.5 + 클리어)가 같은 꼴이다 */
 export function bossCount(stage) {
   if (!stage) return 0;
-  return (stage.elites ?? (stage.elite ? [stage.elite] : [])).length;
+  const n = (stage.elites ?? (stage.elite ? [stage.elite] : [])).length;
+  return n || (stage.finishZ != null ? 1 : 0);
 }
 
 /** 보너스 단계 K 의 코인 = K × round(V(s) × 0.25) */
@@ -81,7 +84,8 @@ export function addEvents(t, events) {
       if (e.summoned) { t.summonedKills++; continue; }
       t.kills++;
       t.enemyRaw += t.perEnemy;
-    } else if (e.type === 'bossKill') {
+    } else if (e.type === 'bossKill' || e.type === 'finish') {
+      //  r4.10: 판 끝 목표 = 보스·중간 보스 처치(bossKill) 또는 결승선 돌파(finish — 대물결 판). 몫은 같은 보스 몫
       t.bossKills++;
       t.bossRaw += t.perBoss;
     }

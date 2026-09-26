@@ -78,6 +78,38 @@ const BOUNTY_AT = Object.freeze({
   21: [[4650, 170], [7750, 310]], 22: [[5050, 170], [6350, 310]], 23: [[2250, 170], [4450, 310]], 24: [[4350, 170], [9550, 310]],
 });
 
+//  r4.10 판 종류 표(게임 화면 줄 — difficulty 표의 bossStages 가 있는 줄 = brutal 에서만 stages.buildStage 가 읽는다. 배수 1 줄은 읽지 않는다, version 불변).
+//   이사님 지시(2026-09-26, 실플레이 5차) "보스가 모든 스테이지에 나오다보니 지루한 느낌이 든다 … 보스 등장 횟수를 3, 6, 9, 12, 15, 18, 21, 24 스테이지로 줄이고
+//   일반 스테이지는 많은 수의 일반 적이나 좀 더 강한 중간 보스로 대체하자".
+//   boss  = 보스 판(3의 배수 — bossStages). 칸은 그 판 정의의 보스를 **바꿀 때만**: skin(단수 보스 그림) · elites(복수 보스 — 한 번에 한 공격) · arena(광장, z = 정의의 eliteZ)
+//   horde = 대물결 판(1·4·7·10·13·16·19·22): 보스가 나오던 자리(정의의 eliteZ)부터 대물결이 겹겹이 들어오고 결승선(eliteZ + BAL3.horde.finishAfter)을 넘으면 승리.
+//           parts = 대물결 겹(스폰 정의 — z 는 대물결 시작에서 더하는 거리)
+//   mid   = 중간 보스 판(2·5·8·11·14·17·20·23): look = 그 판에 나오는 일반 적 그림(kind · skin — skin 이 없으면 그 kind 의 기본 그림 E1 고철 · E5 바퀴 · E6 신호등)을
+//           크게 키운 강한 적 1체. 8판 모두 다른 그림(그 판에 실제로 나오는 적 중에서)
+//  대물결 겹(horde parts): 줄 뿌리기(mass — xs 없음) 스폰만 쓴다. xs 명시 물결은 기본 줄에서 waves 번(waveGap 360 뒤) 되풀이돼 결승선 너머에 놓이기 때문이다.
+//   겹 z = 대물결 시작에서 0 · 120 · 240(앞 겹 잡졸 무리 → 가운데 겹 → 뒤 겹) — 스폰은 발동 z + 760 에 놓이므로 뒤 겹이 대물결 시작 + 1000,
+//   결승선(+1200)은 그 200px 뒤다. n 은 정의값(기본 줄은 × spawnCount 1.8 반올림) · 체력은 다른 스폰과 같은 규칙(구간 배율 × enemyHp — 스킨 체력 포함).
+//   그 판에 나오는 적 종류·스킨만 쓴다(1번 = 가벼운 잡졸 무리 한 겹)
+const HORDE = (...parts) => Object.freeze({ kind: 'horde', parts: Object.freeze(parts) });
+const MID = (kind, skin = null) => Object.freeze({ kind: 'mid', look: Object.freeze({ kind, ...(skin ? { skin } : {}) }) });
+const BOSS = (o = {}) => Object.freeze({ kind: 'boss', ...o });
+export const STAGE_END = Object.freeze({
+  1: HORDE(mass(0, 'grunt', 8, 2)), 2: MID('rusher'), 3: BOSS(),
+  4: HORDE(mass(0, 'grunt', 12, 2), mass(120, 'rusher', 4, 1, HOUND), mass(240, 'shooter', 2, 1)), 5: MID('grunt'), 6: BOSS(),
+  7: HORDE(mass(0, 'grunt', 14, 2), mass(120, 'rusher', 4, 1, HOUND), mass(240, 'shooter', 3, 1)), 8: MID('rusher', 'E2_ramhound'), 9: BOSS({ skin: 'B3_railleviathan' }),
+  10: HORDE(mass(0, 'grunt', 12, 2), mass(120, 'rusher', 4, 1, JUMPER), mass(240, 'grunt', 8, 2)), 11: MID('shooter', 'E10_magnethead'), 12: BOSS({ skin: 'B4_smelter' }),
+  13: HORDE(mass(0, 'grunt', 12, 2), mass(120, 'grunt', 3, 1, ARMOR), mass(240, 'grunt', 8, 2)), 14: MID('grunt', 'E3_wallguard'), 15: BOSS(),
+  16: HORDE(mass(0, 'grunt', 14, 2), mass(120, 'rusher', 4, 1, JUMPER), mass(240, 'shooter', 2, 1)), 17: MID('shooter', 'E9_spawnpod'),
+  //  18 합동전 = 옛 10번의 복수 보스(B1 그레이더 포격 + B2 갠트리 위도우 소환 — 한 번에 한 공격). 체력은 옛 10번 값에서 보스 체력 바닥(30초)이 올린다
+  18: BOSS({ elites: [elite(600, 'gunner', 160), elite(720, 'summoner', 320, { skin: 'B2_gantrywidow' })] }),
+  19: HORDE(mass(0, 'grunt', 14, 2), mass(120, 'shooter', 3, 1, MAGNET), mass(240, 'grunt', 8, 2)), 20: MID('shooter'),
+  //  21 광장 = 옛 20번의 광장 보스 B4 스멜터를 21번 코스 끝(z 9000)으로 옮겼다(광장 앞 여유 z − 800 = 8200 안에 21번의 게이트·통·벽·스폰이 모두 든다)
+  21: BOSS({ arena: arena(9000, { hp: 2600, skin: 'B4_smelter', speed: 120,
+                                  dash: { every: 2.6, first: 1.5, warn: 0.8, speed: 640, range: 460, recover: 0.6 }, shock: { r: 80, dmg: 2 },
+                                  summon: { every: 5, kind: 'grunt', n: 2, dx: 44, dz: -40 } }) }),
+  22: HORDE(mass(0, 'grunt', 16, 2), mass(120, 'grunt', 2, 1, CART), mass(240, 'rusher', 4, 1, HOUND)), 23: MID('grunt', 'E7_cartyard'), 24: BOSS(),
+});
+
 export function makeCourses({ coverZFor }) {
   const C = {};
   //  4 세 갈래 — 한 행에 세 칸(BG1). 시제품 proto3 를 정식 길이로

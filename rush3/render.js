@@ -160,6 +160,9 @@ export const PELLET = Object.freeze({ core: '#F7FFE6', flash: '#FFF6C8', tail: 2
 //   광역 공격만 붉은 경보 구역(ATK_DANGER — 차오르는 채움 + 깜빡이는 테)을 그린다. 탄 공격은 도로에 아무것도 그리지 않고 보스 몸에 장전 번쩍임(ATK_CHARGE)만.
 //   초록 안전 구역 표시는 없앴다(색 상수도 지웠다 — 검사가 그 색이 어디에도 없음을 확인한다). 검사가 이 색으로 그리기 호출을 찾는다
 export const ATK_DANGER = '#FF3040';
+//  r4.10 결승선(대물결 판 — 규칙 run.finishZ 를 읽기만): 도로를 가로지르는 체크무늬 두 줄(밝은·어두운 칸 cells 개, 세계 깊이 depth px) +
+//   양쪽 기둥과 그 위를 잇는 표지 띠, 가운데 '결승'(한 어절 — 줄바꿈 없음, BAL3.horde.label)
+export const FINISH_LOOK = Object.freeze({ light: '#F3F1E8', dark: '#14233A', cells: 16, depth: 26, post: '#9AA1AC', board: 'rgba(20,35,58,0.9)', sign: '#F6C84A', label: BAL3.horde.label });
 export const ATK_CHARGE = '#FFF1B8';
 //  r4.9 (다) 광분(이사님 지시 2026-09-26 "보스 체력이 30% 남으면 광분 모드를 넣자" — 규칙 bo.rage 를 읽기만): 보스 둘레 붉게 달아오르는 오라(맥박 = 규칙 시계 run.time) ·
 //   몸체 잔떨림 · 붉은 체력 막대 · 들어가는 순간 화면 가운데 '광분!' 배너(셸 fx.rageT). 검사가 이 색으로 그리기 호출을 찾는다
@@ -603,6 +606,39 @@ export function createRenderer3(ctx, sprites) {
   //   '가까워지면 열림'을 배운 사람에게 열려도 안 오르는 칸을 셔터 모양으로 보여주면 규칙을 두 번 가르치는 셈이다.
   //   대신 붉은 봉쇄 바 + 큰 자물쇠 + 배지로 '사격이 안 먹히는 장치'를 즉시 알린다(2026-09-17 이사 결정 ③ 함정 외형 A).
   //   ⚠️armZ·armed 규칙 자체는 건드리지 않는다 — 바뀌는 것은 그리기뿐이다.
+  //  r4.10 결승선(대물결 판): 체크무늬 두 줄이 도로를 가로지르고, 도로 양 끝 기둥 위를 잇는 표지 띠 가운데에 '결승'.
+  //   세계 좌표로 그려 원근을 따른다(가까워질수록 커진다 — 멀리서도 보이게 글자는 하한). 규칙 run.finishZ 를 읽기만 한다
+  function drawFinishLine(run) {
+    if (run.finishZ == null) return;
+    const d = run.finishZ - run.z;
+    if (offscreen(d, 90)) return;
+    const L = FINISH_LOOK, n = L.cells, half = L.depth / 2;
+    ctx.save();
+    ctx.globalAlpha = 1;
+    for (let r = 0; r < 2; r++) {
+      const za = d - half + r * half, zb = za + half;
+      for (let i = 0; i < n; i++) {
+        const xa = ROAD0 + (ROAD1 - ROAD0) * i / n, xb = ROAD0 + (ROAD1 - ROAD0) * (i + 1) / n;
+        quad(pj(xa, za), pj(xb, za), pj(xb, zb), pj(xa, zb));
+        ctx.fillStyle = (i + r) % 2 ? L.dark : L.light;
+        ctx.fill();
+      }
+    }
+    //  기둥 두 개(도로 양 끝) + 그 꼭대기를 잇는 표지 띠
+    const a = pj(ROAD0 + 4, d + half), b = pj(ROAD1 - 4, d + half), k = (a.s + b.s) / 2;
+    const ph = 62 * k, bh = Math.max(20, 24 * k);
+    ctx.fillStyle = L.post;
+    for (const p of [a, b]) ctx.fillRect(p.x - 3 * k, p.y - ph, 6 * k, ph);
+    ctx.fillStyle = L.board;
+    roundRect(a.x - 4 * k, a.y - ph - bh / 2, b.x - a.x + 8 * k, bh, 6 * k); ctx.fill();
+    ctx.strokeStyle = L.sign; ctx.lineWidth = 2;
+    roundRect(a.x - 4 * k, a.y - ph - bh / 2, b.x - a.x + 8 * k, bh, 6 * k); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    outlinedText(L.label, (a.x + b.x) / 2, a.y - ph + 1, fs(18, k, 14), L.sign, '900', 4);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
   function drawGateRow(row, fx, runZ) {
     const d = row.z - runZ;
     if (offscreen(d, 60)) return;
@@ -2058,7 +2094,9 @@ export function createRenderer3(ctx, sprites) {
       //  r3.16 복수 정예: 보스가 둘 이상이면 '정예 전투! 남은 목표 N/M'. 단수는 종전 문구 그대로
       const bTotal = (run.bosses ?? []).length, bLeft = (run.bosses ?? []).filter((b) => !b.dead).length;
       //  r3.17 아레나: 광장 보스전은 '아레나 전투!'(도로 정예 문구는 그대로)
-      const goal = run.boss ? (run.phase === 'arena' ? '아레나 전투!' : bTotal > 1 ? '정예 전투! 남은 목표 ' + bLeft + '/' + bTotal : '정예 전투!') : (run.bossDefeated ? '작전 완료' : '남은 거리 ' + hud.distM + 'm');
+      //  r4.10 대물결 판(결승선 run.finishZ): '결승선까지 Nm'(판 길이 = 결승선) → 넘으면 '작전 완료'
+      const goal = run.boss ? (run.phase === 'arena' ? '아레나 전투!' : bTotal > 1 ? '정예 전투! 남은 목표 ' + bLeft + '/' + bTotal : '정예 전투!')
+        : (run.bossDefeated || (run.finishZ != null && run.won)) ? '작전 완료' : run.finishZ != null ? '결승선까지 ' + hud.distM + 'm' : '남은 거리 ' + hud.distM + 'm';
       outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
     }
     //  무기 칩
@@ -2232,6 +2270,17 @@ export function createRenderer3(ctx, sprites) {
       ctx.font = '900 30px ' + FONT;
       ctx.fillStyle = C.outline;
       ctx.fillText(fx.bonusText, W / 2, 224);
+      ctx.globalAlpha = 1;
+    }
+    //  r4.10 결승선 돌파 배너(대물결 판 — 결승선을 넘은 STEP 에 셸이 세운다): 보너스전 배너와 같은 슬롯 A(y196 h56) 금색 띠. fx 새 칸은 ?? 로 관용
+    if ((fx.finishT ?? 0) > 0 && fx.finishText) {
+      const k = fx.finishT / (FX.finishBannerSec || 1.2);
+      ctx.globalAlpha = Math.min(1, k * 3);
+      ctx.fillStyle = 'rgba(246,200,74,0.9)';
+      ctx.fillRect(0, 196, W, 56);
+      ctx.font = '900 30px ' + FONT;
+      ctx.fillStyle = C.outline;
+      ctx.fillText(fx.finishText, W / 2, 224);
       ctx.globalAlpha = 1;
     }
     //  r4.9 (다) 광분 배너: 화면 가운데 검붉은 띠 + 붉은 테 + '광분!'(한 어절 — 줄바꿈 없음). 들어올 때 크게 튀었다 제 크기로, 끝날 때 흐려진다
@@ -2649,6 +2698,8 @@ export function createRenderer3(ctx, sprites) {
     //  원근(r3.20): 세계 그리기(배경~연출)는 전부 P(draw 가 view.flat 으로 골라 둔 투영기)를 지난다. 캔버스 변환(translate/scale)은 쓰지 않는다 —
     //   HUD·배너·버튼은 종전대로 마지막에 화면 좌표로. 그리기 순서(가림)는 r3.19 와 같다
     drawBackground(run.z, Math.max(0, (run.bg || 1) - 1), arena);
+    //  r4.10 결승선(대물결 판)은 도로 바닥 — 벽·게이트·적보다 먼저(아래에) 그린다
+    drawFinishLine(run);
     drawWalls(run);
     drawCovers(run);
     for (const row of run.gateRows) if (!hidden(row.id)) drawGateRow(row, fx, run.z);

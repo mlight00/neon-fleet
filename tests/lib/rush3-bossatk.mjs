@@ -156,10 +156,13 @@ export const enrage = (run, bo) => { bo.rage = true; if (run.bossPhases !== fals
  *  ① 봇(설 곳으로)은 그 공격에서 피해 0 · 끝난다 · 설계가 BOSS-SAFE 규칙을 지킨다 ② (판·보스·공격·병력)마다 한 곳 이상에서 공격이 실제로 시작
  *  ③ 위협: (판·보스·공격)마다 병력 30·60·100 × 시작 자리 3곳 중 한 곳 이상에서 제자리 부대가 맞는다.
  *  opts.rage = 광분 상태(r4.9 (다) — 탄 속도 × 1.12 로 설계·비행 시간을 잰다). 반환 시뮬레이션 수 */
+//  r4.10(이사님 실플레이 5차 — 보스는 3·6·9·12·15·18·21·24 판에만): 네 파일이 보스 판 8개를 둘씩 나눠 맡는다. 보스가 없는 판을 넘기면
+//   조용히 0판으로 통과하지 않게 판마다 보스가 있는지 먼저 본다
 export function dodgeGroup(ids, opts = {}) {
   const mod = opts.rage ? enrage : undefined, tag = opts.rage ? ' 광분' : '';
   let sims = 0;
   for (const id of ids) {
+    assert.ok(bossKinds(id).length > 0, `S${id}: 게임 줄 보스 판이어야 한다(보스 정의 있음)`);
     for (const b of bossKinds(id)) {
       const xs = b.arena ? [100, 240, 380] : [140, 240, 340];
       for (const kind of b.kinds) {

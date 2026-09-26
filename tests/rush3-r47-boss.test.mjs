@@ -18,6 +18,9 @@ const fpStage = (o = {}) => ({ id: 'fp', startUnits: 5, startWeapon: 'rifle', el
 const sup = (id, z, x, kind, payload, o = {}) => ({ id, z, x, r: 30, kind, payload, pairId: null, ...o });
 const row = (id, z, cells) => ({ id, z, cells: cells.map(([x0, x1, value, maxValue]) => ({ x0, x1, value, maxValue })) });
 const best = (st) => bossUpperBound(st);
+//  r4.10(이사님 실플레이 5차 2026-09-26 "보스 등장 횟수를 3, 6, 9, 12, 15, 18, 21, 24 스테이지로 줄이고"): 게임 줄 보스 판 = 줄 표의 bossStages(8판).
+//   나머지 판은 대물결·중간 보스(보스 체력 바닥 없음 — 검사 STAGE-KIND·MIDBOSS)
+const BOSS_IDS = BAL3.difficulty.brutal.bossStages;
 
 test('FIREPOWER-1: 병력 상한 — 분리벽은 한쪽 통로만(더 좋은 쪽) · 배제 쌍은 하나만 · 병력 상한 100 · 게이트는 최선 칸의 상한(음수 칸도) · 칸이 다 덮지 못하면 0 · 연속 증원 = 발판 전부', () => {
   //  분리벽 z 1000~2000: 왼쪽 병사 40 · 오른쪽 병사 30 → 왼쪽만(두 통을 다 받지 않는다) + 벽 밖 병사 10
@@ -86,10 +89,11 @@ test('FIREPOWER-3: 보스에 **실제로 닿는** 탄 — 계산 초당 피해�
   assert.equal(bossDpsFor(ar, 50, 'scatter', 1).hits, 300);
 });
 
-test('BOSS-30S-1: 게임 줄 1~24 — 보스 체력 합 ÷ 상한 화력 ≥ 30초(BAL3.bossMinFightSec) · 새 체력 ≥ 옛 체력 · 보스 여럿은 비율 유지 · 배수 1 줄은 그대로', (t) => {
+test('BOSS-30S-1: 게임 줄 보스 판 8개(3·6·9·12·15·18·21·24 — r4.10) — 보스 체력 합 ÷ 상한 화력 ≥ 30초(BAL3.bossMinFightSec) · 새 체력 ≥ 옛 체력 · 보스 여럿은 비율 유지 · 배수 1 줄은 그대로', (t) => {
   assert.equal(BAL3.bossMinFightSec, 30);
   assert.equal(BAL3.difficulty.brutal.bossFloor, true); assert.equal(BAL3.difficulty.normal.bossFloor, false);
-  for (const id of ALL_STAGE_IDS) {
+  assert.deepEqual(BOSS_IDS, [3, 6, 9, 12, 15, 18, 21, 24]);
+  for (const id of BOSS_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
     const f = st.bossFloor;
     assert.ok(f, `S${id} 보스 체력 바닥 계산`);
@@ -103,8 +107,10 @@ test('BOSS-30S-1: 게임 줄 1~24 — 보스 체력 합 ÷ 상한 화력 ≥ 30�
     //  배수 1 줄: 바닥 없음(종전 체력 — V3-DIFF2ROW 가 바이트 단위로 잠근다)
     assert.equal(buildStage(id).bossFloor, undefined);
   }
+  //  배수 1 줄은 24판 모두 바닥 없음(모든 판 보스 그대로)
+  for (const id of ALL_STAGE_IDS) assert.equal(buildStage(id).bossFloor, undefined, `S${id} 배수 1 줄`);
   //  상수 한 곳: 60초로 바꾸면 체력이 따라 오른다(계산만)
-  const st2 = buildStage(2, { difficulty: 'brutal' });
+  const st2 = buildStage(3, { difficulty: 'brutal' });
   assert.ok(bossFloor({ ...st2, elites: st2.elites.map((e, i) => ({ ...e, hp: st2.bossFloor.base[i] })) }, 60).minSec >= 60 - 1e-9);
 });
 
@@ -115,8 +121,8 @@ test('BOSS-30S-2: 랜덤 길 판(3·12)의 보스 체력은 추첨 시드와 무
   }
 });
 
-test('BOSS-30S-3: 보스전 시간 실측(동작 확인) — 상한 부대(병력·무기·Mk)로 보스 공격을 끈 채 붙으면 쓰러뜨리기까지 30초 안팎(≥ 27초)이 걸린다(1~24)', (t) => {
-  for (const id of ALL_STAGE_IDS) {
+test('BOSS-30S-3: 보스전 시간 실측(동작 확인) — 상한 부대(병력·무기·Mk)로 보스 공격을 끈 채 붙으면 쓰러뜨리기까지 30초 안팎(≥ 27초)이 걸린다(게임 줄 보스 판 8개 — r4.10)', (t) => {
+  for (const id of BOSS_IDS) {
     const r = bestLoadoutFight(id);
     assert.equal(r.won, true, `S${id} 끝난다`);
     assert.ok(r.fightSec >= 27, `S${id}: ${r.fightSec.toFixed(1)}초`);
@@ -133,12 +139,12 @@ test('BOSS-SHOT: 게임 줄 보스 탄 1(= 1 × 3 × 1/3 — 두 발에 병사 1
   //  접촉·착지 충격은 그대로(보스 탄만)
   assert.equal(b.elite.touchDmg, 9);
   assert.equal(createRun(buildStage(24, { difficulty: 'brutal' })).arena.boss.shock.dmg, 6, '광장 착지 충격 = 2 × 3 그대로');
-  //  실제 판: 1번(저격수 extraSpawns + 정예) · 10번(포격형) · 24번(광장 보스) — 새로 생긴 적탄을 **쏜 쪽**으로 가른다:
+  //  실제 판: 3번(저격수 + 보스) · 18번(포격형 — r4.10 합동전) · 24번(광장 보스) — 새로 생긴 적탄을 **쏜 쪽**으로 가른다:
   //   적탄은 생긴 STEP 에 한 번 움직이며 px/pz 에 출발점을 남긴다 → 출발점이 살아 있는 보스 자리면 보스 탄, 아니면 저격수 탄.
   //   r4.8: 게임 줄 보스는 부채꼴 대신 패턴(벽 한 줄·산개탄은 보스 자리가 아닌 곳에서 나온다)을 쓴다 — 패턴 탄은 공격 번호 칸(atk)으로 가른다
   const seen = { boss: new Set(), shooter: new Set() };
   let patternShots = 0;
-  for (const id of [1, 10, 24]) {
+  for (const id of [3, 18, 24]) {
     const run = createRun(buildStage(id, { difficulty: 'brutal' }), { heroGuard: true });
     let steps = 0;
     while (!run.over && steps++ < 12000) {

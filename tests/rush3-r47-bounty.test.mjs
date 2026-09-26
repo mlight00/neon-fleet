@@ -54,7 +54,9 @@ test('BOUNTY-1: 배치 — 게임 줄 2~24번에만(2~12 1체 · 13~24 2체, 1�
       assert.deepEqual([s.n, s.xs, s.zs, s.corridorHw, s.hp], [1, [b.x], [b.z + BAL3.enterZ], null, b.hp]);
       const w = bountyWindow(b.z);
       for (const [p, q, name] of blk) assert.ok(q < b.z || p > w.b, `S${id} #${i} 사선 창 [${b.z}, ${w.b.toFixed(0)}] 안에 ${name}`);
-      assert.ok(w.b <= st.eliteZ - 150, `S${id} #${i} 보스(${st.eliteZ}) 전에 끝난다`);
+      //  r4.10: 대물결 판(보스 없음)은 옛 보스 자리 = 대물결 시작(hordeZ) — 현상금 적은 대물결 전에 끝난다(배치 규칙 그대로)
+      const endZ = st.eliteZ ?? st.hordeZ;
+      assert.ok(w.b <= endZ - 150, `S${id} #${i} 보스·대물결(${endZ}) 전에 끝난다`);
       assert.ok(b.z >= prevEnd, `S${id} #${i} 앞 현상금 적의 창이 끝난 뒤에 나온다`);
       prevEnd = w.b;
     });

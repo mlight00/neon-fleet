@@ -200,6 +200,12 @@ export function weakenBounties(run, hp = 1) {
   for (const e of (run && run.enemies) || []) if (e.kind === 'bounty' && !e.dead && e.hp > hp) e.hp = hp;
 }
 
+//  r4.10 셸 흐름 검사 도구: 부대를 전멸시켜 '진 판'을 만든다(다음 STEP 에 규칙이 병력 0 → 패배를 낸다). 게임 줄 대물결 판(1·4·7·…)은
+//   봇이 결승선을 넘어 이기는 일이 잦아, 패배 흐름(정산·결과 화면·Enter)을 보는 검사가 이 도구로 패배를 만든다 — 규칙은 그대로 두고 run 의 값만 바꾼다(난이도와 무관)
+export function wipeSquad(run) {
+  for (const u of (run && run.units) || []) u.hp = 0;
+}
+
 //  무기 초당 dmg(화력 지수 계산용 — 생존 병력 × 이 값)
 export const DPS = { rifle: 2, auto: 4, heavy: 5 };
 
