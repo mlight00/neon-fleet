@@ -23,6 +23,52 @@ export function artBase3(kind, skin) { return skin || ENEMY_ART_BASE[kind] || nu
 export const DMG_ART_AT = 0.5;
 export function wantsDmgArt(hp, hpMax) { return (hpMax ?? 0) > 2 && hp > 0 && hp <= hpMax * DMG_ART_AT; }
 const ENEMY_LABEL = { grunt: '잡졸', rusher: '돌격체', shooter: '저격수' };
+//  r4.8 (라) 적 움직임 그림(이사님 지시 2026-09-26 "적들이 걸어서 내려오는 듯한 스프라이트도 추가하자. 굴러내려오는건 굴러내려오는 모양으로 보이게 하고").
+//   걷기 동작 시트가 아직 없어(E1_scrapbit 등은 정지 그림 한 장) **코드로 움직임을 준다** — 규칙(run)은 읽기만 한다(그림만 — 규칙 불변, 두 줄 공통).
+//   그림(art base = artBase3) → 움직임 종류:
+//    walk  = 다리 달린 적(잡졸 E1 네 발 로봇 · 장갑체 E3 짧은 발 · 복병 E8 용수철 다리): 걸음마다 한 번 통통 튐 + 좌우로 번갈아 기울기(두 걸음에 한 주기) + 발 디딜 때 살짝 눌림
+//    roll  = 바퀴(돌격체 E5): 바퀴 중심으로 계속 회전(각 = 화면 쪽으로 다가온 거리 ÷ 반지름 — 달려들며 빨라지면 회전도 빨라진다) + 작은 튐 + 뒤쪽 흙먼지 점
+//    drive = 바퀴·궤도 달린 차(돌격 트럭 E2 · 카트 E7): 몸통을 통째로 돌리면 어색해 **돌리지 않고** 잔 떨림 + 흙먼지만
+//    hover = 서 있거나 떠 있는 적(저격수 E6 · E9 · E10 · E4): 가벼운 숨쉬기(떠다님)
+//   박자·회전은 화면에서 다가온 거리(d = e.z − run.z 가 줄어든 만큼)로 정한다 — 다가오는 빠르기에 비례하고, 같은 판·같은 입력이면 같은 그림(결정적). 위상은 적 id 로 어긋나게.
+//   피격 반응 중에는 걷기 흔들림을 hitDamp 배로 줄이고(밀림·찌그러짐과 겹쳐 어색하지 않게), 전격 기절 중에는 멈춘다
+export const ENEMY_MOTION = Object.freeze({
+  E1_scrapbit: 'walk', E3_wallguard: 'walk', E8_manholejumper: 'walk',
+  E5_wheeler: 'roll',
+  E2_ramhound: 'drive', E7_cartyard: 'drive',
+  E6_signaler: 'hover', E9_spawnpod: 'hover', E10_magnethead: 'hover', E4_needleeye: 'hover',
+});
+//  stride = 한 걸음 동안 화면 쪽으로 다가오는 거리(px) · bob = 튐 높이(px, 그 자리 배율을 곱한다) · tilt = 기울기(라디안 — 4°) · squash = 발 디딜 때 눌림 · hitDamp = 피격 중 흔들림 배수
+export const WALK = Object.freeze({ stride: 60, bob: 2.6, tilt: 4 * Math.PI / 180, squash: 0.08, hitDamp: 0.25 });
+//  bob = 바퀴 튐 높이(px) · dust = 흙먼지 점 수
+export const ROLL = Object.freeze({ bob: 1.4, dust: 3 });
+//  다가온 거리의 기준(그림 위상에만 쓰는 상수 — 양수로 두려고)
+const MOTION_REF = 2000;
+
+/** 적 한 기의 움직임 자세(순수 — 규칙 run·적 e 는 읽기만). hitK = 피격 반응 중이면 WALK.hitDamp(흔들림을 줄인다), 아니면 1.
+ *  반환 { kind, steps(걸음 수), bob(px — 배율 전), tilt(라디안), sx·sy(눌림), spin(라디안 — 바퀴), dust(흙먼지 세기 0~1) } | null(움직임 없는 적·기절) */
+export function enemyMotionPose(e, run, hitK = 1) {
+  const kind = ENEMY_MOTION[artBase3(e.kind, e.skin)] ?? null;
+  if (!kind || e.stunT > 0) return null;
+  const travel = MOTION_REF - (e.z - run.z);
+  const ph = (e.id * 0.37) % 2;
+  if (kind === 'walk') {
+    const steps = travel / WALK.stride + ph;
+    const s = Math.sin(Math.PI * steps);
+    const lift = Math.abs(s), land = Math.pow(1 - lift, 3);
+    return { kind, steps, bob: WALK.bob * lift * hitK, tilt: WALK.tilt * s * hitK, sx: 1 + WALK.squash * land * hitK, sy: 1 - WALK.squash * land * hitK, spin: 0, dust: 0 };
+  }
+  if (kind === 'roll') {
+    const spin = travel / e.r;
+    return { kind, steps: 0, bob: ROLL.bob * Math.abs(Math.sin(spin * 2)), tilt: 0, sx: 1, sy: 1, spin, dust: 1 };
+  }
+  if (kind === 'drive') {
+    const v = travel / 9 + ph;
+    return { kind, steps: 0, bob: Math.abs(Math.sin(v)) * hitK, tilt: 0.022 * Math.sin(v * 0.5) * hitK, sx: 1, sy: 1, spin: 0, dust: 0.7 };
+  }
+  const t = (run.time || 0) * 2.2 + e.id * 0.9;
+  return { kind, steps: 0, bob: 1.6 * (0.5 + 0.5 * Math.sin(t)), tilt: 0, sx: 1 - 0.015 * Math.sin(t), sy: 1 + 0.025 * Math.sin(t), spin: 0, dust: 0 };
+}
 //  사격 개시선 옆 안내(계약서 6장 N2-⑤). ⚠️선을 넘는 주체는 **게이트**다 — 플레이어가 넘는다는 뜻으로 읽히면
 //   벽의 통로 확정선과 헷갈린다(2026-09-17 2차 검수 N2-④).
 export const ARM_LINE_TEXT = '이 선 안으로 온 게이트를 쏠 수 있어요';
@@ -929,6 +975,35 @@ export function createRenderer3(ctx, sprites) {
     if (hr.sx !== 1 || hr.sy !== 1) ctx.scale(hr.sx, hr.sy);
     ctx.translate(-ax, -ay);
   }
+  //  r4.8 움직임 자세 적용(호출부가 save/restore): 바퀴 = 그림 가운데를 축으로 spin 만큼 돌리고 bob 만큼 튄다 ·
+  //   그 밖 = 발밑(그림 아래쪽 0.4h)을 축으로 bob 만큼 들어 올리고 tilt 만큼 기울이고 발 디딤 눌림(sx·sy). bob 은 그 자리 배율 k 를 곱한다
+  function motionPose(mo, x, y, h, k) {
+    if (mo.spin) {
+      ctx.translate(x, y - mo.bob * k);
+      ctx.rotate(mo.spin);
+      ctx.translate(-x, -y);
+      return;
+    }
+    const fy = y + h * 0.4;
+    ctx.translate(x, fy - mo.bob * k);
+    if (mo.tilt) ctx.rotate(mo.tilt);
+    if (mo.sx !== 1 || mo.sy !== 1) ctx.scale(mo.sx, mo.sy);
+    ctx.translate(-x, -fy);
+  }
+  //  r4.8 흙먼지(굴러오는 바퀴·차): 적 뒤쪽(화면 위 — 내려오는 반대쪽) 작은 흙빛 점. 자리·크기는 다가온 거리로 돌아간다(결정적)
+  function drawDust(mo, x, y, h, k, id) {
+    const n = ROLL.dust, ph = (mo.spin || mo.bob * 3 + id) * 0.9;
+    ctx.save();
+    ctx.fillStyle = 'rgba(140,122,98,1)';
+    for (let i = 0; i < n; i++) {
+      const a = ph + i * 2.1, u = (i + 1) / n;
+      ctx.globalAlpha = 0.32 * mo.dust * (1 - 0.5 * u) * (0.6 + 0.4 * Math.abs(Math.sin(a)));
+      ctx.beginPath();
+      ctx.arc(x + Math.sin(a) * h * 0.28, y - h * (0.42 + 0.22 * u), (2.2 + 1.6 * u) * k, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 
   //  r4.7 현상금 적 몸통: 바깥 맥박 금색 고리(t = run.time — 결정적) + 어두운 청동 팔각 방패 + 두꺼운 금색 테 + 가운데 코인 그림.
   //   white = 피격 번쩍임(흰 팔각만 — 호출부가 불투명도를 건다)
@@ -993,10 +1068,17 @@ export function createRenderer3(ctx, sprites) {
     shadow(x, y + h * 0.4, r * 0.95);
     //  피격 반응(r3.24 손맛, 셸 fx.hit[id]): 넉백·흔들림·스쿼시는 **그림에만** 건다(그림자·HP 숫자·규칙 위치는 그대로)
     const hr = hitPose(fx, e.id, hitRole(e.kind, e.skin), k);
-    if (hr) { ctx.save(); poseAt(hr, x, y + h * 0.4); }
+    //  r4.8 움직임(걷기·굴러오기·차 떨림·숨쉬기 — enemyMotionPose): 역시 그림에만. 피격 반응 중이면 걷기 흔들림을 줄인다
+    const mo = enemyMotionPose(e, run, hr ? WALK.hitDamp : 1);
+    if (mo && mo.dust) drawDust(mo, x, y, h, k, e.id);
     //  피격 중인 잡졸(셸 fx.enemyHit[id] 남은 초)은 피격 시트를 한 번 재생한다
     const hitLeft = fx && fx.enemyHit ? (fx.enemyHit[e.id] ?? 0) : 0;
     const hitSh = e.kind === 'grunt' && hitLeft > 0 ? sheet('e_grunt_hit') : null;
+    //  r4.8 걷기 동작 시트 자리(SHEETS3 e_grunt_walk — 파일이 들어오면 코드 움직임 대신 이 시트를 쓴다): 그림이 E1 인 잡졸, 피격 시트가 없을 때.
+    //   칸 = 걸음 박자(두 걸음에 시트 한 바퀴 — 다가오는 빠르기에 비례). 파일이 없으면 null → 코드 움직임
+    const walkSh = mo && mo.kind === 'walk' && e.kind === 'grunt' && !e.skin && !hitSh ? sheet('e_grunt_walk') : null;
+    if (mo && !walkSh) { ctx.save(); motionPose(mo, x, y, h, k); }
+    if (hr) { ctx.save(); poseAt(hr, x, y + h * 0.4); }
     //  r3.26 3상태 그림: 맞는 동안 'hit:' · 체력 절반 이하이면 'dmg:'. 없는 그림은 정지 그림으로 조용히 되돌아간다
     //   (잡졸은 피격 시트가 있으면 시트가 먼저 — 12칸 동작이 한 장보다 낫다)
     const artB = artBase3(e.kind, e.skin);
@@ -1004,21 +1086,24 @@ export function createRenderer3(ctx, sprites) {
     let key = baseKey;
     if (artB && !hitSh && hitLeft > 0 && get('hit:' + artB)) key = 'hit:' + artB;
     else if (artB && wantsDmgArt(e.hp, e.hpMax ?? e.hp) && get('dmg:' + artB)) key = 'dmg:' + artB;
-    const hitFrame = hitSh ? sheetFrameAt(hitSh, hitSh.frames / hitSh.fps - hitLeft) : 0;
-    if (hitSh) drawSheetFrame(hitSh, hitFrame, x, y, h);
+    const sh = hitSh || walkSh;
+    const shFrame = hitSh ? sheetFrameAt(hitSh, hitSh.frames / hitSh.fps - hitLeft)
+      : walkSh ? Math.floor((((mo.steps / 2) % 1) + 1) % 1 * walkSh.frames) : 0;
+    if (sh) drawSheetFrame(sh, shFrame, x, y, h);
     else drawImgCentered(key, x, y, h, () => enemyShape(e.kind, x, y, r, false));
     //  흰색 번쩍임: 그림 모양의 흰 실루엣(없으면 도형에 흰 채움)을 반응 불투명도로 덮는다
     if (hr && hr.flash > 0) {
       ctx.globalAlpha = hr.flash;
-      const im = hitSh ? null : get(key);
-      const wsh = hitSh ? whiteOf(hitSh.img, 1024) : null;
+      const im = sh ? null : get(key);
+      const wsh = sh ? whiteOf(sh.img, 1024) : null;
       const wim = im ? whiteOf(im) : null;
-      if (wsh) drawSheetFrame(hitSh, hitFrame, x, y, h, wsh);
+      if (wsh) drawSheetFrame(sh, shFrame, x, y, h, wsh);
       else if (wim) ctx.drawImage(wim.c, x - h * (im.width / im.height) / 2, y - h / 2, h * (im.width / im.height), h);
       else enemyShape(e.kind, x, y, r, true);
       ctx.globalAlpha = 1;
     }
     if (hr) ctx.restore();
+    if (mo && !walkSh) ctx.restore();
     //  전격 기절(r3.31): 멈춘 동안 청보라 고리 + 번개 조각 3개(시간에 따라 돌아간다). 규칙 e.stunT 를 그대로 읽는다
     if (e.stunT > 0) {
       const t = run.time || 0, a = Math.min(1, e.stunT / 0.25);

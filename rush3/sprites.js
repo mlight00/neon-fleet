@@ -51,6 +51,10 @@ export const SHEETS3 = Object.freeze({
   soldier_fire_heavy: Object.freeze({ file: 'SOLDIER_heavy_fire', cols: 8, frames: 8, fw: 251, fh: 327, fps: 12, loop: true, refH: 264 }),
   e_grunt_hit:   Object.freeze({ file: 'E1_hit',    cols: 6, frames: 12, fw: 244, fh: 255, fps: 24, loop: false, refH: 200 }),
   e_grunt_death: Object.freeze({ file: 'E1_death',  cols: 6, frames: 12, fw: 365, fh: 294, fps: 12, loop: false, refH: 200 }),
+  //  r4.8 걷기 동작 시트 **자리**(이사님 지시 2026-09-26 "적들이 걸어서 내려오는 듯한 스프라이트도 추가하자") — 파일은 아직 없다(그림 제작은 따로).
+  //   assets/rush3/E1_walk.png 가 들어오면 render.drawEnemy 가 코드 움직임(enemyMotionPose) 대신 이 시트를 쓴다(칸 = 걸음 박자 — 두 걸음에 시트 한 바퀴, fps 는 쓰지 않는다).
+  //   ⚠️cols·frames·fw·fh·refH 는 들어오는 시트에 맞춰 고친다(지금 값은 같은 잡졸의 피격 시트 E1_hit 꼴 — 자리만). 없는 동안은 조용히 코드 움직임(브라우저 콘솔에 404 한 줄)
+  e_grunt_walk:  Object.freeze({ file: 'E1_walk',   cols: 6, frames: 12, fw: 244, fh: 255, fps: 12, loop: true,  refH: 200 }),
 });
 export const SHEET_BASE3 = 'assets/rush3/';
 //  무기 아이콘(2026-09-19 Gemini 생성, 이미지프롬프트_v5): 6종 × Mk I~III, 옆모습·투명. HUD 칩·보급 통 내용물이 쓴다.
