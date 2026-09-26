@@ -4,7 +4,7 @@ import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
 import { WEAPONS, weaponRank, makeBullet, weaponStats, fanAngles, fanSpeeds, clampMk, MK_MAX } from './weapons.js';
 import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm, isGateCellFixed } from './gates.js';
 import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward, moveSupply } from './supply.js';
-import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit } from './squad.js';
+import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit, formationHalfWidth } from './squad.js';
 import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.js';
 //  r4.4 판 밖 로봇 강화(순수 규칙 모듈 — 비용·구매는 셸·저장 몫, 여기서는 효과 수치만 읽는다)
 import { normUp, hasUp, effects } from './meta.js';
@@ -31,7 +31,13 @@ const inArena = (run) => run.phase === 'arena';
 const squadZ = (run) => run.z - (run.ay || 0);
 const squadOrigin = (run) => (run.ay ? { x: run.x, z: run.z - run.ay } : run);
 //  광장에서는 clampCenter 의 도로 가장자리를 광장 폭(40~440)으로 넓힌다. 도로에서는 undefined(= SQUAD_DEFAULTS 그대로)
-const squadOpts = (run) => (inArena(run) ? run.arena.squadOpts : undefined);
+//  r4.8 보스전 밀집 대형: run.hwCap(보스전 반폭 상한 — 게임 화면 줄에서 보스가 나온 뒤에만 있다)이 있으면 capHw 를 더한 **새 객체**
+//   (run.arena.squadOpts 는 동결). 없으면 종전과 같은 값(도로 undefined · 광장 동결 객체)
+const squadOpts = (run) => {
+  const base = inArena(run) ? run.arena.squadOpts : undefined;
+  if (run.hwCap == null) return base;
+  return base ? { ...base, capHw: run.hwCap } : { capHw: run.hwCap };
+};
 const clampNum = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 // 난이도별 적 정의 표(계약서 3-8). BAL3.enemies 에 배수를 **한 번** 적용한 새 객체 — run 이 이것만 읽으므로 stepRun 안에 난이도 분기가 없다.
@@ -147,6 +153,9 @@ export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard =
     time: 0, peak: 0, kills: 0, lossByTouch: 0, lossByShot: 0, lossByGate: 0, missedSupplies: 0, skippedSupplies: 0, badGatesPassed: 0, lastBadGateId: null,
     over: false, won: false, wonAt: null,
   };
+  //  r4.8 보스전 밀집 대형(희소 — 게임 화면 줄의 buildStage 만 stage.bossHw 를 싣는다. 배수 1 줄·검사 합성 판의 run 에는 키가 없다).
+  //   보스가 나오는 STEP 에 run.hwCap(지금 반폭)을 세우고 STEP 마다 bossHw 쪽으로 줄인다(stepHwCap)
+  if (stage.bossHw) run.bossHw = stage.bossHw;
   const interval = weaponStats(weapon, weaponMk).interval;
   for (let i = 0; i < (stage.startUnits | 0); i++) run.units.push(makeUnit(run.nextUnitId++, interval));
   //  r4.4 hero 표시: 첫 유닛(id 1). 배열 0번 = 대형 중심(0,0) 자리이고, 증원은 뒤에 붙고(addUnits) 제거·정리는 순서를 지키므로(removeUnits·pruneDeadUnits)
@@ -257,8 +266,22 @@ function steer(run, inp, dt) {
     const wantY = (run.tay - run.ay) * (1 - Math.exp(-SQ.followRate * dt));
     run.ay = clampNum(run.ay + Math.max(-cap, Math.min(cap, wantY)), d0, d1);
   }
+  stepHwCap(run, dt);
   const c = clampCenter(run, run.walls, squadOpts(run));
   compressUnits(run.units, c.dxLo, c.dxHi);
+}
+
+//  r4.8 보스전 밀집 대형 전환(1단계 조향 안, clampCenter 앞): run.hwCap 을 목표 쪽으로 SQ.bossHwRate px/s 씩 옮긴다 —
+//   보스전 = run.bossHw 까지 줄이고, 승리 뒤(보너스전)는 지금 대형 반폭까지 늘린 뒤 칸을 지운다(제한 없음). hwCap 이 없는 판은 아무것도 하지 않는다
+function stepHwCap(run, dt) {
+  if (run.hwCap == null) return;
+  const step = SQ.bossHwRate * dt;
+  if (run.bossDefeated) {
+    run.hwCap += step;
+    if (run.hwCap >= formationHalfWidth(run.units.length)) delete run.hwCap;
+  } else if (run.hwCap > run.bossHw) {
+    run.hwCap = Math.max(run.bossHw, run.hwCap - step);
+  }
 }
 
 // 3단계 스폰: ev.z <= z 인 이벤트를 커서 순서로 소비. 정예는 run.bosses(전원 스폰 z = run.z + 760, 별칭 run.boss = 첫 보스)
@@ -273,6 +296,8 @@ function spawnDue(run, ev) {
   //   아레나(r3.17): 같은 발동 조건에서 광장 전환 + 아레나 보스 1체(enterArena)
   if (run.elites.length && !run.eliteSpawned && run.elites[0].z <= run.z) {
     run.eliteSpawned = true;
+    //  r4.8 보스전 밀집 대형 시작(도로 정예 하강 시작·광장 진입 같은 STEP): 상한을 지금 대형 반폭에서 시작해 STEP 마다 bossHw 로 줄인다
+    if (run.bossHw) run.hwCap = Math.max(run.bossHw, formationHalfWidth(run.units.length));
     if (run.arena) { enterArena(run, ev); return; }
     const total = run.elites.length;
     run.elites.forEach((d, i) => {

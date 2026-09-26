@@ -16,6 +16,8 @@
 //     보스 1체 = 보스가 도로를 고르게 왕복하고 부대가 그 바로 아래를 완벽하게 따라갈 때의 평균(도로 끝에서 대형이 눌리는 몫 포함) ·
 //     보스 여럿 = 보스는 제 차선 가운데, 부대는 맞는 발 수가 가장 많은 x 에 선다
 //   · 광장 보스 = 자동 조준이라 모든 발이 닿는다(상한 — 붙어 서면 산탄포 바깥 알갱이까지)
+//   · r4.8: 게임 줄은 보스전 동안 대형 반폭이 bossHw(64)로 모인다(combat.stepHwCap) — 도로 보스 계산도 그 대형으로 잰다(stage.bossHw).
+//     보스 공격을 피하느라 움직여 빗나가는 몫은 빼지 않는다('전원 조준' 상한 그대로 — 실제 보스전은 그만큼 30초보다 조금 길다)
 //  같은 상한 부대를 **현상금 적이 나오는 z 까지로 잘라** 현상금 적 체력도 계산한다(파일 끝 bountyFloor — r4.7 (c))
 import { BAL3 } from './balance.js';
 import { WEAPONS, weaponStats, fanAngles, fanSpeeds, MK_MAX } from './weapons.js';
@@ -29,14 +31,18 @@ const PATROL_STEP = 4;
 
 //  ── 부대 대형(유닛 자리) ──
 //  n 명 대형을 부대 중심 x = sx 에서 도로 안으로 압축한 유닛 오프셋 [{ dx, dy }](combat 과 같은 squad.compressUnits)
-export function squadOffsets(n, sx = ROAD.center) {
+//  cap(r4.8 보스전 밀집 대형, 기본 null = 제한 없음): 대형 반폭 상한 — squad.clampCenter 의 capHw 와 같은 식(압축 범위를 ±(cap − unitR) 안으로)
+export function squadOffsets(n, sx = ROAD.center, cap = null) {
   const units = formation(n).map((p) => ({ dx: p.dx, dy: p.dy }));
-  compressUnits(units, ROAD.x0 + SQ.unitR - sx, ROAD.x1 - SQ.unitR - sx);
+  let lo = ROAD.x0 + SQ.unitR - sx, hi = ROAD.x1 - SQ.unitR - sx;
+  if (cap != null) { const c = cap - SQ.unitR; if (lo < -c) lo = -c; if (hi > c) hi = c; }
+  compressUnits(units, lo, hi);
   return units;
 }
-//  부대 중심이 설 수 있는 x 범위(벽 없는 도로 — squad.clampCenter 와 같은 식)
-export function squadCenterRange(n) {
-  const hw = Math.min(formationHalfWidth(n), 60);
+//  부대 중심이 설 수 있는 x 범위(벽 없는 도로 — squad.clampCenter 와 같은 식: 반폭 min(대형 반폭(상한 cap), hwMax 60))
+export function squadCenterRange(n, cap = null) {
+  const fw = formationHalfWidth(n);
+  const hw = Math.min(cap != null && cap < fw ? cap : fw, SQ.hwMax);
   return [ROAD.x0 + hw, ROAD.x1 - hw];
 }
 
@@ -55,8 +61,8 @@ export function lineCircleZ(ux, uz, t, cx, cz, R, zMax) {
 
 /** 한 번 쏠 때 목표에 닿는 발 수(도로). targets = [{ x, z(부대 중심 기준 전방 거리), r }]. sx = 부대 중심 x.
  *  유닛 자리 (sx + dx, −dy) 에서 부채꼴 발마다 직선을 긋고 가장 먼저 닿는 목표 하나에만 센다(탄 1발 = 1명중 — 관통탄도 목표가 겹치지 않으면 1) */
-export function roadHits(n, weaponId, mk, targets, sx) {
-  return roadHitsFrom(squadOffsets(n, sx), weaponId, mk, targets, sx);
+export function roadHits(n, weaponId, mk, targets, sx, cap = null) {
+  return roadHitsFrom(squadOffsets(n, sx, cap), weaponId, mk, targets, sx);
 }
 //  같은 계산 — 유닛 오프셋을 미리 받는다(현상금 적 계산이 한 자리에서 거리만 바꿔 여러 번 부른다).
 //   tw = 목표의 **세계 속도**(+z, px/s). 보스는 0(부대가 멈춘 보스전 — 종전 계산 그대로). 현상금 적은 부대와 함께 가며 다가오므로 scroll − vz(= 60).
@@ -200,31 +206,33 @@ function bossTargets(stage) {
   return (stage.elites || []).map((e) => ({ x: e.x ?? null, z: BAL3.elites.roles[e.role ?? 'elite'].holdAhead, r: E.r }));
 }
 
-/** 한 부대(n 명·무기·Mk)가 이 판 보스에 닿는 상한 초당 피해. 반환 { dps, hits, sx } */
+/** 한 부대(n 명·무기·Mk)가 이 판 보스에 닿는 상한 초당 피해. 반환 { dps, hits, sx }
+ *  r4.8: 게임 줄(stage.bossHw 가 있는 판)은 보스전 밀집 대형(반폭 상한 bossHw) 그대로 잰다 — 게임과 같은 대형 함수(squad.compressUnits)·같은 중심 범위 */
 export function bossDpsFor(stage, n, weaponId, mk) {
   const s = weaponStats(weaponId, mk);
   const tg = bossTargets(stage);
+  const cap = stage.bossHw ?? null;
   if (!tg) { const hits = n * s.fan; return { dps: dpsOf(weaponId, mk, hits), hits, sx: null }; }
   if (tg.every((t) => t.x === null)) {
     //  보스 1체(차선 없음 = 도로 전체를 왕복): 보스 x 가 차선 [x0 + r, x1 − r] 를 고르게 오가는 동안 부대가 그 바로 아래(설 수 있는 범위로 자름)를
     //   **완벽하게 따라간다**고 보고 맞는 발 수를 평균한다(4px 간격). 보스가 도로 끝에 가면 부대가 가장자리에 눌려 대형이 좁아져 더 많이 맞는다 — 그 몫까지 들어간다
-    const [lo, hi] = squadCenterRange(n);
+    const [lo, hi] = squadCenterRange(n, cap);
     const r = tg[0].r, b0 = ROAD.x0 + r, b1 = ROAD.x1 - r;
     let sum = 0, cnt = 0;
     for (let bx = b0; bx <= b1 + 1e-9; bx += PATROL_STEP) {
       const sx = Math.max(lo, Math.min(hi, bx));
-      sum += roadHits(n, weaponId, mk, tg.map((t) => ({ ...t, x: bx })), sx);
+      sum += roadHits(n, weaponId, mk, tg.map((t) => ({ ...t, x: bx })), sx, cap);
       cnt++;
     }
     const hits = sum / cnt;
     return { dps: dpsOf(weaponId, mk, hits), hits, sx: null };
   }
   //  보스 여럿: 보스는 제 차선 가운데(정의 x), 부대 중심 x 를 2px 간격으로 훑어 가장 많이 맞는 자리
-  const [lo, hi] = squadCenterRange(n);
+  const [lo, hi] = squadCenterRange(n, cap);
   const fixed = tg.map((t) => ({ ...t, x: t.x ?? ROAD.center }));
   let best = { hits: -1, sx: lo };
   for (let sx = lo; sx <= hi + 1e-9; sx += 2) {
-    const h = roadHits(n, weaponId, mk, fixed, sx);
+    const h = roadHits(n, weaponId, mk, fixed, sx, cap);
     if (h > best.hits) best = { hits: h, sx };
   }
   return { dps: dpsOf(weaponId, mk, best.hits), hits: best.hits, sx: best.sx };
@@ -257,7 +265,7 @@ function floorKey(stage, sec) {
     (stage.supplies || []).map((s) => [s.id, s.z, s.x, s.r, s.kind, s.payload, s.pairId, s.padStart, s.padGap]),
     (stage.walls || []).map((w) => [w.id, w.kind, w.z0, w.z1, w.x0, w.x1]),
     stage.lottery ? [stage.lottery.z, stage.lottery.x, stage.lottery.wallId, stage.lottery.supplyId, stage.lottery.rowId] : null,
-    (stage.elites || []).map((e) => [e.hp, e.x, e.role]), !!stage.arena]);
+    (stage.elites || []).map((e) => [e.hp, e.x, e.role]), !!stage.arena, stage.bossHw ?? null]);
 }
 
 /** 보스 체력 바닥(r4.7): 보스 체력 합 ÷ 상한 화력 ≥ sec 초. 모자라면 체력 비율을 지키며 늘린다(각 체력은 올림 — 옛 체력 아래로 내려가지 않는다).

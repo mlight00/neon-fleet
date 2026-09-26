@@ -94,13 +94,18 @@ function pickSide(run, wall) {
  *  반환 { lo, hi, edgeLo, edgeHi, hw, dxLo, dxHi, wallId } — 이름이 세 뜻으로 갈리므로 주의:
  *   lo/hi     = **중심** 허용 범위(절대 x). compressUnits 에 넣으면 안 된다(대형이 hw 폭으로 뭉개진다).
  *   edgeLo/hi = 통로(또는 도로) **가장자리**(절대 x). hw = 적용 반폭.
- *   dxLo/dxHi = compressUnits 에 그대로 넘길 **상대** 범위(= edge ± unitR − run.x). wallId = 활성 벽 id 또는 null. */
+ *   dxLo/dxHi = compressUnits 에 그대로 넘길 **상대** 범위(= edge ± unitR − run.x). wallId = 활성 벽 id 또는 null.
+ *  opts.capHw(r4.8 보스전 밀집 대형, 기본 없음): 대형 반폭 상한(px, 유닛 원 끝까지). 있으면 대형 반폭을 min(대형 반폭, capHw) 로 보고
+ *   (중심 범위는 그 반폭으로 **지금 규칙 그대로** — 벽 밖 hw' = min(반폭, freeHalfMax)), 압축 범위 dxLo/dxHi 를 ±(capHw − unitR) 안으로 더 좁힌다.
+ *   분리벽 통로와 같은 경로(비례 압축)라 새 대형 함수는 없다. 없으면 종전과 한 글자도 다르지 않다 */
 export function clampCenter(run, walls, opts) {
   const o = cfg(opts);
   if (!run.wallSide) run.wallSide = {};
   if (!run.wallSideLog) run.wallSideLog = {};
   const n = run.units ? run.units.length : 0;
-  const fw = formationHalfWidth(n, opts);
+  const cap = o.capHw;
+  const fw0 = formationHalfWidth(n, opts);
+  const fw = cap != null && cap < fw0 ? cap : fw0;
   const prevZ = Number.isFinite(run.prevZ) ? run.prevZ : run.z;
   let edgeLo = o.roadLo, edgeHi = o.roadHi, hw = Math.min(fw, o.freeHalfMax), wallId = null;
   for (const w of walls || []) {
@@ -122,7 +127,9 @@ export function clampCenter(run, walls, opts) {
   const lo = edgeLo + hw, hi = edgeHi - hw;
   run.x = Math.max(lo, Math.min(hi, run.x));
   if (Number.isFinite(run.tx)) run.tx = Math.max(lo, Math.min(hi, run.tx));
-  return { lo, hi, edgeLo, edgeHi, hw, dxLo: edgeLo + o.unitR - run.x, dxHi: edgeHi - o.unitR - run.x, wallId };
+  let dxLo = edgeLo + o.unitR - run.x, dxHi = edgeHi - o.unitR - run.x;
+  if (cap != null) { const c = cap - o.unitR; if (dxLo < -c) dxLo = -c; if (dxHi > c) dxHi = c; }
+  return { lo, hi, edgeLo, edgeHi, hw, dxLo, dxHi, wallId };
 }
 
 // 점 p 와 선분 ab 의 최근접 파라미터 t(0..1)와 거리 제곱
