@@ -1,3 +1,26 @@
+# 스타포지 러시 v3 — 작업 상태 (2026-09-27 새벽)
+
+라이브 https://mlight00.github.io/neon-fleet/rush3.html · master = `2dbcb0e`(r4.11) · 브랜치 `claude/starforge-v3`
+검사: `node --test tests/rush3-*.test.mjs` 518 · `node --test tests/rush-*.test.mjs` 32 (전부 통과)
+
+## 실플레이 피드백 반영 r4.7 ~ r4.11 (2026-09-26 ~ 27, 모두 라이브)
+
+| 개정 | 내용 | 커밋 |
+|---|---|---|
+| r4.7 | 보스 최소 30초(상한 화력 × 30초) · 보스 탄 피해 1 · 현상금 적(체력 0.45) · 산탄포 6발 · 저격총 → '관통탄' | 0aa2897 · d7c4998 · 4715830 · 6274af1 |
+| r4.8 | 보스전 밀집 대형(반폭 64) · 보스 공격 패턴 · 적 걷기·굴러오기 코드 움직임 | 1a4dde2 · 04c8a50 · 595a303 · ab2c5d1 |
+| r4.9 | 보스별 고유 공격 15종 · 광역만 붉은 경보 · 광분 30% | 2b7c5a2 · be80d56 · c72e08c |
+| r4.10 | 보스 판 3·6·…·24, 대물결 판 1·4·…·22(결승선 돌파), 중간 보스 판 2·5·…·23 | eb7e5ae · c2cb0c8 · 41f0a6d · 84ce084 |
+| r4.11 | 그림 시트: 보스 광역 효과 8종 · 보스 피격/파괴 · 적 걷기/달리기/피격(Gemini v9) | 2dbcb0e |
+
+- 설계 계약서 `newmode/v3/DESIGN_v3_stage1.md` 맨 위 r4.7~r4.11(판단·빠진 것 목록은 r4.11 문단).
+- 그림 도구·원본 = `E:\workspace\claude\neon-fleet\newmode\sprites\v9\`(raw 원본 · out 처리본 · sheet_split.py · fix_boss.py · export_assets.py · measure_fit.py).
+- r4.11 화면 캡처 = `E:\workspace\claude\neon-fleet\review\20260927_r411\`(적 9종 · 보스 광역 9종 경보/터짐 · 웅덩이 · 보스 맞음 · 파괴 폭발/잔해).
+- ⚠️난이도는 봇 테스트로 판단하지 않는다(이사님 지시) — 봇은 동작 확인만.
+- 남은 그림 과제(선택): E8 맨홀 점퍼 걷기 · E10 피격 섬광 칸 · E1 피격 새 그림 · E5 굴러오기(모래 띠 없이) · 배경 그림의 Gemini 워터마크 반짝이(이전부터 있던 것).
+
+---
+
 # 스타포지 러시 v3 — 작업 상태 (2026-09-25 밤)
 
 라이브 https://mlight00.github.io/neon-fleet/rush3.html · master = 브랜치 `claude/starforge-v3` 최신 커밋
