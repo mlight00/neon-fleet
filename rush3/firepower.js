@@ -16,8 +16,9 @@
 //     보스 1체 = 보스가 도로를 고르게 왕복하고 부대가 그 바로 아래를 완벽하게 따라갈 때의 평균(도로 끝에서 대형이 눌리는 몫 포함) ·
 //     보스 여럿 = 보스는 제 차선 가운데, 부대는 맞는 발 수가 가장 많은 x 에 선다
 //   · 광장 보스 = 자동 조준이라 모든 발이 닿는다(상한 — 붙어 서면 산탄포 바깥 알갱이까지)
+//  같은 상한 부대를 **현상금 적이 나오는 z 까지로 잘라** 현상금 적 체력도 계산한다(파일 끝 bountyFloor — r4.7 (c))
 import { BAL3 } from './balance.js';
-import { WEAPONS, weaponStats, fanAngles, MK_MAX } from './weapons.js';
+import { WEAPONS, weaponStats, fanAngles, fanSpeeds, MK_MAX } from './weapons.js';
 import { formation, formationHalfWidth, compressUnits } from './squad.js';
 
 const SQ = BAL3.squad, ROAD = BAL3.road;
@@ -55,15 +56,25 @@ export function lineCircleZ(ux, uz, t, cx, cz, R, zMax) {
 /** 한 번 쏠 때 목표에 닿는 발 수(도로). targets = [{ x, z(부대 중심 기준 전방 거리), r }]. sx = 부대 중심 x.
  *  유닛 자리 (sx + dx, −dy) 에서 부채꼴 발마다 직선을 긋고 가장 먼저 닿는 목표 하나에만 센다(탄 1발 = 1명중 — 관통탄도 목표가 겹치지 않으면 1) */
 export function roadHits(n, weaponId, mk, targets, sx) {
+  return roadHitsFrom(squadOffsets(n, sx), weaponId, mk, targets, sx);
+}
+//  같은 계산 — 유닛 오프셋을 미리 받는다(현상금 적 계산이 한 자리에서 거리만 바꿔 여러 번 부른다).
+//   tw = 목표의 **세계 속도**(+z, px/s). 보스는 0(부대가 멈춘 보스전 — 종전 계산 그대로). 현상금 적은 부대와 함께 가며 다가오므로 scroll − vz(= 60).
+//   탄은 세계 속도 vb(= 무기 vz × 발 속도 배수)로 날고 목표도 tw 로 달아나므로, 목표에 붙어 보면 탄이 **옆으로 k = vb ÷ (vb − tw) 배 더 벌어지고**
+//   (부채꼴 발의 x 는 세계 거리로 벌어진다) 사거리(세계 거리) 안에 닿는 거리는 range ÷ k 로 줄어든다(산탄포 420 → 약 370)
+function roadHitsFrom(offs, weaponId, mk, targets, sx, tw = 0) {
   const s = weaponStats(weaponId, mk);
   const angles = fanAngles(s.id);
+  const speeds = fanSpeeds(s.id);
   const half = s.w / 2;
+  const ks = angles.map((_, i) => (tw ? (s.vz * speeds[i]) / (s.vz * speeds[i] - tw) : 1));
   let hits = 0;
-  for (const u of squadOffsets(n, sx)) {
+  for (const u of offs) {
     const ux = sx + u.dx, uz = -u.dy;
-    const zMax = s.range != null ? Math.min(uz + s.range, CULL_AHEAD) : CULL_AHEAD;
-    for (const a of angles) {
-      const t = Math.tan(a);
+    for (let i = 0; i < angles.length; i++) {
+      const k = ks[i];
+      const t = Math.tan(angles[i]) * k;
+      const zMax = s.range != null ? Math.min(uz + s.range / k, CULL_AHEAD) : CULL_AHEAD;
       for (const tg of targets) {
         if (lineCircleZ(ux, uz, t, tg.x, tg.z, tg.r + half, zMax) !== null) { hits++; break; }
       }
@@ -270,4 +281,91 @@ function bossFloorCalc(stage, sec) {
   const hp = base.map((h) => (k === 1 ? h : Math.ceil(h * k)));
   const total = hp.reduce((a, b) => a + b, 0);
   return { sec, units: ub.units, weapon: ub.weapon, mk: ub.mk, dps: ub.dps, hits: ub.hits, base, hp, minSec: ub.dps > 0 ? total / ub.dps : Infinity };
+}
+
+//  ── 현상금 적(r4.7 (c) — 이사님 지시 2026-09-26 "체력이 특수한 높은 일반 적 … 내가 가진 최대의 무기로 끝까지 쏴야 깰 수 있는 긴장감") ──
+//  체력 = 사거리에 들어와서 부대에 닿기까지 **그 자리(트리거 z)까지의 상한 부대**가 줄 수 있는 직격 피해 합 × BAL3.bounty.hpFactor(0.9).
+//   상한 부대 = 위 보스 계산과 같은 규칙(병력·무기·Mk — 분리벽 한쪽·병력 100·강화 0·손실 0)을 **트리거 z 까지로 잘라** 쓴다.
+//   현상금 적은 부대 x 를 따라오므로 부대 바로 앞에 있다고 보고, 거리마다 **실제로 닿는** 발 수(roadHits — 산탄포 사거리는 유닛 자리 기준)로 잰다.
+//   폭발·연쇄는 한 대상 기준이라 넣지 않고, 전격 기절은 현상금 적에 걸리지 않는다(combat.stun). 다른 적이 탄을 받아 내는 몫은 빼지 않는다(상한 — 0.9 가 여유)
+const BT = BAL3.bounty;
+const ENTER_Z = BAL3.enterZ;
+//  거리 적분 간격(px) · 부대 중심 x 훑기 간격(px)
+const D_STEP = 10, SX_STEP = 8;
+
+/** 현상금 적이 부대에 닿는 거리(부대 중심 기준 전방 거리): 적 원(tx, d, r)과 유닛 원(unitR)이 처음 겹치는 d — 가장 앞에서 닿는 유닛 기준(combat 의 overlappingUnits 와 같은 원 겹침) */
+export function bountyContactDist(offs, sx, tx, r = BT.r) {
+  const R = r + SQ.unitR;
+  let best = -Infinity;
+  for (const u of offs) {
+    const ax = sx + u.dx - tx;
+    if (Math.abs(ax) > R) continue;
+    const d = -u.dy + Math.sqrt(R * R - ax * ax);
+    if (d > best) best = d;
+  }
+  return best === -Infinity ? 0 : best;
+}
+
+/** 사선 창: 트리거 z 에서 나온 현상금 적과 부대 사이(부대 ~ 적)에 물체가 끼어들 수 있는 트랙 z 구간 [a, b] — 배치 규칙(보급 통·게이트·벽이 이 안에 없어야 한다).
+ *  적은 트리거 순간 부대 앞 ENTER(760)에서 나와 화면 기준 vz 로 다가오고 탄은 부대 앞 CULL_AHEAD(650)까지 닿는다 →
+ *   사거리에 드는 때 t1 = (ENTER − (CULL_AHEAD + r)) ÷ vz · 가장 늦게 닿는 때 T = (ENTER − (r + unitR)) ÷ vz(부대가 가장 작을 때).
+ *   그동안 부대는 scroll 로 전진하므로 사선이 지나는 트랙 = [z + scroll·t1, z + scroll·T + r + unitR]. tIn = 사거리 안 최대 시간(초) */
+export function bountyWindow(z, B = BT) {
+  const dMin = B.r + SQ.unitR;
+  const t1 = (ENTER_Z - (CULL_AHEAD + B.r)) / B.vz, T = (ENTER_Z - dMin) / B.vz;
+  return { a: z + BAL3.scroll * t1, b: z + BAL3.scroll * T + dMin, tIn: T - t1 };
+}
+
+/** 한 부대(n 명·무기·Mk)가 현상금 적 1체에 사거리 진입부터 닿기까지 줄 수 있는 직격 피해 합.
+ *  적 x = 부대 중심 x(도로 안으로 자름 — 적이 부대를 따라온다). 부대 중심 sx 는 설 수 있는 범위를 8px 간격으로 **고르게** 훑어 평균한다
+ *   (보스 1체 계산과 같은 방식 — 부대가 도로 어디에 서 있든의 평균. 도로 끝에서 대형이 눌려 더 맞는 몫은 그 자리 비율만큼만 들어간다).
+ *  자리마다: 거리 d 를 사거리 끝(CULL_AHEAD + r)에서 닿는 거리까지 10px 씩 줄이며 [그 거리에서 한 번 쏠 때 맞는 발 수(roadHits — 산탄포 사거리는 유닛 자리 기준,
+ *   적이 부대와 함께 달아나는 몫(세계 속도 scroll − vz)으로 부채꼴이 더 벌어지고 사거리 안 거리가 줄어드는 것까지)
+ *   × 발당 피해 ÷ 간격 × 10px 을 지나는 시간(÷ vz)] 을 더한다. 탄이 다가오는 적을 마주 날아가 실제로는 조금 더 자주 맞는 몫(접근 속도 ÷ 탄속, 약 +15%)은 넣지 않는다.
+ *  반환 { dmg(평균), sec(사거리 안 시간 — 평균), max(가장 많이 주는 자리의 피해 합), maxSx } */
+export function bountyDamageFor(n, weaponId, mk, B = BT) {
+  const s = weaponStats(weaponId, mk);
+  const per = s.dmg / s.interval;
+  const [lo, hi] = squadCenterRange(n);
+  const dEnter = CULL_AHEAD + B.r;
+  //  현상금 적의 세계 속도(부대와 함께 가며 vz 만큼 다가온다)
+  const tw = BAL3.scroll - B.vz;
+  let sum = 0, secSum = 0, cnt = 0, max = -1, maxSx = lo;
+  for (let sx = lo; sx <= hi + 1e-9; sx += SX_STEP) {
+    const offs = squadOffsets(n, sx);
+    const tx = Math.max(ROAD.x0 + B.r, Math.min(ROAD.x1 - B.r, sx));
+    const dc = bountyContactDist(offs, sx, tx, B.r);
+    let dmg = 0;
+    for (let d = dEnter; d > dc + 1e-9; d -= D_STEP) {
+      const dd = Math.min(D_STEP, d - dc);
+      dmg += roadHitsFrom(offs, weaponId, mk, [{ x: tx, z: d - dd / 2, r: B.r }], sx, tw) * per * (dd / B.vz);
+    }
+    sum += dmg; secSum += (dEnter - dc) / B.vz; cnt++;
+    if (dmg > max + 1e-9) { max = dmg; maxSx = sx; }
+  }
+  return { dmg: sum / cnt, sec: secSum / cnt, max, maxSx };
+}
+
+/** 현상금 적 1체의 체력(r4.7): 트리거 z 까지의 모든 길 조합 × 무기 후보 중 피해 합이 가장 큰 부대 → round(피해 합 × hpFactor)(최소 1).
+ *  반환 { z, hp, units, weapon, mk, dmg(상한 피해 합), sec(사거리 안 시간), dps(= dmg ÷ sec) } */
+export function bountyFloor(stage, z, B = BT) {
+  const key = floorKey(stage, 'bounty:' + z + ':' + JSON.stringify(B));
+  const hit = FLOOR_CACHE.get(key);
+  if (hit) return { ...hit };
+  const memo = new Map();
+  let best = null;
+  for (const route of routeChoices(stage)) {
+    const lo = routeLoadout(stage, route, z);
+    for (const w of weaponOptions(stage.startWeapon, lo.crates)) {
+      const k = lo.units + ':' + w.weapon + ':' + w.mk;
+      let r = memo.get(k);
+      if (!r) { r = bountyDamageFor(lo.units, w.weapon, w.mk, B); memo.set(k, r); }
+      if (!best || r.dmg > best.dmg + 1e-9) best = { units: lo.units, weapon: w.weapon, mk: w.mk, dmg: r.dmg, sec: r.sec };
+    }
+  }
+  const res = { z, hp: Math.max(1, Math.round(best.dmg * B.hpFactor)), units: best.units, weapon: best.weapon, mk: best.mk,
+                dmg: best.dmg, sec: best.sec, dps: best.sec > 0 ? best.dmg / best.sec : 0 };
+  if (FLOOR_CACHE.size > 500) FLOOR_CACHE.clear();
+  FLOOR_CACHE.set(key, res);
+  return { ...res };
 }

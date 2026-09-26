@@ -1,6 +1,6 @@
 // rush3-loop — 셸 묶음(계약서 8장 V3-DETERMINISM·V3-INPUT + boot 스모크). DOM 없이 main.js 를 import 한다.
 import { test } from 'node:test';
-import { pickInput, weakenBosses } from './lib/rush3-policies.mjs';
+import { pickInput, weakenBosses, weakenBounties } from './lib/rush3-policies.mjs';
 import assert from 'node:assert/strict';
 import { projectorFor } from '../rush3/project.js';
 import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine,
@@ -876,6 +876,8 @@ test('V3-SHELL-LOTTERY-OUT: 위험 항목 공개는 중립 경고음이고, 피�
   //  공개선(revealZ)을 넘기는 **그 프레임에 난 소리**만 따로 본다(앞뒤 전투음에 휩쓸리지 않게)
   while (revealSfx === null && guard++ < 4000) {
     const before = audio.played.length;
+    //  r4.7: 게임 줄 3번 현상금 적(z 4100)에 이 단순 조작 부대가 덮이면 랜덤 길까지 못 간다 — 나오면 체력 1(검사 도구, 규칙 불변)
+    weakenBounties(run());
     app.input.state.pointerX = run().z >= 4000 ? 330 : 240;
     frames(1);
     if (app.getFx().lotSeen) revealSfx = audio.played.slice(before).map((p) => p[0]);
@@ -922,14 +924,16 @@ async function trapWindows(pick) {
   const rowId = run().lottery.rowId;
   const row = () => run().gateRows.find((r) => r.id === rowId);
   //  앞 게이트(z4000)의 소리가 섞이지 않게 z 4200 이후부터 듣는다
+  //  r4.7: 게임 줄 3번 현상금 적(z 4100)은 나오면 체력 1(weakenBounties — 이 단순 조작 부대가 덮이지 않고 랜덤 길까지 가게. 검사 도구, 규칙 불변)
   let guard = 0;
-  while (run().z < 4200 && guard++ < 4000) { app.input.state.pointerX = run().z >= 4000 ? 330 : 240; frames(1); }
+  while (run().z < 4200 && guard++ < 4000) { weakenBounties(run()); app.input.state.pointerX = run().z >= 4000 ? 330 : 240; frames(1); }
   assert.ok(guard < 4000, pick + ': z4200 까지 왔다');
   const hidden = [], shownClosed = [];
   let tipWhileClosed = 'none';
   guard = 0;
   while (!row().armed && guard++ < 4000) {
     const from = audio.played.length;
+    weakenBounties(run());
     app.input.state.pointerX = 330;
     frames(1);
     const heard = audio.played.slice(from).map((p) => p[0]);

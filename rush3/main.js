@@ -553,13 +553,15 @@ export function causeLine(run) {
   return loss + ' · ' + missed;
 }
 
-/** 결과 화면 코인 내역 한 줄(3-9, 작은 글씨): 적 · 보스 · 첫 클리어/재클리어 · 보너스(0 인 항목은 적만 남기고 뺀다). 순수 */
+/** 결과 화면 코인 내역 한 줄(3-9, 작은 글씨): 적 · 보스 · 현상금 · 첫 클리어/재클리어 · 보너스(0 인 항목은 적만 남기고 뺀다). 순수.
+ *  r4.7 현상금(현상금 적을 잡은 몫 — 명세 (다)5 '현상금 +N')은 더하기 표시를 붙여 '현상금 +N' — 판 기본 몫(적·보스·클리어)과 따로 얹힌 보상임이 보이게 */
 export function coinBreakdown(c) {
   if (!c) return null;
   if (c.dev) return '개발용 판 — 코인 없음';
   const NB = ' ';
   const parts = ['적' + NB + (c.enemy | 0)];
   if (c.boss > 0) parts.push('보스' + NB + c.boss);
+  if (c.bounty > 0) parts.push('현상금' + NB + '+' + c.bounty);
   if (c.clear > 0) parts.push((c.clearKind === 'first' ? '첫' + NB + '클리어' : '재클리어') + NB + c.clear);
   if (c.bonus > 0) parts.push('보너스' + NB + c.bonus);
   return parts.join(' · ');
@@ -743,7 +745,7 @@ export function boot(canvas, deps = {}) {
       if (first) firstClear = run.stageId;
     } else {
       const bonus = bonusCoins(run.stageId, run.bonus ? run.bonus.tier : 0, { dev });
-      parts = { enemy: 0, boss: 0, clear: 0, clearKind: null, bonus, total: bonus };
+      parts = { enemy: 0, boss: 0, bounty: 0, clear: 0, clearKind: null, bonus, total: bonus };
     }
     //  개발용 판은 지갑을 건드리지 않는다(0 코인 — 식별자도 남기지 않는다)
     const res = dev ? { paid: false, coins: save.wallet.get().coins, saved: false }
@@ -917,7 +919,7 @@ export function boot(canvas, deps = {}) {
     const c = coin, sm = c && c.settled.main, sb = c && c.settled.bonus;
     const coins = c ? {
       gained: (sm ? sm.total : 0) + (sb ? sb.total : 0),
-      enemy: sm ? sm.enemy : 0, boss: sm ? sm.boss : 0, clear: sm ? sm.clear : 0, clearKind: sm ? sm.clearKind : null, bonus: sb ? sb.bonus : 0,
+      enemy: sm ? sm.enemy : 0, boss: sm ? sm.boss : 0, bounty: sm ? (sm.bounty || 0) : 0, clear: sm ? sm.clear : 0, clearKind: sm ? sm.clearKind : null, bonus: sb ? sb.bonus : 0,
       balance: save.wallet.get().coins, dev: !!run.devWeapon,
     } : null;
     const nextId = won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null;
@@ -1095,11 +1097,20 @@ export function boot(canvas, deps = {}) {
         case 'heroGuardOn': break;
         case 'unitLost': burstAt(ev.x, ev.z, 9, false, C.heroHurt); break;
         //  사망(r3.24): 종류별 연출(잡졸 파편 · 돌격체 굴러 넘어짐+먼지 · 저격수 마젠타 링 · 장갑체 장갑판+연기 · 카트 큰 폭발+약한 흔들림) + 잔해
-        case 'kill': onEnemyDeath(fx, ev, sp); fx.sfx.push(['kill']); break;
+        case 'kill':
+          onEnemyDeath(fx, ev, sp); fx.sfx.push(['kill']);
+          //  r4.7 현상금 적 처치: 보스 처치와 같은 방식 — 큰 폭발 + 다단 폭발 + 흔들림 + '+N 코인'(현상금 1체 몫) 글자
+          if (ev.bounty) {
+            burstAt(ev.x, ev.z, ev.r, true, C.gold); onBossDeath(fx, ev); fx.shakeT = FX.shakeDur;
+            if (coin && !run.devWeapon && coin.tally.perBounty > 0) floaterAt(ev.x, ev.z, -60, '+' + coin.tally.perBounty + ' 코인', C.gold, true);
+          }
+          break;
         case 'touch':
           fx.shakeT = FX.shakeDur;
           if (ev.kind === 'elite') burstAt(ev.x, ev.z, 12, false);
           else onEnemyDeath(fx, ev, sp);
+          //  r4.7 현상금 적 충돌: 붉은 큰 폭발 — 여러 명이 한꺼번에 쓰러지는 자리가 보이게
+          if (ev.kind === 'bounty') burstAt(ev.x, ev.z, ev.r, true, C.heroHurt);
           break;
         //  중화기 폭발(r3.24 재조정): 종전 흰 섬광 원(spawnBurst flash)이 맞는 적을 통째로 덮어 피격 반응이 안 보였다(S21 카트 캡처) —
         //   섬광 대신 폭발 반경의 주황 링 + 주황 파편 몇 개. 적 그림 위 번쩍임·스파크는 enemyHit 이 맡는다

@@ -85,10 +85,14 @@ export const HP_TAG_MIN_Y = 128;
 //   셸(main.js)과 렌더가 같은 함수를 쓴다 — 셸이 만든 반응과 그리는 반응이 갈라지지 않게 판정식은 여기 한 곳
 export function hitRole(kind, skin) {
   if (kind === 'elite') return 'elite';
+  //  r4.7 현상금 적 = 장갑 반응(거의 안 밀리고 금속 스파크 — 무겁고 단단한 적). 처치 연출은 셸이 보스 처치 방식을 더한다
+  if (kind === 'bounty') return 'armor';
   const bySkin = skin ? FX.hitRoleBySkin[skin] : null;
   if (bySkin) return bySkin;
   return kind === 'rusher' || kind === 'shooter' ? kind : 'grunt';
 }
+//  r4.7 현상금 적 겉모습(검사가 이 값으로 그리기 호출을 찾는다): 금색 테(ring = C.gold)·어두운 청동 몸(body)·머리 위 이름표(label = BAL3.bounty.label)
+export const BOUNTY_LOOK = Object.freeze({ ring: BAL3.colors.gold, body: '#3A2A12', label: BAL3.bounty.label });
 //  피격 번쩍임 색(검사 V3-HITFEEL 이 이 값으로 그리기 호출을 찾는다)
 export const HIT_FLASH_FILL = '#FFFFFF';
 //  r4.4 메인 로봇 보호막 고리·피해 이전 빛줄기 색(검사가 이 값으로 그리기 호출을 찾는다). 광장 보스 보호막(C.gatePos 점선)과 다른 흰 하늘색
@@ -913,12 +917,53 @@ export function createRenderer3(ctx, sprites) {
     ctx.translate(-ax, -ay);
   }
 
+  //  r4.7 현상금 적 몸통: 바깥 맥박 금색 고리(t = run.time — 결정적) + 어두운 청동 팔각 방패 + 두꺼운 금색 테 + 가운데 코인 그림.
+  //   white = 피격 번쩍임(흰 팔각만 — 호출부가 불투명도를 건다)
+  function drawBountyBody(x, y, r, k, t, white) {
+    if (!white) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.35 * pulse;
+      ctx.strokeStyle = BOUNTY_LOOK.ring; ctx.lineWidth = Math.max(2, 3 * k);
+      ctx.beginPath(); ctx.arc(x, y, r * (1.2 + 0.1 * pulse), 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = white ? HIT_FLASH_FILL : BOUNTY_LOOK.body;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI / 8 + i * Math.PI / 4, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+      if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.fill();
+    if (white) return;
+    ctx.strokeStyle = BOUNTY_LOOK.ring; ctx.lineWidth = Math.max(3, 5 * k); ctx.stroke();
+    drawCoinIcon(x, y, r * 1.15);
+  }
+  //  r4.7 현상금 적: 잡졸과 확실히 구별(판정 r 34 — 잡졸 14 의 두 배 넘게 크다 · 금색 테 · 코인 · 머리 위 '현상금' 금색 글).
+  //   피격 반응(넉백·번쩍임)은 다른 적과 같은 hitPose, 체력 숫자는 공통 규칙(스폰 체력 3 이상 — 적 아래, HUD 띠에서는 생략)
+  function drawBounty(e, run, fx, x, y, k, r) {
+    shadow(x, y + r * 0.95, r * 1.05);
+    const hr = hitPose(fx, e.id, hitRole(e.kind, e.skin), k);
+    if (hr) { ctx.save(); poseAt(hr, x, y + r); }
+    drawBountyBody(x, y, r, k, run.time || 0, false);
+    if (hr && hr.flash > 0) { ctx.globalAlpha = hr.flash; drawBountyBody(x, y, r, k, 0, true); ctx.globalAlpha = 1; }
+    if (hr) ctx.restore();
+    const ly = y - r * 1.35 - 4 * k;
+    ctx.textAlign = 'center';
+    if (ly >= HP_TAG_MIN_Y) outlinedText(BOUNTY_LOOK.label, x, ly, fs(15, k, 12), BOUNTY_LOOK.ring, 'bold', 4);
+    if ((e.hpMax ?? e.hp) > 2 && e.z >= run.z) {
+      const ty = y + r + 16 * k;
+      if (ty >= HP_TAG_MIN_Y) drawHpTag(x, ty, e.hp, k, hr ? hr.pop : 0);
+    }
+  }
+
   //  적: 스프라이트 폴백(상자/원/마름모) + HP 태그. 저격 예고선은 부대 쪽으로(부대 중심 = (run.x, d −ay) 투영)
   function drawEnemy(e, run, fx) {
     const d = e.z - run.z;
     if (offscreen(d, 80)) return;
     const q = pj(e.x, d), x = q.x, y = q.y, k = q.s;
     const r = e.r * k;
+    if (e.kind === 'bounty') { drawBounty(e, run, fx, x, y, k, r); return; }
     //  저격 예고선 — 맞는 순간(넉백 동안)은 끊긴다(r3.24 저격수 특색: '조준이 흔들렸다')
     const aimCut = !!(fx && fx.hit && fx.hit[e.id] && fx.hit[e.id].t < FX.hit.knockSec);
     if (e.kind === 'shooter' && e.aimT > 0 && !aimCut) {

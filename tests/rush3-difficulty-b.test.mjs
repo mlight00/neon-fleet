@@ -77,6 +77,8 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = roun
       const eh = st.difficultyHp ? m.enemyHp : 1, bh = st.difficultyHp ? m.eliteHp : 1;
       assert.ok(st.spawns.length > 0);
       for (const sp of st.spawns) {
+        //  r4.7 현상금 적(kind 'bounty')은 체력을 상한 화력 계산으로 정한다(V3-R47 BOUNTY-1 이 따로 대조)
+        if (sp.kind === 'bounty') continue;
         //  정의에 체력을 직접 적은 스폰(r3.25 지옥 1번 단단한 잡졸 등)이 먼저 — 없으면 스킨 체력 → 표 체력
         const defHp = explicitHp(id, d, sp) ?? SKIN_HP[sp.skin] ?? BAL3.enemies[sp.kind].hp;
         assert.ok(Number.isInteger(sp.hp) && sp.hp > 0, `S${id} ${d} 스폰 hp 정수`);
@@ -109,7 +111,8 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = roun
   assert.deepEqual([4, 9, 13, 19].map((id) => buildStage(id).spawns.find((s) => s.kind === 'grunt' && !s.skin).hp), [4, 8, 14, 24]);
   //  1~3: 배수 1 줄의 잡졸·정예 체력은 r3.9(33568b2)와 동일 · 기본 줄(지옥)만 × enemyHp·eliteHp(r3.22) · 4 부터는 두 줄 모두 배수(r4.2: 어려움 칸 삭제)
   const s2 = buildStage(2).spawns.map((s) => s.hp);
-  assert.deepEqual(buildStage(2, { difficulty: 'brutal' }).spawns.map((s) => s.hp), s2.map((h) => Math.round(h * BAL3.difficulty.brutal.enemyHp)), 'S2 지옥 = 보통 × enemyHp');
+  //  r4.7 현상금 적(kind 'bounty' — 게임 줄 전용)은 빼고 본다
+  assert.deepEqual(buildStage(2, { difficulty: 'brutal' }).spawns.filter((s) => s.kind !== 'bounty').map((s) => s.hp), s2.map((h) => Math.round(h * BAL3.difficulty.brutal.enemyHp)), 'S2 지옥 = 보통 × enemyHp');
   //  r4.7: 기본 줄의 × eliteHp 값은 보스 체력 바닥의 base(실제 체력은 30초 × 상한 화력까지 오른다 — V3-R47 BOSS-30S)
   assert.deepEqual(DIFFS.map((d) => { const st = buildStage(3, { difficulty: d }); return st.bossFloor ? st.bossFloor.base[0] : st.elite.hp; }), [500, Math.round(500 * BAL3.difficulty.brutal.eliteHp)]);
   assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).spawns[0].hp), [4, 8]);

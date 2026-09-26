@@ -41,6 +41,7 @@ test('V3-DIFF2ROW 스냅숏 형식: 고치기 전 코드(00be4e3)로 찍은 1~24
 function undoR47Stage(st) {
   if (st.bossFloor) { st.elites.forEach((e, i) => { e.hp = st.bossFloor.base[i]; }); delete st.bossFloor; }
   st.spawns = st.spawns.filter((sp) => sp.kind !== 'bounty');
+  delete st.bounties;
   return st;
 }
 function undoR47Run(rp, row) {

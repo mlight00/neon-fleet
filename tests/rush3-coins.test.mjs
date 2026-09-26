@@ -14,7 +14,7 @@ import { createSave3, KEY3, WALLET_KEY, TAB_KEY, COIN_MAX, PAID_KEEP, normWallet
 import { createRenderer3, HUD_ROW, SAVE_WARN } from '../rush3/render.js';
 import { boot, HUD_BTN, TITLE_GRID, LOCK_NOTICE, ALL_CLEAR_LINE, unlockedThrough, causeLine, coinBreakdown } from '../rush3/main.js';
 import { ADVICE_DEFAULT } from '../rush3/advice.js';
-import { pickInput, weakenBosses } from './lib/rush3-policies.mjs';
+import { pickInput, weakenBosses, weakenBounties } from './lib/rush3-policies.mjs';
 import { seedOldClears } from './lib/rush3-unlock.mjs';
 
 const C = BAL3.colors;
@@ -27,7 +27,8 @@ function playEvents(id, policy, difficulty = 'brutal', maxSteps = 14400, opts = 
   const run = createRun(stage);
   const events = [];
   let n = 0;
-  while (!run.over && n < maxSteps) { if (opts.win) weakenBosses(run); stepRun(run, pickInput(policy, run), STEP); events.push(...drainEvents(run)); n++; }
+  //  opts.weakBounty = 현상금 적이 나오면 체력 1(weakenBounties — r4.7 현상금 적이 없던 판 흐름을 보는 검사용, 난이도와 무관)
+  while (!run.over && n < maxSteps) { if (opts.win) weakenBosses(run); if (opts.weakBounty) weakenBounties(run); stepRun(run, pickInput(policy, run), STEP); events.push(...drainEvents(run)); n++; }
   return { stage, run, events };
 }
 
@@ -130,8 +131,8 @@ test('COIN-1: 공식 P2 — V(s) = 24 + 2s, 일정 스폰 1마리 = V ÷ 일정 
   assert.equal(r.run.won, true, 'evLead + 보스 체력 1 = 이긴 판');
   const kills = r.events.filter((e) => e.type === 'kill');
   assert.equal(kills.filter((e) => !e.summoned).length, 26, '일정 스폰 26마리 처치(F 계산 예)');
-  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: true }), { enemy: 15, boss: 13, clear: 26, bonus: 0, total: 54 });
-  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: false }), { enemy: 15, boss: 13, clear: 5, bonus: 0, total: 33 });
+  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: true }), { enemy: 15, boss: 13, bounty: 0, clear: 26, bonus: 0, total: 54 });
+  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: false }), { enemy: 15, boss: 13, bounty: 0, clear: 5, bonus: 0, total: 33 });
   //  2번 evLead 패배 = 일정 스폰 10마리 × V(2) 28 ÷ 38 = 7.37 → 7(F '2번에서 한 번 지면 7코인')
   const r2 = playEvents(2, 'evLead');
   assert.equal(r2.run.won, false);
@@ -152,7 +153,8 @@ test('COIN-1: 공식 P2 — V(s) = 24 + 2s, 일정 스폰 1마리 = V ÷ 일정 
 
 test('COIN-2: 보스 소환 적은 0 코인 — kill 이벤트 summoned(도로 정예·광장 소환 모두), 일정 스폰 적 객체엔 표식 키가 없다, hpMax 는 스폰 체력', () => {
   //  10번(도로 정예 2체, 소환형 포함): evLead 는 소환 잡졸을 많이 잡는다 — 코인 셈은 소환 처치를 빼도 같아야 한다
-  const r = playEvents(10, 'evLead');
+  //  r4.7: 게임 줄 10번 현상금 적(z 7150)이 이 봇 부대를 덮으면 보스전이 짧아져 소환 처치가 줄어든다 — 나오면 체력 1(weakBounty, 검사 도구)
+  const r = playEvents(10, 'evLead', 'brutal', 14400, { weakBounty: true });
   const kills = r.events.filter((e) => e.type === 'kill');
   const summoned = kills.filter((e) => e.summoned === true), sched = kills.filter((e) => e.summoned === false);
   assert.ok(summoned.length > 50, '소환 잡졸 처치가 있다: ' + summoned.length);
@@ -170,6 +172,7 @@ test('COIN-2: 보스 소환 적은 0 코인 — kill 이벤트 summoned(도로 �
     let n = 0, mismatch = 0, checked = 0;
     while (!run.over && n < 14400) {
       const id0 = run.nextEnemyId;
+      weakenBounties(run);
       stepRun(run, pickInput('evLead', run), STEP); n++;
       const ev = drainEvents(run);
       let nSched = 0;
@@ -211,7 +214,7 @@ test('COIN-3: 부딪혀 사라진 적은 0 코인 — touch 이벤트의 적은 
 
 test('COIN-4: 개발용 판(devWeapon·proto3·?dev=1 로 연 잠긴 판)은 0 코인 — 공식·셸 모두, 지갑에 식별자도 남기지 않는다', async () => {
   const r = playEvents(1, 'evLead');
-  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: true, dev: true, bonusTier: 3 }), { enemy: 0, boss: 0, clear: 0, bonus: 0, total: 0 });
+  assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: true, dev: true, bonusTier: 3 }), { enemy: 0, boss: 0, bounty: 0, clear: 0, bonus: 0, total: 0 });
   //  셸: ?weapon= 개발 판 — 적을 잡고 포기해도 0, 지갑 불변. HUD 코인 칩도 없다(coins null)
   const h = await bootApp({ search: '?weapon=scatter' });
   h.app.startRun(1);

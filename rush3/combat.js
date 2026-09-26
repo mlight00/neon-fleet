@@ -55,6 +55,12 @@ export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY, hpMul = 1, difficu
     if (kind === 'shooter' && (m.shooterFireRate ?? 1) !== 1) e.shootEvery = d.shootEvery / m.shooterFireRate;
     out[kind] = Object.freeze(e);
   }
+  //  r4.7 현상금 적(BAL3.bounty — enemies 표 밖): 줄 칸 bounty 가 참인 줄(게임 화면 = brutal)에서만 표에 붙인다. hp 는 스폰 정의가 항상 명시(buildStage — firepower.bountyFloor).
+  //   touchDmg = 피해 풀 × 줄의 touchDmg 배수(반올림) · crush = 앞줄부터 풀을 나눠 뺀다(contacts) · 체력 비례 크기 없음(HP_BASE 에 없다 → r 그대로)
+  if (m.bounty) {
+    const B = BAL3.bounty;
+    out.bounty = Object.freeze({ r: B.r, vz: B.vz, track: B.track, touchDmg: Math.round(B.touchDmg * m.touchDmg), crush: true });
+  }
   return Object.freeze(out);
 }
 
@@ -518,7 +524,8 @@ function hitLook(t) {
 //  이벤트 arc {x,z,tx,tz} 는 연출 전용
 //  전격 기절(r3.31): 일반 적만(보스 kind 'elite' 제외). 남은 시간은 긴 쪽으로 — 연속으로 맞으면 계속 묶인다
 function stun(t, sec, ev) {
-  if (!sec || t.kind === 'elite' || t.dead) return;
+  //  r4.7 현상금 적도 제외 — 화면 기준으로 다가오는 적을 묶으면 제자리에 떠서 영영 닿지 않는다(체력 계산의 '닿기까지 시간'이 사라진다)
+  if (!sec || t.kind === 'elite' || t.kind === 'bounty' || t.dead) return;
   const was = t.stunT > 0;
   t.stunT = Math.max(t.stunT || 0, sec);
   if (!was) ev.push({ type: 'stun', id: t.id, x: t.x, z: t.z, sec });
@@ -596,6 +603,13 @@ function moveEnemies(run, ev, dt) {
     if (e.kind === 'grunt') {
       const want = run.x - e.x, mv = d.track * dt;
       e.x += Math.abs(want) <= mv ? want : Math.sign(want) * mv;
+    } else if (e.kind === 'bounty') {
+      //  r4.7 현상금 적: x 는 부대 중심을 track 속도로 따라가고(도로 안), z 는 이번 STEP 부대가 전진한 만큼 함께 간 뒤 아래 공통 줄에서 vz 만큼 다가온다
+      //   = 화면 기준 접근 속도 vz(부대 전진과 무관 — 보스전으로 스크롤이 멈춰도 같은 빠르기)
+      const want = run.x - e.x, mv = d.track * dt;
+      e.x += Math.abs(want) <= mv ? want : Math.sign(want) * mv;
+      e.x = clampNum(e.x, ROAD.x0 + e.r, ROAD.x1 - e.r);
+      e.z += run.z - run.prevZ;
     } else if (e.kind === 'rusher') {
       e.vz = Math.min(d.maxVz, e.vz + d.accel * dt);
     } else if (e.kind === 'shooter') {
@@ -809,6 +823,19 @@ function moveEshots(run, ev, dt) {
   }
 }
 
+//  r4.7 현상금 적 충돌: 풀(pool)을 hp > 0 유닛에 앞줄부터 나눠 뺀다(한 유닛 = 남은 체력만큼). 로봇이 차례가 되면 damageUnit 의 보호(heroGuard)가
+//   가장 가까운 호위에게 넘긴다 — 넘겨받아 쓰러진 호위는 뒤 차례에서 hp ≤ 0 이라 건너뛴다. 손실 원인 = 접촉(lossByTouch)
+function crush(run, e, pool, ev) {
+  const order = run.units.filter((u) => u.hp > 0).sort((a, b) => a.dy - b.dy || a.id - b.id);
+  for (const u of order) {
+    if (pool <= 0) break;
+    if (u.hp <= 0) continue;
+    const k = Math.min(pool, u.hp);
+    pool -= k;
+    damageUnit(run, u, k, 'touch', ev, e.x, e.z);
+  }
+}
+
 // 8단계 접촉: 잡졸·돌격체 스윕 vs 유닛 원 → 겹친 유닛 중 앞줄 1명, 적 소모(touched, kills 제외). 보스는 0.5s 타이머 접촉
 function contacts(run, ev, dt) {
   for (const e of run.enemies) {
@@ -817,9 +844,10 @@ function contacts(run, ev, dt) {
     if (!d.touchDmg) continue;
     const hits = overlappingUnits(run.units, e.x, e.z, e.r, { x: e.px, z: e.pz }, squadOrigin(run));
     if (!hits.length) continue;
-    const u = frontmostUnit(hits);
     e.touched = true; e.dead = true;
-    damageUnit(run, u, d.touchDmg, 'touch', ev, e.x, e.z);
+    //  r4.7 현상금 적(crush): 피해 풀 touchDmg 를 앞줄(dy 작은 순, 같으면 id 순)부터 병사 체력만큼 나눠 뺀다 — 병사 여러 명 손실. 그 밖의 적은 종전(겹친 앞줄 1명)
+    if (d.crush) crush(run, e, d.touchDmg, ev);
+    else damageUnit(run, frontmostUnit(hits), d.touchDmg, 'touch', ev, e.x, e.z);
     ev.push({ type: 'touch', id: e.id, kind: e.kind, x: e.x, z: e.z, skin: e.skin ?? null, r: e.r });
   }
   const E = run.enemyDefs.elite;
@@ -872,7 +900,8 @@ function cleanup(run, ev) {
   const behind = run.z - BAL3.cull.enemyBehind, ahead = run.z + LINE_Y + BAL3.cull.bulletAhead;
   run.enemies = run.enemies.filter((e) => {
     if (e.dead) {
-      if (!e.touched) { run.kills++; ev.push({ type: 'kill', id: e.id, kind: e.kind, x: e.x, z: e.z, skin: e.skin ?? null, r: e.r, hpMax: e.hpMax, summoned: !!e.summoned }); }
+      //  r4.7 현상금 적 처치 = bounty: true(희소 — 다른 적의 kill 이벤트에는 키가 없다). 셸의 코인 셈(coins.js 현상금 몫)이 읽는다
+      if (!e.touched) { run.kills++; ev.push({ type: 'kill', id: e.id, kind: e.kind, x: e.x, z: e.z, skin: e.skin ?? null, r: e.r, hpMax: e.hpMax, summoned: !!e.summoned, ...(e.kind === 'bounty' ? { bounty: true } : {}) }); }
       return false;
     }
     return e.z >= behind;

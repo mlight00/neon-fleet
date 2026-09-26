@@ -6,7 +6,7 @@ import { WEAPONS } from './weapons.js';
 import { formation } from './squad.js';
 import { CAPSULE_N_DEFAULT } from './supply.js';
 import { hashSeed, mulberry32 } from '../rush/rng.js';
-import { bossFloor } from './firepower.js';
+import { bossFloor, bountyFloor } from './firepower.js';
 
 //  STAGE_IDS = 검사·봇 실측·계약서 기준 코스(1~3, 코스 버전 2). ALL_STAGE_IDS = 셸(타이틀·다음 작전)이 보는 공개 목록 1~24(4~24 는 courses.js).
 export const STAGE_IDS = [1, 2, 3];
@@ -103,6 +103,8 @@ export const DEFS = {
       { z: 7000, kind: 'grunt', n: 8, xs: [94, 136, 178, 220, 262, 304, 346, 386], dz: [0, 0, 0, 0, 40, 40, 40, 40], corridorHw: null },
     ],
     elite: { z: 8200, hp: 220, summon: false },
+    //  r4.7 현상금 적(게임 화면 줄 brutal 에서만 — 배수 1 줄은 읽지 않는다, version 불변). 배치 규칙·체력 계산은 계약서 r4.7 (c)
+    bounties: [{ z: 5900, x: 240 }],
   },
   3: {
     version: 2, title: '군단', startUnits: 3, startWeapon: 'rifle', length: 11000, eliteZ: 10600,
@@ -149,6 +151,8 @@ export const DEFS = {
       { z: 8800, kind: 'shooter', n: 3, xs: [130, 240, 350], corridorHw: null },
     ],
     elite: { z: 10600, hp: 500, summon: true },
+    //  r4.7 현상금 적(게임 화면 줄 brutal 에서만, version 불변)
+    bounties: [{ z: 4100, x: 240 }],
   },
 };
 
@@ -453,6 +457,16 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     const f = bossFloor(stage);
     stage.elites.forEach((e, i) => { e.hp = f.hp[i]; });
     stage.bossFloor = { sec: f.sec, units: f.units, weapon: f.weapon, mk: f.mk, dps: f.dps, base: f.base, hp: f.hp, minSec: f.minSec };
+  }
+  //  r4.7 현상금 적(이사님 지시 2026-09-26 "체력이 특수한 높은 일반 적을 배치해서 … 끝까지 쏴야 깰 수 있는 긴장감 … 대신 코인 같은 보상"):
+  //   줄 표의 bounty 가 참인 줄(게임 화면 = brutal)에서만 판 정의의 bounties [{ z(발동 z), x }] 를 스폰 1체로 붙인다(물결·무리 수 배수 없음 — makeSpawn 을 거치지 않는다).
+  //   체력 = firepower.bountyFloor(그 z 까지의 상한 부대가 사거리 진입부터 닿기까지 줄 수 있는 피해 합 × 0.9). stage.bounties = 계산 내역(보고·검사용 — 규칙은 읽지 않는다)
+  if (mult.bounty && d.bounties && d.bounties.length) {
+    stage.bounties = d.bounties.map((b) => {
+      const f = bountyFloor(stage, b.z);
+      stage.spawns.push({ z: b.z, kind: 'bounty', n: 1, xs: [b.x], zs: [b.z + ENTER], corridorHw: null, hp: f.hp });
+      return { z: b.z, x: b.x, hp: f.hp, units: f.units, weapon: f.weapon, mk: f.mk, dmg: f.dmg, sec: f.sec };
+    });
   }
   stage.spawns.sort((a, b) => a.z - b.z);
   //  보너스 스테이지 불변식 guard(r3.15 검수 반영, 같은 계열의 빌드 시점 데이터 오류): stepBonus 는 셔터·통 이동·스폰·접촉을 부르지 않으므로

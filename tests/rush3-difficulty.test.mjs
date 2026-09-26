@@ -142,7 +142,8 @@ test('V3-DIFF DIFF-4: buildStage — 1~3 기준 코스는 정예 hp·잡졸 hp �
       //  r3.22 지옥 전용 추가 무리(DEFS[id].extraSpawns — r4.2 에서 brutalSpawns 이름만 바꿈)는 짝 비교에서 뺀다 — 이벤트 z·종류로 식별
       const extra = d === 'brutal' ? (DEFS[id].extraSpawns ?? []) : [];
       const isExtra = (x) => extra.some((e) => e.z === x.z && e.kind === x.kind);
-      const s = buildStage(id, { difficulty: d }).spawns.filter((x) => !(id === 3 && x.z === 8800 && x.kind === 'grunt') && !isExtra(x));
+      //  r4.7 현상금 적(kind 'bounty' — 게임 줄 전용 1체, V3-R47 BOUNTY)도 짝 비교에서 뺀다
+      const s = buildStage(id, { difficulty: d }).spawns.filter((x) => !(id === 3 && x.z === 8800 && x.kind === 'grunt') && !isExtra(x) && x.kind !== 'bounty');
       assert.equal(s.length, base.length, `S${id} ${d}: 무리 수 같음(지옥 전용 추가 무리 제외)`);
       assert.equal(buildStage(id, { difficulty: d }).spawns.filter(isExtra).length, extra.length, `S${id} ${d}: 지옥 전용 추가 무리 수`);
       for (let k = 0; k < base.length; k++) {
@@ -331,14 +332,14 @@ test('V3-SIM-DIFF SD-7 기록: 기본 줄(brutal) S1 — planBoss·evLead 모두
   }
 });
 
-test('V3-SIM-DIFF SD-8 기록: brutal S2·S3 는 실패를 허용하고 결과만 남긴다 — 다만 지더라도 정예전에서만 진다', (t) => {
+//  r4.7(이사님 지시 2026-09-26 "난이도는 너의 봇테스트로 하지 말도록"): 게임 줄에 현상금 적(부딪히면 병사 여러 명)이 들어와 봇이 보스 전에 질 수 있다 —
+//   '지더라도 정예전에서만 진다'(봇 결과로 판을 재는 잠금)는 풀고 판이 끝나는가만 잠근다. 결과는 기록만
+test('V3-SIM-DIFF SD-8 기록: brutal S2·S3 는 결과만 남긴다(판이 끝나는가만 잠금 — r4.7 부터 어디서 지는지는 기록만)', (t) => {
   for (const id of [2, 3]) {
     const r = BR('brutal', id), run = r.run;
     assert.equal(run.over, true, `brutal S${id} planBoss 가 끝나지 않음`);
     assert.ok(r.steps < 14400);
-    assert.equal(r.events.elite, 1, `brutal S${id} planBoss: 정예 등장까지 도달`);
-    if (!run.won) assert.ok(run.boss && run.units.length === 0, `brutal S${id} planBoss: 지더라도 정예전에서만 진다`);
-    t.diagnostic(`SIM-BOSS-RECORD brutal S${id} won=${run.won} units=${run.units.length} 정예잔여hp=${run.boss ? Math.ceil(run.boss.hp) : 0}`);
+    t.diagnostic(`SIM-BOSS-RECORD brutal S${id} won=${run.won} units=${run.units.length} 정예등장=${r.events.elite ?? 0} 정예잔여hp=${run.boss ? Math.ceil(run.boss.hp) : 0}`);
   }
   //  2026-09-20 재실측(r3.21 대항 검수 반영 = r3.9 와 같은 판): brutal S2 실패(정예 hp 1 잔존) · brutal S3 완주(66명). 완주 사실도 감추지 않고 기록한다.
   const b2 = BR('brutal', 2), b3 = BR('brutal', 3);

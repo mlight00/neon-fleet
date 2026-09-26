@@ -121,6 +121,17 @@ export const BAL3 = deepFreeze({
   //   상한 화력 = rush3/firepower.js(그 판을 가장 잘 했을 때 보스 앞 부대가 보스에 **실제로 닿는** 초당 피해 — 강화 0). 보스 여럿은 합으로, 비율 유지.
   //   이 숫자 하나만 바꾸면 24판 보스 체력이 함께 따라간다
   bossMinFightSec: 30,
+  //  현상금 적(r4.7 — 이사님 지시 2026-09-26 "체력이 특수한 높은 일반 적을 배치해서 내가 가진 최대의 무기로 끝까지 쏴야 깰 수 있는 긴장감을 주자.
+  //   대신 코인 같은 보상을 주자"). 게임 화면 줄(difficulty 표의 bounty 가 참인 줄 = brutal)에서만 판 정의의 bounties(z·x)로 나온다.
+  //  ⚠️enemies 에 넣지 않는다(enemies 는 kind 4종 표 — enemyDefsFor·HP_BASE·검사용 배수 1 줄 표가 그대로여야 한다). combat.enemyDefsFor 가 bounty 줄에서만 표에 붙인다.
+  //   r        판정·그림 반지름(px, 체력 비례 크기 없음 — 이 값 그대로. 잡졸 14 · 돌격체 18 · 저격수 22 보다 크다)
+  //   vz       **화면 기준** 접근 속도(px/s): 부대가 전진한 만큼 함께 가고 이 빠르기로만 다가온다(잡졸 화면 속도 214 의 약 60% — 천천히 내려온다).
+  //            배치 창(보급 통·게이트와 사선이 겹치지 않는 구간)이 24판 모두에 나오는 가장 느린 값으로 골랐다(계약서 r4.7 (c))
+  //   track    부대 중심 x 를 따라가는 속도(px/s, 부대 최고 250 보다 느리다 — 피하기만으로는 못 벗어나고 쏴서 잡아야 한다)
+  //   touchDmg 부딪혔을 때 **피해 풀**(× 줄의 touchDmg 배수 3 = 18): 앞줄(dy 작은 순)부터 병사 체력만큼 나눠 뺀다 — 체력 2 병사 약 9명.
+  //            부딪히면 적은 사라지고(코인 0 — 부딪혀 사라진 적 규칙 그대로) 손실은 접촉(lossByTouch)으로 센다
+  //   hpFactor 체력 = 사거리에 들어와서 부대에 닿기까지 **상한 화력으로 줄 수 있는 피해 합 × 이 값**(rush3/firepower.js bountyFloor — 상수 한 곳)
+  bounty: { label: '현상금', r: 34, vz: 130, track: 120, touchDmg: 6, hpFactor: 0.9 },
 
   elites: {
     laneHw: 32,
@@ -167,6 +178,7 @@ export const BAL3 = deepFreeze({
   //   bossShotDmg  (r4.7) 보스 탄 전용 배수 — 도로 정예(정예·포격 역할)와 광장 보스가 쏘는 탄 dmg = round(1 × eshotDmg × bossShotDmg). 저격수 탄·접촉·착지 충격은 그대로.
   //                이사님 지시(2026-09-26) "보스가 발사하는 탄환의 데미지를 1/3 정도 줄여주자" — 게임 줄 3 → 1(병사 체력 2 = 두 발에 쓰러짐. 3 → 2 는 여전히 한 발이라 체감 변화가 없다)
   //   bossFloor    (r4.7) 이 줄에서만 보스 체력을 max(지금 체력, BAL3.bossMinFightSec × 상한 화력)으로 올린다(buildStage — rush3/firepower.js)
+  //   bounty       (r4.7) 이 줄에서만 판 정의의 현상금 적(bounties)을 배치하고 적 표에 bounty 칸을 붙인다(BAL3.bounty — buildStage·enemyDefsFor)
   //  화면 이름(label·short)은 r4.2 에서 지웠다 — 어디에도 표시하지 않는다.
   difficulty: {
     //  r3.9(2026-09-18 이사 결정 2)는 위협을 **출현 빈도**로만 올렸다(enemyHp·eliteHp 1 고정). → **r3.21(2026-09-20 이사 결정 B안)로 뒤집음**:
@@ -174,12 +186,12 @@ export const BAL3 = deepFreeze({
     //   빈도 배수(waves·waveGap·spawnCount·eliteSummonRate)와 적탄·접촉 피해 배수는 r3.9 그대로 둔다. 스테이지 구간 배율(enemyHpByStage)은 여기에 곱해진다.
     //   ⚠️1~3 기준 코스(enemyHpByStage difficultyHp: ['brutal'])에서는 배수 1 줄의 enemyHp·eliteHp 가 ×1 이다(stages.buildStage·combat.createRun).
     normal: { id: 'normal', enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1, extraSpawns: false,
-              bossShotDmg: 1, bossFloor: false },
+              bossShotDmg: 1, bossFloor: false, bounty: false },
     //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다. brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반).
     //   지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
-    //   r4.7(이사님 실플레이 뒤 지시 2026-09-26 — 결정 D2′ '지옥 값 그대로'를 **보스 체력·보스 탄 피해·현상금 적에 한해** 푼다): bossShotDmg 1/3 · bossFloor true
+    //   r4.7(이사님 실플레이 뒤 지시 2026-09-26 — 결정 D2′ '지옥 값 그대로'를 **보스 체력·보스 탄 피해·현상금 적에 한해** 푼다): bossShotDmg 1/3 · bossFloor true · bounty true
     brutal: { id: 'brutal', enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2, extraSpawns: true,
-              bossShotDmg: 1 / 3, bossFloor: true },
+              bossShotDmg: 1 / 3, bossFloor: true, bounty: true },
   },
   //  적 체력 스테이지 배율(r3.21, 이사 결정 2026-09-20 B안 ①): 스테이지 번호 구간별 배수. 잡졸·돌격체·저격수(스폰 정의 hp 명시 포함)와
   //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).

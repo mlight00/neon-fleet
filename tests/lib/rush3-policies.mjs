@@ -194,6 +194,12 @@ export function weakenBosses(run, hp = 1) {
   for (const b of (run && run.bosses) || []) if (!b.dead && b.hp > hp) b.hp = hp;
 }
 
+//  r4.7 (c) 셸 흐름 검사 도구: 현상금 적이 나오면 체력을 hp 로 깎는다. 현상금 적(게임 줄 전용, 상한 부대 기준 체력)이 부대를 덮쳐
+//   병력이 크게 줄면 그 뒤를 보는 검사(랜덤 길 소리 등)가 그 자리까지 가지 못한다 — 규칙은 그대로 두고 run 의 값만 바꾼다(난이도와 무관)
+export function weakenBounties(run, hp = 1) {
+  for (const e of (run && run.enemies) || []) if (e.kind === 'bounty' && !e.dead && e.hp > hp) e.hp = hp;
+}
+
 //  무기 초당 dmg(화력 지수 계산용 — 생존 병력 × 이 값)
 export const DPS = { rifle: 2, auto: 4, heavy: 5 };
 
