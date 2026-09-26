@@ -7,10 +7,10 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox, ATK_LOOK, RAGE_COLOR } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox, ATK_LOOK, RAGE_COLOR, artBase3, BOSS_WRECK } from './render.js';
 import { UP_TRACKS, UP_MAX, UP_EFFECT, normUp, hasUp, nextCost, canBuy } from './meta.js';
 import { projectorFor, projectorMode } from './project.js';
-import { loadSprites3, sheetSec } from './sprites.js';
+import { loadSprites3, sheetSec, hitSheetKey3 } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
 import { adviceLine, ADVICE_DEFAULT } from './advice.js';
@@ -339,7 +339,9 @@ export function makeFx() {
            //  r4.4 메인 로봇 보호: beams = 피해 이전 빛줄기 [{ x0, y0, x1, y1, t, life }](만드는 시점에 투영한 화면 좌표, 로봇 → 대신 맞은 호위)
            beams: [],
            //  r4.8 보스 공격 폭발: atkBlasts = [{ kind 'pillar'|'burst', xs, w, x, z, R, color, t, life }](규칙 좌표 — 보스전은 카메라가 멈춰 있어 그릴 때 투영한다)
-           atkBlasts: [] };
+           atkBlasts: [],
+           //  r4.11 쓰러진 보스: bossWrecks = [{ x, z, r, skin, t, life }](규칙 좌표 — bossKill 이 넣고 렌더 drawBossWrecks 가 몸 시트 폭발 → 잔해 칸으로 그린다)
+           bossWrecks: [] };
 }
 
 //  r4.4 피해 이전 빛줄기 수명(초)·보호막이 깨질 때 조각 수
@@ -347,7 +349,9 @@ const BEAM_SEC = 0.3, SHIELD_SHARDS = 10;
 //  r4.9 (다) 광분 배너 글(한 어절 — 줄바꿈 없음)
 export const RAGE_TEXT = '광분!';
 //  r4.9 보스 광역 공격이 터지는 연출 길이(초 — render.drawAtkBlasts 가 이 동안 그린다). 열차 질주·철퇴 휩쓸기는 짧고 굵게, 매연·거미줄은 조금 오래
-const ATK_BLAST_SEC = Object.freeze({ smoke: 0.55, hook: 0.4, web: 0.6, rail: 0.32, crossrail: 0.32, pour: 0.4, rain: 0.3, mace: 0.3, quake: 0.4 });
+//  r4.11: 그림 시트(3~4칸)가 읽히게 늘렸다(종전 smoke 0.55 · hook 0.4 · web 0.6 · rail 0.32 · pour 0.4 · rain 0.3 · mace 0.3 · quake 0.4). 규칙과 무관한 연출 수명.
+//   레일 열차 질주는 렌더가 종전 길이(FX_ART.trainSec 0.32초)대로 달리고, 나머지 시간은 레일 자국 그림이 식어 간다
+const ATK_BLAST_SEC = Object.freeze({ smoke: 0.8, hook: 0.6, web: 0.7, rail: 0.7, crossrail: 0.7, pour: 0.5, rain: 0.5, mace: 0.45, quake: 0.6 });
 
 //  쓰러진 적 등록(kill·touch 공통). 규칙은 이미 enemies 에서 뺐으므로 위치만 셸이 기억한다.
 //  r3.24: 잡졸만이 아니라 모든 적 — kind·skin·r·역할(role)과 머무는 시간(life)을 싣는다. 잡졸 = 사망 시트 + 머묾, 나머지 = 역할별 deathSec
@@ -619,6 +623,8 @@ export function boot(canvas, deps = {}) {
 
   const ctx = canvas.getContext('2d');
   let state = 'title', run = null, renderer = null, buttons = [], fx = makeFx();
+  //  r4.11 불러온 그림 묶음(ready 뒤) — 보스 처치 연출이 몸 시트 유무를 본다(없으면 종전 섬광·다단 폭발)
+  let sprites = null;
   //  overT: 판 종료 뒤 결과 화면까지 남은 여운(초). -1 = 아직 종료를 보지 못함
   let overT = -1, result = null;
   //  notice(r4.3) = 스테이지 선택 화면에 잠깐 뜨는 안내 { text, t 남은 초 } | null — 잠긴 판을 불렀을 때 '앞 판을 먼저 깨야 합니다'
@@ -1013,11 +1019,16 @@ export function boot(canvas, deps = {}) {
           if (fx.heroFire <= 0 && fx.heroWalk >= FX.heroWalkMinSec) fx.heroFire = sheetSec('m1_fire');
           break;
         //  피격(r3.24 손맛): 모든 적 — 피격 상태(번쩍임·넉백·스쿼시·HP 튐)·무기별 스파크·'-n'.
-        //   잡졸 피격 시트(e_grunt_hit)는 종전대로 **그림이 잡졸(E1)인 잡졸**에만 겹친다(살아남은 경우만 — 죽으면 사망 시트가 대신한다)
-        case 'enemyHit':
+        //   피격 시트는 살아남은 경우만(죽으면 사망 연출이 대신한다). 잡졸(E1) = 종전 12칸 e_grunt_hit(맞을 때마다 처음부터) ·
+        //   r4.11 그 밖의 적 = 그 그림의 피격 시트 hs:<그림>(sprites.hitSheetKey3 — 없으면 켜지 않는다). 연사에 매번 처음으로 돌아가면 섬광 칸에만
+        //   머물러 보이므로 **도는 동안은 다시 켜지 않는다**(끝나면 다음 탄에 다시 — 맞는 동안 튕김이 박자 있게 되풀이된다)
+        case 'enemyHit': {
           onEnemyHit(fx, ev, sp);
-          if (ev.kind === 'grunt' && !ev.skin && ev.hp > 0) fx.enemyHit[ev.id] = sheetSec('e_grunt_hit');
+          const hk = ev.hp > 0 && ev.kind !== 'elite' ? hitSheetKey3(artBase3(ev.kind, ev.skin)) : null;
+          if (hk === 'e_grunt_hit') fx.enemyHit[ev.id] = sheetSec(hk);
+          else if (hk && !(fx.enemyHit[ev.id] > 0)) fx.enemyHit[ev.id] = sheetSec(hk);
           break;
+        }
         case 'supplyHit': fx.sfx.push(['crateHit']); break;
         case 'supplyOpen': {
           const q = sp(ev.x, ev.z), y = q.y;
@@ -1177,11 +1188,20 @@ export function boot(canvas, deps = {}) {
           break;
         //  정예 처치: 파편·흔들림은 매번, 효과음은 마지막(left 0)이면 승리음, 아니면 처치음. 남은 목표 배너는 bossesLeft 가 세운다
         //  r3.24: 처치 순간 큰 폭발 + 0.6초에 걸친 다단 폭발(onBossDeath 예약 → tickHitFx)
-        case 'bossKill':
-          burstAt(ev.x, ev.z, ev.r, true); onBossDeath(fx, ev); fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']);
+        case 'bossKill': {
+          //  r4.11 파괴 그림: 보스 = 몸 시트 폭발 → 잔해(fx.bossWrecks) · 중간 보스 = 그 판 일반 적 그림(look)의 쓰러진 모습(addCorpse — 크기는 중간 보스 반지름).
+          //   보스 몸 시트가 불러와져 있으면 종전 큰 섬광 원·다단 폭발(코드 도형)을 쓰지 않는다 — 폭발 그림을 덮어 가렸다(2026-09-27 캡처). 파편만 작게
+          const bo = run.bosses.find((b) => b.id === ev.id);
+          const wreckArt = !(bo && bo.mid) && sprites && typeof sprites.sheet === 'function' ? sprites.sheet('bd:' + artBase3('elite', ev.skin)) : null;
+          if (wreckArt) { delete fx.hit[ev.id]; burstAt(ev.x, ev.z, ev.r * 0.35, false, C.bulletHeavy); }
+          else { burstAt(ev.x, ev.z, ev.r, true); onBossDeath(fx, ev); }
+          fx.shakeT = FX.shakeDur; fx.sfx.push([(ev.left ?? 0) === 0 ? 'win' : 'kill']);
+          if (bo && bo.mid) { const look = bo.look || { kind: 'grunt' }; addCorpse(fx, { x: ev.x, z: ev.z, r: ev.r, id: ev.id, kind: look.kind, skin: look.skin ?? null }); }
+          else if (fx.bossWrecks) fx.bossWrecks.push({ x: ev.x, z: ev.z, r: ev.r, skin: ev.skin ?? null, t: 0, life: BOSS_WRECK.lifeSec });
           //  r4.3: 보스 처치 때만 '+코인' 글자(일반 적 처치마다는 띄우지 않는다). 값 = 보스 1체 몫(V × 0.5 ÷ 보스 수)의 반올림
           if (coin && !run.devWeapon && coin.tally.perBoss > 0) floaterAt(ev.x, ev.z, -60, '+' + Math.round(coin.tally.perBoss) + ' 코인', C.gold, true);
           break;
+        }
         case 'bossesLeft':
           if (ev.left > 0) { fx.bossBannerText = '정예 ' + (ev.index + 1) + ' 격파 — 남은 목표 ' + ev.left; fx.bossBannerT = FX.bossKillBannerSec; }
           break;
@@ -1293,6 +1313,7 @@ export function boot(canvas, deps = {}) {
     for (const b of fx.beams) b.t += dt;
     fx.beams = fx.beams.filter((b) => b.t < b.life);
     if (fx.atkBlasts) { for (const b of fx.atkBlasts) b.t += dt; fx.atkBlasts = fx.atkBlasts.filter((b) => b.t < b.life); }
+    if (fx.bossWrecks) { for (const w of fx.bossWrecks) w.t += dt; fx.bossWrecks = fx.bossWrecks.filter((w) => w.t < w.life); }
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
     //  동작 시트 타이머: 사격이 끝나면 걷기 시간을 다시 센다 · 피격은 0 이하 삭제 · 쓰러진 잡졸은 재생+머묾이 끝나면 지운다
     fx.heroFire = Math.max(0, fx.heroFire - dt);
@@ -1657,6 +1678,7 @@ export function boot(canvas, deps = {}) {
   fitCanvas();
   const base = deps.spriteBase ?? 'assets/rush/';
   const ready = Promise.resolve(deps.sprites ?? loadSprites3(base)).then((sp) => {
+    sprites = sp;
     renderer = createRenderer3(ctx, sp);
     raf(frame);
   });

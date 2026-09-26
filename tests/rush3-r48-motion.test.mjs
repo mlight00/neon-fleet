@@ -62,18 +62,20 @@ test('MOTION-1: 움직임 표 — 다리 달린 적 = 걷기(E1·E3·E8) · 바�
   for (const id of ALL_STAGE_IDS) for (const row of ['normal', 'brutal']) for (const sp of buildStage(id, { difficulty: row }).spawns) if (sp.kind !== 'bounty') used.add(artBase3(sp.kind, sp.skin));
   for (const a of used) assert.ok(ENEMY_MOTION[a], a + ' 움직임 종류');
   for (const a of ENEMY_ART3.filter((n) => n.startsWith('B'))) assert.equal(ENEMY_MOTION[a], undefined, a + ' 보스는 움직임 표 밖');
-  //  걷기 시트 자리(파일은 아직 없다 — 들어오면 코드 움직임 대신 쓴다). 파일이 없는 동안(pending)은 불러오지 않는다 — 콘솔 404 없음
+  //  걷기 시트(r4.8 자리 → r4.11 파일 반입, 8칸 한 주기): 들어왔으므로 pending 이 아니다(불러온다)
   assert.equal(SHEETS3.e_grunt_walk.file, 'E1_walk');
-  assert.equal(SHEETS3.e_grunt_walk.pending, true);
+  assert.equal(SHEETS3.e_grunt_walk.pending, undefined);
+  assert.equal(SHEETS3.e_grunt_walk.frames, 8);
 });
 
-test('MOTION-1b: 그림 불러오기 — 파일이 아직 없는 걷기 시트 자리(pending)는 요청하지 않는다(나머지 시트는 그대로 요청)', async () => {
+test('MOTION-1b: 그림 불러오기 — r4.11 부터 걷기 시트(E1_walk)도 요청한다 · pending 표시가 남은 자리는 요청하지 않는다(나머지 시트는 그대로 요청)', async () => {
   const requested = [];
   globalThis.Image = class { set src(v) { requested.push(v); setTimeout(() => this.onerror && this.onerror(), 0); } };
   try {
     await loadSprites3('assets/rush/', 'assets/rush3/');
   } finally { delete globalThis.Image; }
-  assert.ok(!requested.some((s) => s.includes('E1_walk')), '걷기 시트 자리는 요청하지 않는다');
+  assert.ok(requested.some((s) => s.includes('E1_walk')), '걷기 시트는 이제 요청한다(파일 반입)');
+  for (const [k, m] of Object.entries(SHEETS3)) if (m.pending) assert.ok(!requested.some((s) => s.endsWith('/' + m.file + '.png')), k + ' pending 자리는 요청하지 않는다');
   assert.ok(requested.some((s) => s.includes('E1_hit')) && requested.some((s) => s.includes('E1_death')), '다른 시트는 그대로');
 });
 

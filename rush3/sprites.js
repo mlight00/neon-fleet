@@ -51,12 +51,58 @@ export const SHEETS3 = Object.freeze({
   soldier_fire_heavy: Object.freeze({ file: 'SOLDIER_heavy_fire', cols: 8, frames: 8, fw: 251, fh: 327, fps: 12, loop: true, refH: 264 }),
   e_grunt_hit:   Object.freeze({ file: 'E1_hit',    cols: 6, frames: 12, fw: 244, fh: 255, fps: 24, loop: false, refH: 200 }),
   e_grunt_death: Object.freeze({ file: 'E1_death',  cols: 6, frames: 12, fw: 365, fh: 294, fps: 12, loop: false, refH: 200 }),
-  //  r4.8 걷기 동작 시트 **자리**(이사님 지시 2026-09-26 "적들이 걸어서 내려오는 듯한 스프라이트도 추가하자") — 파일은 아직 없다(그림 제작은 따로).
-  //   assets/rush3/E1_walk.png 가 들어오면 render.drawEnemy 가 코드 움직임(enemyMotionPose) 대신 이 시트를 쓴다(칸 = 걸음 박자 — 두 걸음에 시트 한 바퀴, fps 는 쓰지 않는다).
-  //   pending: true = 파일이 아직 없어 **불러오지 않는다**(없는 파일을 매번 요청하면 브라우저 콘솔에 404 오류가 남는다) — 그동안은 코드 움직임.
-  //   ⚠️파일을 넣을 때: ① pending 을 지운다 ② cols·frames·fw·fh·refH 를 그 시트에 맞춰 고친다(지금 값은 같은 잡졸의 피격 시트 E1_hit 꼴 — 자리값)
-  e_grunt_walk:  Object.freeze({ file: 'E1_walk',   cols: 6, frames: 12, fw: 244, fh: 255, fps: 12, loop: true,  refH: 200, pending: true }),
+  //  r4.8 걷기 동작 시트 자리(이사님 지시 2026-09-26 "적들이 걸어서 내려오는 듯한 스프라이트도 추가하자") → r4.11 파일 반입(2026-09-27 Gemini v9, 8칸 한 주기).
+  //   render.drawEnemy 가 코드 움직임(enemyMotionPose) 대신 이 시트를 쓴다(칸 = 걸음 박자 — 두 걸음에 시트 한 바퀴, fps 는 쓰지 않는다).
+  //   pending: true 인 자리는 불러오지 않는다(파일이 없을 때 콘솔 404 방지 — 지금은 쓰는 곳 없음)
+  e_grunt_walk:  Object.freeze({ file: 'E1_walk',   cols: 8, frames: 8,  fw: 209, fh: 200, fps: 12, loop: true,  refH: 188.8, oy: -0.014 }),
+  //  ── r4.11 그림 시트(2026-09-27 Gemini v9 — 이사님 지시 2026-09-26 "보스 광역 대미지 그래픽도 코드로 그리지 말고 이미지를 만들어서 사용하자.
+  //   그리고 보스의 피격시, 파괴 시 이미지와 일반 적들의 걸어오는 모습등과 피격등 모든 이미지들을 스프라이트로 만들자").
+  //   refH·ox·oy = 정지 그림(assets/rush/<그림>.png)과 몸 높이·몸 가운데가 같게 맞춘 값(newmode/sprites/v9/measure_fit.py 실측) —
+  //   ox·oy 는 몸 높이 h 에 대한 비율로, 칸 가운데를 정지 그림 가운데로 옮긴다. 파일이 없으면 null → 종전 정지 그림·코드 연출(폴백)
+  //  적 움직임 시트 mv:<그림>(칸 = 걸음·바퀴 박자 — 규칙 거리로 고른다). E1 잡졸은 위 e_grunt_walk. E5 굴러오기는 시트를 쓰지 않는다(코드 회전)
+  'mv:E3_wallguard':  Object.freeze({ file: 'E3_walk',  cols: 4, frames: 4, fw: 165, fh: 256, fps: 8, loop: true, refH: 217.0, ox: 0.001, oy: -0.081 }),
+  'mv:E2_ramhound':   Object.freeze({ file: 'E2_drive', cols: 4, frames: 4, fw: 256, fh: 225, fps: 8, loop: true, refH: 205.2, ox: 0.001, oy: -0.029 }),
+  'mv:E7_cartyard':   Object.freeze({ file: 'E7_drive', cols: 4, frames: 4, fw: 269, fh: 256, fps: 8, loop: true, refH: 248.0, oy: -0.004 }),
+  //  적 피격 시트 hs:<그림>([맞음(섬광) · 튕김 · 평상] — 맞자마자 섬광이 보이게 첫 평상 칸은 뺐다). E8 = [섬광 · 평상] · E10 = [젖혀짐 · 평상](둘째 칸이 잘려 나와 못 씀).
+  //   E1 잡졸은 종전 12칸 e_grunt_hit. E3 장갑체는 걷기 시트와 몸 비율이 달라(맞을 때마다 모습이 바뀌어 보인다) 피격 시트를 쓰지 않는다(코드 번쩍임)
+  'hs:E2_ramhound':      Object.freeze({ file: 'E2_hitsheet',  cols: 3, frames: 3, fw: 269, fh: 256, fps: 14, loop: false, refH: 236.0, ox: 0.002, oy: -0.025 }),
+  'hs:E4_needleeye':     Object.freeze({ file: 'E4_hitsheet',  cols: 3, frames: 3, fw: 169, fh: 256, fps: 14, loop: false, refH: 243.0, ox: 0.022, oy: -0.019 }),
+  'hs:E5_wheeler':       Object.freeze({ file: 'E5_hitsheet',  cols: 3, frames: 3, fw: 198, fh: 256, fps: 14, loop: false, refH: 247.0, oy: -0.006 }),
+  'hs:E6_signaler':      Object.freeze({ file: 'E6_hitsheet',  cols: 3, frames: 3, fw: 204, fh: 256, fps: 14, loop: false, refH: 248.0, ox: 0.002 }),
+  'hs:E7_cartyard':      Object.freeze({ file: 'E7_hitsheet',  cols: 3, frames: 3, fw: 251, fh: 256, fps: 14, loop: false, refH: 244.0, oy: -0.008 }),
+  'hs:E8_manholejumper': Object.freeze({ file: 'E8_hitsheet',  cols: 2, frames: 2, fw: 236, fh: 256, fps: 10, loop: false, refH: 250.0, oy: -0.004 }),
+  'hs:E9_spawnpod':      Object.freeze({ file: 'E9_hitsheet',  cols: 3, frames: 3, fw: 230, fh: 254, fps: 14, loop: false, refH: 254.9, ox: 0.002, oy: 0.018 }),
+  'hs:E10_magnethead':   Object.freeze({ file: 'E10_hitsheet', cols: 2, frames: 2, fw: 180, fh: 256, fps: 10, loop: false, refH: 250.0 }),
+  //  보스 몸 시트 bd:<그림>([평상 · 맞음 · 폭발 · 잔해]). 보스는 시트가 있으면 **몸 전체를 시트로** 그린다(평상 = 0칸) — 정지 그림과 섞으면
+  //   맞을 때마다 두 그림이 번갈아 깜빡여 보인다(B3 은 몸 모양이 조금 다르다). 파괴 = 셸 fx.bossWrecks 가 2 → 3칸
+  'bd:B1_grader':        Object.freeze({ file: 'B1_grader_hitdie',        cols: 4, frames: 4, fw: 245, fh: 239, fps: 8, loop: false, refH: 215.2, ox: -0.002, oy: -0.056 }),
+  'bd:B2_gantrywidow':   Object.freeze({ file: 'B2_gantrywidow_hitdie',   cols: 4, frames: 4, fw: 271, fh: 256, fps: 8, loop: false, refH: 250.0 }),
+  'bd:B3_railleviathan': Object.freeze({ file: 'B3_railleviathan_hitdie', cols: 4, frames: 4, fw: 141, fh: 256, fps: 8, loop: false, refH: 230.0, oy: -0.048 }),
+  'bd:B4_smelter':       Object.freeze({ file: 'B4_smelter_hitdie',       cols: 4, frames: 4, fw: 236, fh: 256, fps: 8, loop: false, refH: 233.0, oy: -0.036 }),
+  'bd:B5_crownbreaker':  Object.freeze({ file: 'B5_crownbreaker_hitdie',  cols: 4, frames: 4, fw: 279, fh: 256, fps: 8, loop: false, refH: 248.0, oy: 0.008 }),
+  //  보스 광역 효과 시트 fx:<공격 종류>(위에서 본 모습 — 칸은 터짐 진행도로 고른다, fps 는 쓰지 않는다). 칸 가운데 = 효과 가운데
+  //   (철퇴 mace 만 칸 아래 가운데 = 부채꼴 꼭짓점, 위로 펼쳐진다 · 충격파 quake 는 끊긴 틈이 칸 위쪽 · 레일 rail 은 세로 띠)
+  'fx:smoke': Object.freeze({ file: 'fx_b1_smoke', cols: 4, frames: 4, fw: 263, fh: 256, fps: 8, loop: false, refH: 256 }),
+  'fx:hook':  Object.freeze({ file: 'fx_b2_hook',  cols: 4, frames: 4, fw: 248, fh: 226, fps: 8, loop: false, refH: 226 }),
+  'fx:web':   Object.freeze({ file: 'fx_b2_web',   cols: 3, frames: 3, fw: 237, fh: 256, fps: 8, loop: false, refH: 256 }),
+  'fx:rail':  Object.freeze({ file: 'fx_b3_rail',  cols: 3, frames: 3, fw: 129, fh: 384, fps: 8, loop: false, refH: 384 }),
+  'fx:pour':  Object.freeze({ file: 'fx_b4_pool',  cols: 3, frames: 3, fw: 278, fh: 256, fps: 8, loop: false, refH: 256 }),
+  'fx:rain':  Object.freeze({ file: 'fx_b4_rain',  cols: 4, frames: 4, fw: 224, fh: 216, fps: 8, loop: false, refH: 216 }),
+  'fx:mace':  Object.freeze({ file: 'fx_b5_mace',  cols: 3, frames: 3, fw: 246, fh: 256, fps: 8, loop: false, refH: 256 }),
+  'fx:quake': Object.freeze({ file: 'fx_b5_quake', cols: 4, frames: 4, fw: 243, fh: 224, fps: 8, loop: false, refH: 224 }),
 });
+//  r4.11 적 피격 시트 키: 그림(artBase3) → SHEETS3 키 | null. E1 잡졸 = 종전 12칸 e_grunt_hit, 나머지 = hs:<그림>(없으면 null — 코드 번쩍임만)
+export function hitSheetKey3(art) {
+  if (!art) return null;
+  if (art === 'E1_scrapbit') return 'e_grunt_hit';
+  return SHEETS3['hs:' + art] ? 'hs:' + art : null;
+}
+//  r4.11 적 움직임 시트 키: 그림 → SHEETS3 키 | null(E1 = e_grunt_walk · 나머지 = mv:<그림>)
+export function moveSheetKey3(art) {
+  if (!art) return null;
+  if (art === 'E1_scrapbit') return 'e_grunt_walk';
+  return SHEETS3['mv:' + art] ? 'mv:' + art : null;
+}
 export const SHEET_BASE3 = 'assets/rush3/';
 //  무기 아이콘(2026-09-19 Gemini 생성, 이미지프롬프트_v5): 6종 × Mk I~III, 옆모습·투명. HUD 칩·보급 통 내용물이 쓴다.
 //  규칙에는 아직 강화 단계(Mk)가 없으므로 렌더는 mk 1 을 기본으로 읽는다. 없으면 종전 도형 폴백.

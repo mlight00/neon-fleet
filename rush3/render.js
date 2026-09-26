@@ -6,6 +6,7 @@ import { BAL3 } from './balance.js';
 import { PERSPECTIVE, projectorFor, projectorMode } from './project.js';
 import { WEAPONS } from './weapons.js';
 import { gateColor, gateLabel } from './gates.js';
+import { hitSheetKey3, moveSheetKey3 } from './sprites.js';
 
 const W = BAL3.view.w, H = BAL3.view.h, LINE_Y = BAL3.view.LINE_Y;
 //  병력 수 글(부대 중심 마커 옆, 수정 라운드 2): 마커에서 COUNT_DX 떨어져 쓰고, 마커 x 가 COUNT_FLIP_X 를 넘으면 왼쪽에 쓴다(세 자리 26px ≈ 46px 가 화면 밖으로 안 나가게)
@@ -44,9 +45,11 @@ export const WALK = Object.freeze({ stride: 60, bob: 2.6, tilt: 4 * Math.PI / 18
 export const ROLL = Object.freeze({ bob: 1.4, dust: 3 });
 //  다가온 거리의 기준(그림 위상에만 쓰는 상수 — 양수로 두려고)
 const MOTION_REF = 2000;
+//  r4.11 차 달리기 시트(E2·E7) 한 바퀴 = 다가온 거리 60px(바퀴 구르기·덜컹임 한 주기). 걷기 시트는 두 걸음에 한 바퀴(cyc = steps ÷ 2)
+export const DRIVE_CYCLE = 60;
 
 /** 적 한 기의 움직임 자세(순수 — 규칙 run·적 e 는 읽기만). hitK = 피격 반응 중이면 WALK.hitDamp(흔들림을 줄인다), 아니면 1.
- *  반환 { kind, steps(걸음 수), bob(px — 배율 전), tilt(라디안), sx·sy(눌림), spin(라디안 — 바퀴), dust(흙먼지 세기 0~1) } | null(움직임 없는 적·기절) */
+ *  반환 { kind, steps(걸음 수), cyc(r4.11 움직임 시트 바퀴 수 — 소수부 = 시트 칸 위치), bob(px — 배율 전), tilt(라디안), sx·sy(눌림), spin(라디안 — 바퀴), dust(흙먼지 세기 0~1) } | null(움직임 없는 적·기절) */
 export function enemyMotionPose(e, run, hitK = 1) {
   const kind = ENEMY_MOTION[artBase3(e.kind, e.skin)] ?? null;
   if (!kind || e.stunT > 0) return null;
@@ -56,18 +59,18 @@ export function enemyMotionPose(e, run, hitK = 1) {
     const steps = travel / WALK.stride + ph;
     const s = Math.sin(Math.PI * steps);
     const lift = Math.abs(s), land = Math.pow(1 - lift, 3);
-    return { kind, steps, bob: WALK.bob * lift * hitK, tilt: WALK.tilt * s * hitK, sx: 1 + WALK.squash * land * hitK, sy: 1 - WALK.squash * land * hitK, spin: 0, dust: 0 };
+    return { kind, steps, cyc: steps / 2, bob: WALK.bob * lift * hitK, tilt: WALK.tilt * s * hitK, sx: 1 + WALK.squash * land * hitK, sy: 1 - WALK.squash * land * hitK, spin: 0, dust: 0 };
   }
   if (kind === 'roll') {
     const spin = travel / e.r;
-    return { kind, steps: 0, bob: ROLL.bob * Math.abs(Math.sin(spin * 2)), tilt: 0, sx: 1, sy: 1, spin, dust: 1 };
+    return { kind, steps: 0, cyc: 0, bob: ROLL.bob * Math.abs(Math.sin(spin * 2)), tilt: 0, sx: 1, sy: 1, spin, dust: 1 };
   }
   if (kind === 'drive') {
     const v = travel / 9 + ph;
-    return { kind, steps: 0, bob: Math.abs(Math.sin(v)) * hitK, tilt: 0.022 * Math.sin(v * 0.5) * hitK, sx: 1, sy: 1, spin: 0, dust: 0.7 };
+    return { kind, steps: 0, cyc: travel / DRIVE_CYCLE + ph / 2, bob: Math.abs(Math.sin(v)) * hitK, tilt: 0.022 * Math.sin(v * 0.5) * hitK, sx: 1, sy: 1, spin: 0, dust: 0.7 };
   }
   const t = (run.time || 0) * 2.2 + e.id * 0.9;
-  return { kind, steps: 0, bob: 1.6 * (0.5 + 0.5 * Math.sin(t)), tilt: 0, sx: 1 - 0.015 * Math.sin(t), sy: 1 + 0.025 * Math.sin(t), spin: 0, dust: 0 };
+  return { kind, steps: 0, cyc: 0, bob: 1.6 * (0.5 + 0.5 * Math.sin(t)), tilt: 0, sx: 1 - 0.015 * Math.sin(t), sy: 1 + 0.025 * Math.sin(t), spin: 0, dust: 0 };
 }
 //  사격 개시선 옆 안내(계약서 6장 N2-⑤). ⚠️선을 넘는 주체는 **게이트**다 — 플레이어가 넘는다는 뜻으로 읽히면
 //   벽의 통로 확정선과 헷갈린다(2026-09-17 2차 검수 N2-④).
@@ -186,6 +189,13 @@ export const ATK_LOOK = Object.freeze({
 export const ATK_FX = Object.freeze({
   smoke: '#5E5A57', flame: '#FF9A3D', steel: '#B9C2CC', web: '#F2F4FF', train: '#5A1E24', window: '#FFD27A', molten: '#FF7A2A', gold: '#FFD447',
 });
+//  r4.11 보스 광역 효과 그림(fx:<종류> 시트 — 이사님 지시 2026-09-26 "보스 광역 대미지 그래픽도 코드로 그리지 말고 이미지를 만들어서 사용하자").
+//   시트가 있으면 터짐·남는 웅덩이·그물·레일 자국을 그림으로, 없으면 종전 코드 연출(폴백). 붉은 경보 구역은 그대로 코드(한눈에 '피해 구역').
+//   그림 크기 = 구역 크기 × 배수: circ(원 지름 2R) · ring(충격파 바깥 지름 2(R+th)) · pool(남는 쇳물) · rect(그물 사각) · rail(레일 띠 폭 = 줄 반폭 r × 2) · mace(부채꼴 반지름).
+//   maceHalf = 철퇴 그림 속 부채꼴의 반각(약 33° — 실제 부채꼴 반각에 맞춰 가로로 늘이고 줄인다) · trainSec = 레일 열차 질주 길이(종전 레일 연출 수명 그대로)
+export const FX_ART = Object.freeze({ circ: 1.2, ring: 1.15, pool: 1.12, rect: 1.1, rail: 1.3, mace: 1.05, maceHalf: 33 * Math.PI / 180, trainSec: 0.32 });
+//  r4.11 쓰러진 보스(셸 fx.bossWrecks — bossKill 이 넣는다): 몸 시트 폭발 칸(2)을 boomSec, 잔해 칸(3)을 lifeSec 까지, 마지막 fadeSec 에 흐려진다
+export const BOSS_WRECK = Object.freeze({ boomSec: 0.5, lifeSec: 2.6, fadeSec: 0.7 });
 
 //  r4.5 강화 화면(새 상태 'upgrade', 원본 v4 3-5 '강화 화면')의 **자리표 단일 출처** — 셸(main.js)의 [구매]·[돌아가기] 히트 상자가 이 표에서 나온다
 //   (HUD_ROW 와 같은 원칙: 그리는 자리와 누르는 자리가 갈라지지 않게 좌표를 두 곳에 적지 않는다). 480×800 기준.
@@ -241,10 +251,27 @@ export function createRenderer3(ctx, sprites) {
     const f = Math.max(0, Math.min(sh.frames - 1, Math.floor(frame)));
     const sx = (f % sh.cols) * sh.fw, sy0 = Math.floor(f / sh.cols) * sh.fh;
     const k = bodyH / sh.refH, dw = sh.fw * k, dh = sh.fh * k;
+    //  r4.11 ox·oy(몸 높이 비율): 칸 가운데를 정지 그림 가운데로 옮긴다(시트와 정지 그림의 몸 자리가 같게 — 없으면 0)
+    const cx = x + (sh.ox || 0) * bodyH, cy = y + (sh.oy || 0) * bodyH;
     //  alt = 같은 시트의 흰 실루엣(whiteOf) — 원본 대비 축척 a.k 로 같은 칸을 잘라 같은 자리에 찍는다
-    if (alt) ctx.drawImage(alt.c, sx * alt.k, sy0 * alt.k, sh.fw * alt.k, sh.fh * alt.k, x - dw / 2, y - dh / 2, dw, dh);
-    else ctx.drawImage(sh.img, sx, sy0, sh.fw, sh.fh, x - dw / 2, y - dh / 2, dw, dh);
+    if (alt) ctx.drawImage(alt.c, sx * alt.k, sy0 * alt.k, sh.fw * alt.k, sh.fh * alt.k, cx - dw / 2, cy - dh / 2, dw, dh);
+    else ctx.drawImage(sh.img, sx, sy0, sh.fw, sh.fh, cx - dw / 2, cy - dh / 2, dw, dh);
   }
+  //  r4.11 효과 시트 한 칸(보스 광역 효과): 기준점 (cx, cy)·폭 w·높이 h·회전 rot(라디안)·불투명도 a.
+  //   bottom = 기준점이 칸 아래 가운데(철퇴 부채꼴 꼭짓점), 아니면 칸 가운데. 호출부 상태(globalAlpha 등)는 save/restore 로 지킨다
+  function drawFxCell(sh, frame, cx, cy, w, h, rot = 0, a = 1, bottom = false) {
+    if (!(a > 0) || !(w > 0) || !(h > 0)) return;
+    const f = Math.max(0, Math.min(sh.frames - 1, Math.floor(frame)));
+    const sx = (f % sh.cols) * sh.fw, sy0 = Math.floor(f / sh.cols) * sh.fh;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a);
+    ctx.translate(cx, cy);
+    if (rot) ctx.rotate(rot);
+    ctx.drawImage(sh.img, sx, sy0, sh.fw, sh.fh, -w / 2, bottom ? -h : -h / 2, w, h);
+    ctx.restore();
+  }
+  //  진행도 k(0~1) → 칸 번호(0 … frames−1)
+  const fxFrameAt = (sh, k) => Math.min(sh.frames - 1, Math.max(0, Math.floor(k * sh.frames)));
   //  피격 번쩍임용 흰 실루엣(r3.24): 그림 모양 그대로 흰색으로 칠한 사본을 그림마다 한 번만 만든다(작업 캔버스에 그림 → source-in 흰 채움).
   //   ⚠️본 캔버스에서 source-atop 을 쓰면 배경이 불투명이라 도로까지 하얘진다 — 그래서 사본을 만든다. 긴 변 maxPx 로 줄여 메모리를 아낀다.
   //   DOM 이 없는 환경(Node 검사)·그림이 아직 없으면 null → 호출부가 도형 폴백에 흰 채움으로 번쩍인다
@@ -1139,24 +1166,28 @@ export function createRenderer3(ctx, sprites) {
     //  r4.8 움직임(걷기·굴러오기·차 떨림·숨쉬기 — enemyMotionPose): 역시 그림에만. 피격 반응 중이면 걷기 흔들림을 줄인다
     const mo = enemyMotionPose(e, run, hr ? WALK.hitDamp : 1);
     if (mo && mo.dust) drawDust(mo, x, y, h, k, e.id);
-    //  피격 중인 잡졸(셸 fx.enemyHit[id] 남은 초)은 피격 시트를 한 번 재생한다
+    //  피격 시트(셸 fx.enemyHit[id] 남은 초 — 셸은 그 적 그림의 피격 시트가 있을 때만 켠다)를 한 번 재생한다.
+    //   r4.11: E1 잡졸 = 종전 12칸 e_grunt_hit · 그 밖 = hs:<그림>(E2·E4~E10 — sprites.hitSheetKey3)
+    const artB = artBase3(e.kind, e.skin);
     const hitLeft = fx && fx.enemyHit ? (fx.enemyHit[e.id] ?? 0) : 0;
-    const hitSh = e.kind === 'grunt' && hitLeft > 0 ? sheet('e_grunt_hit') : null;
-    //  r4.8 걷기 동작 시트 자리(SHEETS3 e_grunt_walk — 파일이 들어오면 코드 움직임 대신 이 시트를 쓴다): 그림이 E1 인 잡졸, 피격 시트가 없을 때.
-    //   칸 = 걸음 박자(두 걸음에 시트 한 바퀴 — 다가오는 빠르기에 비례). 파일이 없으면 null → 코드 움직임
-    const walkSh = mo && mo.kind === 'walk' && e.kind === 'grunt' && !e.skin && !hitSh ? sheet('e_grunt_walk') : null;
+    const hitKey = hitLeft > 0 ? hitSheetKey3(artB) : null;
+    const hitSh = hitKey ? sheet(hitKey) : null;
+    //  r3.26 손상 그림 'dmg:'(체력 절반 이하) — r4.11: 움직임 시트보다 먼저(몇 방 남았는지 보이는 것이 걷는 모습보다 중요하다)
+    const dmgKey = artB && wantsDmgArt(e.hp, e.hpMax ?? e.hp) && get('dmg:' + artB) ? 'dmg:' + artB : null;
+    //  r4.8 걷기 시트 자리 → r4.11 움직임 시트(걷기 E1·E3 · 달리기 E2·E7 — sprites.moveSheetKey3): 피격 시트가 도는 동안·손상 그림일 때는
+    //   쓰지 않는다(그때는 종전 그림 + 코드 움직임). 칸 = 박자(mo.cyc 소수부 — 다가오는 빠르기에 비례). 파일이 없으면 null → 코드 움직임
+    const walkSh = mo && !hitSh && !dmgKey && (mo.kind === 'walk' || mo.kind === 'drive') ? sheet(moveSheetKey3(artB)) : null;
     if (mo && !walkSh) { ctx.save(); motionPose(mo, x, y, h, k); }
     if (hr) { ctx.save(); poseAt(hr, x, y + h * 0.4); }
     //  r3.26 3상태 그림: 맞는 동안 'hit:' · 체력 절반 이하이면 'dmg:'. 없는 그림은 정지 그림으로 조용히 되돌아간다
-    //   (잡졸은 피격 시트가 있으면 시트가 먼저 — 12칸 동작이 한 장보다 낫다)
-    const artB = artBase3(e.kind, e.skin);
+    //   (피격 시트가 있으면 시트가 먼저 — 여러 칸 동작이 한 장보다 낫다)
     const baseKey = e.skin ? 'skin:' + e.skin : ENEMY_SPRITE[e.kind];
     let key = baseKey;
     if (artB && !hitSh && hitLeft > 0 && get('hit:' + artB)) key = 'hit:' + artB;
-    else if (artB && wantsDmgArt(e.hp, e.hpMax ?? e.hp) && get('dmg:' + artB)) key = 'dmg:' + artB;
+    else if (dmgKey) key = dmgKey;
     const sh = hitSh || walkSh;
     const shFrame = hitSh ? sheetFrameAt(hitSh, hitSh.frames / hitSh.fps - hitLeft)
-      : walkSh ? Math.floor((((mo.steps / 2) % 1) + 1) % 1 * walkSh.frames) : 0;
+      : walkSh ? Math.floor((((mo.cyc % 1) + 1) % 1) * walkSh.frames) : 0;
     if (sh) drawSheetFrame(sh, shFrame, x, y, h);
     else drawImgCentered(key, x, y, h, () => enemyShape(e.kind, x, y, r, false));
     //  흰색 번쩍임: 그림 모양의 흰 실루엣(없으면 도형에 흰 채움)을 반응 불투명도로 덮는다
@@ -1197,6 +1228,23 @@ export function createRenderer3(ctx, sprites) {
     if ((e.hpMax ?? e.hp) > 2 && e.z >= run.z) {
       const ty = y + r + 16 * k;
       if (ty >= HP_TAG_MIN_Y) drawHpTag(x, ty, e.hp, k, hr ? hr.pop : 0);
+    }
+  }
+
+  //  r4.11 쓰러진 보스(셸 fx.bossWrecks — 규칙의 보스는 dead 라 drawBoss 가 그리지 않는다): 몸 시트 폭발 칸(2) → 잔해 칸(3), 마지막에 흐려진다.
+  //   몸 시트가 없으면 그리지 않는다(종전 폭발·다단 폭발만). 크기·자리는 살아 있을 때와 같다(r × 2.6, 투영 배율)
+  function drawBossWrecks(fx, runZ) {
+    const list = fx && fx.bossWrecks;
+    if (!list || !list.length) return;
+    for (const w of list) {
+      const sh = sheet('bd:' + (w.skin || ENEMY_ART_BASE.elite));
+      if (!sh) continue;
+      const q = pj(w.x, w.z - runZ);
+      const fade = Math.max(0, Math.min(1, ((w.life ?? BOSS_WRECK.lifeSec) - w.t) / BOSS_WRECK.fadeSec));
+      if (!(fade > 0)) continue;
+      ctx.globalAlpha = fade;
+      drawSheetFrame(sh, w.t < BOSS_WRECK.boomSec ? 2 : 3, q.x, q.y, w.r * q.s * 2.6);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -1350,8 +1398,13 @@ export function createRenderer3(ctx, sprites) {
       ctx.restore();
     }
     const bkey = b.skin ? 'skin:' + b.skin : 'elite';
+    //  r4.11 보스 몸 시트(bd:<그림> — [평상 · 맞음 · 폭발 · 잔해]): 있으면 **몸 전체를 시트로** 그린다(평상 0칸 · 번쩍이는 동안 맞음 1칸).
+    //   정지 그림과 섞으면 맞을 때마다 두 그림이 번갈아 깜빡여 보인다. 파괴(2·3칸)는 drawBossWrecks. 없으면 종전 정지 그림
+    const bd = sheet('bd:' + (b.skin || ENEMY_ART_BASE.elite));
+    const bh = r * 2.6, bf = hr && hr.flash > 0 ? 1 : 0;
     if (hr) { ctx.save(); poseAt(hr, x, y + r * 1.05); }
-    drawImgCentered(bkey, x, y, r * 2.6, () => {
+    if (bd) drawSheetFrame(bd, bf, x, y, bh);
+    else drawImgCentered(bkey, x, y, bh, () => {
       ctx.fillStyle = ENEMY_FALLBACK.elite;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = C.warn; ctx.lineWidth = role === 'tank' ? 9 : 6;
@@ -1361,8 +1414,10 @@ export function createRenderer3(ctx, sprites) {
     });
     if (hr && hr.flash > 0) {
       ctx.globalAlpha = hr.flash;
-      const im = get(bkey), wim = im ? whiteOf(im, 320) : null;
-      if (wim) { const bh = r * 2.6, bw = bh * (im.width / im.height); ctx.drawImage(wim.c, x - bw / 2, y - bh / 2, bw, bh); }
+      const wsh = bd ? whiteOf(bd.img, 1024) : null;
+      const im = bd ? null : get(bkey), wim = im ? whiteOf(im, 320) : null;
+      if (wsh) drawSheetFrame(bd, bf, x, y, bh, wsh);
+      else if (wim) { const bw = bh * (im.width / im.height); ctx.drawImage(wim.c, x - bw / 2, y - bh / 2, bw, bh); }
       else { ctx.fillStyle = HIT_FLASH_FILL; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = 1;
     }
@@ -1372,8 +1427,10 @@ export function createRenderer3(ctx, sprites) {
       const f = 0.5 + 0.5 * Math.sin(now * 42);
       ctx.save();
       ctx.globalAlpha = (0.22 + 0.4 * charge) * (0.55 + 0.45 * f);
-      const im = get(bkey), wim = im ? whiteOf(im, 320) : null;
-      if (wim) { const bh = r * 2.6, bw = bh * (im.width / im.height); ctx.drawImage(wim.c, x - bw / 2, y - bh / 2, bw, bh); }
+      const wsh = bd ? whiteOf(bd.img, 1024) : null;
+      const im = bd ? null : get(bkey), wim = im ? whiteOf(im, 320) : null;
+      if (wsh) drawSheetFrame(bd, 0, x, y, bh, wsh);
+      else if (wim) { const bw = bh * (im.width / im.height); ctx.drawImage(wim.c, x - bw / 2, y - bh / 2, bw, bh); }
       ctx.fillStyle = ATK_CHARGE;
       ctx.beginPath(); ctx.arc(x, y, r * 0.9, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 0.85; ctx.strokeStyle = ATK_CHARGE; ctx.lineWidth = 3;
@@ -1827,6 +1884,67 @@ export function createRenderer3(ctx, sprites) {
     ctx.stroke();
     for (const f of [0.35, 0.7]) { worldBoxPath(cx - hx * f, cx + hx * f, cz - hz * f, cz + hz * f, rz, 3); ctx.stroke(); }
   }
+  //  r4.11 그물 그림(fx:web 칸 f): 사각 구역을 덮게(가운데 깊이의 폭 × 위아래 끝 사이 높이 — 원근 사다리꼴은 가운데 폭으로 어림)
+  function webArt(sh, f, s, rz, a) {
+    const cx = (s.x0 + s.x1) / 2, cz = (s.z0 + s.z1) / 2;
+    const l = pj(s.x0, cz - rz), r = pj(s.x1, cz - rz), t = pj(cx, s.z1 - rz), b = pj(cx, s.z0 - rz);
+    drawFxCell(sh, f, (l.x + r.x) / 2, (t.y + b.y) / 2, (r.x - l.x) * FX_ART.rect, (b.y - t.y) * FX_ART.rect, 0, a);
+  }
+  //  r4.11 레일 자국 그림(fx:rail 칸 f — 세로 띠): 줄(화면 안으로 자른 구간)을 따라 조각을 이어 붙인다. 조각의 세계 길이 = 띠 폭 × 그림 세로/가로 비율 —
+  //   조각마다 양 끝을 따로 투영하므로 먼 쪽 조각은 원근대로 짧고 좁다. 조각은 2% 겹쳐 이음매가 벌어지지 않게
+  function railArt(sh, f, s, rz, a) {
+    const c = clipSegZ(s.ax, s.az, s.bx, s.bz, rz - 240, rz + 780);
+    if (!c) return;
+    const [ax, az, bx, bz] = c, L = Math.hypot(bx - ax, bz - az);
+    if (!(L > 1)) return;
+    const wW = 2 * s.r * FX_ART.rail, n = Math.max(1, Math.round(L / (wW * sh.fh / sh.fw)));
+    for (let i = 0; i < n; i++) {
+      const u0 = i / n, u1 = (i + 1) / n;
+      const p0 = pj(ax + (bx - ax) * u0, az + (bz - az) * u0 - rz), p1 = pj(ax + (bx - ax) * u1, az + (bz - az) * u1 - rz);
+      drawFxCell(sh, f, (p0.x + p1.x) / 2, (p0.y + p1.y) / 2, wW * (p0.s + p1.s) / 2, Math.hypot(p1.x - p0.x, p1.y - p0.y) * 1.02,
+        Math.atan2(p1.y - p0.y, p1.x - p0.x) - Math.PI / 2, a);
+    }
+  }
+  //  r4.11 철퇴 궤적 그림(fx:mace 칸 f — 칸 아래 가운데 = 부채꼴 꼭짓점, 위로 펼쳐짐): 꼭짓점(pts[0])에 두고 부채꼴 가운데 방향(호의 가운데 점)으로 돌린다.
+  //   높이 = 반지름, 가로 = 실제 부채꼴 반각에 맞춰 늘이고 줄인다(그림 속 반각 FX_ART.maceHalf 기준, 0.5~2.2배)
+  function maceArt(sh, f, s, rz, a) {
+    const A = s.pts[0], arc = s.pts.slice(1);
+    if (arc.length < 2) return;
+    const M = arc[Math.floor(arc.length / 2)], E0 = arc[0], E1 = arc[arc.length - 1];
+    const pa = pj(A[0], A[1] - rz), pm = pj(M[0], M[1] - rz), p0 = pj(E0[0], E0[1] - rz), p1 = pj(E1[0], E1[1] - rz);
+    const len = Math.hypot(pm.x - pa.x, pm.y - pa.y);
+    if (!(len > 1)) return;
+    const ang = (p) => Math.atan2(p.y - pa.y, p.x - pa.x);
+    let span = Math.abs(ang(p1) - ang(p0));
+    if (span > Math.PI) span = 2 * Math.PI - span;
+    const wf = Math.max(0.5, Math.min(2.2, Math.tan(Math.min(1.45, span / 2)) / Math.tan(FX_ART.maceHalf)));
+    const h = len * FX_ART.mace;
+    drawFxCell(sh, f, pa.x, pa.y, h * (sh.fw / sh.fh) * wf, h, ang(pm) + Math.PI / 2, a, true);
+  }
+  //  r4.11 광역이 터질 때 그림(fx:<종류> 시트 — 없으면 false → 호출부가 종전 코드 연출). k = 터짐 진행 0~1, 마지막 30% 에 흐려진다.
+  //   원(매연·갈고리) = 구역 가운데에 칸 0 → 끝 · 쇳물 붓기 = 쏟아져 퍼지는 0칸(남는 웅덩이는 drawPool 이 1 → 2칸) · 쇳물 비 = 튀는 왕관 → 웅덩이 → 식은 자국(1 → 3칸,
+  //   떨어지는 방울 0칸은 경보 중 drawAtkProps) · 그물 = 사각을 덮게 · 레일 = 줄을 따라(열차 질주는 종전 코드 그대로 위에) · 철퇴 = 부채꼴 · 충격파 = 끊긴 틈이 끊긴 쪽을 향하게
+  function drawBlastArt(b, k, s, rz) {
+    const kind = b.kind === 'crossrail' ? 'rail' : b.kind;
+    const sh = sheet('fx:' + kind);
+    if (!sh) return false;
+    const a = k < 0.7 ? 1 : Math.max(0, (1 - k) / 0.3);
+    if ((kind === 'smoke' || kind === 'hook' || kind === 'pour' || kind === 'rain') && s.t === 'circ') {
+      const q = pj(s.x, s.z - rz), D = 2 * s.R * q.s * FX_ART.circ;
+      const f = kind === 'pour' ? 0 : kind === 'rain' ? 1 + Math.min(sh.frames - 2, Math.floor(k * (sh.frames - 1))) : fxFrameAt(sh, k);
+      drawFxCell(sh, f, q.x, q.y, D, D * sh.fh / sh.fw, 0, kind === 'pour' ? Math.max(0, 1 - k) : a);
+    } else if (kind === 'web' && s.t === 'rect') webArt(sh, fxFrameAt(sh, k), s, rz, a);
+    else if (kind === 'rail' && s.t === 'seg') {
+      railArt(sh, fxFrameAt(sh, k), s, rz, a);
+      trainDash(s, Math.min(1, b.t / FX_ART.trainSec), rz);
+    } else if (kind === 'mace' && s.pts) maceArt(sh, fxFrameAt(sh, k), s, rz, a);
+    else if (kind === 'quake' && s.t === 'ring') {
+      //  그림의 끊긴 틈은 칸 위쪽(화면 각 −90°). 세계 각 ang(z 가 화면 위) → 화면 각 −ang 이므로 π/2 − ang 만큼 돌린다
+      const q = pj(s.x, s.z - rz), D = 2 * (s.R + s.th) * q.s * FX_ART.ring;
+      drawFxCell(sh, fxFrameAt(sh, k), q.x, q.y, D, D * sh.fh / sh.fw, Math.PI / 2 - s.ang, a);
+    } else return false;
+    return true;
+  }
   //  열차 몸통 질주(교차 레일·레일이 터질 때): 앞(z 큰 끝, 가로면 왼쪽)에서 반대 끝으로 k(0 → 1) — 검붉은 몸 + 노란 창 + 뒤로 흐린 바람 줄
   function trainDash(s, k, rz) {
     const c = clipSegZ(s.ax, s.az, s.bx, s.bz, rz - 240, rz + 780);
@@ -1884,9 +2002,15 @@ export function createRenderer3(ctx, sprites) {
         ctx.lineWidth = Math.max(2, 4 * g.s);
         ctx.beginPath(); ctx.moveTo(g.x, hy - 16 * g.s); ctx.lineTo(g.x, hy); ctx.arc(g.x - 8 * g.s, hy, 8 * g.s, 0, Math.PI * 0.95); ctx.stroke();
       } else if (cur.kind === 'web') {
+        //  r4.11: 그물 그림이 있으면 펼쳐진 그물(1칸)을 흐리게 — 경보가 찰수록 짙어진다
+        const ws = s.t === 'rect' ? sheet('fx:web') : null;
+        if (ws) { webArt(ws, 1, s, rz, 0.2 + 0.35 * p); continue; }
         ctx.globalAlpha = 0.3 + 0.3 * p; ctx.strokeStyle = ATK_FX.web; ctx.lineWidth = 1.2;
         webLines(s, rz);
       } else if (cur.kind === 'rail' || cur.kind === 'crossrail') {
+        //  r4.11: 레일 그림이 있으면 달려올 선로(식은 레일 2칸)를 흐리게 깐다
+        const rs = s.t === 'seg' ? sheet('fx:rail') : null;
+        if (rs) { railArt(rs, 2, s, rz, 0.3 + 0.3 * p); continue; }
         const c = clipSegZ(s.ax, s.az, s.bx, s.bz, rz - 240, rz + 780);
         if (!c) continue;
         const [ax, az, bx, bz] = c, L = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / L, uz = (bz - az) / L;
@@ -1903,6 +2027,9 @@ export function createRenderer3(ctx, sprites) {
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x + g.x) / 2, a.y - 40, g.x, g.y); ctx.stroke();
       } else if (cur.kind === 'rain') {
         const g = pj(s.x, s.z - rz), h = (1 - p) * 210 * g.s;
+        //  r4.11: 쇳물 비 그림이 있으면 떨어지는 방울(0칸)이 떨어진다
+        const rs = sheet('fx:rain');
+        if (rs) { const D = 2 * s.R * g.s * 0.9; drawFxCell(rs, 0, g.x, g.y - h - D * 0.25, D, D * rs.fh / rs.fw, 0, 0.95); continue; }
         ctx.globalAlpha = 0.9; ctx.fillStyle = ATK_FX.molten;
         ctx.beginPath(); ctx.arc(g.x, g.y - h, 5 * g.s, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(g.x, g.y - h - 9 * g.s, 3 * g.s, 0, Math.PI * 2); ctx.fill();
@@ -1919,6 +2046,16 @@ export function createRenderer3(ctx, sprites) {
   //  남은 쇳물 웅덩이(붓기 — 식을 때까지 들어가면 피해): 주황·분홍 발광 원 + 노란 거품(시각 now 로 끓는다). 마지막 0.5초에 흐려진다
   function drawPool(s, left, now, rz) {
     const fade = Math.min(1, left / 0.5);
+    //  r4.11 그림(fx:pour): 끓는 웅덩이 1칸(살짝 부풀었다 줄었다) → 마지막 0.7초에 식어 굳은 2칸으로 바뀌며 흐려진다. 테두리 선은 피해 구역 경계라 그대로
+    const sh = sheet('fx:pour');
+    if (sh) {
+      const q = pj(s.x, s.z - rz), D = 2 * s.R * q.s * FX_ART.pool * (1 + 0.02 * Math.sin(now * 6));
+      const cool = Math.max(0, Math.min(1, (0.7 - left) / 0.35));
+      drawFxCell(sh, 1, q.x, q.y, D, D * sh.fh / sh.fw, 0, 1 - cool);
+      drawFxCell(sh, 2, q.x, q.y, D, D * sh.fh / sh.fw, 0, cool * Math.min(1, left / 0.35));
+      ctx.globalAlpha = 0.6 * fade; ctx.strokeStyle = '#FF5FA8'; ctx.lineWidth = 2; worldCirclePath(s.x, s.z, s.R, rz); ctx.stroke();
+      return;
+    }
     ctx.globalAlpha = 0.55 * fade; ctx.fillStyle = ATK_FX.molten; worldCirclePath(s.x, s.z, s.R, rz); ctx.fill();
     ctx.globalAlpha = 0.5 * fade; ctx.fillStyle = '#FFB347'; worldCirclePath(s.x, s.z, s.R * 0.62, rz); ctx.fill();
     ctx.globalAlpha = 0.65 * fade; ctx.fillStyle = '#FFE08A';
@@ -1932,6 +2069,13 @@ export function createRenderer3(ctx, sprites) {
   function drawSlowWeb(run) {
     if (!(run.slowT > 0) || !run.units.length) return;
     const zc = run.z - (run.ay || 0), c = pj(run.x, zc - run.z), R = 70;
+    //  r4.11 그림(fx:web): 펼쳐진 그물 1칸을 부대 위에, 풀리기 직전(0.35초)엔 끊어지는 2칸 — 끝나 갈수록 흐려진다
+    const sh = sheet('fx:web');
+    if (sh) {
+      const D = 2 * R * c.s * 1.1;
+      drawFxCell(sh, run.slowT < 0.35 ? 2 : 1, c.x, c.y, D, D * sh.fh / sh.fw, 0, Math.min(1, run.slowT / 0.6) * 0.8);
+      return;
+    }
     ctx.save();
     ctx.globalAlpha = Math.min(1, run.slowT / 0.6) * 0.75; ctx.strokeStyle = ATK_FX.web; ctx.lineWidth = 1.4;
     ctx.beginPath();
@@ -1951,6 +2095,8 @@ export function createRenderer3(ctx, sprites) {
     for (const b of list) {
       const k = Math.max(0, Math.min(1, b.t / (b.life || 0.35))), s = b.shape;
       if (!s) continue;
+      //  r4.11: 효과 시트가 있으면 그림으로(아래 코드 연출은 시트가 없을 때의 폴백)
+      if (drawBlastArt(b, k, s, rz)) continue;
       if (b.kind === 'smoke') {
         if (k < 0.35) { ctx.globalAlpha = 0.7 * (1 - k / 0.35); ctx.fillStyle = ATK_FX.flame; worldCirclePath(s.x, s.z, s.R * (0.5 + k), rz); ctx.fill(); }
         ctx.globalAlpha = 0.55 * (1 - k); ctx.fillStyle = ATK_FX.smoke;
@@ -1963,7 +2109,7 @@ export function createRenderer3(ctx, sprites) {
         ctx.globalAlpha = 0.9 * (1 - k); ctx.strokeStyle = ATK_FX.web; ctx.lineWidth = 1.8;
         webLines(s, rz);
       } else if (b.kind === 'rail' || b.kind === 'crossrail') {
-        trainDash(s, k, rz);
+        trainDash(s, Math.min(1, b.t / FX_ART.trainSec), rz);
       } else if (b.kind === 'pour' || b.kind === 'rain') {
         ctx.globalAlpha = 0.85 * (1 - k); ctx.strokeStyle = ATK_FX.molten; ctx.lineWidth = 4 * (1 - k) + 1;
         worldCirclePath(s.x, s.z, s.R * (0.4 + 0.8 * k), rz); ctx.stroke();
@@ -2780,6 +2926,7 @@ export function createRenderer3(ctx, sprites) {
     drawLotteryBox(run, mask);
     drawBonusTargets(run);
     drawCorpses(fx, run.z);
+    drawBossWrecks(fx, run.z);
     for (const e of run.enemies) if (!e.dead) drawEnemy(e, run, fx);
     //  보스(r3.16 복수 정예): 살아 있는 것만, 먼 것(z 큰 것)을 먼저 그려 가까운 것이 위에 오게. 죽은 보스는 배열에 남아 있으므로 반드시 거른다
     const shockR = run.arena && run.arena.boss && run.arena.boss.shock ? run.arena.boss.shock.r : null;
