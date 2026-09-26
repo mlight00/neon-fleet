@@ -187,6 +187,13 @@ export function pickX(policy, run) {
   }
 }
 
+//  r4.7 셸 흐름 검사 도구: 보스가 나오면 체력을 hp 로 깎는다(살아 있는 보스 전부). 보스 체력 바닥(BAL3.bossMinFightSec × 상한 화력, r4.7)으로
+//   봇이 게임 줄 1번을 더는 이기지 못해, '이긴 판'이 필요한 셸 검사(정산·결과 화면·해금·기록)가 이 도구로 승리를 만든다.
+//   난이도 판단과 무관하다 — 규칙은 그대로 두고 run 의 보스 체력 값만 바꾼다(캡처 스크립트의 강제 승리와 같은 계열, 승리 이벤트는 규칙이 낸다)
+export function weakenBosses(run, hp = 1) {
+  for (const b of (run && run.bosses) || []) if (!b.dead && b.hp > hp) b.hp = hp;
+}
+
 //  무기 초당 dmg(화력 지수 계산용 — 생존 병력 × 이 값)
 export const DPS = { rifle: 2, auto: 4, heavy: 5 };
 

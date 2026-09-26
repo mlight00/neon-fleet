@@ -48,7 +48,8 @@ export function enemyDefsFor(difficulty = DEFAULT_DIFFICULTY, hpMul = 1, difficu
     const e = { ...d };
     if (d.hp != null) e.hp = Math.round(d.hp * hpMul * (difficultyHp ? m.enemyHp : 1));
     if (d.touchDmg) e.touchDmg = Math.round(d.touchDmg * m.touchDmg);
-    if (d.shot) e.shot = Object.freeze({ ...d.shot, dmg: Math.round(d.shot.dmg * m.eshotDmg) });
+    //  r4.7 보스 탄 전용 배수(bossShotDmg — 정예 표의 탄 = 도로 정예·광장 보스가 쏘는 탄만. 저격수 탄은 eshotDmg 그대로). 없는 줄(검사 합성)은 1
+    if (d.shot) e.shot = Object.freeze({ ...d.shot, dmg: Math.round(d.shot.dmg * m.eshotDmg * (kind === 'elite' ? (m.bossShotDmg ?? 1) : 1)) });
     if (kind === 'elite') { e.shootEvery = d.shootEvery / m.eliteFireRate; e.summonEvery = d.summonEvery / (m.eliteSummonRate ?? 1); }
     //  r3.22 지옥 강화 손잡이: 저격수 발사 주기 ÷ shooterFireRate(기본 1 = 불변)
     if (kind === 'shooter' && (m.shooterFireRate ?? 1) !== 1) e.shootEvery = d.shootEvery / m.shooterFireRate;

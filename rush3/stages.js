@@ -6,6 +6,7 @@ import { WEAPONS } from './weapons.js';
 import { formation } from './squad.js';
 import { CAPSULE_N_DEFAULT } from './supply.js';
 import { hashSeed, mulberry32 } from '../rush/rng.js';
+import { bossFloor } from './firepower.js';
 
 //  STAGE_IDS = 검사·봇 실측·계약서 기준 코스(1~3, 코스 버전 2). ALL_STAGE_IDS = 셸(타이틀·다음 작전)이 보는 공개 목록 1~24(4~24 는 courses.js).
 export const STAGE_IDS = [1, 2, 3];
@@ -444,6 +445,15 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     throw new Error('stage ' + id + ': objective supplyId 가 capsule 통을 가리키지 않는다');
   }
   applyLottery(d, stage, lotterySeed);
+  //  r4.7 보스 체력 바닥(이사님 지시 2026-09-26 "적어도 보스와 30초는 싸울 수 있도록"): 줄 표의 bossFloor 가 참인 줄(게임 화면 = brutal)에서만.
+  //   보스 체력 합 ÷ 상한 화력(rush3/firepower.js — 이 판을 가장 잘 했을 때 보스 앞 부대가 보스에 실제로 닿는 초당 피해) ≥ BAL3.bossMinFightSec.
+  //   모자라면 비율을 지키며 올린다(옛 체력 아래로는 안 내려간다). 랜덤 길은 풀의 좋은 결과 중 최선으로 계산하므로 추첨 시드와 무관하게 같은 체력이다.
+  //   stage.bossFloor = 계산 내역(보고·검사용 — 규칙은 읽지 않는다). 검사용 배수 1 줄(normal)은 이 칸이 없고 체력도 종전 그대로
+  if (mult.bossFloor && stage.elites.length) {
+    const f = bossFloor(stage);
+    stage.elites.forEach((e, i) => { e.hp = f.hp[i]; });
+    stage.bossFloor = { sec: f.sec, units: f.units, weapon: f.weapon, mk: f.mk, dps: f.dps, base: f.base, hp: f.hp, minSec: f.minSec };
+  }
   stage.spawns.sort((a, b) => a.z - b.z);
   //  보너스 스테이지 불변식 guard(r3.15 검수 반영, 같은 계열의 빌드 시점 데이터 오류): stepBonus 는 셔터·통 이동·스폰·접촉을 부르지 않으므로
   //   게이트·통·스폰 z 가 전부 eliteZ(없으면 length) 이하여야 한다 — 보너스 구간(그 뒤)에 물체를 두면 조용히 멈춘 물체가 생긴다.

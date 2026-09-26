@@ -1,6 +1,6 @@
 // rush3-loop — 셸 묶음(계약서 8장 V3-DETERMINISM·V3-INPUT + boot 스모크). DOM 없이 main.js 를 import 한다.
 import { test } from 'node:test';
-import { pickInput } from './lib/rush3-policies.mjs';
+import { pickInput, weakenBosses } from './lib/rush3-policies.mjs';
 import assert from 'node:assert/strict';
 import { projectorFor } from '../rush3/project.js';
 import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine,
@@ -376,6 +376,8 @@ test('V3-SHELL: boot 스모크 — 타이틀 렌더 → 출격 → 진행 → �
   let guard = 0;
   while (app.getState() === 'run' && guard++ < 5000) {
     const run = app.getRun();
+    //  r4.7: 보스 체력 바닥(30초 × 상한 화력)으로 봇이 1번을 못 이겨, 보스가 나오면 체력 1(셸 흐름 검사 도구 — 난이도와 무관)
+    weakenBosses(run);
     app.input.state.pointerX = botX(run) ?? 240;
     frames(1);
   }
@@ -1014,10 +1016,12 @@ function recordFrame(b) {
 }
 
 //  봇 정책(위 스모크와 같은 botX)으로 결과 화면까지 굴린다
+//  r4.7: 보스가 나오면 체력 1(weakenBosses) — 결과 화면 배치 검사는 이긴 판([다음 작전] 이 있는 배치)을 본다. 보스 체력 바닥으로 봇이 못 이겨서 쓰는 검사 도구
 async function botToResult(b, stageId, guardMax = 20000) {
   b.app.startRun(stageId);
   let guard = 0;
   while (b.app.getState() === 'run' && guard++ < guardMax) {
+    weakenBosses(b.app.getRun());
     b.app.input.state.pointerX = botX(b.app.getRun()) ?? 240;
     b.frames(1);
   }

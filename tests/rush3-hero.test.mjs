@@ -335,6 +335,8 @@ test('V4-REAL: 셸 실제 설정(기본 줄 + heroGuard + 강화 0) 1~24 × evLe
   assert.deepEqual(fx.meta.ids, ALL_STAGE_IDS);
   assert.deepEqual(fx.meta.bots, V4_BOTS);
   for (const bot of V4_BOTS) for (const id of ALL_STAGE_IDS) assert.deepEqual(v4RealRun(id, bot), fx.runs[bot + '/' + id], `${bot}/${id}`);
+  //  r4.7: 끝나지 않는 판 0(상한 28,800 STEP 안에 모든 판이 over) — 동작 확인이다(봇 승패는 난이도 근거로 쓰지 않는다, 이사님 지시 2026-09-26)
+  for (const [k, r] of Object.entries(fx.runs)) assert.equal(r.over, true, k + ': 상한 안에 끝난다');
   //  보호 규칙이 실제로 일한 판이 있다(기준값이 '보호 없음'과 같은 파일이 아니다)
   assert.ok(V4_BOTS.some((b) => fx.meta.summary[b].transfers > 0), '피해 이전이 일어난 판이 있다');
 });

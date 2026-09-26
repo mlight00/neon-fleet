@@ -116,6 +116,11 @@ export const BAL3 = deepFreeze({
   //   from = 페이즈를 켜는 첫 스테이지. 1·2번은 정예 체력이 120·220 이라 페이즈에 닿기 전에 끝나고, 어려움 2번 성공 경로가
   //   병력 4명(최대 17)으로 이미 아슬아슬해 보스를 조금만 세게 해도 깨진다(SD-7 잠금, 2026-09-23 실측) — 학습 구간은 종전 그대로 둔다
   bossPhases: { from: 3, at: [0.5, 0.2], rate: [1, 0.8, 0.62], speed: [1, 1.15, 1.3], dashEvery: [1, 0.82, 0.68] },
+  //  보스와 최소 싸움 시간(초, r4.7 — 이사님 지시 2026-09-26 "적 보스 체력: 적어도 보스와 30초는 싸울 수 있도록 조정").
+  //   게임 화면 줄(difficulty 표의 bossFloor 가 참인 줄 = brutal)에서만 buildStage 가 보스 체력을 max(지금 체력, 이 초 × 상한 화력)으로 올린다.
+  //   상한 화력 = rush3/firepower.js(그 판을 가장 잘 했을 때 보스 앞 부대가 보스에 **실제로 닿는** 초당 피해 — 강화 0). 보스 여럿은 합으로, 비율 유지.
+  //   이 숫자 하나만 바꾸면 24판 보스 체력이 함께 따라간다
+  bossMinFightSec: 30,
 
   elites: {
     laneHw: 32,
@@ -159,16 +164,22 @@ export const BAL3 = deepFreeze({
   //   touchDmg     잡졸·돌격체·정예 접촉 피해          eliteHp      정예 hp(반올림)
   //   spawnCount   xs 없이 rows 로 뿌리는 스폰의 n(반올림, xs 명시 스폰은 그대로)   eliteFireRate 정예 부채꼴 발사 빈도(shootEvery ÷ 배수)
   //   extraSpawns  이 줄에서만 스테이지 정의의 추가 배치(stages/courses 의 extraSpawns — 옛 이름 brutalSpawns, S1·S5·S8)를 spawns 뒤에 붙인다(r3.22)
+  //   bossShotDmg  (r4.7) 보스 탄 전용 배수 — 도로 정예(정예·포격 역할)와 광장 보스가 쏘는 탄 dmg = round(1 × eshotDmg × bossShotDmg). 저격수 탄·접촉·착지 충격은 그대로.
+  //                이사님 지시(2026-09-26) "보스가 발사하는 탄환의 데미지를 1/3 정도 줄여주자" — 게임 줄 3 → 1(병사 체력 2 = 두 발에 쓰러짐. 3 → 2 는 여전히 한 발이라 체감 변화가 없다)
+  //   bossFloor    (r4.7) 이 줄에서만 보스 체력을 max(지금 체력, BAL3.bossMinFightSec × 상한 화력)으로 올린다(buildStage — rush3/firepower.js)
   //  화면 이름(label·short)은 r4.2 에서 지웠다 — 어디에도 표시하지 않는다.
   difficulty: {
     //  r3.9(2026-09-18 이사 결정 2)는 위협을 **출현 빈도**로만 올렸다(enemyHp·eliteHp 1 고정). → **r3.21(2026-09-20 이사 결정 B안)로 뒤집음**:
     //   이사 실기(지옥, 24까지 조작 없이 클리어) "일반 적 체력이 낮아 한두 방에 다 파괴된다" — 체력 배수를 되살렸다(brutal 2/1.5).
     //   빈도 배수(waves·waveGap·spawnCount·eliteSummonRate)와 적탄·접촉 피해 배수는 r3.9 그대로 둔다. 스테이지 구간 배율(enemyHpByStage)은 여기에 곱해진다.
     //   ⚠️1~3 기준 코스(enemyHpByStage difficultyHp: ['brutal'])에서는 배수 1 줄의 enemyHp·eliteHp 가 ×1 이다(stages.buildStage·combat.createRun).
-    normal: { id: 'normal', enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1, extraSpawns: false },
+    normal: { id: 'normal', enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1, extraSpawns: false,
+              bossShotDmg: 1, bossFloor: false },
     //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다. brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반).
     //   지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
-    brutal: { id: 'brutal', enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2, extraSpawns: true },
+    //   r4.7(이사님 실플레이 뒤 지시 2026-09-26 — 결정 D2′ '지옥 값 그대로'를 **보스 체력·보스 탄 피해·현상금 적에 한해** 푼다): bossShotDmg 1/3 · bossFloor true
+    brutal: { id: 'brutal', enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2, extraSpawns: true,
+              bossShotDmg: 1 / 3, bossFloor: true },
   },
   //  적 체력 스테이지 배율(r3.21, 이사 결정 2026-09-20 B안 ①): 스테이지 번호 구간별 배수. 잡졸·돌격체·저격수(스폰 정의 hp 명시 포함)와
   //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).

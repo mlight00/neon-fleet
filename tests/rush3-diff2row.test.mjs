@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildStage, ALL_STAGE_IDS } from '../rush3/stages.js';
 import { createRun } from '../rush3/combat.js';
+import { BAL3 } from '../rush3/balance.js';
 
 const SNAP = JSON.parse(readFileSync(new URL('./fixtures/rush3-stages-pre-r4.2.json', import.meta.url), 'utf8'));
 //  스냅숏을 찍을 때와 같은 인코더(-0·비유한수는 문자열로 남겨 JSON 이 지우지 못하게)
@@ -34,11 +35,31 @@ test('V3-DIFF2ROW 스냅숏 형식: 고치기 전 코드(00be4e3)로 찍은 1~24
   assert.match(SNAP.meta.source, /00be4e3/);
 });
 
-test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 지옥 판과 바이트 단위로 같다(1~24, 추가 배치 S1·S5·S8 포함) — createRun 파생값도 같다", () => {
+//  r4.7(이사님 지시 2026-09-26 — 결정 D2′ '지옥 값 그대로'를 **보스 체력·보스 탄 피해·현상금 적에 한해** 푼다): 기본 줄에서 그 몫만 되돌리면
+//   옛 지옥 판과 바이트 단위로 같아야 한다(그 밖의 판 수치 — 일반 적 체력·스폰·게이트·보급은 그대로라는 잠금).
+//   되돌리는 몫: 보스 체력(stage.bossFloor.base 로 — 바닥 계산 내역 칸도 뺀다) · 현상금 적 스폰(kind 'bounty') · 정예 탄 dmg(bossShotDmg 전 = round(1 × eshotDmg)) · 적 표의 bounty 칸
+function undoR47Stage(st) {
+  if (st.bossFloor) { st.elites.forEach((e, i) => { e.hp = st.bossFloor.base[i]; }); delete st.bossFloor; }
+  st.spawns = st.spawns.filter((sp) => sp.kind !== 'bounty');
+  return st;
+}
+function undoR47Run(rp, row) {
+  const { bounty, ...defs } = rp.enemyDefs;
+  const E = defs.elite;
+  return { ...rp, enemyDefs: { ...defs, elite: { ...E, shot: { ...E.shot, dmg: Math.round(1 * row.eshotDmg) } } } };
+}
+
+test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 지옥 판과 — r4.7 의 보스 체력·보스 탄·현상금 적 몫만 되돌리면 — 바이트 단위로 같다(1~24, 추가 배치 S1·S5·S8 포함) · createRun 파생값도 같다", () => {
+  const row = BAL3.difficulty.brutal;
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
-    assert.equal(S(st), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
-    assert.equal(S(runPart(createRun(buildStage(id, { difficulty: 'brutal' })))), S(SNAP.run_brutal[id]), `S${id} 기본 줄(옛 지옥) createRun`);
+    //  r4.7 몫이 실제로 들어 있다: 보스 체력 바닥(옛 값 이상) · 보스 탄 1
+    assert.ok(st.bossFloor && st.elites.every((e, i) => e.hp >= st.bossFloor.base[i]), `S${id} 보스 체력 바닥`);
+    assert.equal(S(undoR47Stage(st)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
+    const rp = runPart(createRun(buildStage(id, { difficulty: 'brutal' })));
+    assert.equal(rp.enemyDefs.elite.shot.dmg, 1, `S${id} 보스 탄 1`);
+    assert.equal(rp.enemyDefs.shooter.shot.dmg, 3, `S${id} 저격수 탄 3 그대로`);
+    assert.equal(S(undoR47Run(rp, row)), S(SNAP.run_brutal[id]), `S${id} 기본 줄(옛 지옥) createRun`);
   }
 });
 

@@ -465,8 +465,11 @@ test('V3-LOTTERY LOT-6b: 두 줄 모두(배수 1 · 기본 — r4.2 어려움 �
     //  좌 통(병사 10) 과 확정 손실 10 이라 벽을 빠져나온 자리에서 차이가 20 쯤 난다
     assert.ok(L.units - R.units >= 15, difficulty + ': 좌 ' + L.units + ' vs 우 ' + R.units + ' — 꽝이 손해로 나타나야 한다');
     rows.push([difficulty, L.units, R.units, R.lossByGate].join('\t'));
-    //  판 자체는 계속 완주 가능하다(꽝을 골라도 막히지 않는다)
-    assert.equal(playRight(SEED_OF.trapGate, difficulty).run.won, true, difficulty + ': 꽝을 골라도 완주는 된다');
+    //  판 자체는 막히지 않는다(꽝을 골라도 보스까지 간다). 배수 1 줄은 완주까지 잠그고, 기본 줄은 r4.7(보스 체력 = 30초 × 상한 화력,
+    //   이사님 지시 "난이도는 너의 봇테스트로 하지 말도록")부터 봇 승패를 잠그지 않는다 — 보스 등장·판 끝남만
+    const pr = playRight(SEED_OF.trapGate, difficulty);
+    if (difficulty === 'normal') assert.equal(pr.run.won, true, difficulty + ': 꽝을 골라도 완주는 된다');
+    else { assert.equal(pr.run.eliteSpawned, true, difficulty + ': 꽝을 골라도 보스까지 간다'); assert.equal(pr.run.over, true, difficulty + ': 판이 끝난다'); }
   }
   t.diagnostic('난이도\t좌(병사10)\t우(확정 −10)\t게이트 손실');
   for (const r of rows) t.diagnostic(r);

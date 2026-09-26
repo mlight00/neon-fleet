@@ -15,7 +15,7 @@ import { createRenderer3, UPGRADE_UI, upgradeCard, upgradeBuyBox, HERO_BULLET_RI
 import { boot, hitButton, TITLE_UPGRADE_BTN, RESULT_UPGRADE_SLOT, UPGRADE_HEAD, UP_BLOCK_TEXT, UP_HINT_LINE, UP_REC_TEXT, UP_TRACK_NAME,
          upgradeLines, shotsToKill, canBuyAny } from '../rush3/main.js';
 import { UP_TRACKS, UP_COST, effects } from '../rush3/meta.js';
-import { pickInput } from './lib/rush3-policies.mjs';
+import { pickInput, weakenBosses } from './lib/rush3-policies.mjs';
 
 const Z0 = { power: 0, rate: 0, multi: 0 };
 
@@ -81,10 +81,13 @@ async function bootApp({ storage = memStorage(), search = '', BroadcastChannel, 
   const textNow = () => { texts.length = 0; frames(1); return texts.map((t) => t.text); };
   return { app, save: sv, storage, texts, frames, tap, tapId, btn, key, textNow, audio, win };
 }
-function drive(h, policy, cond, max = 20000) {
+//  r4.7: opts.win = 보스가 나오면 체력 1(weakenBosses — 보스 체력 바닥으로 봇이 게임 줄 1번을 못 이긴다. 이긴 판이 필요한 셸 흐름 검사용, 난이도와 무관)
+const WIN = Object.freeze({ win: true });
+function drive(h, policy, cond, max = 20000, opts = {}) {
   let n = 0;
   while (!cond() && n < max) {
     const run = h.app.getRun();
+    if (opts.win && run && h.app.getState() === 'run') weakenBosses(run);
     if (run && h.app.getState() === 'run') h.app.input.state.pointerX = pickInput(policy, run).pointerX;
     h.frames(1);
     n++;
@@ -101,7 +104,7 @@ test('SHELL-FLOW: 결과 → [로봇 강화] → [돌아가기] = 방금 판 결
   //  ① 승리(1번 evLead — 새 사용자의 첫 승리, 54 코인) → [로봇 강화] 보조 버튼 → 강화 화면에서 다연발 구매 → [돌아가기]
   const h = await bootApp();
   h.app.startRun(1);
-  drive(h, 'evLead', () => h.app.getState() === 'result', 20000);
+  drive(h, 'evLead', () => h.app.getState() === 'result', 20000, WIN);
   const r = h.app.getResult();
   assert.equal(r.won, true); assert.equal(r.nextId, 2);
   h.frames(1);
@@ -221,7 +224,7 @@ test('UP-HINT: 잔액이 처음으로 1단계 비용(40) 이상이 된 **승리*
   const h = await bootApp();
   assert.equal(h.save.get().seenUpHint, false); assert.equal(h.save.get().seenUpRec, false);
   h.app.startRun(1);
-  drive(h, 'evLead', () => h.app.getState() === 'result', 20000);
+  drive(h, 'evLead', () => h.app.getState() === 'result', 20000, WIN);
   assert.equal(h.app.getResult().upHint, UP_HINT_LINE);
   assert.equal(h.save.get().seenUpHint, true, '본 적 있음 저장');
   h.texts.length = 0; h.frames(1);

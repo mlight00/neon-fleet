@@ -95,7 +95,8 @@ test('V3-DIFF DIFF-3: enemyDefsFor — hp(반올림)·접촉·적탄 dmg·정예
   assert.deepEqual(touch('rusher'), [2, 6]);
   assert.deepEqual(touch('elite'), [3, 9]);
   assert.deepEqual(DIFFS.map((d) => rows[d].shooter.shot.dmg), [1, 3], '기본 줄은 적탄 1발 = 병사 1명 이상(hp 2)');
-  assert.deepEqual(DIFFS.map((d) => rows[d].elite.shot.dmg), [1, 3]);
+  //  r4.7(이사님 지시 2026-09-26 "보스가 발사하는 탄환의 데미지를 1/3 정도 줄여주자"): 보스 탄 = 1 × eshotDmg 3 × bossShotDmg 1/3 = 1(두 발에 병사 1명). 저격수 탄은 3 그대로
+  assert.deepEqual(DIFFS.map((d) => rows[d].elite.shot.dmg), [1, 1]);
   assert.deepEqual(DIFFS.map((d) => +rows[d].elite.shootEvery.toFixed(4)), [1, 0.6667]);
   assert.deepEqual(DIFFS.map((d) => rows[d].shooter.shootEvery), [1.6, 1.6], '저격수 주기는 표에 없다(정예만)');
   for (const d of DIFFS) {
@@ -109,11 +110,14 @@ test('V3-DIFF DIFF-3: enemyDefsFor — hp(반올림)·접촉·적탄 dmg·정예
 
 test('V3-DIFF DIFF-4: buildStage — 1~3 기준 코스는 정예 hp·잡졸 hp 가 난이도와 무관(r3.21 대항 검수 반영: difficultyHp false = r3.9 와 같음)·rows 스폰 n(spawnCount 반올림)·xs 명시 스폰은 같은 xs 로 waves 번(waveGap 뒤) 반복', () => {
   //  r3.22: 1~3 은 지옥(기본 줄)에서만 × eliteHp(1.5) — 배수 1 줄은 r3.9 그대로
-  assert.deepEqual(DIFFS.map((d) => STAGE_IDS.map((id) => buildStage(id, { difficulty: d }).elite.hp)),
+  //  r4.7: 기본 줄의 보스 체력은 그 값(stage.bossFloor.base)을 바닥으로 30초 × 상한 화력까지 오른다(V3-R47 BOSS-30S) — 배수를 곱한 값은 base 에 남는다
+  const eliteBase = (st) => (st.bossFloor ? st.bossFloor.base[0] : st.elite.hp);
+  assert.deepEqual(DIFFS.map((d) => STAGE_IDS.map((id) => eliteBase(buildStage(id, { difficulty: d })))),
                    [[120, 220, 500], [180, 330, 750]]);
+  assert.ok(STAGE_IDS.every((id) => !buildStage(id).bossFloor), '배수 1 줄은 보스 체력 바닥이 없다');
   for (const id of STAGE_IDS) for (const d of DIFFS) assert.equal(buildStage(id, { difficulty: d }).difficultyHp, d === 'brutal', `S${id} ${d} difficultyHp`);
   //  4~24 는 여전히 × eliteHp(V3-DIFFB DB-2 가 전부 대조) — 여기서는 경계 표본만
-  assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).elite.hp), [160, 240]);
+  assert.deepEqual(DIFFS.map((d) => eliteBase(buildStage(4, { difficulty: d }))), [160, 240]);
   //  rows 스폰은 S3 z8800 잡졸(n 18, rows 2) 하나뿐
   const rowsN = DIFFS.map((d) => buildStage(3, { difficulty: d }).spawns.find((s) => s.z === 8800 && s.kind === 'grunt').n);
   assert.deepEqual(rowsN, [18, 32]);   // 18×1.8 = 32.4 → 32
@@ -315,18 +319,16 @@ for (const d of ['brutal']) for (const id of STAGE_IDS) BOSS_TABLE.push(bossRow(
 //   대항 검수 반영(2026-09-20): 1~3 기준 코스는 구간 배율 ×1 과 같은 원칙으로 난이도 체력 배수도 ×1(BAL3.enemyHpByStage difficultyHp: false) →
 //   세 난이도의 1~3 이 r3.9(33568b2)와 완전히 같아져 **hard S1·S2·S3 + brutal S1 잠금**을 되살렸다. 대조점도 r3.9 값(hard S2 4명 · brutal S1 14명) 그대로.
 //  r4.2: 어려움 줄 삭제 — 남는 잠금은 기본 줄(brutal) 1번의 두 단언(planBoss 패배 · evLead 승리 26명)이다
-test('V3-SIM-DIFF SD-7 성공 경로: 기본 줄(brutal) S1 — planBoss 는 지고 evLead 는 병력을 잃으며 26명으로 이긴다(봇 결과 — 사람 성공률 아님, r4.2 어려움 단언 삭제)', (t) => {
+test('V3-SIM-DIFF SD-7 기록: 기본 줄(brutal) S1 — planBoss·evLead 모두 보스까지 가고 판이 끝난다(승패는 기록만 — r4.7 이사님 지시로 난이도를 봇 승패로 판단하지 않는다)', (t) => {
   for (const r of BOSS_TABLE) t.diagnostic('SIM-BOSS ' + JSON.stringify(r));
-  //  r3.22 지옥 강화(이사 소감 2026-09-22 "지옥도 아직 너무 쉽다"): 지옥 S1 에 저격수·돌격체를 더해 단순 조준 봇(planBoss)은 더 못 이긴다.
-  //   성공 경로는 게이트 칸을 예상 최종값으로 고르는 evLead 로 잠근다 — '이길 수 있는 조작이 존재한다' 는 뜻은 그대로다
-  assert.equal(BR('brutal', 1).run.won, false, 'brutal S1 planBoss 는 이제 진다(지옥 강화 확인)');
-  const b1 = playPolicy(1, 'evLead', 14400, 'brutal');
-  assert.equal(b1.run.won, true, `brutal S1 evLead 미완주(정예 잔여 hp ${b1.run.boss ? Math.ceil(b1.run.boss.hp) : 0})`);
-  assert.ok(b1.run.units.length > 0, 'brutal S1 evLead 생존 병력 0');
-  assert.ok(b1.run.units.length < b1.run.peak, 'brutal S1 evLead 도 병력을 잃는다(무손실 승리 없음)');
-  //  r3.30(확정 칸 통과): 상한에 닿은 게이트에 헛발로 흡수되던 탄이 뒤의 적을 맞히게 되어 21 → 24명(최대 29 그대로, 여전히 손실 있음)
-  //  r3.31(적 크기 체력 비례·돌격체 감속·중화기 조정): 24 → 26명(최대 29 그대로, 여전히 손실 있음)
-  assert.equal(b1.run.units.length, 26, 'brutal S1 evLead 생존 병력 = r3.31 실측 26명(최대 29명)');
+  //  r3.22~r4.6 은 'evLead 가 26명으로 이긴다'를 잠갔다. r4.7(이사님 지시 2026-09-26 "난이도는 너의 봇테스트로 하지 말도록")부터
+  //   보스 체력은 상한 화력 계산(30초)으로 정하고 봇 승패를 잠그지 않는다 — 판이 끝나는가(보스 등장·over)만 잠그고 결과는 기록한다
+  for (const bot of ['planBoss', 'evLead']) {
+    const b = bot === 'planBoss' ? BR('brutal', 1) : playPolicy(1, 'evLead', 14400, 'brutal');
+    assert.equal(b.events.elite, 1, `brutal S1 ${bot}: 보스까지 간다`);
+    assert.equal(b.run.over, true, `brutal S1 ${bot}: 판이 끝난다`);
+    t.diagnostic(`SIM-BOSS-RECORD brutal S1 ${bot} won=${b.run.won} units=${b.run.units.length}/${b.run.peak} 보스잔여hp=${b.run.boss ? Math.ceil(b.run.boss.hp) : 0} time=${b.run.time.toFixed(1)}`);
+  }
 });
 
 test('V3-SIM-DIFF SD-8 기록: brutal S2·S3 는 실패를 허용하고 결과만 남긴다 — 다만 지더라도 정예전에서만 진다', (t) => {

@@ -83,7 +83,12 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = roun
         assert.equal(sp.hp, Math.round(defHp * mul * eh), `S${id} ${d} ${sp.kind}${sp.skin ? '(' + sp.skin + ')' : ''} z${sp.z} hp`);
       }
       //  정예: 구간 배율 없음 — normal 값 × eliteHp(1~3 은 ×1)
-      for (let k = 0; k < st.elites.length; k++) assert.equal(st.elites[k].hp, Math.round(base.elites[k].hp * bh), `S${id} ${d} 정예 ${k}`);
+      //  r4.7: 기본 줄은 그 값이 보스 체력 바닥의 base(stage.bossFloor.base)이고 실제 체력은 30초 × 상한 화력까지 오른다(옛 값 아래로는 안 내려간다)
+      for (let k = 0; k < st.elites.length; k++) {
+        const want = Math.round(base.elites[k].hp * bh);
+        if (st.bossFloor) { assert.equal(st.bossFloor.base[k], want, `S${id} ${d} 정예 ${k} base`); assert.ok(st.elites[k].hp >= want, `S${id} ${d} 정예 ${k} 바닥 ≥ 옛 값`); }
+        else assert.equal(st.elites[k].hp, want, `S${id} ${d} 정예 ${k}`);
+      }
     }
     //  같은 스테이지 안에서 난이도 순으로 단조 증가. r3.22: 지옥 전용 추가 무리(extraSpawns — 옛 brutalSpawns)가 z 순 정렬 중간에 끼므로
     //   번호(k)가 아니라 **이벤트 z·종류**로 짝을 맞춘다(추가 무리는 배수 1 줄에 짝이 없어 비교에서 빠진다)
@@ -105,7 +110,8 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = roun
   //  1~3: 배수 1 줄의 잡졸·정예 체력은 r3.9(33568b2)와 동일 · 기본 줄(지옥)만 × enemyHp·eliteHp(r3.22) · 4 부터는 두 줄 모두 배수(r4.2: 어려움 칸 삭제)
   const s2 = buildStage(2).spawns.map((s) => s.hp);
   assert.deepEqual(buildStage(2, { difficulty: 'brutal' }).spawns.map((s) => s.hp), s2.map((h) => Math.round(h * BAL3.difficulty.brutal.enemyHp)), 'S2 지옥 = 보통 × enemyHp');
-  assert.deepEqual(DIFFS.map((d) => buildStage(3, { difficulty: d }).elite.hp), [500, Math.round(500 * BAL3.difficulty.brutal.eliteHp)]);
+  //  r4.7: 기본 줄의 × eliteHp 값은 보스 체력 바닥의 base(실제 체력은 30초 × 상한 화력까지 오른다 — V3-R47 BOSS-30S)
+  assert.deepEqual(DIFFS.map((d) => { const st = buildStage(3, { difficulty: d }); return st.bossFloor ? st.bossFloor.base[0] : st.elite.hp; }), [500, Math.round(500 * BAL3.difficulty.brutal.eliteHp)]);
   assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).spawns[0].hp), [4, 8]);
   assert.equal(buildStage(13).spawns.find((s) => s.skin === 'E3_wallguard').hp, 70, '장갑체 10 × 7');
   assert.equal(buildStage(21, { difficulty: 'brutal' }).spawns.find((s) => s.skin === 'E7_cartyard').hp, 480, '카트 20 × 12 × 2');
