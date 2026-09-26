@@ -7,7 +7,7 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox, ATK_LOOK, ATK_DANGER } from './render.js';
 import { UP_TRACKS, UP_MAX, UP_EFFECT, normUp, hasUp, nextCost, canBuy } from './meta.js';
 import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
@@ -319,7 +319,9 @@ export function makeFx() {
            //   recruits = 부대로 날아가는 병사(규칙 좌표 출발점 + 이번 프레임 화면점 sx/sy/s)
            hit: {}, booms: [], recruits: [],
            //  r4.4 메인 로봇 보호: beams = 피해 이전 빛줄기 [{ x0, y0, x1, y1, t, life }](만드는 시점에 투영한 화면 좌표, 로봇 → 대신 맞은 호위)
-           beams: [] };
+           beams: [],
+           //  r4.8 보스 공격 폭발: atkBlasts = [{ kind 'pillar'|'burst', xs, w, x, z, R, color, t, life }](규칙 좌표 — 보스전은 카메라가 멈춰 있어 그릴 때 투영한다)
+           atkBlasts: [] };
 }
 
 //  r4.4 피해 이전 빛줄기 수명(초)·보호막이 깨질 때 조각 수
@@ -1158,6 +1160,23 @@ export function boot(canvas, deps = {}) {
         case 'arenaEnter': fx.arenaOpen = FX.arenaOpenSec; fx.arenaT = FX.arenaGuideSec; fx.arenaText = ARENA_GUIDE_TEXT; break;
         //  돌진 예고 = 중립 경고음(lotWarn 재사용). 화면의 붉은 원·점선은 이벤트가 아니라 run.boss.state 를 렌더가 직접 읽는다
         case 'bossDashWarn': fx.sfx.push(['lotWarn']); break;
+        //  r4.8 보스 공격 예고: 짧은 경고음(돌진 예고와 같은 lotWarn). 위험·안전 구역 그림은 렌더가 run.bossAtk.cur 를 직접 읽는다
+        case 'bossTele': fx.sfx.push(['lotWarn']); break;
+        //  발사: 기둥 포격 = 기둥마다 번쩍 + 흔들림 + 폭발음 · 산개탄 = 떨어진 자리 폭발 · 조준 대포·벽·쓸기 = 금속 발사음
+        case 'bossFire': {
+          const col = (ATK_LOOK[ev.look] ?? ATK_LOOK.orb).color;
+          if (ev.kind === 'pillar') {
+            fx.atkBlasts.push({ kind: 'pillar', xs: ev.xs, w: ev.w, t: 0, life: 0.35 });
+            for (const x of ev.xs || []) burstAt(x, run.z - (run.ay || 0), 18, false, ATK_DANGER);
+            fx.shakeT = FX.shakeDur; fx.sfx.push(['kill']);
+          } else if (ev.kind === 'burst') {
+            fx.atkBlasts.push({ kind: 'burst', x: ev.x, z: ev.z, R: ev.R ?? 60, color: col, t: 0, life: 0.35 });
+            burstAt(ev.x, ev.z, 16, true, col);
+            fx.sfx.push(['kill']);
+          } else fx.sfx.push(['gateClang']);
+          break;
+        }
+        case 'bossAtkEnd': break;
         case 'bossDash': fx.sfx.push(['gateClang']); break;
         //  보호막(r3.18): 흡수된 탄마다 회색 스파크(차폐물 흡수와 같은 표현), 효과음은 프레임당 1회. 해제는 반전음 + 보스 위 글자
         case 'bossGuard': burstAt(ev.x, ev.z, 4, false, C.wall); if (!guardSfx) { guardSfx = true; fx.sfx.push(['gateClang']); } break;
@@ -1201,6 +1220,7 @@ export function boot(canvas, deps = {}) {
     fx.shocks = fx.shocks.filter((s) => s.t < s.life);
     for (const b of fx.beams) b.t += dt;
     fx.beams = fx.beams.filter((b) => b.t < b.life);
+    if (fx.atkBlasts) { for (const b of fx.atkBlasts) b.t += dt; fx.atkBlasts = fx.atkBlasts.filter((b) => b.t < b.life); }
     fx.lotOpen = Math.max(0, fx.lotOpen - dt);
     //  동작 시트 타이머: 사격이 끝나면 걷기 시간을 다시 센다 · 피격은 0 이하 삭제 · 쓰러진 잡졸은 재생+머묾이 끝나면 지운다
     fx.heroFire = Math.max(0, fx.heroFire - dt);

@@ -133,9 +133,11 @@ test('BOSS-SHOT: 게임 줄 보스 탄 1(= 1 × 3 × 1/3 — 두 발에 병사 1
   //  접촉·착지 충격은 그대로(보스 탄만)
   assert.equal(b.elite.touchDmg, 9);
   assert.equal(createRun(buildStage(24, { difficulty: 'brutal' })).arena.boss.shock.dmg, 6, '광장 착지 충격 = 2 × 3 그대로');
-  //  실제 판: 1번(저격수 extraSpawns + 정예) · 10번(포격형) · 24번(광장 보스 부채꼴) — 새로 생긴 적탄을 **쏜 자리**로 가른다:
-  //   적탄은 생긴 STEP 에 한 번 움직이며 px/pz 에 출발점을 남긴다 → 출발점이 살아 있는 보스 자리면 보스 탄, 아니면 저격수 탄
+  //  실제 판: 1번(저격수 extraSpawns + 정예) · 10번(포격형) · 24번(광장 보스) — 새로 생긴 적탄을 **쏜 쪽**으로 가른다:
+  //   적탄은 생긴 STEP 에 한 번 움직이며 px/pz 에 출발점을 남긴다 → 출발점이 살아 있는 보스 자리면 보스 탄, 아니면 저격수 탄.
+  //   r4.8: 게임 줄 보스는 부채꼴 대신 패턴(벽 한 줄·산개탄은 보스 자리가 아닌 곳에서 나온다)을 쓴다 — 패턴 탄은 공격 번호 칸(atk)으로 가른다
   const seen = { boss: new Set(), shooter: new Set() };
+  let patternShots = 0;
   for (const id of [1, 10, 24]) {
     const run = createRun(buildStage(id, { difficulty: 'brutal' }), { heroGuard: true });
     let steps = 0;
@@ -144,11 +146,13 @@ test('BOSS-SHOT: 게임 줄 보스 탄 1(= 1 × 3 × 1/3 — 두 발에 병사 1
       stepRun(run, pickInput('evLead', run), STEP); drainEvents(run);
       for (const s of run.eshots) {
         if (before.has(s)) continue;
-        const fromBoss = run.bosses.some((b) => Math.abs(b.x - s.px) < 1e-6 && Math.abs(b.z - s.pz) < 1e-6);
+        if (s.atk != null) patternShots++;
+        const fromBoss = s.atk != null || run.bosses.some((b) => Math.abs(b.x - s.px) < 1e-6 && Math.abs(b.z - s.pz) < 1e-6);
         (fromBoss ? seen.boss : seen.shooter).add(s.dmg);
       }
     }
   }
+  assert.ok(patternShots > 0, '게임 줄 보스 탄 = 패턴 탄(r4.8)');
   assert.deepEqual([...seen.boss], [1], '보스 탄 = 1');
   assert.deepEqual([...seen.shooter], [3], '저격수 탄 = 3');
 });

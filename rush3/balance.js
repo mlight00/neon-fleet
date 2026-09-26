@@ -138,6 +138,45 @@ export const BAL3 = deepFreeze({
   //            r4.7 보정(이사님 실플레이 2026-09-26 "보스는 괜찮은데 현상금 적이 너무 셈"): 0.9 → 0.45(절반). 상한 부대는 창의 절반쯤에 잡고,
   //            상한의 절반쯤 되는 부대가 끝까지 쏴야 깨는 정도(난이도는 봇이 아니라 이사님 실플레이 기준)
   bounty: { label: '현상금', r: 34, vz: 130, track: 120, touchDmg: 6, hpFactor: 0.45 },
+  //  보스 공격 패턴(r4.8 — 이사님 지시 2026-09-26 "적 보스의 공격 쏘는 패턴을 다양하게 만들자. 모든 보스가 같은 패턴의 같은 총알만 쏟아낸다" ·
+  //   "병사를 아무리 많이 모아도 보스에 가면 … 피할 수가 없이 모든 총알을 맞게 된다"). 게임 화면 줄(difficulty 표의 bossPatterns 가 참인 줄)에서만
+  //   buildStage 가 보스 정의에 atk(패턴 순서·처음 열린 수·간격·탄 모양)를 싣고, 그 보스는 조준 부채꼴 대신 이 패턴을 쓴다(rush3/bossatk.js 설계 · combat.js 진행).
+  //  공통 규칙: 예고(tele 초) 동안 위험 구역(붉은)과 안전 구역(초록 테)을 보인다. 안전 구역 폭 ≥ 부대 폭(2 × 반폭) + margin 이고, 부대 중심이
+  //   moveMax × tele × reachK 안에서 닿는다. 보장이 안 되면 그 패턴을 고르지 않는다(다음 패턴). 전체에 공격 1개(보스가 여럿이면 차례로).
+  //   공격이 끝나면(그 공격의 탄이 모두 사라지면) 다음 예고까지 gap × 페이즈 rate 초. 페이즈(체력 50%·20%)마다 패턴이 하나씩 더 열린다.
+  //   피해 = 탄·포격 모두 병사 1명에게 적 표의 보스 탄 피해(게임 줄 1 — r4.7). ⚠️enemies 에 넣지 않는다(kind 4종 표)
+  bossAtk: {
+    first: 1.2,   // 보스가 자리를 잡은 뒤(도로 = 하강 끝, 광장 = 추격 중) 첫 예고까지(초)
+    retry: 0.25,  // 고를 수 있는 패턴이 없을 때 다시 볼 때까지(초)
+    margin: 48,   // 안전 구역 여유(px) — 부대 양옆에 24 씩
+    reachK: 0.8,  // 닿는 거리 = 부대 최고 횡속도(squad.moveMax) × 예고 초 × 이 값
+    //  ① 조준 대포: 부대 몸통 안 한 점을 겨눈 붉은 조준선 → 크고 느린 탄 1발(반지름 r · 속도 v). 보스는 예고 동안 멈춘다
+    aim:    { tele: 0.8, r: 10, v: 200 },
+    //  ② 탄막 벽: 도로(광장) 전체를 가로지르는 작은 탄 한 줄이 내려온다 — 빈틈(초록 기둥)만 비어 있다. gap = 탄 사이 간격(px, 병사 원이 빠져나갈 수 없게 좁게)
+    wall:   { tele: 0.8, r: 6, v: 180, gap: 20 },
+    //  ③ 기둥 포격: 붉은 세로 기둥(폭 w)이 예고 동안 차오르다 터진다 — 기둥 안 병사 모두 피해(탄 없이 즉시). 기둥 사이 최소 간격 space · 최대 max 개
+    pillar: { tele: 0.9, w: 44, space: 14, max: 3 },
+    //  ④ 쓸기: 보스가 멈춰 탄 줄기를 부대 쪽 끝에서 반대쪽으로 dur 초 동안 쓸어 간다(every 초마다 1발). 줄기는 안전 구역 앞에서 멈춘다 — 끝 쪽으로 건너가 기다리면 된다
+    sweep:  { tele: 0.8, dur: 1.4, every: 0.07, r: 5, v: 320, minSpan: 60 },
+    //  ⑤ 산개탄(광장): 떨어질 자리에 붉은 원 → 보스가 던진 큰 탄이 그 자리에서 터져 n 방향 작은 탄이 reach 까지 퍼진다
+    burst:  { tele: 0.9, reach: 55, n: 8, r: 5, v: 160 },
+    //  보스 그림(스킨)별 패턴 순서(앞 open 개가 처음부터 열려 있고 50%·20% 에서 하나씩 더) · 공격 간격 gap(초, × 페이즈 rate — 1.95 × 0.62 ≥ 1.2) · 탄 모양 look.
+    //   road = 도로 단수 보스(역할 정예) · arena = 광장 보스(⑤·② 가 먼저). 역할이 있는 보스(복수 보스 판 10·23)는 roles 가 순서·여는 수를 정한다(간격·탄 모양은 스킨)
+    open: 2,
+    skins: {
+      B1_grader:        { road: ['aim', 'wall', 'pillar', 'sweep'], gap: 2.0, look: 'orb' },
+      B2_gantrywidow:   { road: ['pillar', 'wall', 'sweep', 'aim'], gap: 1.95, look: 'needle' },
+      B3_railleviathan: { road: ['sweep', 'aim', 'wall', 'pillar'], arena: ['burst', 'wall', 'pillar', 'aim'], gap: 2.0, look: 'laser' },
+      B4_smelter:       { road: ['pillar', 'sweep', 'aim', 'wall'], arena: ['wall', 'burst', 'aim', 'pillar'], gap: 1.95, look: 'magma' },
+      B5_crownbreaker:  { arena: ['burst', 'wall', 'aim', 'pillar'], gap: 1.95, look: 'crown' },
+    },
+    //  역할 = 포격(②④ — 탄만) · 소환(③ + 소환) · 장갑(①③)
+    roles: {
+      gunner:   { seq: ['wall', 'sweep', 'aim', 'pillar'], open: 2 },
+      summoner: { seq: ['pillar', 'wall', 'aim'], open: 1 },
+      tank:     { seq: ['aim', 'pillar', 'sweep', 'wall'], open: 2 },
+    },
+  },
 
   elites: {
     laneHw: 32,
@@ -188,6 +227,7 @@ export const BAL3 = deepFreeze({
   //   bossHw       (r4.8) 이 줄에서만 보스전(보스 등장 ~ 승리) 부대 대형 반폭 상한(px) — 이사님 지시(2026-09-26) "병사를 아무리 많이 모아도 보스에 가면
   //                총알을 많이 쏟아부으니까 피할 수가 없이 모든 총알을 맞게 된다". 100명 대형(반폭 약 130 = 도로 폭의 80%)을 64 로 모아 피할 자리를 만든다.
   //                buildStage 가 stage.bossHw 로 싣고(상한 화력 계산기도 같은 대형), createRun·stepRun 은 run.bossHw·run.hwCap 만 읽는다. null = 제한 없음(종전)
+  //   bossPatterns (r4.8) 이 줄에서만 보스가 조준 부채꼴 대신 예고·안전 구역이 있는 패턴(BAL3.bossAtk)을 쓴다 — buildStage 가 보스 정의에 atk 를 싣는다
   //  화면 이름(label·short)은 r4.2 에서 지웠다 — 어디에도 표시하지 않는다.
   difficulty: {
     //  r3.9(2026-09-18 이사 결정 2)는 위협을 **출현 빈도**로만 올렸다(enemyHp·eliteHp 1 고정). → **r3.21(2026-09-20 이사 결정 B안)로 뒤집음**:
@@ -195,12 +235,12 @@ export const BAL3 = deepFreeze({
     //   빈도 배수(waves·waveGap·spawnCount·eliteSummonRate)와 적탄·접촉 피해 배수는 r3.9 그대로 둔다. 스테이지 구간 배율(enemyHpByStage)은 여기에 곱해진다.
     //   ⚠️1~3 기준 코스(enemyHpByStage difficultyHp: ['brutal'])에서는 배수 1 줄의 enemyHp·eliteHp 가 ×1 이다(stages.buildStage·combat.createRun).
     normal: { id: 'normal', enemyHp: 1,   eshotDmg: 1, touchDmg: 1, eliteHp: 1,    spawnCount: 1,   waves: 1, waveGap: 0,   eliteFireRate: 1,    shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 1, extraSpawns: false,
-              bossShotDmg: 1, bossFloor: false, bounty: false, bossHw: null },
+              bossShotDmg: 1, bossFloor: false, bounty: false, bossHw: null, bossPatterns: false },
     //   waves·waveGap 은 봇 실측(2026-09-19, 6후보 스윕)으로 잡았다. brutal waves 3 은 gap 160~480 전부에서 planBoss 가 S2 정예 전에 전멸(SD-8 위반).
     //   지옥은 waves 대신 spawnCount 1.8·소환 2배·피해 3배로 벌어진다.
     //   r4.7(이사님 실플레이 뒤 지시 2026-09-26 — 결정 D2′ '지옥 값 그대로'를 **보스 체력·보스 탄 피해·현상금 적에 한해** 푼다): bossShotDmg 1/3 · bossFloor true · bounty true
     brutal: { id: 'brutal', enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2, extraSpawns: true,
-              bossShotDmg: 1 / 3, bossFloor: true, bounty: true, bossHw: 64 },
+              bossShotDmg: 1 / 3, bossFloor: true, bounty: true, bossHw: 64, bossPatterns: true },
   },
   //  적 체력 스테이지 배율(r3.21, 이사 결정 2026-09-20 B안 ①): 스테이지 번호 구간별 배수. 잡졸·돌격체·저격수(스폰 정의 hp 명시 포함)와
   //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).

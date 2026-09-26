@@ -109,6 +109,19 @@ export const HERO_BULLET_RIM = 'rgba(217,166,255,0.85)';
 //   막 나온 알갱이(사거리 원점에서 flashPx 안)에는 총구 섬광(흰 노랑 원이 빠르게 줄어든다)을 겹친다 — 한 번에 나온 6발이 한자리에 겹쳐 한 번 번쩍인다.
 //   검사(SCATTER)가 core·flash 색으로 그리기 호출을 찾는다
 export const PELLET = Object.freeze({ core: '#F7FFE6', flash: '#FFF6C8', tail: 2.4, glow: 1.7, flashPx: 40 });
+//  r4.8 보스 공격 패턴 예고(규칙 run.bossAtk.cur 를 읽기만 해서 그린다 — 이사님 지시 2026-09-26 "보스 탄을 피할 수 없다"):
+//   위험 = 붉은 반투명(조준선·기둥·벽 줄·쓸 범위·떨어질 원) · 안전 구역 = 초록 테(부대 띠 높이의 사각, 벽은 빈틈 기둥). 검사가 이 색으로 그리기 호출을 찾는다
+export const ATK_DANGER = '#FF3040';
+export const ATK_SAFE = '#5CFF8A';
+//  보스 스킨별 탄 모양(look — balance.bossAtk.skins): 구슬(B1 주황) · 바늘(B2 보라) · 레이저 줄기(B3 하늘) · 용암 포탄(B4 주홍 + 검은 껍질) · 왕관 조각(B5 금 마름모).
+//   패턴 탄(규칙 적탄의 look 칸)만 이 모양이고, 저격수 탄·배수 1 줄 보스 부채꼴은 종전 마젠타 구슬
+export const ATK_LOOK = Object.freeze({
+  orb:    Object.freeze({ shape: 'orb', color: '#FFB347', core: '#FFF1C9' }),
+  needle: Object.freeze({ shape: 'needle', color: '#C77DFF', core: '#F6E9FF' }),
+  laser:  Object.freeze({ shape: 'laser', color: '#5CE1FF', core: '#EFFFFF' }),
+  magma:  Object.freeze({ shape: 'magma', color: '#FF6A2A', core: '#FFE08A', crust: '#5A1A08' }),
+  crown:  Object.freeze({ shape: 'crown', color: '#FFD447', core: '#FFFBE0' }),
+});
 
 //  r4.5 강화 화면(새 상태 'upgrade', 원본 v4 3-5 '강화 화면')의 **자리표 단일 출처** — 셸(main.js)의 [구매]·[돌아가기] 히트 상자가 이 표에서 나온다
 //   (HUD_ROW 와 같은 원칙: 그리는 자리와 누르는 자리가 갈라지지 않게 좌표를 두 곳에 적지 않는다). 480×800 기준.
@@ -1414,18 +1427,212 @@ export function createRenderer3(ctx, sprites) {
     ctx.restore();
   }
 
-  //  적탄: 마젠타 구슬 + 흰 테(기존 램프탄 복제)
+  //  적탄: 마젠타 구슬 + 흰 테(기존 램프탄 복제). r4.8 보스 패턴 탄(look 칸)은 보스 스킨별 모양(ATK_LOOK — drawAtkShot)
   function drawEshots(run) {
     for (const s of run.eshots) {
       if (s.dead) continue;
       const d = s.z - run.z;
       if (offscreen(d, 20)) continue;
-      const q = pj(s.x, d), r = 5.5 * q.s;
+      const q = pj(s.x, d);
+      const L = s.look ? ATK_LOOK[s.look] : null;
+      if (L) { drawAtkShot(s, q, L); continue; }
+      const r = 5.5 * q.s;
       ctx.fillStyle = C.eshot;
       ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.stroke();
     }
+  }
+
+  //  r4.8 보스 패턴 탄 한 발: 크기 = 판정 반지름 × 그 자리 배율, 진행 방향(화면: vx 오른쪽 · vz 아래)으로 돌려 그린다(바늘·줄기·꼬리가 날아가는 쪽을 향한다)
+  function drawAtkShot(s, q, L) {
+    const r = Math.max(3, s.r * q.s * 1.1);
+    const ang = Math.atan2(s.vz || 0, s.vx || 0);
+    ctx.save();
+    ctx.translate(q.x, q.y);
+    ctx.rotate(ang);
+    if (L.shape === 'needle') {
+      ctx.globalAlpha = 0.4; ctx.strokeStyle = L.color; ctx.lineWidth = r * 0.7; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-r * 3.2, 0); ctx.lineTo(0, 0); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = L.color;
+      ctx.beginPath(); ctx.moveTo(r * 2.2, 0); ctx.lineTo(-r * 1.4, r * 0.62); ctx.lineTo(-r * 1.4, -r * 0.62); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = L.core;
+      ctx.beginPath(); ctx.ellipse(r * 0.2, 0, r * 1.1, r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (L.shape === 'laser') {
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.45; ctx.strokeStyle = L.color; ctx.lineWidth = r * 1.9;
+      ctx.beginPath(); ctx.moveTo(-r * 4, 0); ctx.lineTo(r, 0); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.lineWidth = r * 1.05;
+      ctx.beginPath(); ctx.moveTo(-r * 3.4, 0); ctx.lineTo(r * 0.8, 0); ctx.stroke();
+      ctx.strokeStyle = L.core; ctx.lineWidth = r * 0.4;
+      ctx.beginPath(); ctx.moveTo(-r * 3, 0); ctx.lineTo(r * 0.7, 0); ctx.stroke();
+    } else if (L.shape === 'magma') {
+      ctx.globalAlpha = 0.35; ctx.fillStyle = L.color;
+      ctx.beginPath(); ctx.arc(-r * 1.3, 0, r * 0.7, 0, Math.PI * 2); ctx.arc(-r * 2.3, 0, r * 0.45, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = L.color;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = L.crust; ctx.lineWidth = Math.max(1.5, r * 0.28);
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0.4, 2.6); ctx.stroke();
+      ctx.fillStyle = L.core;
+      ctx.beginPath(); ctx.arc(r * 0.25, -r * 0.1, r * 0.38, 0, Math.PI * 2); ctx.fill();
+    } else if (L.shape === 'crown') {
+      ctx.globalAlpha = 0.35; ctx.fillStyle = L.color;
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.7, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = L.color;
+      ctx.beginPath(); ctx.moveTo(r * 1.5, 0); ctx.lineTo(0, r * 0.95); ctx.lineTo(-r * 1.5, 0); ctx.lineTo(0, -r * 0.95); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = L.core;
+      ctx.beginPath(); ctx.moveTo(r * 0.6, 0); ctx.lineTo(0, r * 0.35); ctx.lineTo(-r * 0.6, 0); ctx.lineTo(0, -r * 0.35); ctx.closePath(); ctx.fill();
+    } else {
+      //  orb(구슬): 번짐 + 몸 + 밝은 심 + 흰 테
+      ctx.globalAlpha = 0.35; ctx.fillStyle = L.color;
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = L.core;
+      ctx.beginPath(); ctx.arc(r * 0.15, -r * 0.1, r * 0.45, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  //  세계 사각(x0~x1 × z0~z1)을 화면 경로로 — 원근에서 세로 가장자리는 곡선이라 n 조각으로 나눠 잇는다
+  function worldBoxPath(x0, x1, z0, z1, rz, n = 8) {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const q = pj(x0, z0 + (z1 - z0) * i / n - rz); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }
+    for (let i = n; i >= 0; i--) { const q = pj(x1, z0 + (z1 - z0) * i / n - rz); ctx.lineTo(q.x, q.y); }
+    ctx.closePath();
+  }
+  //  세계 선분(x0,z0)→(x1,z1)을 화면 경로로(n 조각)
+  function worldLinePath(x0, z0, x1, z1, rz, n = 10) {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const t = i / n, q = pj(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t - rz); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }
+  }
+  //  세계 원(가운데 (x, z), 반지름 R)을 화면 경로로
+  function worldCirclePath(x, z, R, rz, n = 28) {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2, q = pj(x + Math.cos(a) * R, z + Math.sin(a) * R - rz); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }
+    ctx.closePath();
+  }
+
+  //  r4.8 보스 공격 예고·진행(규칙 run.bossAtk.cur — 읽기만). p = 예고 진행(0 → 1, 발사 뒤 1) · 깜빡임은 now 로.
+  //   ① 조준 대포 = 보스 → 겨눈 점을 지나 부대 뒤까지 붉은 조준선 + 겨눈 점 표적 · ② 탄막 벽 = 벽이 나올 줄(붉은 띠 + 탄 자리 점) + 초록 '빈틈' 기둥 ·
+  //   ③ 기둥 포격 = 붉은 세로 기둥이 아래부터 차오른다 · ④ 쓸기 = 쓸 범위(붉은) + 쓸어 갈 방향 화살표 · ⑤ 산개탄 = 떨어질 자리 붉은 원 + 날아오는 큰 탄.
+  //   안전 구역 = 초록 테(부대 띠 높이 — 벽은 빈틈 기둥이 대신한다). 발사 뒤에는 흐리게 남겨 탄이 지나갈 때까지 보인다
+  function drawBossAtk(run, now) {
+    const cur = run.bossAtk && run.bossAtk.cur;
+    if (!cur) return;
+    const rz = run.z, tele = cur.state === 'tele';
+    const p = tele ? Math.max(0, Math.min(1, 1 - cur.t / cur.tele)) : 1;
+    const blink = 0.72 + 0.28 * Math.sin(now * 16);
+    const a = tele ? 1 : 0.45;
+    const [b0, b1] = cur.band;
+    const top = rz + 720, bot = rz - 170;
+    const arenaW = run.phase === 'arena' && run.arena ? run.arena.w : [ROAD0, ROAD1];
+    ctx.save();
+    ctx.lineJoin = 'round';
+    if (cur.kind === 'pillar') {
+      for (const x of cur.xs) {
+        const x0 = x - cur.w / 2, x1 = x + cur.w / 2;
+        ctx.globalAlpha = 0.16 * blink; ctx.fillStyle = ATK_DANGER;
+        worldBoxPath(x0, x1, bot, top, rz); ctx.fill();
+        ctx.globalAlpha = 0.42; ctx.fillStyle = ATK_DANGER;
+        worldBoxPath(x0, x1, bot, bot + (top - bot) * p, rz); ctx.fill();
+        ctx.globalAlpha = 0.85 * blink; ctx.strokeStyle = ATK_DANGER; ctx.lineWidth = 2;
+        worldBoxPath(x0, x1, bot, top, rz); ctx.stroke();
+      }
+    } else if (cur.kind === 'wall') {
+      const [s0, s1] = cur.safe;
+      if (tele) {
+        ctx.globalAlpha = 0.5 * blink; ctx.fillStyle = ATK_DANGER;
+        if (s0 > arenaW[0]) { worldBoxPath(arenaW[0], s0, cur.z - 8, cur.z + 8, rz, 2); ctx.fill(); }
+        if (s1 < arenaW[1]) { worldBoxPath(s1, arenaW[1], cur.z - 8, cur.z + 8, rz, 2); ctx.fill(); }
+        ctx.globalAlpha = 0.9;
+        for (const x of cur.xs) { const q = pj(x, cur.z - rz); ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(2, cur.r * q.s * 0.8), 0, Math.PI * 2); ctx.fill(); }
+      }
+      //  빈틈 기둥(초록): 벽이 나오는 줄부터 부대 뒤까지
+      ctx.globalAlpha = 0.14 * a; ctx.fillStyle = ATK_SAFE;
+      worldBoxPath(s0, s1, b0 - 20, Math.min(top, cur.z), rz); ctx.fill();
+      ctx.globalAlpha = 0.95 * a; ctx.strokeStyle = ATK_SAFE; ctx.lineWidth = 3;
+      worldBoxPath(s0, s1, b0 - 20, Math.min(top, cur.z), rz); ctx.stroke();
+    } else if (cur.kind === 'aim') {
+      const zEnd = b0 - 40, s = (zEnd - cur.oz) / cur.uz, xEnd = cur.ox + cur.ux * s;
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.28 * a * blink; ctx.strokeStyle = ATK_DANGER; ctx.lineWidth = Math.max(8, cur.r * 2.4);
+      worldLinePath(cur.ox, cur.oz, xEnd, zEnd, rz); ctx.stroke();
+      ctx.globalAlpha = 0.9 * a; ctx.lineWidth = 2; ctx.setLineDash([10, 8]);
+      worldLinePath(cur.ox, cur.oz, xEnd, zEnd, rz); ctx.stroke();
+      ctx.setLineDash([]);
+      if (tele) {
+        const q = pj(cur.tx, cur.tz - rz), rr = (14 + 10 * (1 - p)) * q.s;
+        ctx.globalAlpha = 0.9 * blink; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(q.x, q.y, rr, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(q.x - rr * 1.4, q.y); ctx.lineTo(q.x + rr * 1.4, q.y); ctx.moveTo(q.x, q.y - rr * 1.4); ctx.lineTo(q.x, q.y + rr * 1.4); ctx.stroke();
+      }
+    } else if (cur.kind === 'sweep') {
+      const [d0, d1] = cur.danger[0];
+      ctx.globalAlpha = (tele ? 0.2 : 0.1) * blink; ctx.fillStyle = ATK_DANGER;
+      worldBoxPath(d0, d1, b0 - 10, b1 + 10, rz); ctx.fill();
+      //  시작·끝 줄기(흐린 선)
+      const xs0 = cur.xs[0], xs1 = cur.xs[cur.xs.length - 1];
+      ctx.globalAlpha = 0.35 * a; ctx.strokeStyle = ATK_DANGER; ctx.lineWidth = 2; ctx.setLineDash([6, 8]);
+      worldLinePath(cur.ox, cur.oz, xs0, cur.tz, rz); ctx.stroke();
+      worldLinePath(cur.ox, cur.oz, xs1, cur.tz, rz); ctx.stroke();
+      ctx.setLineDash([]);
+      //  쓸어 갈 방향 화살표(부대 앞줄 위, 예고 동안 시작 → 끝으로 자란다)
+      if (tele) {
+        const za = b1 + 34, xe = xs0 + (xs1 - xs0) * Math.max(0.35, p);
+        const qa = pj(xs0, za - rz), qb = pj(xe, za - rz), dir = Math.sign(xs1 - xs0) || 1, h = 12 * qb.s;
+        ctx.globalAlpha = 0.95 * blink; ctx.strokeStyle = ATK_DANGER; ctx.fillStyle = ATK_DANGER; ctx.lineWidth = 5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(qa.x, qa.y); ctx.lineTo(qb.x, qb.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(qb.x + dir * h, qb.y); ctx.lineTo(qb.x - dir * h * 0.4, qb.y - h * 0.9); ctx.lineTo(qb.x - dir * h * 0.4, qb.y + h * 0.9); ctx.closePath(); ctx.fill();
+      }
+    } else if (cur.kind === 'burst' && tele) {
+      ctx.globalAlpha = (0.14 + 0.22 * p) * blink; ctx.fillStyle = ATK_DANGER;
+      worldCirclePath(cur.tx, cur.tz, cur.R, rz); ctx.fill();
+      ctx.globalAlpha = 0.9 * blink; ctx.strokeStyle = ATK_DANGER; ctx.lineWidth = 3;
+      worldCirclePath(cur.tx, cur.tz, cur.R, rz); ctx.stroke();
+      //  던진 큰 탄: 보스 → 떨어질 자리로 포물선(높이 = 화면 px), 바닥 그림자
+      const gx = cur.ox + (cur.tx - cur.ox) * p, gz = cur.oz + (cur.tz - cur.oz) * p;
+      const g = pj(gx, gz - rz), hgt = 150 * 4 * p * (1 - p) * g.s;
+      const L = ATK_LOOK[cur.look] ?? ATK_LOOK.orb;
+      ctx.globalAlpha = 0.35; ctx.fillStyle = 'rgba(20,25,35,1)';
+      ctx.beginPath(); ctx.ellipse(g.x, g.y, 11 * g.s, 4 * g.s, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = L.color;
+      ctx.beginPath(); ctx.arc(g.x, g.y - hgt, 10 * g.s, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    //  안전 구역(초록 테) — 부대 띠 높이. 벽은 빈틈 기둥이 대신한다
+    if (cur.kind !== 'wall') {
+      const [s0, s1] = cur.safe;
+      ctx.globalAlpha = 0.13 * a; ctx.fillStyle = ATK_SAFE;
+      worldBoxPath(s0, s1, b0 - 10, b1 + 10, rz, 4); ctx.fill();
+      ctx.globalAlpha = 0.95 * a; ctx.strokeStyle = ATK_SAFE; ctx.lineWidth = 3;
+      worldBoxPath(s0, s1, b0 - 10, b1 + 10, rz, 4); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  //  r4.8 보스 공격 폭발 연출(셸 fx.atkBlasts — 규칙 좌표, 이벤트 bossFire 가 넣는다): ③ 기둥 = 흰·붉은 기둥이 번쩍 사라진다 · ⑤ 산개탄 = 원이 퍼지며 사라진다
+  function drawAtkBlasts(list, rz) {
+    if (!list || !list.length) return;
+    ctx.save();
+    for (const b of list) {
+      const k = Math.max(0, Math.min(1, b.t / (b.life || 0.35)));
+      if (b.kind === 'pillar') {
+        for (const x of b.xs || []) {
+          ctx.globalAlpha = 0.75 * (1 - k); ctx.fillStyle = '#FFE6D0';
+          worldBoxPath(x - b.w / 2 * (1 - 0.4 * k), x + b.w / 2 * (1 - 0.4 * k), rz - 170, rz + 720, rz); ctx.fill();
+          ctx.globalAlpha = 0.5 * (1 - k); ctx.fillStyle = ATK_DANGER;
+          worldBoxPath(x - b.w / 2, x + b.w / 2, rz - 170, rz + 720, rz); ctx.fill();
+        }
+      } else if (b.kind === 'burst') {
+        ctx.globalAlpha = 0.8 * (1 - k); ctx.strokeStyle = b.color || ATK_DANGER; ctx.lineWidth = 4 * (1 - k) + 1;
+        worldCirclePath(b.x, b.z, b.R * (0.4 + 0.6 * k), rz); ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   //  파편·플로터·팝은 셸이 만드는 시점에 투영한 **화면 좌표**를 들고 있다(main.js) — 여기서는 그대로 찍는다
@@ -2189,12 +2396,15 @@ export function createRenderer3(ctx, sprites) {
     //  보스(r3.16 복수 정예): 살아 있는 것만, 먼 것(z 큰 것)을 먼저 그려 가까운 것이 위에 오게. 죽은 보스는 배열에 남아 있으므로 반드시 거른다
     const shockR = run.arena && run.arena.boss && run.arena.boss.shock ? run.arena.boss.shock.r : null;
     for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, run.z, now, shockR, fx);
+    //  r4.8 보스 공격 예고(위험·안전 구역) — 보스 위, 탄·부대 아래
+    drawBossAtk(run, now);
     drawBullets(run);
     drawEshots(run);
     drawSquad(run, fx, now);
     drawBeams(fx.beams ?? []);
     drawRecruits(fx.recruits);
     drawShocks(fx.shocks ?? []);
+    drawAtkBlasts(fx.atkBlasts ?? [], run.z);
     drawParts(fx.parts);
     drawFloaters(fx.floaters);
     drawPops(fx.pops);

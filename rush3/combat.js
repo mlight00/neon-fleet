@@ -8,6 +8,8 @@ import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlapping
 import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.js';
 //  r4.4 판 밖 로봇 강화(순수 규칙 모듈 — 비용·구매는 셸·저장 몫, 여기서는 효과 수치만 읽는다)
 import { normUp, hasUp, effects } from './meta.js';
+//  r4.8 보스 공격 패턴 설계(순수 규칙 모듈 — 안전 구역을 먼저 정한 공격 한 번의 기하). 차례·예고 시간·탄 생성·피해는 여기(bossAttackStep)
+import { planAttack, unlockedAtk } from './bossatk.js';
 
 export const STEP = BAL3.STEP;
 
@@ -18,6 +20,9 @@ const ELITES = BAL3.elites;
 const ARENA_BOSS_Z = BAL3.arena.bossZ;
 //  체력 비례 크기(r3.31) 표. 파일 상단 상수 — stepRun 이후 소스가 BAL3 를 직접 읽지 않는 규약(DIFF-6)을 지킨다
 const SIZE_BY_HP = BAL3.sizeByHp;
+//  r4.8 보스 공격 패턴 표(첫 예고까지·다시 볼 때까지 초) · 보스 페이즈 표(공격 간격 × rate). 파일 상단 상수
+const BATK = BAL3.bossAtk;
+const PHASES = BAL3.bossPhases;
 const HP_BASE = Object.freeze(Object.fromEntries(Object.entries(BAL3.enemies).filter(([, d]) => d.hp != null).map(([k, d]) => [k, d.hp])));
 const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
 const DEG = Math.PI / 180;
@@ -156,6 +161,9 @@ export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard =
   //  r4.8 보스전 밀집 대형(희소 — 게임 화면 줄의 buildStage 만 stage.bossHw 를 싣는다. 배수 1 줄·검사 합성 판의 run 에는 키가 없다).
   //   보스가 나오는 STEP 에 run.hwCap(지금 반폭)을 세우고 STEP 마다 bossHw 쪽으로 줄인다(stepHwCap)
   if (stage.bossHw) run.bossHw = stage.bossHw;
+  //  r4.8 보스 공격 차례(희소 — 보스 정의에 atk 가 있는 판 = 게임 화면 줄만): wait = 다음 예고까지 초 · cur = 진행 중인 공격(전체에 1개) ·
+  //   turn = 다음 차례 보스 번호 · n = 공격 일련번호(탄의 atk 칸 — 그 공격의 탄이 모두 사라지면 공격이 끝난다)
+  if (elites.some((e) => e.atk)) run.bossAtk = { wait: BATK.first, cur: null, turn: 0, n: 0 };
   const interval = weaponStats(weapon, weaponMk).interval;
   for (let i = 0; i < (stage.startUnits | 0); i++) run.units.push(makeUnit(run.nextUnitId++, interval));
   //  r4.4 hero 표시: 첫 유닛(id 1). 배열 0번 = 대형 중심(0,0) 자리이고, 증원은 뒤에 붙고(addUnits) 제거·정리는 순서를 지키므로(removeUnits·pruneDeadUnits)
@@ -331,6 +339,9 @@ export function makeBoss(run, def, index) {
                laneLo, laneHi, holdAhead: rd.holdAhead, descendSpeed: E.descendSpeed * rd.descendMul, patrolSpeed: E.patrolSpeed * rd.patrolMul,
                phase: 0, dead: false, reaped: false };
   if (def.skin) bo.skin = def.skin;
+  //  r4.8 보스 공격 패턴(게임 화면 줄 — buildStage 가 보스 정의에 atk 를 싣는다): 조준 부채꼴(shoot)을 끄고 패턴 차례(bossAttackStep)에 든다.
+  //   atkN = 이 보스의 공격 횟수(패턴 순서) · atkK = 패턴별 횟수(빈틈 위치 번갈이·겨누는 쪽). 배수 1 줄·검사 합성 판은 키가 없다(종전 부채꼴 그대로)
+  if (def.atk) { bo.atk = { ...def.atk, seq: [...def.atk.seq] }; bo.atkN = 0; bo.atkK = {}; bo.shoot = false; }
   return bo;
 }
 
@@ -347,7 +358,8 @@ function enterArena(run, ev) {
   Object.assign(bo, {
     arena: true, r: B.r, x: ROAD.center, z: run.z + B.spawnAhead, state: 'chase', touchT: 0,
     dashT: B.dash.first, warnT: 0, recoverT: 0, dashTx: null, dashTz: null, dashUx: 0, dashUz: 0, dashLeft: 0,
-    summon: !!B.summon, spawnT: B.summon ? B.summon.every : 0, shoot: !!B.shoot, shootT: B.shoot ? B.shoot.every : 0,
+    //  r4.8: 패턴을 쓰는 보스(atk — 게임 화면 줄)는 부채꼴 사격(shoot)을 끈다(광장 정의의 shoot 칸은 그대로 — 배수 1 줄은 종전 부채꼴)
+    summon: !!B.summon, spawnT: B.summon ? B.summon.every : 0, shoot: !!B.shoot && !bo.atk, shootT: B.shoot ? B.shoot.every : 0,
     //  보호막(r3.18 대항 검수 반영): 첫 착지 충격까지 피격 무효. 탄은 흡수(bossGuard)·폭발·연쇄 무효. arenaShock 의 첫 호출이 내린다(bossGuardOff)
     guard: !!B.guard,
   });
@@ -643,6 +655,8 @@ function moveEnemies(run, ev, dt) {
     e.z -= e.vz * dt;
   }
   for (const bo of run.bosses) if (!bo.dead) { if (bo.arena) arenaBossAct(run, bo, ev, dt); else bossAct(run, bo, ev, dt); }
+  //  r4.8 보스 공격 패턴(게임 화면 줄): 보스가 움직인 뒤·적탄 이동(7단계) 앞 — 이번 STEP 에 쏜 탄도 이번 STEP 에 한 번 움직인다(부채꼴과 같은 자리)
+  if (run.bossAtk && !run.bossDefeated) bossAttackStep(run, ev, dt);
 }
 
 /** 아레나 보스 상태기계(r3.17, 전부 STEP 타이머·난수 0). 목표 = 부대 중심 (run.x, squadZ).
@@ -658,9 +672,13 @@ function arenaBossAct(run, bo, ev, dt) {
   bo.px = bo.x; bo.pz = bo.z;
   const tx = run.x, tz = squadZ(run);
   if (bo.state === 'chase') {
-    const dx = tx - bo.x, dz = tz - bo.z, dist = Math.hypot(dx, dz), mv = B.speed * ph.speed * dt;
-    if (dist > 1e-9) { const k = Math.min(1, mv / dist); bo.x += dx * k; bo.z += dz * k; }
-    bo.dashT -= dt;
+    //  r4.8: 패턴 공격이 진행 중이면(게임 화면 줄) 돌진 시계를 멈춘다 — 돌진·착지 충격이 패턴의 안전 구역에 떨어지지 않게(패턴은 추격 중에만 시작한다).
+    //   조준 대포는 예고 동안 보스가 멈춰 조준선이 그대로다(atkPaused)
+    if (!atkPaused(run, bo)) {
+      const dx = tx - bo.x, dz = tz - bo.z, dist = Math.hypot(dx, dz), mv = B.speed * ph.speed * dt;
+      if (dist > 1e-9) { const k = Math.min(1, mv / dist); bo.x += dx * k; bo.z += dz * k; }
+    }
+    if (!(run.bossAtk && run.bossAtk.cur)) bo.dashT -= dt;
     if (bo.dashT <= 0) {
       bo.state = 'warn'; bo.warnT = D.warn; bo.dashTx = tx; bo.dashTz = tz;
       ev.push({ type: 'bossDashWarn', x: bo.x, z: bo.z, tx, tz, warn: D.warn });
@@ -768,7 +786,8 @@ function bossAct(run, bo, ev, dt) {
   if (bo.state === 'descend') {
     bo.z -= bo.descendSpeed * dt;
     if (bo.z <= run.z + bo.holdAhead) { bo.z = run.z + bo.holdAhead; bo.state = 'hold'; }
-  } else {
+  } else if (!atkPaused(run, bo)) {
+    //  r4.8: 조준 대포 예고·쓸기 동안(게임 화면 줄)은 보스가 멈춘다 — 조준선·줄기의 출발점이 예고 그대로
     bo.x += bo.dir * bo.patrolSpeed * ph.speed * dt;
     if (bo.x <= bo.laneLo) { bo.x = bo.laneLo; bo.dir = 1; } else if (bo.x >= bo.laneHi) { bo.x = bo.laneHi; bo.dir = -1; }
   }
@@ -793,6 +812,119 @@ function bossAct(run, bo, ev, dt) {
       ev.push({ type: 'summon', kind: E.summonKind, n: E.summonN, x: bo.x, z: bo.z + E.summonDz });
     }
   }
+}
+
+//  ── r4.8 보스 공격 패턴(게임 화면 줄 — run.bossAtk 가 있는 판만) ──────────────────────────────────────────
+//  이사님 지시(2026-09-26) "보스에 가면 … 피할 수가 없이 모든 총알을 맞게 된다" · "모든 보스가 같은 패턴의 같은 총알만 쏟아낸다".
+//  공격 한 번 = 예고(tele 초 — 위험·안전 구역을 화면에 보인다) → 발사(탄·기둥) → 그 공격의 탄이 모두 사라지면 끝 → 보스 간격 gap × 페이즈 rate 뒤 다음 예고.
+//  전체에 공격 1개(보스가 여럿이면 번호 순으로 차례). 설계(안전 구역 보장)는 bossatk.planAttack — 보장이 안 되는 패턴은 고르지 않는다. 난수 없음.
+//  탄의 판정·피해 기록(lossByShot)·이벤트는 기존 적탄 경로(moveEshots → damageUnit)를 그대로 지난다. 탄 칸 atk(공격 번호)·pat(패턴)·look(보스 탄 모양)·life(수명)는 희소 칸
+
+//  이 보스가 공격 때문에 멈춰 있어야 하는가: 조준 대포 예고 중 · 쓸기 예고 ~ 발사 중(조준선·줄기의 출발점이 예고 그대로)
+function atkPaused(run, bo) {
+  const c = run.bossAtk && run.bossAtk.cur;
+  return !!(c && c.pause && c.boss === bo.id && (c.state === 'tele' || (c.kind === 'sweep' && c.fired < c.xs.length)));
+}
+
+//  6단계 끝(보스가 움직인 뒤): 진행 중인 공격을 한 STEP 진행하거나, 없으면 준비된 보스가 있을 때만 대기 시계를 돌려 다음 공격을 고른다.
+//   준비 = 도로 하강을 마친 hold · 광장 추격 chase(예고·돌진·회복 중에는 시작하지 않는다 — 돌진 시계도 공격 동안 멈춘다).
+//   고르기 = 번호(index)가 turn 이상인 첫 보스부터 돌아가며, 그 보스의 열린 패턴(bossatk.unlockedAtk — 페이즈마다 하나씩 더)을 공격 횟수 atkN 순서로 보고
+//   설계가 되는 첫 패턴. 아무것도 안 되면 retry 초 뒤 다시
+function bossAttackStep(run, ev, dt) {
+  const A = run.bossAtk;
+  if (A.cur) { advanceAttack(run, A, ev, dt); return; }
+  const ready = run.bosses.filter((b) => !b.dead && b.atk && (b.arena ? b.state === 'chase' : b.state === 'hold'));
+  if (!ready.length) return;
+  A.wait -= dt;
+  if (A.wait > 1e-9) return;
+  let start = ready.findIndex((b) => b.index >= A.turn);
+  if (start < 0) start = 0;
+  for (let j = 0; j < ready.length; j++) {
+    const bo = ready[(start + j) % ready.length];
+    const list = unlockedAtk(bo.atk, bo.phase);
+    for (let i = 0; i < list.length; i++) {
+      const kind = list[(bo.atkN + i) % list.length];
+      const k = bo.atkK[kind] || 0;
+      const plan = planAttack(run, bo, kind, k);
+      if (!plan) continue;
+      bo.atkN++; bo.atkK[kind] = k + 1;
+      A.turn = bo.index + 1; A.n++;
+      A.cur = { ...plan, boss: bo.id, serial: A.n, look: bo.atk.look, state: 'tele', t: plan.tele, age: 0, fired: 0 };
+      ev.push({ type: 'bossTele', id: bo.id, kind, serial: A.n, tele: plan.tele, safe: [plan.safe[0], plan.safe[1]], x: bo.x, z: bo.z });
+      return;
+    }
+  }
+  A.wait = BATK.retry;
+}
+
+//  진행: 예고(t 가 0 이 되면 발사) → 발사 뒤(쓸기는 every 초마다 한 발씩 dur 동안) → 그 공격 번호의 탄이 하나도 없으면 끝
+function advanceAttack(run, A, ev, dt) {
+  const cur = A.cur;
+  const bo = run.bosses.find((b) => b.id === cur.boss) ?? null;
+  cur.age += dt;
+  if (cur.state === 'tele') {
+    //  예고 중에 그 보스가 쓰러지면 공격을 거둔다(쏘지 않는다)
+    if (!bo || bo.dead) { endAttack(A, bo, ev, true); return; }
+    cur.t -= dt;
+    if (cur.t > 1e-9) return;
+    cur.state = 'act'; cur.t = 0;
+    fireAttack(run, cur, ev);
+  } else cur.t += dt;
+  if (cur.kind === 'sweep') sweepShots(run, cur, bo);
+  const firing = cur.kind === 'sweep' && cur.fired < cur.xs.length;
+  if (!firing && !run.eshots.some((s) => s.atk === cur.serial && !s.dead)) endAttack(A, bo, ev, false);
+}
+
+//  발사(예고가 끝난 STEP): ① 조준 대포 1발 · ② 벽 한 줄 · ⑤ 산개탄 n 발(떨어질 자리에서 퍼진다 — 수명 = 퍼질 거리 ÷ 속도) · ③ 기둥 = 탄 없이 즉시 피해. 쓸기는 sweepShots
+function fireAttack(run, cur, ev) {
+  const dmg = run.enemyDefs.elite.shot.dmg;
+  if (cur.kind === 'aim') shotFrom(run, cur, cur.ox, cur.oz, cur.ux, cur.uz, dmg);
+  else if (cur.kind === 'wall') for (const x of cur.xs) shotFrom(run, cur, x, cur.z, 0, -1, dmg);
+  else if (cur.kind === 'burst') {
+    for (let i = 0; i < cur.n; i++) {
+      const a = (i + (cur.spin ? 0.5 : 0)) * 2 * Math.PI / cur.n;
+      shotFrom(run, cur, cur.tx, cur.tz, Math.sin(a), Math.cos(a), dmg).life = cur.reach / cur.v;
+    }
+  } else if (cur.kind === 'pillar') pillarBlast(run, cur, dmg, ev);
+  ev.push({ type: 'bossFire', id: cur.boss, kind: cur.kind, serial: cur.serial, x: cur.tx ?? cur.ox ?? null, z: cur.tz ?? cur.oz ?? null,
+            xs: cur.xs ? [...cur.xs] : null, w: cur.w ?? null, R: cur.R ?? null, look: cur.look, band: [cur.band[0], cur.band[1]] });
+}
+
+//  ④ 쓸기: 발사 뒤 every 초마다 한 발 — 출발점(멈춘 보스)에서 부대 중심 z 의 x 들(xs, 부대 쪽 끝 → 안전 구역 앞)로. 보스가 쓰러지면 멈춘다
+function sweepShots(run, cur, bo) {
+  if (!bo || bo.dead) { cur.fired = cur.xs.length; return; }
+  const dmg = run.enemyDefs.elite.shot.dmg;
+  while (cur.fired < cur.xs.length && cur.fired * cur.every <= cur.t + 1e-9) {
+    const dx = cur.xs[cur.fired++] - cur.ox, dz = cur.tz - cur.oz, L = Math.hypot(dx, dz);
+    shotFrom(run, cur, cur.ox, cur.oz, dx / L, dz / L, dmg);
+  }
+}
+
+//  패턴 탄 1발: 출발 (x, z) · 단위 방향 (ux, uz)(uz < 0 = 부대 쪽 아래) · 반지름·속도 = 설계 값. 적탄 규약(vz 양수 = z 감소) 그대로.
+//   아래로 나는 탄의 수명 = 부대가 있을 수 있는 가장 낮은 z(설계 zFloor) 아래로 다 지나갈 때까지(그 뒤로는 아무도 맞힐 수 없다)
+function shotFrom(run, cur, x, z, ux, uz, dmg) {
+  const s = { x, z, px: x, pz: z, vx: ux * cur.v, vz: -uz * cur.v, dmg, r: cur.r, dead: false, atk: cur.serial, pat: cur.kind, look: cur.look };
+  if (uz < -1e-6) s.life = (z - (cur.zFloor - cur.r - 4)) / (-uz * cur.v);
+  run.eshots.push(s);
+  return s;
+}
+
+//  ③ 기둥 포격 폭발: 기둥(폭 w, 세로로 끝없는 띠)과 원이 겹치는 병사 전부 피해(손실 원인 = 적탄과 같은 'shot').
+//   로봇 보호(heroGuard)는 착지 충격과 같은 꼴 — 로봇 몫은 기둥 **밖**의 가장 가까운 호위에게(기둥 안 호위는 제 몫을 받으므로 후보에서 뺀다)
+function pillarBlast(run, cur, dmg, ev) {
+  const R = cur.w / 2 + SQ.unitR;
+  const oz = squadZ(run);
+  const hits = run.units.filter((u) => u.hp > 0 && cur.xs.some((p) => Math.abs(run.x + u.dx - p) <= R));
+  const inside = run.heroGuard ? new Set(hits) : null;
+  for (const u of hits) damageUnit(run, u, dmg, 'shot', ev, run.x + u.dx, oz - u.dy, inside);
+}
+
+//  공격 끝: 다음 예고까지 = 그 보스의 간격 × 페이즈 rate(페이즈는 간격만 줄이고 예고 시간은 줄이지 않는다). 거둔 공격은 retry 초
+function endAttack(A, bo, ev, cancelled) {
+  const cur = A.cur;
+  A.cur = null;
+  A.wait = cancelled || !bo || !bo.atk ? BATK.retry : bo.atk.gap * (PHASES.rate[bo.phase || 0] ?? 1);
+  ev.push({ type: 'bossAtkEnd', id: cur.boss, kind: cur.kind, serial: cur.serial, cancelled: !!cancelled });
 }
 
 // 선분 (ax,az)→(bx,bz) 가 사각형 w(x0..x1 × z0..z1)와 겹치는가(Liang–Barsky)
@@ -836,6 +968,9 @@ function damageUnit(run, u, dmg, cause, ev, x, z, skip = null) {
 function moveEshots(run, ev, dt) {
   for (const s of run.eshots) {
     if (s.dead) continue;
+    //  r4.8 보스 패턴 탄의 수명(희소 칸 life, 초): 부대가 있을 수 있는 가장 낮은 z 아래로 지나갔거나(아래로 나는 탄) 퍼질 거리를 다 간(산개탄) 탄은 사라진다.
+    //   수명이 없는 탄(부채꼴·저격수)은 종전 그대로 화면 밖 정리(cleanup)만
+    if (s.life != null) { s.life -= dt; if (s.life <= 0) { s.dead = true; continue; } }
     s.px = s.x; s.pz = s.z;
     s.z -= s.vz * dt;
     s.x += s.vx * dt;
@@ -949,6 +1084,8 @@ function cleanup(run, ev) {
     run.bossDefeated = true;
     run.enemies.length = 0;
     run.eshots.length = 0;
+    //  r4.8 진행 중인 보스 공격(예고 포함)도 거둔다
+    if (run.bossAtk) run.bossAtk.cur = null;
   }
   //  탄 정리(r3.17): 아래·옆으로 조준된 탄이 영원히 남지 않게 behind·x 범위를 더한다. 도로 탄은 출발 z ≥ run.z − 159 에서 +z 로만 가고
   //   카메라 3.2px/STEP < 최저 탄속 8.0px/STEP(r4.7 산탄포 알갱이 520 × 0.92) 이라 behind 에 결코 걸리지 않는다. 산탄포 x 드리프트는 r4.7(±18°)부터 사거리 끝에서 ±136 이라

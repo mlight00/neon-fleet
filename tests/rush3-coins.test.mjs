@@ -157,7 +157,8 @@ test('COIN-2: 보스 소환 적은 0 코인 — kill 이벤트 summoned(도로 �
   const r = playEvents(10, 'evLead', 'brutal', 14400, { weakBounty: true });
   const kills = r.events.filter((e) => e.type === 'kill');
   const summoned = kills.filter((e) => e.summoned === true), sched = kills.filter((e) => e.summoned === false);
-  assert.ok(summoned.length > 50, '소환 잡졸 처치가 있다: ' + summoned.length);
+  //  r4.8: 게임 줄 보스가 예고·안전 구역 패턴을 쓰게 되어(안전 구역을 모르는) 이 봇의 보스전이 짧아졌다 — 소환 처치 표본 문턱 50 → 20(표본이 있는지만 본다, 난이도 판단 아님)
+  assert.ok(summoned.length > 20, '소환 잡졸 처치가 있다: ' + summoned.length);
   assert.equal(summoned.length + sched.length, kills.length, 'summoned 는 늘 불리언');
   assert.ok(kills.every((e) => Number.isFinite(e.hpMax) && e.hpMax > 0), 'kill 이벤트에 hpMax');
   const all = runCoins(r.stage, r.events, { cleared: r.run.won });
@@ -180,7 +181,8 @@ test('COIN-2: 보스 소환 적은 0 코인 — kill 이벤트 summoned(도로 �
       for (let id = id0; id < run.nextEnemyId; id++) byId.set(id, id - id0 >= nSched);
       for (const e of ev) if (e.type === 'kill') { checked++; if (byId.get(e.id) !== e.summoned) mismatch++; }
     }
-    assert.ok(checked > 100); assert.equal(mismatch, 0, 'ID 순서 판별과 summoned 표식 불일치 0');
+    //  r4.8: 게임 줄 보스 패턴으로 이 봇(안전 구역을 모름)의 보스전이 짧아져 처치 표본 문턱 100 → 50(표본이 있는지만 본다 — 실측 67, 난이도 판단 아님)
+    assert.ok(checked > 50, '처치 표본 ' + checked); assert.equal(mismatch, 0, 'ID 순서 판별과 summoned 표식 불일치 0');
   }
   //  광장(20번) 소환도 summoned — 무입력으로 광장에 들어가 소환이 난 STEP 의 새 적은 표식이 있고, 죽으면 kill 에 실린다
   {

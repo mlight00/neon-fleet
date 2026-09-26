@@ -34,52 +34,55 @@
   ],
   "summary": {
    "evLead": {
-    "wins": 2,
+    "wins": 3,
     "won": [
-     10,
-     23
+     1,
+     3,
+     21
     ],
-    "heroAlive": 2,
-    "transfers": 256,
-    "shieldOff": 22
+    "heroAlive": 3,
+    "transfers": 138,
+    "shieldOff": 21
    },
    "aimLead": {
     "wins": 0,
     "won": [],
     "heroAlive": 0,
-    "transfers": 206,
+    "transfers": 187,
     "shieldOff": 24
    },
    "planBoss": {
-    "wins": 0,
-    "won": [],
-    "heroAlive": 0,
-    "transfers": 184,
-    "shieldOff": 25
+    "wins": 1,
+    "won": [
+     3
+    ],
+    "heroAlive": 1,
+    "transfers": 158,
+    "shieldOff": 24
    }
   }
  },
  "runs": {
   "evLead/1": {
-   "won": false,
+   "won": true,
    "over": true,
-   "steps": 5939,
-   "survivors": 0,
+   "steps": 6238,
+   "survivors": 18,
    "peak": 29,
-   "kills": 25,
-   "time": 98.983333333329,
+   "kills": 26,
+   "time": 103.96666666666205,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 35,
+    "shot": 17,
     "touch": 0,
     "shock": 0
    },
-   "hero": false,
-   "transfers": 5,
+   "hero": true,
+   "transfers": 3,
    "shieldOn": 1,
-   "shieldOff": 1,
+   "shieldOff": 0,
    "gates": [
     [
      "g1",
@@ -96,11 +99,11 @@
   "evLead/2": {
    "won": false,
    "over": true,
-   "steps": 4697,
+   "steps": 6851,
    "survivors": 0,
    "peak": 16,
    "kills": 10,
-   "time": 78.28333333333018,
+   "time": 114.18333333332814,
    "weapon": "rifle",
    "mk": 1,
    "loss": {
@@ -110,7 +113,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 5,
+   "transfers": 8,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -127,25 +130,25 @@
    ]
   },
   "evLead/3": {
-   "won": false,
+   "won": true,
    "over": true,
-   "steps": 7861,
-   "survivors": 0,
+   "steps": 6473,
+   "survivors": 66,
    "peak": 78,
-   "kills": 152,
-   "time": 131.01666666666307,
+   "kills": 125,
+   "time": 107.8833333333285,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 75,
+    "shot": 9,
     "touch": 4,
     "shock": 0
    },
-   "hero": false,
-   "transfers": 11,
+   "hero": true,
+   "transfers": 1,
    "shieldOn": 0,
-   "shieldOff": 1,
+   "shieldOff": 0,
    "gates": [
     [
      "g1",
@@ -162,11 +165,11 @@
   "evLead/4": {
    "won": false,
    "over": true,
-   "steps": 5625,
+   "steps": 6461,
    "survivors": 0,
    "peak": 33,
    "kills": 17,
-   "time": 93.74999999999596,
+   "time": 107.6833333333285,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -176,7 +179,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 6,
+   "transfers": 4,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -200,11 +203,11 @@
   "evLead/5": {
    "won": false,
    "over": true,
-   "steps": 5754,
+   "steps": 6557,
    "survivors": 0,
    "peak": 27,
    "kills": 20,
-   "time": 95.89999999999584,
+   "time": 109.28333333332841,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -238,11 +241,11 @@
   "evLead/6": {
    "won": false,
    "over": true,
-   "steps": 5818,
+   "steps": 5704,
    "survivors": 0,
    "peak": 39,
    "kills": 34,
-   "time": 96.96666666666245,
+   "time": 95.06666666666256,
    "weapon": "scatter",
    "mk": 1,
    "loss": {
@@ -252,7 +255,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 16,
+   "transfers": 4,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -276,11 +279,11 @@
   "evLead/7": {
    "won": false,
    "over": true,
-   "steps": 5943,
+   "steps": 5159,
    "survivors": 0,
    "peak": 38,
    "kills": 17,
-   "time": 99.04999999999566,
+   "time": 85.98333333332974,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -290,7 +293,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 3,
+   "transfers": 2,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -314,11 +317,11 @@
   "evLead/8": {
    "won": false,
    "over": true,
-   "steps": 6002,
+   "steps": 5746,
    "survivors": 0,
    "peak": 33,
-   "kills": 76,
-   "time": 100.03333333332894,
+   "kills": 78,
+   "time": 95.76666666666252,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -352,17 +355,17 @@
   "evLead/9": {
    "won": false,
    "over": true,
-   "steps": 5922,
+   "steps": 6042,
    "survivors": 0,
    "peak": 45,
-   "kills": 51,
-   "time": 98.69999999999568,
+   "kills": 52,
+   "time": 100.69999999999557,
    "weapon": "rifle",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 51,
-    "touch": 8,
+    "shot": 50,
+    "touch": 9,
     "shock": 0
    },
    "hero": false,
@@ -388,25 +391,25 @@
    ]
   },
   "evLead/10": {
-   "won": true,
+   "won": false,
    "over": true,
-   "steps": 11460,
-   "survivors": 16,
+   "steps": 6075,
+   "survivors": 0,
    "peak": 49,
-   "kills": 197,
-   "time": 191.00000000004414,
+   "kills": 68,
+   "time": 101.24999999999554,
    "weapon": "scatter",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 33,
+    "shot": 49,
     "touch": 3,
     "shock": 0
    },
-   "hero": true,
-   "transfers": 33,
+   "hero": false,
+   "transfers": 2,
    "shieldOn": 0,
-   "shieldOff": 0,
+   "shieldOff": 1,
    "gates": [
     [
      "g1",
@@ -428,21 +431,21 @@
   "evLead/11": {
    "won": false,
    "over": true,
-   "steps": 7008,
+   "steps": 7719,
    "survivors": 0,
    "peak": 47,
-   "kills": 86,
-   "time": 116.79999999999465,
+   "kills": 96,
+   "time": 128.64999999999452,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 61,
-    "touch": 4,
+    "shot": 62,
+    "touch": 3,
     "shock": 0
    },
    "hero": false,
-   "transfers": 6,
+   "transfers": 15,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -466,21 +469,21 @@
   "evLead/12": {
    "won": false,
    "over": true,
-   "steps": 7437,
+   "steps": 8266,
    "survivors": 0,
    "peak": 62,
-   "kills": 107,
-   "time": 123.94999999999425,
+   "kills": 119,
+   "time": 137.76666666666844,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 63,
-    "touch": 5,
+    "shot": 64,
+    "touch": 4,
     "shock": 0
    },
    "hero": false,
-   "transfers": 4,
+   "transfers": 11,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -514,21 +517,21 @@
   "evLead/13": {
    "won": false,
    "over": true,
-   "steps": 6483,
+   "steps": 7465,
    "survivors": 0,
    "peak": 52,
-   "kills": 17,
-   "time": 108.04999999999515,
+   "kills": 16,
+   "time": 124.41666666666089,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 50,
-    "touch": 6,
+    "shot": 49,
+    "touch": 7,
     "shock": 0
    },
    "hero": false,
-   "transfers": 29,
+   "transfers": 8,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -552,11 +555,11 @@
   "evLead/14": {
    "won": false,
    "over": true,
-   "steps": 6752,
+   "steps": 8203,
    "survivors": 0,
    "peak": 58,
    "kills": 16,
-   "time": 112.53333333332823,
+   "time": 136.7166666666676,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
@@ -566,7 +569,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 21,
+   "transfers": 6,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -590,17 +593,17 @@
   "evLead/15": {
    "won": false,
    "over": true,
-   "steps": 5619,
+   "steps": 4622,
    "survivors": 0,
    "peak": 47,
    "kills": 21,
-   "time": 93.64999999999597,
+   "time": 77.03333333333025,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 7,
-    "touch": 64,
+    "shot": 15,
+    "touch": 56,
     "shock": 0
    },
    "hero": false,
@@ -628,21 +631,21 @@
   "evLead/16": {
    "won": false,
    "over": true,
-   "steps": 7481,
+   "steps": 5412,
    "survivors": 0,
    "peak": 63,
-   "kills": 78,
-   "time": 124.68333333332754,
+   "kills": 50,
+   "time": 90.19999999999617,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 55,
-    "touch": 17,
+    "shot": 56,
+    "touch": 16,
     "shock": 0
    },
    "hero": false,
-   "transfers": 3,
+   "transfers": 9,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -666,17 +669,17 @@
   "evLead/17": {
    "won": false,
    "over": true,
-   "steps": 6394,
+   "steps": 4272,
    "survivors": 0,
    "peak": 62,
-   "kills": 64,
-   "time": 106.5666666666619,
+   "kills": 40,
+   "time": 71.19999999999725,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 70,
-    "touch": 4,
+    "shot": 73,
+    "touch": 1,
     "shock": 0
    },
    "hero": false,
@@ -704,11 +707,11 @@
   "evLead/18": {
    "won": false,
    "over": true,
-   "steps": 7142,
+   "steps": 5451,
    "survivors": 0,
    "peak": 55,
-   "kills": 52,
-   "time": 119.03333333332786,
+   "kills": 29,
+   "time": 90.84999999999613,
    "weapon": "arc",
    "mk": 1,
    "loss": {
@@ -742,11 +745,11 @@
   "evLead/19": {
    "won": false,
    "over": true,
-   "steps": 6444,
+   "steps": 4299,
    "survivors": 0,
    "peak": 61,
-   "kills": 27,
-   "time": 107.39999999999519,
+   "kills": 26,
+   "time": 71.64999999999722,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
@@ -756,7 +759,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 11,
+   "transfers": 13,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -780,21 +783,21 @@
   "evLead/20": {
    "won": false,
    "over": true,
-   "steps": 4604,
+   "steps": 4169,
    "survivors": 0,
    "peak": 73,
-   "kills": 25,
-   "time": 76.73333333333026,
+   "kills": 24,
+   "time": 69.48333333333068,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 9,
-    "touch": 75,
+    "shot": 14,
+    "touch": 70,
     "shock": 0
    },
    "hero": false,
-   "transfers": 6,
+   "transfers": 0,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -816,25 +819,25 @@
    ]
   },
   "evLead/21": {
-   "won": false,
+   "won": true,
    "over": true,
-   "steps": 7656,
-   "survivors": 0,
+   "steps": 6798,
+   "survivors": 41,
    "peak": 83,
-   "kills": 19,
-   "time": 127.59999999999404,
+   "kills": 20,
+   "time": 113.29999999999485,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 77,
+    "shot": 36,
     "touch": 12,
     "shock": 0
    },
-   "hero": false,
-   "transfers": 18,
+   "hero": true,
+   "transfers": 2,
    "shieldOn": 0,
-   "shieldOff": 1,
+   "shieldOff": 0,
    "gates": [
     [
      "g1",
@@ -856,21 +859,21 @@
   "evLead/22": {
    "won": false,
    "over": true,
-   "steps": 8765,
+   "steps": 6549,
    "survivors": 0,
    "peak": 87,
-   "kills": 114,
-   "time": 146.08333333334173,
+   "kills": 60,
+   "time": 109.14999999999509,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 91,
-    "touch": 20,
+    "shot": 90,
+    "touch": 21,
     "shock": 0
    },
    "hero": false,
-   "transfers": 33,
+   "transfers": 7,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -892,25 +895,25 @@
    ]
   },
   "evLead/23": {
-   "won": true,
+   "won": false,
    "over": true,
-   "steps": 6155,
-   "survivors": 74,
+   "steps": 6734,
+   "survivors": 0,
    "peak": 100,
-   "kills": 86,
-   "time": 102.5833333333288,
+   "kills": 105,
+   "time": 112.23333333332825,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 33,
-    "touch": 10,
+    "shot": 108,
+    "touch": 9,
     "shock": 0
    },
-   "hero": true,
-   "transfers": 3,
+   "hero": false,
+   "transfers": 7,
    "shieldOn": 0,
-   "shieldOff": 0,
+   "shieldOff": 1,
    "gates": [
     [
      "g1",
@@ -937,21 +940,21 @@
   "evLead/24": {
    "won": false,
    "over": true,
-   "steps": 4983,
+   "steps": 4872,
    "survivors": 0,
    "peak": 100,
-   "kills": 64,
-   "time": 83.04999999999657,
+   "kills": 56,
+   "time": 81.19999999999668,
    "weapon": "sniper",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 49,
-    "touch": 80,
+    "shot": 41,
+    "touch": 88,
     "shock": 0
    },
    "hero": false,
-   "transfers": 12,
+   "transfers": 5,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -980,11 +983,11 @@
   "aimLead/1": {
    "won": false,
    "over": true,
-   "steps": 4381,
+   "steps": 7133,
    "survivors": 0,
    "peak": 14,
    "kills": 15,
-   "time": 73.01666666666381,
+   "time": 118.88333333332787,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -994,7 +997,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 3,
+   "transfers": 6,
    "shieldOn": 1,
    "shieldOff": 1,
    "gates": [
@@ -1013,11 +1016,11 @@
   "aimLead/2": {
    "won": false,
    "over": true,
-   "steps": 4697,
+   "steps": 6851,
    "survivors": 0,
    "peak": 16,
    "kills": 10,
-   "time": 78.28333333333018,
+   "time": 114.18333333332814,
    "weapon": "rifle",
    "mk": 1,
    "loss": {
@@ -1027,7 +1030,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 5,
+   "transfers": 8,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1046,21 +1049,21 @@
   "aimLead/3": {
    "won": false,
    "over": true,
-   "steps": 7631,
+   "steps": 9490,
    "survivors": 0,
    "peak": 51,
-   "kills": 113,
-   "time": 127.1833333333274,
+   "kills": 162,
+   "time": 158.16666666668468,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 50,
-    "touch": 1,
+    "shot": 51,
+    "touch": 0,
     "shock": 0
    },
    "hero": false,
-   "transfers": 5,
+   "transfers": 6,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1079,11 +1082,11 @@
   "aimLead/4": {
    "won": false,
    "over": true,
-   "steps": 4505,
+   "steps": 6662,
    "survivors": 0,
    "peak": 18,
-   "kills": 12,
-   "time": 75.08333333333036,
+   "kills": 14,
+   "time": 111.03333333332832,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -1093,7 +1096,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 4,
+   "transfers": 7,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1117,11 +1120,11 @@
   "aimLead/5": {
    "won": false,
    "over": true,
-   "steps": 4634,
+   "steps": 7386,
    "survivors": 0,
    "peak": 12,
    "kills": 10,
-   "time": 77.23333333333024,
+   "time": 123.0999999999943,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -1131,7 +1134,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 3,
+   "transfers": 6,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1188,11 +1191,11 @@
   "aimLead/7": {
    "won": false,
    "over": true,
-   "steps": 4823,
+   "steps": 4395,
    "survivors": 0,
    "peak": 15,
    "kills": 18,
-   "time": 80.38333333333006,
+   "time": 73.24999999999713,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -1202,7 +1205,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 4,
+   "transfers": 3,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1226,11 +1229,11 @@
   "aimLead/8": {
    "won": false,
    "over": true,
-   "steps": 4882,
+   "steps": 4305,
    "survivors": 0,
    "peak": 19,
    "kills": 51,
-   "time": 81.36666666666333,
+   "time": 71.74999999999721,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -1240,7 +1243,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 8,
+   "transfers": 7,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1302,11 +1305,11 @@
   "aimLead/10": {
    "won": false,
    "over": true,
-   "steps": 5150,
+   "steps": 6192,
    "survivors": 0,
    "peak": 33,
-   "kills": 38,
-   "time": 85.83333333332975,
+   "kills": 40,
+   "time": 103.19999999999543,
    "weapon": "scatter",
    "mk": 1,
    "loss": {
@@ -1316,7 +1319,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 28,
+   "transfers": 7,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1378,21 +1381,21 @@
   "aimLead/12": {
    "won": false,
    "over": true,
-   "steps": 5037,
+   "steps": 3807,
    "survivors": 0,
    "peak": 28,
-   "kills": 40,
-   "time": 83.94999999999652,
+   "kills": 35,
+   "time": 63.44999999999768,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 27,
-    "touch": 13,
+    "shot": 29,
+    "touch": 11,
     "shock": 0
    },
    "hero": false,
-   "transfers": 7,
+   "transfers": 11,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1426,21 +1429,21 @@
   "aimLead/13": {
    "won": false,
    "over": true,
-   "steps": 5817,
+   "steps": 5486,
    "survivors": 0,
    "peak": 24,
-   "kills": 13,
-   "time": 96.94999999999578,
+   "kills": 12,
+   "time": 91.43333333332943,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 21,
-    "touch": 7,
+    "shot": 20,
+    "touch": 8,
     "shock": 0
    },
    "hero": false,
-   "transfers": 3,
+   "transfers": 10,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1464,11 +1467,11 @@
   "aimLead/14": {
    "won": false,
    "over": true,
-   "steps": 6006,
+   "steps": 5673,
    "survivors": 0,
    "peak": 28,
    "kills": 10,
-   "time": 100.0999999999956,
+   "time": 94.54999999999592,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
@@ -1478,7 +1481,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 4,
+   "transfers": 12,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1535,11 +1538,11 @@
   "aimLead/16": {
    "won": false,
    "over": true,
-   "steps": 6761,
+   "steps": 5388,
    "survivors": 0,
    "peak": 55,
-   "kills": 60,
-   "time": 112.68333333332822,
+   "kills": 35,
+   "time": 89.79999999999619,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -1611,11 +1614,11 @@
   "aimLead/18": {
    "won": false,
    "over": true,
-   "steps": 3893,
+   "steps": 3449,
    "survivors": 0,
    "peak": 19,
    "kills": 2,
-   "time": 64.88333333333094,
+   "time": 57.48333333333135,
    "weapon": "arc",
    "mk": 1,
    "loss": {
@@ -1687,21 +1690,21 @@
   "aimLead/20": {
    "won": false,
    "over": true,
-   "steps": 3425,
+   "steps": 3215,
    "survivors": 0,
    "peak": 45,
    "kills": 2,
-   "time": 57.083333333331375,
+   "time": 53.583333333331574,
    "weapon": "rifle",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 10,
-    "touch": 47,
+    "shot": 11,
+    "touch": 46,
     "shock": 0
    },
    "hero": false,
-   "transfers": 1,
+   "transfers": 3,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1725,11 +1728,11 @@
   "aimLead/21": {
    "won": false,
    "over": true,
-   "steps": 6508,
+   "steps": 6695,
    "survivors": 0,
    "peak": 40,
    "kills": 17,
-   "time": 108.4666666666618,
+   "time": 111.58333333332828,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
@@ -1739,7 +1742,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 6,
+   "transfers": 14,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1763,21 +1766,21 @@
   "aimLead/22": {
    "won": false,
    "over": true,
-   "steps": 8405,
+   "steps": 6191,
    "survivors": 0,
    "peak": 82,
-   "kills": 101,
-   "time": 140.08333333333695,
+   "kills": 56,
+   "time": 103.18333333332876,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 83,
-    "touch": 21,
+    "shot": 82,
+    "touch": 22,
     "shock": 0
    },
    "hero": false,
-   "transfers": 28,
+   "transfers": 7,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1801,11 +1804,11 @@
   "aimLead/23": {
    "won": false,
    "over": true,
-   "steps": 4721,
+   "steps": 5197,
    "survivors": 0,
    "peak": 55,
-   "kills": 34,
-   "time": 78.68333333333015,
+   "kills": 35,
+   "time": 86.61666666666304,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
@@ -1815,7 +1818,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 31,
+   "transfers": 22,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1844,21 +1847,21 @@
   "aimLead/24": {
    "won": false,
    "over": true,
-   "steps": 4647,
+   "steps": 4629,
    "survivors": 0,
    "peak": 89,
-   "kills": 50,
-   "time": 77.44999999999689,
+   "kills": 45,
+   "time": 77.14999999999691,
    "weapon": "sniper",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 48,
-    "touch": 61,
+    "shot": 39,
+    "touch": 70,
     "shock": 0
    },
    "hero": false,
-   "transfers": 15,
+   "transfers": 7,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1887,11 +1890,11 @@
   "planBoss/1": {
    "won": false,
    "over": true,
-   "steps": 3699,
+   "steps": 3529,
    "survivors": 0,
    "peak": 14,
    "kills": 7,
-   "time": 61.64999999999778,
+   "time": 58.81666666666461,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -1901,7 +1904,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 2,
+   "transfers": 1,
    "shieldOn": 1,
    "shieldOff": 1,
    "gates": [
@@ -1951,25 +1954,25 @@
    ]
   },
   "planBoss/3": {
-   "won": false,
+   "won": true,
    "over": true,
-   "steps": 7861,
-   "survivors": 0,
+   "steps": 6472,
+   "survivors": 66,
    "peak": 78,
-   "kills": 152,
-   "time": 131.01666666666307,
+   "kills": 125,
+   "time": 107.86666666666183,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 75,
+    "shot": 9,
     "touch": 4,
     "shock": 0
    },
-   "hero": false,
-   "transfers": 11,
+   "hero": true,
+   "transfers": 1,
    "shieldOn": 0,
-   "shieldOff": 1,
+   "shieldOff": 0,
    "gates": [
     [
      "g1",
@@ -1986,11 +1989,11 @@
   "planBoss/4": {
    "won": false,
    "over": true,
-   "steps": 4945,
+   "steps": 7893,
    "survivors": 0,
    "peak": 27,
    "kills": 17,
-   "time": 82.41666666666328,
+   "time": 131.54999999999683,
    "weapon": "rifle",
    "mk": 1,
    "loss": {
@@ -2000,7 +2003,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 5,
+   "transfers": 8,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2024,11 +2027,11 @@
   "planBoss/5": {
    "won": false,
    "over": true,
-   "steps": 4634,
+   "steps": 6788,
    "survivors": 0,
    "peak": 12,
    "kills": 7,
-   "time": 77.23333333333024,
+   "time": 113.1333333333282,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -2038,7 +2041,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 3,
+   "transfers": 6,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2062,11 +2065,11 @@
   "planBoss/6": {
    "won": false,
    "over": true,
-   "steps": 5198,
+   "steps": 4334,
    "survivors": 0,
    "peak": 18,
    "kills": 8,
-   "time": 86.6333333333297,
+   "time": 72.23333333333052,
    "weapon": "rifle",
    "mk": 1,
    "loss": {
@@ -2100,11 +2103,11 @@
   "planBoss/7": {
    "won": false,
    "over": true,
-   "steps": 5261,
+   "steps": 4395,
    "survivors": 0,
    "peak": 20,
    "kills": 20,
-   "time": 87.68333333332964,
+   "time": 73.24999999999713,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -2114,7 +2117,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 5,
+   "transfers": 4,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2138,11 +2141,11 @@
   "planBoss/8": {
    "won": false,
    "over": true,
-   "steps": 4882,
+   "steps": 4305,
    "survivors": 0,
    "peak": 20,
    "kills": 51,
-   "time": 81.36666666666333,
+   "time": 71.74999999999721,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -2152,7 +2155,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 6,
+   "transfers": 5,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2176,21 +2179,21 @@
   "planBoss/9": {
    "won": false,
    "over": true,
-   "steps": 4014,
+   "steps": 3851,
    "survivors": 0,
    "peak": 21,
    "kills": 6,
-   "time": 66.89999999999749,
+   "time": 64.18333333333098,
    "weapon": "rifle",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 16,
-    "touch": 17,
+    "shot": 17,
+    "touch": 16,
     "shock": 0
    },
    "hero": false,
-   "transfers": 4,
+   "transfers": 3,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2214,21 +2217,21 @@
   "planBoss/10": {
    "won": false,
    "over": true,
-   "steps": 5238,
+   "steps": 5395,
    "survivors": 0,
    "peak": 39,
-   "kills": 20,
-   "time": 87.29999999999633,
+   "kills": 21,
+   "time": 89.91666666666285,
    "weapon": "rifle",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 35,
-    "touch": 5,
+    "shot": 31,
+    "touch": 9,
     "shock": 0
    },
    "hero": false,
-   "transfers": 42,
+   "transfers": 10,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2290,11 +2293,11 @@
   "planBoss/12": {
    "won": false,
    "over": true,
-   "steps": 5397,
+   "steps": 4843,
    "survivors": 0,
    "peak": 40,
-   "kills": 65,
-   "time": 89.94999999999618,
+   "kills": 62,
+   "time": 80.71666666666337,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -2304,7 +2307,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 6,
+   "transfers": 13,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2338,21 +2341,21 @@
   "planBoss/13": {
    "won": false,
    "over": true,
-   "steps": 5135,
+   "steps": 4848,
    "survivors": 0,
    "peak": 20,
-   "kills": 11,
-   "time": 85.58333333332976,
+   "kills": 10,
+   "time": 80.7999999999967,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 17,
-    "touch": 10,
+    "shot": 16,
+    "touch": 11,
     "shock": 0
    },
    "hero": false,
-   "transfers": 3,
+   "transfers": 10,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2442,11 +2445,11 @@
   "planBoss/16": {
    "won": false,
    "over": true,
-   "steps": 6521,
+   "steps": 5388,
    "survivors": 0,
    "peak": 50,
-   "kills": 55,
-   "time": 108.68333333332845,
+   "kills": 32,
+   "time": 89.79999999999619,
    "weapon": "auto",
    "mk": 1,
    "loss": {
@@ -2584,21 +2587,21 @@
   "planBoss/20": {
    "won": false,
    "over": true,
-   "steps": 4045,
+   "steps": 3750,
    "survivors": 0,
    "peak": 53,
-   "kills": 16,
-   "time": 67.41666666666413,
+   "kills": 14,
+   "time": 62.49999999999773,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 14,
-    "touch": 56,
+    "shot": 19,
+    "touch": 51,
     "shock": 0
    },
    "hero": false,
-   "transfers": 5,
+   "transfers": 6,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2622,11 +2625,11 @@
   "planBoss/21": {
    "won": false,
    "over": true,
-   "steps": 7190,
+   "steps": 6969,
    "survivors": 0,
    "peak": 43,
    "kills": 15,
-   "time": 119.83333333332781,
+   "time": 116.14999999999469,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
@@ -2636,7 +2639,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 7,
+   "transfers": 15,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2660,21 +2663,21 @@
   "planBoss/22": {
    "won": false,
    "over": true,
-   "steps": 7910,
+   "steps": 6191,
    "survivors": 0,
    "peak": 77,
-   "kills": 83,
-   "time": 131.8333333333304,
+   "kills": 54,
+   "time": 103.18333333332876,
    "weapon": "auto",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 61,
-    "touch": 25,
+    "shot": 62,
+    "touch": 24,
     "shock": 0
    },
    "hero": false,
-   "transfers": 2,
+   "transfers": 9,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2698,11 +2701,11 @@
   "planBoss/23": {
    "won": false,
    "over": true,
-   "steps": 5005,
+   "steps": 5196,
    "survivors": 0,
    "peak": 59,
    "kills": 37,
-   "time": 83.41666666666322,
+   "time": 86.59999999999637,
    "weapon": "heavy",
    "mk": 1,
    "loss": {
@@ -2712,7 +2715,7 @@
     "shock": 0
    },
    "hero": false,
-   "transfers": 26,
+   "transfers": 14,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -2741,21 +2744,21 @@
   "planBoss/24": {
    "won": false,
    "over": true,
-   "steps": 4275,
+   "steps": 4184,
    "survivors": 0,
    "peak": 74,
-   "kills": 47,
-   "time": 71.24999999999724,
+   "kills": 44,
+   "time": 69.73333333333066,
    "weapon": "sniper",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 42,
-    "touch": 63,
+    "shot": 38,
+    "touch": 67,
     "shock": 0
    },
    "hero": false,
-   "transfers": 10,
+   "transfers": 6,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
