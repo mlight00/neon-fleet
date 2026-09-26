@@ -67,7 +67,7 @@ test('STAGE-KIND 보스 배정: 3 = B1 그레이더 · 6 = B2 갠트리 위도�
   assert.deepEqual(s18.elites.map((e) => e.atk.seq.join(',')), ['blade,ricochet', 'hook'], '역할 공격(포격 = 탄 · 소환 = 광역 하나)');
 });
 
-test('STAGE-KIND 보스 없는 판: 대물결 판은 보스 정의가 없다(elites 없음 · 광장 없음 · 정예 z 없음) — 옛 보스 자리(정의 eliteZ)가 대물결 시작 · 판 길이 = 결승선 · 같은 판의 배수 1 줄은 보스 그대로', () => {
+test('STAGE-KIND 보스 없는 판: 대물결 판은 보스 정의가 없다(elites 없음 · 광장 없음 · 정예 z 없음) — 옛 보스 자리(정의 eliteZ)가 대물결 시작 · 판 길이 = 결승선 · 중간 보스 판은 보스 대신 중간 보스 1체(옛 광장 20·세 정예 23 도) · 같은 판의 배수 1 줄은 보스 그대로', () => {
   for (const id of HORDE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' }), n = buildStage(id);
     assert.deepEqual([st.elites.length, st.elite, st.arena, st.eliteZ], [0, null, null, null], `S${id} 보스 정의 없음`);
@@ -81,6 +81,17 @@ test('STAGE-KIND 보스 없는 판: 대물결 판은 보스 정의가 없다(eli
     assert.equal(goalKind(st), 'horde');
   }
   for (const id of BOSS_IDS) assert.ok(!('finishZ' in createRun(buildStage(id, { difficulty: 'brutal' }))), `S${id} 보스 판 run 에는 결승선 칸이 없다`);
+  //  중간 보스 판: 보스 정의 없음 — 보스 자리(정의 eliteZ)에 중간 보스 1체(mid)만. 옛 광장(20)·복수 보스(23)도 게임 줄에서는 없다. 판 길이·정예 z 는 정의 그대로(결승선 없음)
+  for (const id of MID_IDS) {
+    const st = buildStage(id, { difficulty: 'brutal' }), n = buildStage(id);
+    assert.equal(st.elites.length, 1, `S${id} 중간 보스 1체`);
+    assert.ok(st.elites[0].mid && !('atk' in st.elites[0]), `S${id} 중간 보스(보스 고유 공격 없음)`);
+    assert.deepEqual([st.arena, st.eliteZ, st.length], [null, n.eliteZ, n.length], `S${id} 광장 없음 · 정의 자리`);
+    assert.ok(!('bossFloor' in st) && !('finishZ' in st), `S${id} 보스 칸·결승선 없음`);
+    assert.ok(n.elites.length >= 1 && n.elites.every((e) => !e.mid), `S${id} 배수 1 줄은 보스 그대로`);
+    assert.equal(goalKind(st), 'mid');
+  }
+  assert.ok(buildStage(20).arena && buildStage(23).elites.length === 3, '배수 1 줄 20 광장 · 23 세 정예 그대로');
 });
 
 // ═══════════════════════════════ HORDE ═══════════════════════════════

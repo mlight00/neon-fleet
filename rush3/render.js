@@ -162,6 +162,8 @@ export const PELLET = Object.freeze({ core: '#F7FFE6', flash: '#FFF6C8', tail: 2
 export const ATK_DANGER = '#FF3040';
 //  r4.10 결승선(대물결 판 — 규칙 run.finishZ 를 읽기만): 도로를 가로지르는 체크무늬 두 줄(밝은·어두운 칸 cells 개, 세계 깊이 depth px) +
 //   양쪽 기둥과 그 위를 잇는 표지 띠, 가운데 '결승'(한 어절 — 줄바꿈 없음, BAL3.horde.label)
+//  r4.10 중간 보스 겉모습: 머리 위 이름표(label = BAL3.midBoss.label '중간 보스' — 금빛 글) + 그 아래 체력 막대(주황 — 보스 막대 색과 다르게) · 막대 바탕
+export const MID_LOOK = Object.freeze({ label: BAL3.midBoss.label, labelColor: '#FFD27A', bar: '#FF9A3D', back: 'rgba(20,35,58,0.85)' });
 export const FINISH_LOOK = Object.freeze({ light: '#F3F1E8', dark: '#14233A', cells: 16, depth: 26, post: '#9AA1AC', board: 'rgba(20,35,58,0.9)', sign: '#F6C84A', label: BAL3.horde.label });
 export const ATK_CHARGE = '#FFF1B8';
 //  r4.9 (다) 광분(이사님 지시 2026-09-26 "보스 체력이 30% 남으면 광분 모드를 넣자" — 규칙 bo.rage 를 읽기만): 보스 둘레 붉게 달아오르는 오라(맥박 = 규칙 시계 run.time) ·
@@ -1382,6 +1384,54 @@ export function createRenderer3(ctx, sprites) {
     if (rl) { ctx.textAlign = 'center'; outlinedText(rl, x, y + r + 36 * k, fs(12, k), C.hud, 'bold', 4); }
   }
 
+  //  r4.10 중간 보스(규칙 bo.mid — 읽기만): 그 판 일반 적 그림(look kind·skin)을 크게 — 반지름 bo.r, 그림 높이 = r × 2.4 × 그림 배율(일반 적 그리기 규칙 그대로라
+  //   일반 적 그림의 2.2~2.6배) · 3상태 그림(맞는 순간 hit: · 절반 아래 dmg:)·피격 반응(번쩍임·흔들림 — 보스처럼 무겁게)은 일반 적과 같은 규칙 ·
+  //   머리 위 이름표 '중간 보스' + 체력 막대(남은 체력 비율) · 몸 아래 체력 숫자(보스와 같은 자리)
+  function drawMidBoss(b, run, fx) {
+    const q = pj(b.x, b.z - run.z), k = q.s, x = q.x, y = q.y;
+    const r = b.r * k;
+    const look = b.look || { kind: 'grunt' };
+    const artB = artBase3(look.kind, look.skin);
+    const h = r * 2.4 * ((FX.artScale && FX.artScale[artB]) || 1);
+    shadow(x, y + h * 0.4, r * 0.95);
+    const hr = hitPose(fx, b.id, 'elite', k);
+    if (hr) { ctx.save(); poseAt(hr, x, y + h * 0.4); }
+    const baseKey = look.skin ? 'skin:' + look.skin : ENEMY_SPRITE[look.kind];
+    let key = baseKey;
+    if (artB && hr && hr.flash > 0 && get('hit:' + artB)) key = 'hit:' + artB;
+    else if (artB && wantsDmgArt(b.hp, b.max) && get('dmg:' + artB)) key = 'dmg:' + artB;
+    drawImgCentered(key, x, y, h, () => enemyShape(look.kind, x, y, r, false));
+    if (hr && hr.flash > 0) {
+      ctx.globalAlpha = hr.flash;
+      const im = get(key), wim = im ? whiteOf(im) : null;
+      if (wim) ctx.drawImage(wim.c, x - h * (im.width / im.height) / 2, y - h / 2, h * (im.width / im.height), h);
+      else enemyShape(look.kind, x, y, r, true);
+      ctx.globalAlpha = 1;
+    }
+    if (hr) ctx.restore();
+    //  머리 위: 체력 막대(바탕 + 남은 비율) → 그 위 이름표
+    const bw = Math.max(64, r * 2.3), bh = Math.max(7, 9 * k), by = y - h / 2 - 8 * k - bh;
+    ctx.fillStyle = MID_LOOK.back;
+    roundRect(x - bw / 2, by, bw, bh, bh / 2); ctx.fill();
+    const f = Math.max(0, Math.min(1, b.hp / (b.max || 1)));
+    if (f > 0) { ctx.fillStyle = MID_LOOK.bar; roundRect(x - bw / 2, by, bw * f, bh, bh / 2); ctx.fill(); }
+    ctx.textAlign = 'center';
+    outlinedText(MID_LOOK.label, x, by - 7 * k, fs(15, k, 13), MID_LOOK.labelColor, 'bold', 4);
+    drawHpTag(x, y + r + 20 * k, b.hp, k, hr ? hr.pop : 0);
+  }
+  //  r4.10 중간 보스 돌진 경보(규칙 bo.charge — 읽기만): 경보 동안(그리고 돌진해 치기 전까지) 돌진할 줄(몸 폭)을 붉은 경보 구역으로 — 보스 광역 경보와 같은 그리기(warnShape)
+  function drawMidCharge(run, now) {
+    const rz = run.z, blink = 0.72 + 0.28 * Math.sin(now * 16);
+    ctx.save();
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const b of run.bosses ?? []) {
+      const c = b.mid && !b.dead ? b.charge : null;
+      if (!c || c.hit) continue;
+      warnShape(c.zones[0].shape, Math.max(0, Math.min(1, c.t / (c.tele || 0.8))), blink, rz);
+    }
+    ctx.restore();
+  }
+
   //  부대: 실제 units 배열 — 히어로(hero 표시 유닛, M01 — r4.4 전에는 units[0]) + 병사(SOLDIER). 그림자·행진 바운스·병력 수·중심 마커
   //   원근(r3.20): 병사마다 부대 중심 + (dx, dz) 로 각각 투영한다 — 앞줄(d 큰 쪽)은 작게, 뒷줄(d < 0)은 부대 줄 배율 near 그대로·간격은 평면(수정 라운드 2
   //   2026-09-20 — 처음엔 뒷줄이 자라 s 1.9 → 1.5 상한, 그래도 59/40명부터 뒷줄이 화면 아래로 넘쳐 project.js 뒤쪽 갈래를 바꿨다). 아레나 ay 는 d 오프셋(−ay)
@@ -2095,7 +2145,8 @@ export function createRenderer3(ctx, sprites) {
       const bTotal = (run.bosses ?? []).length, bLeft = (run.bosses ?? []).filter((b) => !b.dead).length;
       //  r3.17 아레나: 광장 보스전은 '아레나 전투!'(도로 정예 문구는 그대로)
       //  r4.10 대물결 판(결승선 run.finishZ): '결승선까지 Nm'(판 길이 = 결승선) → 넘으면 '작전 완료'
-      const goal = run.boss ? (run.phase === 'arena' ? '아레나 전투!' : bTotal > 1 ? '정예 전투! 남은 목표 ' + bLeft + '/' + bTotal : '정예 전투!')
+      //  r4.10 중간 보스: '중간 보스 전투!'
+      const goal = run.boss ? (run.boss.mid ? '중간 보스 전투!' : run.phase === 'arena' ? '아레나 전투!' : bTotal > 1 ? '정예 전투! 남은 목표 ' + bLeft + '/' + bTotal : '정예 전투!')
         : (run.bossDefeated || (run.finishZ != null && run.won)) ? '작전 완료' : run.finishZ != null ? '결승선까지 ' + hud.distM + 'm' : '남은 거리 ' + hud.distM + 'm';
       outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
     }
@@ -2146,7 +2197,8 @@ export function createRenderer3(ctx, sprites) {
     }
     ctx.textBaseline = 'alphabetic';
     //  정예 HP 막대. r3.16 복수 정예: 보스가 둘 이상이면 300px 를 gap 6 으로 등분해 칸마다 '역할 hp/max'(격파된 칸은 회색 '격파'). 단수는 종전 그리기 그대로
-    if (run.boss) {
+    //   r4.10 중간 보스는 HUD 막대 대신 머리 위 이름표·체력 막대(drawMidBoss)
+    if (run.boss && !run.boss.mid) {
       const bosses = run.bosses ?? [run.boss];
       //  r3.24: 보스가 맞는 동안 막대가 좌우로 떨린다(떨림은 캔버스 이동으로만 — 막대 좌표는 그대로)
       const bfx = view.fx && view.fx.hit;
@@ -2713,7 +2765,9 @@ export function createRenderer3(ctx, sprites) {
     //  r4.9 (가) 탄 공격 장전 중인 보스(규칙 run.bossAtk.cur.state 'charge' — 읽기만): 진행 0 → 1
     const ac = run.bossAtk && run.bossAtk.cur && run.bossAtk.cur.state === 'charge' ? run.bossAtk.cur : null;
     const chargeOf = (b) => (ac && ac.boss === b.id ? Math.max(0, Math.min(1, 1 - ac.t / (ac.charge || 0.3))) : null);
-    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, run.z, now, shockR, fx, chargeOf(b), run.time);
+    //  r4.10 중간 보스는 돌진 경보(붉은 줄)를 몸 아래에 먼저, 몸은 일반 적 그림을 키워서(drawMidBoss)
+    drawMidCharge(run, now);
+    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) { if (b.mid) drawMidBoss(b, run, fx); else drawBoss(b, run.z, now, shockR, fx, chargeOf(b), run.time); }
     //  r4.8 보스 공격 예고(r4.9 — 광역의 붉은 경보 구역만) — 보스 위, 탄·부대 아래
     drawBossAtk(run, now);
     drawBullets(run);

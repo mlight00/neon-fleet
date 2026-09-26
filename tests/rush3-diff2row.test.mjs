@@ -60,7 +60,7 @@ function undoR410Stage(st, id, row) {
   st.eliteZ = nb.eliteZ;
   st.length = nb.length;
   st.spawns = st.spawns.filter((sp) => !sp.horde);
-  delete st.endKind; delete st.hordeZ; delete st.finishZ;
+  delete st.endKind; delete st.hordeZ; delete st.finishZ; delete st.midFloor; delete st.bossHw;
   return st;
 }
 function undoR47Run(rp, row) {
@@ -75,14 +75,19 @@ test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 �
     const st = buildStage(id, { difficulty: 'brutal' });
     const kind = stageKindOf(id, 'brutal');
     assert.equal(st.endKind, kind, `S${id} 판 종류 칸(r4.10)`);
-    if (st.elites.length) {
+    if (kind === 'mid') {
+      //  r4.10 중간 보스 판: 보스 정의 = 중간 보스 1체(mid — 고유 공격 없음) · 체력 = 상한 화력 × 12초(midFloor — 보스 칸 bossFloor 는 없다) · 밀집 대형 64
+      assert.ok(st.elites.length === 1 && st.elites[0].mid && !('atk' in st.elites[0]), `S${id} 중간 보스 1체(고유 공격 없음)`);
+      assert.ok(st.midFloor && !('bossFloor' in st), `S${id} 중간 보스 체력 계산(midFloor)`);
+      assert.equal(st.bossHw, 64, `S${id} 중간 보스전도 밀집 대형`);
+    } else if (st.elites.length) {
       //  r4.7 몫이 실제로 들어 있다: 보스 체력 바닥(옛 값 이상) · 보스 탄 1 · r4.8 보스전 밀집 대형 64
       assert.ok(st.bossFloor && st.elites.every((e, i) => e.hp >= st.bossFloor.base[i]), `S${id} 보스 체력 바닥`);
       assert.equal(st.bossHw, 64, `S${id} 보스전 밀집 대형(r4.8)`);
       //  r4.9 보스별 고유 공격: 스킨마다 3종 · 역할 보스는 자기 스킨 공격 중 역할에 맞는 것만(18번 포격 = 탄 2종, 소환 = 광역 1종)
       assert.ok(st.elites.every((e) => e.atk && e.atk.seq.length >= 1 && e.atk.skin), `S${id} 보스 고유 공격 배정(r4.9)`);
     } else {
-      assert.ok(kind === 'horde' || kind === 'mid', `S${id} 보스 없는 판 = 대물결·중간 보스(r4.10)`);
+      assert.equal(kind, 'horde', `S${id} 보스 없는 판 = 대물결(r4.10)`);
       assert.ok(!('bossFloor' in st) && !('bossHw' in st), `S${id} 보스 없는 판에 보스 칸 없음`);
     }
     assert.equal(S(undoR410Stage(undoR47Stage(st), id, row)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);

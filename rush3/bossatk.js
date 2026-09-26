@@ -327,6 +327,38 @@ function frontExt(F, ux, uz) {
   return m;
 }
 
+//  ── r4.10 중간 보스 돌진(보스 고유 공격 15종과 따로 — 중간 보스의 한 가지 행동) ─────────────────────────────────────
+/** 중간 보스 돌진 한 번의 설계(광역 경보와 같은 안전 상자 보장 — r4.9 규칙 그대로). P = BAL3.midBoss.charge, k = 이 중간 보스가 돌진한 횟수(겨누는 쪽 번갈이).
+ *  붉은 경보 줄 = 중간 보스 자리(bo.x, bo.z)에서 곧게 — 부대 한가운데 z 에서 겨누는 x 를 지나 부대가 있을 수 있는 가장 낮은 z 아래까지. 줄 폭 = 몸(반지름 bo.r).
+ *  겨누는 x 는 부대 한가운데에서 조금씩 벌려 가며(첫 쪽은 k 로 번갈아) 설 곳(안전 상자 — 부대 폭 + 48)이 경보 시간 × moveMax × 0.8 안에 나오는 첫 자리.
+ *  벌림 한계 = 줄이 부대 몸통에 걸치는 만큼(가만히 있으면 치인다). 몸이 부대 띠 위끝에 닿는 때(at) = 경보 + 그 길이 ÷ 돌진 속도(닿는 거리는 경보 시간으로 잰다 — 안전 쪽).
+ *  반환 { kind 'charge', type 'aoe', axis 'x', goal, safe, safeZ, reachT, reachD, hw, band, zFloor, from, tele, zones: [{ shape(seg), at }], lane: { ax, az, bx, bz }, len, ux, uz } | null */
+export function planCharge(run, bo, P, k = 0) {
+  if (!run.units.length) return null;
+  const F = squadFrame(run);
+  const r = bo.r, ax = bo.x, az = bo.z;
+  if (az - F.zc < r + 40) return null;
+  const zEnd = F.zFloor - r - 4;
+  const top = squadBox(F).z1;
+  const D = reachDist(F, P.tele);
+  const lim = F.hw - SQ.unitR + r - 6;
+  for (const off of offsets(lim, k, 4)) {
+    const tx = clamp(F.x + off, F.eLo + r, F.eHi - r);
+    const bx = ax + (tx - ax) * (az - zEnd) / (az - F.zc);
+    const shape = { t: 'seg', ax, az, bx, bz: zEnd, r };
+    const g = searchGoal(F, [shape], ['x'], () => D);
+    if (!g) continue;
+    const B = squadBox(F, g.v, F.zc);
+    if (!boxClear([shape], B) || Math.abs(g.v - F.x) > D + 1e-9) continue;
+    const len = Math.hypot(bx - ax, zEnd - az), ux = (bx - ax) / len, uz = (zEnd - az) / len;
+    const sHit = clamp((az - (top + r)) / -uz, 0, len);
+    return { kind: 'charge', type: 'aoe', axis: 'x', goal: { x: g.v, z: F.zc }, safe: [B.x0, B.x1], safeZ: [B.z0, B.z1], reachT: P.tele, reachD: D, hw: F.hw,
+             band: [F.zLo, F.zHi], zFloor: F.zFloor, from: { x: F.x, z: F.zc }, tele: P.tele,
+             zones: [{ shape, at: P.tele + sHit / P.speed }], lane: { ax, az, bx, bz: zEnd }, len, ux, uz };
+  }
+  return null;
+}
+
 //  ── 공격 한 번의 설계 ─────────────────────────────────────────────────────────────────────────────────
 /** bo = 공격하는 보스(자리 bo.x·bo.z·반지름 bo.r), kind = 고유 공격, k = 이 보스가 이 공격을 쓴 횟수(빈틈 위치·겨누는 쪽 번갈이).
  *  반환(공통) { kind, type, axis, goal: { x, z }(부대가 설 곳), safe: [x0, x1]·safeZ: [z0, z1](안전 상자), reachT(닿는 시간), reachD(닿는 거리), hw, band, zFloor, from, pause } +

@@ -200,10 +200,11 @@ export function weaponOptions(startWeapon, crates) {
 }
 
 //  보스 목표(부대 중심 기준). 도로: 역할 표의 정지 거리·보스 x(정의 x 가 없으면 부대와 같은 x = null) · 광장: null(자동 조준)
+//   r4.10 중간 보스: 정의의 정지 거리(holdAhead)·반지름(r — 일반 적 그림을 키운 크기)이 있으면 그 값(보스 정의에는 없다 — 종전 계산 그대로)
 function bossTargets(stage) {
   if (stage.arena) return null;
   const E = BAL3.enemies.elite;
-  return (stage.elites || []).map((e) => ({ x: e.x ?? null, z: BAL3.elites.roles[e.role ?? 'elite'].holdAhead, r: E.r }));
+  return (stage.elites || []).map((e) => ({ x: e.x ?? null, z: e.holdAhead ?? BAL3.elites.roles[e.role ?? 'elite'].holdAhead, r: e.r ?? E.r }));
 }
 
 /** 한 부대(n 명·무기·Mk)가 이 판 보스에 닿는 상한 초당 피해. 반환 { dps, hits, sx }
@@ -265,7 +266,7 @@ function floorKey(stage, sec) {
     (stage.supplies || []).map((s) => [s.id, s.z, s.x, s.r, s.kind, s.payload, s.pairId, s.padStart, s.padGap]),
     (stage.walls || []).map((w) => [w.id, w.kind, w.z0, w.z1, w.x0, w.x1]),
     stage.lottery ? [stage.lottery.z, stage.lottery.x, stage.lottery.wallId, stage.lottery.supplyId, stage.lottery.rowId] : null,
-    (stage.elites || []).map((e) => [e.hp, e.x, e.role]), !!stage.arena, stage.bossHw ?? null]);
+    (stage.elites || []).map((e) => [e.hp, e.x, e.role, e.r ?? null, e.holdAhead ?? null]), !!stage.arena, stage.bossHw ?? null]);
 }
 
 /** 보스 체력 바닥(r4.7): 보스 체력 합 ÷ 상한 화력 ≥ sec 초. 모자라면 체력 비율을 지키며 늘린다(각 체력은 올림 — 옛 체력 아래로 내려가지 않는다).

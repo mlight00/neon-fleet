@@ -43,7 +43,8 @@ test('BOSS-RAGE 문턱: 게임 줄 보스의 페이즈 문턱 = 50%·30%(atk.pha
   assert.equal(bossPhaseOf(30, 100), 1, '종전 표는 30% 가 1단계');
   for (const id of BOSS_IDS) assert.ok(buildStage(id, { difficulty: 'brutal' }).elites.length > 0, `S${id} 보스 판`);
   for (const id of ALL_STAGE_IDS) {
-    for (const e of buildStage(id, { difficulty: 'brutal' }).elites) { assert.deepEqual(e.atk.phaseAt, BA.phaseAt, `S${id}`); assert.deepEqual(e.atk.rage, BA.rage, `S${id}`); }
+    //  r4.10 중간 보스(mid)는 광분이 없다(검사 MIDBOSS) — 보스만
+    for (const e of buildStage(id, { difficulty: 'brutal' }).elites.filter((x) => !x.mid)) { assert.deepEqual(e.atk.phaseAt, BA.phaseAt, `S${id}`); assert.deepEqual(e.atk.rage, BA.rage, `S${id}`); }
     assert.ok(buildStage(id).elites.every((e) => !('atk' in e)), `S${id} 배수 1 줄: 광분 칸 없음`);
   }
 });

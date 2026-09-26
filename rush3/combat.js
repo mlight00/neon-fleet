@@ -10,7 +10,7 @@ import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.
 import { normUp, hasUp, effects } from './meta.js';
 //  r4.9 보스 고유 공격 설계(순수 규칙 모듈 — 위험과 안전 상자를 함께 정한 공격 한 번의 기하 · 탄 길 따라가기 · 광역 구역 × 병사 판정).
 //   차례·장전/경보 시간·탄 생성·피해는 여기(bossAttackStep)
-import { planAttack, unlockedAtk, pathAt, shapeHitsUnit } from './bossatk.js';
+import { planAttack, unlockedAtk, pathAt, shapeHitsUnit, planCharge } from './bossatk.js';
 
 export const STEP = BAL3.STEP;
 
@@ -26,6 +26,8 @@ const BATK = BAL3.bossAtk;
 const PHASES = BAL3.bossPhases;
 //  r4.9 거미줄 그물에 걸린 부대의 이동 배수(run.slowT 초 동안 — 게임 화면 줄에서 그물이 병사를 잡았을 때만 생기는 희소 칸)
 const WEB_SLOW = BAL3.bossAtk.kinds.web.slowMul;
+//  r4.10 중간 보스(돌진 경보·돌진·제자리 — 게임 화면 줄 중간 보스 판만). 파일 상단 상수(DIFF-6 규약 — stepRun 이후는 이 이름만 읽는다)
+const MID = BAL3.midBoss;
 const HP_BASE = Object.freeze(Object.fromEntries(Object.entries(BAL3.enemies).filter(([, d]) => d.hp != null).map(([k, d]) => [k, d.hp])));
 const NO_INPUT = Object.freeze({ pointerX: null, dragDx: 0, keyDir: 0, dragDy: 0, keyDirY: 0 });
 const DEG = Math.PI / 180;
@@ -166,6 +168,8 @@ export function createRun(stage, { difficulty, startWeapon, startMk, heroGuard =
   if (stage.bossHw) run.bossHw = stage.bossHw;
   //  r4.10 결승선(희소 — 게임 화면 줄의 대물결 판만 stage.finishZ 를 싣는다): 부대 중심이 이 z 를 넘는 STEP 에 승리(verdict). 보스가 있는 판·배수 1 줄의 판에는 키가 없다
   if (stage.finishZ != null) run.finishZ = stage.finishZ;
+  //  r4.10 중간 보스 돌진 피해 풀(희소 — 보스 정의에 mid 가 있는 판 = 게임 화면 줄 중간 보스 판만): 현상금 적과 같은 규모(풀 × 줄의 touchDmg 배수, 반올림)
+  if (elites.some((e) => e.mid)) run.midCrush = Math.round(MID.crush * m.touchDmg);
   //  r4.8 보스 공격 차례(희소 — 보스 정의에 atk 가 있는 판 = 게임 화면 줄만): wait = 다음 예고까지 초 · cur = 진행 중인 공격(전체에 1개) ·
   //   turn = 다음 차례 보스 번호 · n = 공격 일련번호(탄의 atk 칸 — 그 공격의 탄이 모두 사라지면 공격이 끝난다)
   if (elites.some((e) => e.atk)) run.bossAtk = { wait: BATK.first, cur: null, turn: 0, n: 0 };
@@ -324,7 +328,8 @@ function spawnDue(run, ev) {
     run.elites.forEach((d, i) => {
       const bo = makeBoss(run, d, i);
       run.bosses.push(bo);
-      ev.push({ type: 'elite', id: bo.id, index: i, total, role: bo.role, x: bo.x, z: bo.z, hp: bo.hp });
+      //  r4.10 중간 보스면 mid 표시(셸 배너 '중간 보스 접근!')
+      ev.push({ type: 'elite', id: bo.id, index: i, total, role: bo.role, x: bo.x, z: bo.z, hp: bo.hp, ...(bo.mid ? { mid: true } : {}) });
     });
     run.boss = run.bosses[0];
   }
@@ -338,7 +343,8 @@ export function makeBoss(run, def, index) {
   const E = run.enemyDefs.elite;
   const role = def.role ?? 'elite';
   const rd = ELITES.roles[role];
-  const r = E.r;
+  //  r4.10 중간 보스: 반지름·정지 거리는 정의 값(그 판 일반 적 그림을 키운 크기 — 보스 정의에는 없어 종전 값)
+  const r = def.r ?? E.r;
   const x = def.x ?? ROAD.center;
   const roadLo = ROAD.x0 + r, roadHi = ROAD.x1 - r;
   const patrol = def.patrol ?? ELITES.laneHw;
@@ -349,9 +355,12 @@ export function makeBoss(run, def, index) {
   const bo = { id: 'b' + (index + 1), index, kind: 'elite', role, x, z, px: x, pz: z, hp: def.hp, max: def.hp, r,
                state: 'descend', dir: index % 2 === 0 ? 1 : -1, shootT: E.shootEvery, touchT: 0, spawnT: E.summonEvery,
                shoot: !!rd.shoot, summon: rd.summon == null ? !!def.summon : !!rd.summon,
-               laneLo, laneHi, holdAhead: rd.holdAhead, descendSpeed: E.descendSpeed * rd.descendMul, patrolSpeed: E.patrolSpeed * rd.patrolMul,
+               laneLo, laneHi, holdAhead: def.holdAhead ?? rd.holdAhead, descendSpeed: E.descendSpeed * rd.descendMul, patrolSpeed: E.patrolSpeed * rd.patrolMul,
                phase: 0, dead: false, reaped: false };
   if (def.skin) bo.skin = def.skin;
+  //  r4.10 중간 보스(희소 — 게임 화면 줄 중간 보스 판만): 보스와 다르다 — 사격·소환·고유 공격·페이즈·광분 없음. 행동은 돌진 하나(midBossAct).
+  //   look = 그림(그 판 일반 적 kind·skin) · chargeT = 다음 돌진 경보까지(자리 잡은 뒤부터 센다) · chargeK = 돌진 횟수(겨누는 쪽 번갈이) · charge = 진행 중인 돌진 | null
+  if (def.mid) Object.assign(bo, { mid: true, look: { ...def.look }, shoot: false, summon: false, chargeT: null, chargeK: 0, charge: null });
   //  r4.8 보스 공격 패턴(게임 화면 줄 — buildStage 가 보스 정의에 atk 를 싣는다): 조준 부채꼴(shoot)을 끄고 패턴 차례(bossAttackStep)에 든다.
   //   atkN = 이 보스의 공격 횟수(패턴 순서) · atkK = 패턴별 횟수(빈틈 위치 번갈이·겨누는 쪽). 배수 1 줄·검사 합성 판은 키가 없다(종전 부채꼴 그대로)
   if (def.atk) { bo.atk = { ...def.atk, seq: [...def.atk.seq] }; bo.atkN = 0; bo.atkK = {}; bo.shoot = false; }
@@ -804,6 +813,7 @@ function updateBossRage(run, bo, ev) {
 }
 
 function bossAct(run, bo, ev, dt) {
+  if (bo.mid) { midBossAct(run, bo, ev, dt); return; }
   const E = run.enemyDefs.elite;
   const ph = updateBossPhase(run, bo, ev);
   updateBossRage(run, bo, ev);
@@ -837,6 +847,72 @@ function bossAct(run, bo, ev, dt) {
       ev.push({ type: 'summon', kind: E.summonKind, n: E.summonN, x: bo.x, z: bo.z + E.summonDz });
     }
   }
+}
+
+//  ── r4.10 중간 보스(게임 화면 줄 중간 보스 판 — 보스 정의에 mid 가 있는 판만) ─────────────────────────────────────
+//  이사님 지시(2026-09-26) "일반 스테이지는 … 좀 더 강한 중간 보스로 대체하자" · 명세 "중간 보스는 보스와 달라야 한다: 탄막·광분·고유 공격 없음. 행동은 단순하게 한 가지".
+//  하강(보스와 같은 빠르기) → 정지 거리(holdAhead)에서 좌우로 왕복 → chargeT 가 다 되면 돌진 설계(bossatk.planCharge — 피할 곳이 보장되는 붉은 경보 줄, 안 되면 retry 초 뒤) →
+//   경보(warn, tele 초 — 멈춘다, 이벤트 midWarn) → 돌진(dash — 줄을 따라 speed 로, 몸이 부대 띠에 닿는 때(at) 줄 안 병사에게 피해 풀을 앞줄부터 — 이벤트 midBoom) →
+//   줄 끝에서 제자리로(back, 이벤트 midBack) → every 초 뒤 다음 경보. 페이즈·광분·사격·소환·접촉 사격 없음. 난수 없음
+function midBossAct(run, bo, ev, dt) {
+  const P = MID.charge;
+  bo.px = bo.x; bo.pz = bo.z;
+  if (bo.state === 'descend') {
+    bo.z -= bo.descendSpeed * dt;
+    if (bo.z <= run.z + bo.holdAhead) { bo.z = run.z + bo.holdAhead; bo.state = 'hold'; bo.chargeT = P.first; }
+    return;
+  }
+  const c = bo.charge;
+  if (!c) {
+    bo.x += bo.dir * bo.patrolSpeed * dt;
+    if (bo.x <= bo.laneLo) { bo.x = bo.laneLo; bo.dir = 1; } else if (bo.x >= bo.laneHi) { bo.x = bo.laneHi; bo.dir = -1; }
+    bo.chargeT -= dt;
+    if (bo.chargeT > 1e-9) return;
+    const plan = planCharge(run, bo, P, bo.chargeK);
+    if (!plan) { bo.chargeT = P.retry; return; }
+    bo.chargeK++;
+    bo.charge = { ...plan, state: 'warn', t: 0, s: 0, hit: false, homeX: bo.x, homeZ: bo.z };
+    ev.push({ type: 'midWarn', id: bo.id, x: bo.x, z: bo.z, tele: P.tele, shape: { ...plan.zones[0].shape } });
+    return;
+  }
+  c.t += dt;
+  if (c.state === 'warn') {
+    if (c.t + 1e-9 < P.tele) return;
+    c.state = 'dash';
+    ev.push({ type: 'midDash', id: bo.id, x: bo.x, z: bo.z });
+  }
+  if (c.state === 'dash') {
+    c.s = Math.min(c.len, c.s + P.speed * dt);
+    bo.x = c.lane.ax + c.ux * c.s; bo.z = c.lane.az + c.uz * c.s;
+    if (!c.hit && (c.t + 1e-9 >= c.zones[0].at || c.s >= c.len - 1e-9)) {
+      c.hit = true;
+      const hits = chargeHit(run, c.zones[0].shape, ev);
+      ev.push({ type: 'midBoom', id: bo.id, x: bo.x, z: bo.z, shape: { ...c.zones[0].shape }, hits });
+    }
+    if (c.s >= c.len - 1e-9) c.state = 'back';
+    return;
+  }
+  const dx = c.homeX - bo.x, dz = c.homeZ - bo.z, dist = Math.hypot(dx, dz), mv = P.back * dt;
+  if (dist <= mv + 1e-9) {
+    bo.x = c.homeX; bo.z = c.homeZ; bo.charge = null; bo.chargeT = P.every;
+    ev.push({ type: 'midBack', id: bo.id, x: bo.x, z: bo.z });
+  } else { bo.x += dx / dist * mv; bo.z += dz / dist * mv; }
+}
+//  돌진에 치임: 경보 줄(seg — 몸 반지름) 안 병사에게 피해 풀(run.midCrush)을 앞줄(dy 작은 순, 같으면 id 순)부터 체력만큼 나눠 뺀다(현상금 적 crush 와 같은 꼴 — 손실 원인 접촉).
+//   로봇이 줄 안이면 로봇 몫은 줄 **밖**의 가장 가까운 호위에게(heroGuard — 착지 충격·광역과 같은 꼴). 반환 = 줄 안 병사 수
+function chargeHit(run, shape, ev) {
+  const oz = squadZ(run);
+  const hits = run.units.filter((u) => u.hp > 0 && shapeHitsUnit(shape, run.x + u.dx, oz - u.dy, SQ.unitR));
+  const inside = run.heroGuard ? new Set(hits) : null;
+  let pool = run.midCrush ?? 0;
+  for (const u of [...hits].sort((a, b) => a.dy - b.dy || a.id - b.id)) {
+    if (pool <= 0) break;
+    if (u.hp <= 0) continue;
+    const k = Math.min(pool, u.hp);
+    pool -= k;
+    damageUnit(run, u, k, 'touch', ev, run.x + u.dx, oz - u.dy, inside);
+  }
+  return hits.length;
 }
 
 //  ── r4.9 보스 고유 공격(게임 화면 줄 — run.bossAtk 가 있는 판만) ──────────────────────────────────────────
@@ -1067,7 +1143,8 @@ function contacts(run, ev, dt) {
   }
   const E = run.enemyDefs.elite;
   for (const bo of run.bosses) {
-    if (bo.dead) continue;
+    //  r4.10 중간 보스는 겹침 접촉 피해가 없다(피해는 돌진에 치인 것 — chargeHit)
+    if (bo.dead || bo.mid) continue;
     //  아레나 보스(r3.17)는 접촉 상수를 아레나 설정에서(돌진 경로에 선 유닛도 이 타이머 접촉으로 맞는다). 도로 정예는 종전 표
     const T = bo.arena ? run.arena.boss : E;
     bo.touchT = Math.max(0, bo.touchT - dt);

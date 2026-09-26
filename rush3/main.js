@@ -49,6 +49,8 @@ export const ARENA_GUIDE_TEXT = Object.freeze(['드래그로 피하세요', '광
 //  r4.10 대물결 판(게임 화면 줄 1·4·7·…): 대물결 첫 겹이 들어올 때 정예 경고와 같은 슬롯 A 붉은 띠 · 결승선을 넘는 순간 금색 띠(한 줄 — 줄바꿈 없음)
 export const HORDE_BANNER_TEXT = '대물결 접근!';
 export const FINISH_TEXT = '결승선 돌파!';
+//  r4.10 중간 보스 판: 중간 보스가 나올 때 정예 경고 슬롯 붉은 띠(한 줄 — 줄바꿈 없음)
+export const MID_BANNER_TEXT = '중간 보스 접근!';
 //  r4.10 판 끝 목표 이름(결과 화면 코인 내역 — 보스 몫 V × 0.5 를 받는 목표): 보스 판 '보스' · 중간 보스 판 '중간 보스' · 대물결 판 '돌파'
 export const GOAL_NAME = Object.freeze({ boss: '보스', mid: '중간 보스', horde: '돌파' });
 /** 판 끝 목표 종류(순수 — 판 정의만 본다): 결승선이 있으면 'horde' · 중간 보스(보스 정의의 mid 표시)면 'mid' · 그 밖(보스·배수 1 줄·시제품) 'boss' */
@@ -1160,7 +1162,8 @@ export function boot(canvas, deps = {}) {
         //  정예 등장(r3.16 복수 정예): 2~3체가 같은 프레임에 나오므로 index 0 에서만 배너·효과음·BGM(소리가 겹치지 않게). 문구는 체 수를 붙인다
         case 'elite':
           if ((ev.index ?? 0) > 0) break;
-          fx.eliteT = FX.eliteBannerSec; fx.eliteText = (ev.total ?? 1) > 1 ? '정예 ' + ev.total + '체 접근!' : '정예 접근!';
+          //  r4.10 중간 보스(ev.mid)는 '중간 보스 접근!'
+          fx.eliteT = FX.eliteBannerSec; fx.eliteText = ev.mid ? MID_BANNER_TEXT : (ev.total ?? 1) > 1 ? '정예 ' + ev.total + '체 접근!' : '정예 접근!';
           fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]);
           break;
         //  정예 처치: 파편·흔들림은 매번, 효과음은 마지막(left 0)이면 승리음, 아니면 처치음. 남은 목표 배너는 bossesLeft 가 세운다
@@ -1213,6 +1216,16 @@ export function boot(canvas, deps = {}) {
           break;
         }
         case 'bossAtkEnd': break;
+        //  r4.10 중간 보스 돌진: 경보(붉은 줄 — 그림은 렌더가 bo.charge 를 직접 읽는다) = 경보음(광역 경보와 같은 lotWarn) · 돌진 = 금속음 ·
+        //   치임 = 흔들림(줄 안에 병사가 있으면 크게) + 폭발음 + 부대 쪽 파편(손실 글자·피격 번쩍임은 같은 STEP 의 hurt 가 낸다)
+        case 'midWarn': fx.sfx.push(['lotWarn']); break;
+        case 'midDash': fx.sfx.push(['gateClang']); break;
+        case 'midBoom':
+          fx.shakeT = Math.max(fx.shakeT, FX.shakeDur * (ev.hits > 0 ? 1.4 : 0.6));
+          fx.sfx.push(['kill']);
+          burstAt(ev.x, ev.z, 16, ev.hits > 0, C.bulletHeavy);
+          break;
+        case 'midBack': break;
         case 'bossDash': fx.sfx.push(['gateClang']); break;
         //  보호막(r3.18): 흡수된 탄마다 회색 스파크(차폐물 흡수와 같은 표현), 효과음은 프레임당 1회. 해제는 반전음 + 보스 위 글자
         case 'bossGuard': burstAt(ev.x, ev.z, 4, false, C.wall); if (!guardSfx) { guardSfx = true; fx.sfx.push(['gateClang']); } break;

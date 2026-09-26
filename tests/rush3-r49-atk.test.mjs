@@ -50,7 +50,8 @@ test('BOSS-UNIQUE 배정표: 스킨 5종 × 고유 공격 3종 = 15종이 서로
   //  판 정의: 게임 줄 보스마다 자기 스킨(그림이 없으면 B1)의 공격만 · 배수 1 줄은 배정이 없다
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
-    for (const e of st.elites) {
+    //  r4.10 중간 보스(mid — 보스와 다르다: 고유 공격 없음, 검사 MIDBOSS)는 뺀다
+    for (const e of st.elites.filter((x) => !x.mid)) {
       const skin = e.skin ?? ATK_DEFAULT_SKIN;
       assert.equal(e.atk.skin, skin, `S${id}: 공격 스킨 = 그림 스킨`);
       for (const k of e.atk.seq) assert.ok(skinKinds(skin).includes(k), `S${id} ${skin}: ${k} 는 자기 공격`);
@@ -65,7 +66,8 @@ test('BOSS-UNIQUE 페이즈·역할: 체력 50%·30%(r4.9 (다) 게임 줄 문�
   for (const id of BOSS_IDS) assert.equal(buildStage(id, { difficulty: 'brutal' }).bossPhases, true, `S${id} 보스 판은 페이즈 있음`);
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
-    for (const e of st.elites) {
+    //  r4.10 중간 보스(mid — 보스와 다르다: 고유 공격 없음, 검사 MIDBOSS)는 뺀다
+    for (const e of st.elites.filter((x) => !x.mid)) {
       const p = e.atk;
       if ((e.role ?? 'elite') !== 'elite') continue;
       if (st.bossPhases) {

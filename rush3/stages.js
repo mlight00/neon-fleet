@@ -210,7 +210,8 @@ export function stageKindOf(id, difficulty = DEFAULT_DIFFICULTY) {
  *  boss  = 표의 칸이 있을 때만 보스를 바꾼다: skin(단수 보스 그림) · elites(복수 보스) · arena(광장 — 정의의 elite 를 빼고 광장으로, z = 정의의 eliteZ)
  *  horde = 보스를 빼고(elite·elites·arena 없음) 정의의 eliteZ 를 대물결 시작(hordeZ)으로, 판 길이 = 결승선(hordeZ + BAL3.horde.finishAfter).
  *          대물결 겹(parts)은 스폰에 붙인다(z = hordeZ + 겹의 z, horde 표시 — 스폰 지터 시드·체력 배율은 다른 스폰과 같은 makeSpawn)
- *  mid   = (r4.10 (b) 전까지) 정의의 보스 그대로 */
+ *  mid   = 보스를 빼고(광장도) 정의의 eliteZ 에 **중간 보스 1체**: 표의 look(그 판 일반 적 그림 kind·skin)을 크게 키운 강한 적 —
+ *          반지름 = 그 적 종류 표 반지름 × BAL3.midBoss.scale[kind] · 정지 거리 BAL3.midBoss.holdAhead · 체력 원값 1(buildStage 가 상한 화력 × midBossSec 로 올린다) */
 function playDef(d, end) {
   if (end.kind === 'boss') {
     if (end.arena) { const { elite: _e, elites: _es, ...rest } = d; return { ...rest, arena: end.arena }; }
@@ -218,7 +219,12 @@ function playDef(d, end) {
     if (end.skin) return { ...d, elite: { ...d.elite, skin: end.skin } };
     return d;
   }
-  if (end.kind === 'mid') return d;
+  if (end.kind === 'mid') {
+    const { elite: _e, elites: _es, arena: _a, ...rest } = d;
+    const M = BAL3.midBoss, look = end.look;
+    const r = Math.round(BAL3.enemies[look.kind].r * M.scale[look.kind] * 100) / 100;
+    return { ...rest, eliteZ: d.eliteZ, elites: [{ hp: 1, mid: true, r, holdAhead: M.holdAhead, look: { ...look } }] };
+  }
   const { elite: _e, elites: _es, arena: _a, ...rest } = d;
   const hordeZ = d.eliteZ;
   const parts = end.kind === 'horde' ? end.parts.map((p) => ({ ...p, z: hordeZ + p.z, horde: true })) : [];
@@ -399,6 +405,8 @@ function makeElites(d, mult) {
     ...(e.x != null ? { x: e.x } : {}),
     ...(e.role ? { role: e.role } : {}),
     ...(e.patrol != null ? { patrol: e.patrol } : {}),
+    //  r4.10 중간 보스(게임 화면 줄 — 판 종류 표의 mid 만): 표시 mid · 반지름 r · 정지 거리 holdAhead · 그림 look. 보스 정의에는 이 칸들이 없다(배수 1 줄 출력 불변)
+    ...(e.mid ? { mid: true, r: e.r, holdAhead: e.holdAhead, look: { ...e.look } } : {}),
   }));
 }
 
@@ -497,15 +505,19 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   //   보스 정의마다 atk = { skin(공격을 정하는 스킨 — 그림이 없는 보스는 B1 그레이더), seq(고유 공격 순서), open(처음 열린 수), gap(공격 간격 초), look(탄 모양) }
   //   (bossatk.atkPlanFor — 스킨·역할로 정한다. 페이즈가 없는 판(1·2번)은 스킨의 early 를 처음부터 번갈아). combat 은 atk 가 있는 보스를 조준 부채꼴 대신 고유 공격으로 돌린다.
   //   배수 1 줄(normal)은 칸이 없다(종전 부채꼴 그대로)
-  if (mult.bossPatterns) for (const e of stage.elites) e.atk = atkPlanFor(e, !!stage.arena, { phases: stage.bossPhases });
+  //   r4.10 중간 보스(mid)는 보스와 달라야 한다 — 고유 공격을 싣지 않는다(탄막·광분·고유 공격 없음 · 돌진 하나 — combat.midBossAct)
+  if (mult.bossPatterns) for (const e of stage.elites) if (!e.mid) e.atk = atkPlanFor(e, !!stage.arena, { phases: stage.bossPhases });
   //  r4.7 보스 체력 바닥(이사님 지시 2026-09-26 "적어도 보스와 30초는 싸울 수 있도록"): 줄 표의 bossFloor 가 참인 줄(게임 화면 = brutal)에서만.
   //   보스 체력 합 ÷ 상한 화력(rush3/firepower.js — 이 판을 가장 잘 했을 때 보스 앞 부대가 보스에 실제로 닿는 초당 피해) ≥ BAL3.bossMinFightSec.
   //   모자라면 비율을 지키며 올린다(옛 체력 아래로는 안 내려간다). 랜덤 길은 풀의 좋은 결과 중 최선으로 계산하므로 추첨 시드와 무관하게 같은 체력이다.
   //   stage.bossFloor = 계산 내역(보고·검사용 — 규칙은 읽지 않는다). 검사용 배수 1 줄(normal)은 이 칸이 없고 체력도 종전 그대로
+  //   r4.10 중간 보스 판(보스 정의 = 중간 보스 1체)은 같은 계산기로 **상한 화력 × BAL3.midBossSec(12초)** — 원값 1 이라 체력 = ceil(12 × 상한 화력).
+  //    계산 내역은 stage.midFloor(보스 칸 bossFloor 와 따로 — 보스 판 검사·되돌리기가 섞이지 않게)
   if (mult.bossFloor && stage.elites.length) {
-    const f = bossFloor(stage);
+    const mid = stage.elites.every((e) => e.mid);
+    const f = bossFloor(stage, mid ? BAL3.midBossSec : BAL3.bossMinFightSec);
     stage.elites.forEach((e, i) => { e.hp = f.hp[i]; });
-    stage.bossFloor = { sec: f.sec, units: f.units, weapon: f.weapon, mk: f.mk, dps: f.dps, base: f.base, hp: f.hp, minSec: f.minSec };
+    stage[mid ? 'midFloor' : 'bossFloor'] = { sec: f.sec, units: f.units, weapon: f.weapon, mk: f.mk, dps: f.dps, base: f.base, hp: f.hp, minSec: f.minSec };
   }
   //  r4.7 현상금 적(이사님 지시 2026-09-26 "체력이 특수한 높은 일반 적을 배치해서 … 끝까지 쏴야 깰 수 있는 긴장감 … 대신 코인 같은 보상"):
   //   줄 표의 bounty 가 참인 줄(게임 화면 = brutal)에서만 판 정의의 bounties [{ z(발동 z), x }] 를 스폰 1체로 붙인다(물결·무리 수 배수 없음 — makeSpawn 을 거치지 않는다).
