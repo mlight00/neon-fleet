@@ -150,10 +150,14 @@ export function checkSafe(p, at, flightT, arena, label, slowT = 0) {
   assert.ok(Math.abs((s0 + s1) / 2 - p.goal.x) < 1e-6, `${label}: 설 곳 = 안전 상자 가운데`);
 }
 
+//  r4.9 (다) 광분 상태로 세우기(시뮬레이션용): 광분 칸 + 페이즈를 켜는 판은 광분 단계(2 — 보스가 빨라진다). 체력은 atkRun 이 1e9 로 둔 그대로(광분은 칸으로만)
+export const enrage = (run, bo) => { bo.rage = true; if (run.bossPhases !== false) bo.phase = 2; };
 /** 판 묶음 하나의 BOSS-DODGE·BOSS-SAFE(+ 위협): 모든 보스·고유 공격 × 병력 1·30·60·100 × 시작 자리 3곳.
  *  ① 봇(설 곳으로)은 그 공격에서 피해 0 · 끝난다 · 설계가 BOSS-SAFE 규칙을 지킨다 ② (판·보스·공격·병력)마다 한 곳 이상에서 공격이 실제로 시작
- *  ③ 위협: (판·보스·공격)마다 병력 30·60·100 × 시작 자리 3곳 중 한 곳 이상에서 제자리 부대가 맞는다. 반환 시뮬레이션 수 */
-export function dodgeGroup(ids) {
+ *  ③ 위협: (판·보스·공격)마다 병력 30·60·100 × 시작 자리 3곳 중 한 곳 이상에서 제자리 부대가 맞는다.
+ *  opts.rage = 광분 상태(r4.9 (다) — 탄 속도 × 1.12 로 설계·비행 시간을 잰다). 반환 시뮬레이션 수 */
+export function dodgeGroup(ids, opts = {}) {
+  const mod = opts.rage ? enrage : undefined, tag = opts.rage ? ' 광분' : '';
   let sims = 0;
   for (const id of ids) {
     for (const b of bossKinds(id)) {
@@ -164,8 +168,8 @@ export function dodgeGroup(ids) {
           let started = 0;
           for (const [xi, x0] of xs.entries()) {
             const k = (xi + ni) % 3;
-            const label = `S${id} 보스${b.bi} ${kind} ${n}명 x${x0} k${k}`;
-            const { run } = atkRun(id, n, b.bi, kind, x0, k);
+            const label = `S${id} 보스${b.bi} ${kind} ${n}명 x${x0} k${k}${tag}`;
+            const { run } = atkRun(id, n, b.bi, kind, x0, k, { mod });
             const r = playAttack(run, 'move', x0);
             sims++;
             if (!r.started) continue;
@@ -174,14 +178,14 @@ export function dodgeGroup(ids) {
             assert.equal(r.hurt, 0, label + ': 설 곳(빈틈 가운데)으로 간 부대는 피해 0');
             checkSafe(r.plan, r.at, r.flightT, b.arena, label);
             if (n >= 30 && !stayHit) {
-              const q = playAttack(atkRun(id, n, b.bi, kind, x0, k).run, 'stay', x0);
+              const q = playAttack(atkRun(id, n, b.bi, kind, x0, k, { mod }).run, 'stay', x0);
               sims++;
               if (q.hurt > 0) stayHit++;
             }
           }
-          assert.ok(started > 0, `S${id} 보스${b.bi} ${kind} ${n}명: 시작 자리 3곳 중 한 곳 이상에서 공격이 시작된다(설계 가능)`);
+          assert.ok(started > 0, `S${id} 보스${b.bi} ${kind} ${n}명${tag}: 시작 자리 3곳 중 한 곳 이상에서 공격이 시작된다(설계 가능)`);
         }
-        assert.ok(stayHit > 0, `S${id} 보스${b.bi} ${kind}: 제자리 부대가 한 번도 맞지 않았다(위협 없음)`);
+        assert.ok(stayHit > 0, `S${id} 보스${b.bi} ${kind}${tag}: 제자리 부대가 한 번도 맞지 않았다(위협 없음)`);
       }
     }
   }

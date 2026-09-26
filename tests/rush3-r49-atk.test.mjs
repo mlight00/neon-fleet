@@ -58,7 +58,7 @@ test('BOSS-UNIQUE 배정표: 스킨 5종 × 고유 공격 3종 = 15종이 서로
   }
 });
 
-test('BOSS-UNIQUE 페이즈·역할: 체력 50%·20% 마다 새 고유 공격이 하나씩 열린다(3번부터) · 1·2번은 삽날 밀기·잔해 튕기기를 처음부터 번갈아 · 포격 = 자기 스킨 탄 · 소환 = 광역 하나 · 장갑 = 광역 · 10번 포격은 B1 그레이더(그림 키 elite = B1_grader)', () => {
+test('BOSS-UNIQUE 페이즈·역할: 체력 50%·30%(r4.9 (다) 게임 줄 문턱) 마다 새 고유 공격이 하나씩 열린다(3번부터) · 1·2번은 삽날 밀기·잔해 튕기기를 처음부터 번갈아 · 포격 = 자기 스킨 탄 · 소환 = 광역 하나 · 장갑 = 광역 · 10번 포격은 B1 그레이더(그림 키 elite = B1_grader)', () => {
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
     for (const e of st.elites) {
@@ -128,7 +128,7 @@ test('BOSS-UNIQUE 실제 판: 게임 줄 1~24 보스는 조준 부채꼴(eshot n
   }
 });
 
-test('BOSS-UNIQUE 페이즈 실제: 4번 B1 — 체력 90% 는 삽날 밀기만, 45% 에 굴뚝 매연탄, 15% 에 잔해 튕기기가 실제로 나온다 · 1번(페이즈 없음)은 삽날 밀기·잔해 튕기기가 처음부터 번갈아', () => {
+test('BOSS-UNIQUE 페이즈 실제: 4번 B1 — 체력 90% 는 삽날 밀기만, 45% 에 굴뚝 매연탄, 29%(30% 문턱 바로 아래 — 광분) 에 잔해 튕기기가 실제로 나온다 · 1번(페이즈 없음)은 삽날 밀기·잔해 튕기기가 처음부터 번갈아', () => {
   const run0 = (id) => {
     const st = buildStage(id, { difficulty: 'brutal' });
     const stage = { ...st, startUnits: 60, gateRows: [], supplies: [], spawns: [], walls: [], lottery: null, bonus: null };
@@ -150,8 +150,8 @@ test('BOSS-UNIQUE 페이즈 실제: 4번 B1 — 체력 90% 는 삽날 밀기만,
   assert.deepEqual([...new Set(attacks(r4, 3, 0.9))], ['blade']);
   const p1 = attacks(r4, 4, 0.45);
   assert.ok(p1.includes('smoke') && !p1.includes('ricochet'), '50% 아래: 굴뚝 매연탄이 열린다 ' + p1);
-  const p2 = attacks(r4, 5, 0.15);
-  assert.ok(p2.includes('ricochet'), '20% 아래: 잔해 튕기기가 열린다 ' + p2);
+  const p2 = attacks(r4, 5, 0.29);
+  assert.ok(p2.includes('ricochet'), '30% 아래(광분): 잔해 튕기기가 열린다 ' + p2);
   const r1 = run0(1);
   const k1 = attacks(r1, 4, 0.9);
   assert.deepEqual([...new Set(k1)].sort(), ['blade', 'ricochet'], '1번: 두 공격 번갈아 ' + k1);

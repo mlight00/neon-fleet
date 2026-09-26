@@ -29,8 +29,9 @@ export const atkSkinOf = (def) => (def && def.skin && BA.skins[def.skin] ? def.s
 /** 스킨의 고유 공격(순서대로) */
 export const skinKinds = (skin) => [...BA.skins[skin].seq];
 
-/** 보스 정의 → 공격 배정 { skin, seq, open, gap, look }(새 객체). 역할이 있는 보스(포격·소환·장갑 — 복수 보스 판)는 **자기 스킨의 고유 공격 중**
+/** 보스 정의 → 공격 배정 { skin, seq, open, gap, look, phaseAt, rage }(새 객체). 역할이 있는 보스(포격·소환·장갑 — 복수 보스 판)는 **자기 스킨의 고유 공격 중**
  *  역할에 맞는 것만(포격 = 탄 · 소환 = 광역 하나 · 장갑 = 광역). phases false(페이즈가 없는 판 1·2번)는 스킨의 early 를 처음부터 모두 연다.
+ *  r4.9 (다) phaseAt = 게임 줄 페이즈 문턱(50%·30%) · rage = 광분(문턱·간격 배수·탄 속도 배수) — 이 칸이 있는 보스(게임 줄)만 광분한다.
  *  arena 는 r4.8 호출 모양을 지키려고 남긴 인자다(고유 공격은 도로·광장 모두 같은 3종 — 광장 기하는 설계가 맡는다) */
 export function atkPlanFor(def, arena = false, { phases = true } = {}) {
   void arena;
@@ -41,10 +42,10 @@ export function atkPlanFor(def, arena = false, { phases = true } = {}) {
   let seq = S.seq, open = BA.open;
   if (R) { seq = S.seq.filter((k) => KD[k].type === R.type); if (R.max) seq = seq.slice(0, R.max); }
   else if (!phases && S.early) { seq = S.early; open = S.early.length; }
-  return { skin, seq: [...seq], open: Math.min(open, seq.length), gap: S.gap, look: S.look };
+  return { skin, seq: [...seq], open: Math.min(open, seq.length), gap: S.gap, look: S.look, phaseAt: [...BA.phaseAt], rage: { ...BA.rage } };
 }
 
-/** 지금 열린 공격: seq 의 앞 open + 페이즈 개(페이즈 50% = 1 · 20% = 2 — 하나씩 더 열린다) */
+/** 지금 열린 공격: seq 의 앞 open + 페이즈 개(페이즈 50% = 1 · 30% = 2(게임 줄 phaseAt) — 하나씩 더 열린다) */
 export function unlockedAtk(atk, phase = 0) {
   return atk.seq.slice(0, Math.min(atk.seq.length, atk.open + (phase || 0)));
 }
@@ -334,7 +335,8 @@ export function planAttack(run, bo, kind, k = 0) {
   const P = KD[kind];
   if (!P || !run.units.length) return null;
   const F = squadFrame(run);
-  const vm = 1;
+  //  r4.9 (다) 광분 중에는 탄 속도 × vMul — 탄 길을 빨라진 속도로 설계하므로 닿는 시간·설 곳 보장도 빨라진 탄으로 잰다(광역 경보 시간은 그대로)
+  const vm = bo.rage && bo.atk && bo.atk.rage ? bo.atk.rage.vMul : 1;
   switch (kind) {
     case 'blade': return planBlade(bo, F, P, k, vm);
     case 'smoke': return planSmoke(bo, F, P, k);

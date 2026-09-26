@@ -197,7 +197,14 @@ export const BAL3 = deepFreeze({
       //  집게 충격파(광역): 집게로 내려찍은 자리(부대 쪽 한 점)에서 고리가 반지름 R 까지 퍼진다 — 한 곳(반각 gapHalf°)이 끊긴 고리. 고리 두께 th
       quake:    { skin: 'B5_crownbreaker', type: 'aoe', name: '집게 충격파', tele: 0.85, R: 44, gapHalf: 30, th: 12 },
     },
-    //  보스 그림(스킨)별 고유 공격 순서(앞 open 개가 처음부터 열려 있고 체력 50%·20% 에서 하나씩 더) · 공격 간격 gap(초, × 페이즈 rate) · 탄 모양 look.
+    //  r4.9 (다) 광분 모드(이사님 지시 2026-09-26 "보스 체력이 30% 남으면 광분 모드를 넣자"): 게임 화면 줄 보스(atk 가 있는 보스)만.
+    //   phaseAt = 게임 줄 페이즈 문턱(체력 비율) — 50%·**30%**(r4.8 까지 50%·20%. 배수 1 줄은 BAL3.bossPhases.at 그대로). 두 번째 문턱(30%)이 광분 단계라
+    //   세 번째 고유 공격도 30% 에서 열린다(1·2번은 페이즈가 없어 새 공격은 안 열리지만 광분은 켠다).
+    //   rage = { at(광분 문턱 — 체력이 이 비율 이하가 되는 STEP 에 한 번 들어가고 되돌아가지 않는다), gapMul(공격 간격 배수 — 그 단계 rate 에 더 곱한다),
+    //            vMul(탄 속도 배수 — 광분 중 설계하는 탄 길의 속도) }. 경보 시간·한 번에 한 공격·피할 수 있음 보장(설계가 빨라진 탄으로 잰다)은 그대로
+    phaseAt: [0.5, 0.3],
+    rage: { at: 0.3, gapMul: 0.8, vMul: 1.12 },
+    //  보스 그림(스킨)별 고유 공격 순서(앞 open 개가 처음부터 열려 있고 체력 50%·30%(게임 줄 phaseAt) 에서 하나씩 더) · 공격 간격 gap(초, × 페이즈 rate) · 탄 모양 look.
     //   early = 페이즈가 없는 판(1·2번 학습 구간 — bossPhases.from 3)에서 처음부터 번갈아 쓰는 공격(그레이더다움이 삽날 하나로 단조롭지 않게 — 계약서 r4.9)
     open: 1,
     skins: {
@@ -330,6 +337,8 @@ export const BAL3 = deepFreeze({
         objectiveBannerSec: 3,
         //  bossKillBannerSec(r3.16 복수 정예) = 정예 하나를 잡았는데 남은 목표가 있을 때 배너 '정예 N 격파 — 남은 목표 M' 표시 시간
         bossKillBannerSec: 1.2,
+        //  r4.9 (다) 광분 배너('광분!' — 화면 가운데, 광분에 들어가는 순간 1회) 표시 시간
+        rageBannerSec: 1.0,
         //  아레나(r3.17): arenaOpenSec = 도로가 광장으로 열리는 연출 초 · arenaGuideSec = '드래그로 피하세요' 배너(판마다 진입 시 1회) · shockRingSec = 착지 충격 확장 링
         arenaOpenSec: 0.6, arenaGuideSec: 2.4, shockRingSec: 0.45,
         //  동작 시트(6장, 2026-09-18 파일럿): 히어로는 걷기 heroWalkMinSec 뒤 발사 이벤트에 사격 시트 1회,

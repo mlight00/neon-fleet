@@ -679,6 +679,7 @@ function moveEnemies(run, ev, dt) {
 function arenaBossAct(run, bo, ev, dt) {
   const A = run.arena, B = A.boss, D = B.dash;
   const ph = updateBossPhase(run, bo, ev);   // r3.27 페이즈: 추격이 빨라지고 돌진 간격이 줄어든다
+  updateBossRage(run, bo, ev);
   bo.px = bo.x; bo.pz = bo.z;
   const tx = run.x, tz = squadZ(run);
   if (bo.state === 'chase') {
@@ -781,17 +782,28 @@ export function bossPhaseOf(hp, max, P = BAL3.bossPhases) {
 function updateBossPhase(run, bo, ev) {
   const P = BAL3.bossPhases;
   if (run.bossPhases === false) return { rate: 1, speed: 1, dashEvery: 1 };
-  const p = Math.max(bo.phase ?? 0, bossPhaseOf(bo.hp, bo.max, P));
+  //  r4.9 (다) 게임 줄 보스(atk)는 문턱이 50%·30%(atk.phaseAt — 두 번째가 광분 단계). 배수 1 줄·합성 판은 종전 표(50%·20%)
+  const p = Math.max(bo.phase ?? 0, bossPhaseOf(bo.hp, bo.max, bo.atk && bo.atk.phaseAt ? { at: bo.atk.phaseAt } : P));
   if (p !== (bo.phase ?? 0)) {
     bo.phase = p;
     ev.push({ type: 'bossPhase', id: bo.id, phase: p, x: bo.x, z: bo.z, skin: bo.skin ?? null, r: bo.r });
   }
   return { rate: P.rate[p] ?? 1, speed: P.speed[p] ?? 1, dashEvery: P.dashEvery[p] ?? 1 };
 }
+//  r4.9 (다) 광분(이사님 지시 2026-09-26 "보스 체력이 30% 남으면 광분 모드를 넣자"): 게임 줄 보스(atk.rage 가 있는 보스)의 체력이 문턱 이하가 되는 STEP 에
+//   한 번 들어가고(bo.rage — 희소 칸) 되돌아가지 않는다. 페이즈를 켜지 않는 판(1·2번)도 광분은 켠다. 이벤트 bossRage — 셸이 '광분!' 배너·경고음·흔들림.
+//   광분 효과: 다음 공격까지 간격 × gapMul(endAttack) · 탄 속도 × vMul(bossatk.planAttack). 그림(붉은 오라·맥박·잔떨림·붉은 체력 막대)은 렌더가 bo.rage 를 읽는다
+function updateBossRage(run, bo, ev) {
+  const R = bo.atk && bo.atk.rage;
+  if (!R || bo.rage || !(bo.hp > 0) || bo.hp > bo.max * R.at) return;
+  bo.rage = true;
+  ev.push({ type: 'bossRage', id: bo.id, index: bo.index, x: bo.x, z: bo.z, r: bo.r, skin: bo.skin ?? null });
+}
 
 function bossAct(run, bo, ev, dt) {
   const E = run.enemyDefs.elite;
   const ph = updateBossPhase(run, bo, ev);
+  updateBossRage(run, bo, ev);
   bo.px = bo.x; bo.pz = bo.z;
   if (bo.state === 'descend') {
     bo.z -= bo.descendSpeed * dt;
@@ -953,11 +965,11 @@ function zoneHit(run, z, ev) {
   return hits.length;
 }
 
-//  공격 끝: 다음 공격까지 = 그 보스의 간격 × 페이즈 rate(페이즈는 간격만 줄이고 경보 시간은 줄이지 않는다). 거둔 공격은 retry 초
+//  공격 끝: 다음 공격까지 = 그 보스의 간격 × 페이즈 rate(× 광분이면 rage.gapMul — 페이즈·광분은 간격만 줄이고 경보 시간은 줄이지 않는다). 거둔 공격은 retry 초
 function endAttack(A, bo, ev, cancelled) {
   const cur = A.cur;
   A.cur = null;
-  A.wait = cancelled || !bo || !bo.atk ? BATK.retry : bo.atk.gap * (PHASES.rate[bo.phase || 0] ?? 1);
+  A.wait = cancelled || !bo || !bo.atk ? BATK.retry : bo.atk.gap * (PHASES.rate[bo.phase || 0] ?? 1) * (bo.rage && bo.atk.rage ? bo.atk.rage.gapMul : 1);
   ev.push({ type: 'bossAtkEnd', id: cur.boss, kind: cur.kind, serial: cur.serial, cancelled: !!cancelled });
 }
 

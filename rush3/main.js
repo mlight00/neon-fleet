@@ -7,7 +7,7 @@ import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersio
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
-import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox, ATK_LOOK } from './render.js';
+import { createRenderer3, isTrapGateRow, HUD_ROW, hitRole, HERO_RING_COLOR, UPGRADE_UI, upgradeBuyBox, ATK_LOOK, RAGE_COLOR } from './render.js';
 import { UP_TRACKS, UP_MAX, UP_EFFECT, normUp, hasUp, nextCost, canBuy } from './meta.js';
 import { projectorFor, projectorMode } from './project.js';
 import { loadSprites3, sheetSec } from './sprites.js';
@@ -311,6 +311,8 @@ export function makeFx() {
            //  eliteText(r3.16 복수 정예) = 정예 경고 배너 문구('정예 접근!' / '정예 2체 접근!') · bossBannerT/bossBannerText = 처치 배너
            //   '정예 N 격파 — 남은 목표 M'(bossesLeft 이벤트가 left > 0 일 때 세우고 updateFx 가 줄인다). 슬롯 A(y196)
            eliteText: null, bossBannerT: 0, bossBannerText: null,
+           //  rageT/rageText(r4.9 (다)) = 보스 광분 배너 '광분!'(화면 가운데 — bossRage 이벤트가 세우고 updateFx 가 줄인다)
+           rageT: 0, rageText: null,
            //  아레나(r3.17): arenaOpen = 광장 열림 연출 남은 초 · arenaT/arenaText = '드래그로 피하세요' 배너 · shocks = 착지 충격 링 [{ x, y, r, t, life }](화면 좌표)
            arenaOpen: 0, arenaT: 0, arenaText: null, shocks: [],
            //  동작 시트 타이머(6장): heroFire = 사격 시트 남은 초 · heroWalk = 마지막 사격 뒤 걸은 초 · enemyHit = { id: 피격 시트 남은 초 } · corpses = 쓰러진 잡졸
@@ -326,6 +328,8 @@ export function makeFx() {
 
 //  r4.4 피해 이전 빛줄기 수명(초)·보호막이 깨질 때 조각 수
 const BEAM_SEC = 0.3, SHIELD_SHARDS = 10;
+//  r4.9 (다) 광분 배너 글(한 어절 — 줄바꿈 없음)
+export const RAGE_TEXT = '광분!';
 //  r4.9 보스 광역 공격이 터지는 연출 길이(초 — render.drawAtkBlasts 가 이 동안 그린다). 열차 질주·철퇴 휩쓸기는 짧고 굵게, 매연·거미줄은 조금 오래
 const ATK_BLAST_SEC = Object.freeze({ smoke: 0.55, hook: 0.4, web: 0.6, rail: 0.32, crossrail: 0.32, pour: 0.4, rain: 0.3, mace: 0.3, quake: 0.4 });
 
@@ -1188,12 +1192,24 @@ export function boot(canvas, deps = {}) {
         case 'bossGuardOff': fx.sfx.push(['gateFlip']); floaterAt(ev.x, ev.z, -70, '보호막 해제!', C.gatePos, true); break;
         //  보스 페이즈(r3.27): 체력이 절반·1/5 아래로 떨어져 보스가 빨라진 순간. 붉은 글 + 흔들림 + 피격 번쩍임 한 번(무슨 일이 일어났는지 보이게)
         case 'bossPhase': {
+          //  r4.9 (다) 광분하는 보스(게임 줄)의 두 번째 페이즈는 광분과 같은 STEP(체력 30%) — 글자·소리는 광분 배너(bossRage)가 맡는다(두 번 알리지 않는다)
+          const pb = (run.bosses ?? []).find((b) => b.id === ev.id);
+          if (ev.phase >= 2 && pb && pb.atk && pb.atk.rage) break;
           fx.sfx.push(['elite']);
           floaterAt(ev.x, ev.z, -70, ev.phase >= 2 ? '보스 광분!' : '보스 각성!', C.gateNeg, true);
           fx.shakeT = FX.shakeDur;
           fx.hit[ev.id] = { t: 0, fa: 0, dir: -1, role: 'elite', n: 1, dmgF: null };   // 피격과 같은 번쩍임 한 번
           break;
         }
+        //  r4.9 (다) 보스 광분(체력 30% — 게임 줄): 화면 가운데 '광분!' 배너(약 1초) + 경고음 + 짧은 흔들림 + 보스 번쩍임 한 번.
+        //   붉은 오라·맥박·잔떨림·붉은 체력 막대는 렌더가 규칙 bo.rage 를 읽어 계속 그린다
+        case 'bossRage':
+          fx.rageT = FX.rageBannerSec; fx.rageText = RAGE_TEXT;
+          fx.sfx.push(['bossRage']);
+          fx.shakeT = Math.max(fx.shakeT, FX.shakeDur * 1.4);
+          fx.hit[ev.id] = { t: 0, fa: 0, dir: -1, role: 'elite', n: 1, dmgF: null };
+          burstAt(ev.x, ev.z, ev.r, true, RAGE_COLOR);
+          break;
         //  착지 충격: 확장 링(화면 좌표·반지름 × 그 자리 배율) + 흔들림. hits > 0 이면 hurt 이벤트가 따로 나므로 피격 플래시·hurt 음은 그쪽이 맡는다
         case 'bossShock': { const q = sp(ev.x, ev.z); fx.shocks.push({ x: q.x, y: q.y, r: ev.r * q.s, t: 0, life: FX.shockRingSec }); fx.shakeT = FX.shakeDur; break; }
         //  r4.3: 패배 = 그때까지의 적·보스분 정산(여운 1.0초 **전** — 여운 중에 나가도 받는다)
@@ -1219,6 +1235,7 @@ export function boot(canvas, deps = {}) {
     fx.objT = Math.max(0, fx.objT - dt);
     fx.bonusT = Math.max(0, fx.bonusT - dt);
     fx.bossBannerT = Math.max(0, (fx.bossBannerT ?? 0) - dt);
+    fx.rageT = Math.max(0, (fx.rageT ?? 0) - dt);
     fx.arenaOpen = Math.max(0, (fx.arenaOpen ?? 0) - dt);
     fx.arenaT = Math.max(0, (fx.arenaT ?? 0) - dt);
     for (const s of fx.shocks) s.t += dt;

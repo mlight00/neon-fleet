@@ -161,6 +161,9 @@ export const PELLET = Object.freeze({ core: '#F7FFE6', flash: '#FFF6C8', tail: 2
 //   초록 안전 구역 표시는 없앴다(색 상수도 지웠다 — 검사가 그 색이 어디에도 없음을 확인한다). 검사가 이 색으로 그리기 호출을 찾는다
 export const ATK_DANGER = '#FF3040';
 export const ATK_CHARGE = '#FFF1B8';
+//  r4.9 (다) 광분(이사님 지시 2026-09-26 "보스 체력이 30% 남으면 광분 모드를 넣자" — 규칙 bo.rage 를 읽기만): 보스 둘레 붉게 달아오르는 오라(맥박 = 규칙 시계 run.time) ·
+//   몸체 잔떨림 · 붉은 체력 막대 · 들어가는 순간 화면 가운데 '광분!' 배너(셸 fx.rageT). 검사가 이 색으로 그리기 호출을 찾는다
+export const RAGE_COLOR = '#FF2A2A';
 //  r4.9 보스 스킨별 탄 모양(look — balance.bossAtk.skins, 이사님 "각 보스마다 특색있는 패턴"): 잔해 덩어리(B1 회갈색 — 돌며 굴러온다) · 바늘(B2 보라) ·
 //   객차(B3 — 어두운 몸에 붉은 창 불빛, 사슬로 이어진다) · 쇳물 덩이(B4 주황 + 분홍 발광) · 왕관 칼날(B5 금 — 돌며 날아온다).
 //   고유 공격 탄(규칙 적탄의 look 칸)만 이 모양이고, 저격수 탄·배수 1 줄 보스 부채꼴은 종전 마젠타 구슬. 검사가 color 로 그리기 호출을 찾는다
@@ -1252,8 +1255,11 @@ export function createRenderer3(ctx, sprites) {
   //   r3.16 복수 정예: 역할이 'elite' 가 아니면 HP 숫자 아래 역할 이름('포격'·'소환'·'장갑') 한 줄. 장갑형 폴백 원은 테두리를 두껍게(새 그림 없이 도형으로만)
   //   r3.17 아레나: 예고(warn)·돌진(dash) 중이면 목표 지점에 붉은 원(반지름 = 충격 r × 그 자리 배율, 깜빡임)과 보스→목표 점선을 **보스보다 먼저** 그린다. shockR 은 run.arena.boss.shock.r
   //   r4.9 (가) charge(0 → 1 | null) = 탄 공격 장전 진행: 보스 **몸에만** 밝은 번쩍임(ATK_CHARGE — 몸 위 밝은 원 + 고리가 조여 든다). 도로에는 아무것도 그리지 않는다
-  function drawBoss(b, runZ, now, shockR = null, fx = null, charge = null) {
-    const q = pj(b.x, b.z - runZ), x = q.x, y = q.y, k = q.s;
+  //   r4.9 (다) t = 규칙 시계(run.time): 광분 보스(b.rage)의 오라 맥박·몸체 잔떨림(결정적 — 같은 규칙 시각이면 같은 그림)
+  function drawBoss(b, runZ, now, shockR = null, fx = null, charge = null, t = null) {
+    const q0 = pj(b.x, b.z - runZ), k = q0.s;
+    const rage = !!(b.rage && t != null);
+    const x = q0.x + (rage ? Math.sin(t * 73) * 1.8 * k : 0), y = q0.y + (rage ? Math.cos(t * 61) * 1.2 * k : 0);
     //  피격 반응(r3.24): 짧은 번쩍임·작은 흔들림·HP 숫자 튐(정예는 무겁다 — 넉백 작게)
     const hr = hitPose(fx, b.id, 'elite', k);
     const r = b.r * k;
@@ -1273,6 +1279,19 @@ export function createRenderer3(ctx, sprites) {
       ctx.restore();
     }
     shadow(x, y + r * 1.05, r * 1.15);
+    if (rage) {
+      //  광분 오라: 붉은 원 세 겹이 맥박에 맞춰 부풀었다 줄었다(안쪽이 진하다) + 몸 둘레 붉은 테
+      const pulse = 0.5 + 0.5 * Math.sin(t * 9);
+      ctx.save();
+      ctx.fillStyle = RAGE_COLOR;
+      for (let i = 3; i >= 1; i--) {
+        ctx.globalAlpha = (0.1 + 0.1 * pulse) * (4 - i) / 3;
+        ctx.beginPath(); ctx.arc(x, y, r * (0.95 + 0.22 * i + 0.12 * pulse), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 0.55 + 0.4 * pulse; ctx.strokeStyle = RAGE_COLOR; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x, y, r * (1.08 + 0.08 * pulse), 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
     const bkey = b.skin ? 'skin:' + b.skin : 'elite';
     if (hr) { ctx.save(); poseAt(hr, x, y + r * 1.05); }
     drawImgCentered(bkey, x, y, r * 2.6, () => {
@@ -2099,7 +2118,8 @@ export function createRenderer3(ctx, sprites) {
         if (bs) { ctx.save(); ctx.translate(bs, 0); }
         ctx.fillStyle = 'rgba(20,35,58,0.85)';
         roundRect(90, 76, 300, 16, 8); ctx.fill();
-        ctx.fillStyle = C.eshot;
+        //  r4.9 (다) 광분 중 체력 막대는 붉게
+        ctx.fillStyle = run.boss.rage ? RAGE_COLOR : C.eshot;
         roundRect(90, 76, 300 * Math.max(0, run.boss.hp / run.boss.max), 16, 8); ctx.fill();
         ctx.textAlign = 'center';
         outlinedText('정예 ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
@@ -2114,7 +2134,7 @@ export function createRenderer3(ctx, sprites) {
           ctx.fillStyle = 'rgba(20,35,58,0.85)';
           roundRect(x, 76, segW, 16, 8); ctx.fill();
           if (!b.dead) {
-            ctx.fillStyle = C.eshot;
+            ctx.fillStyle = b.rage ? RAGE_COLOR : C.eshot;
             roundRect(x, 76, segW * Math.max(0, Math.min(1, b.hp / b.max)), 16, 8); ctx.fill();
           }
           const label = BAL3.elites?.roles?.[b.role ?? 'elite']?.label ?? '정예';
@@ -2212,6 +2232,22 @@ export function createRenderer3(ctx, sprites) {
       ctx.font = '900 30px ' + FONT;
       ctx.fillStyle = C.outline;
       ctx.fillText(fx.bonusText, W / 2, 224);
+      ctx.globalAlpha = 1;
+    }
+    //  r4.9 (다) 광분 배너: 화면 가운데 검붉은 띠 + 붉은 테 + '광분!'(한 어절 — 줄바꿈 없음). 들어올 때 크게 튀었다 제 크기로, 끝날 때 흐려진다
+    if ((fx.rageT ?? 0) > 0 && fx.rageText) {
+      const k = fx.rageT / (FX.rageBannerSec || 1);
+      ctx.globalAlpha = Math.min(1, k * 3);
+      ctx.fillStyle = 'rgba(120,8,16,0.9)';
+      ctx.fillRect(0, 362, W, 76);
+      ctx.fillStyle = RAGE_COLOR;
+      ctx.fillRect(0, 362, W, 4); ctx.fillRect(0, 434, W, 4);
+      const pop = 1 + 0.3 * Math.max(0, (k - 0.8) / 0.2);
+      ctx.font = '900 ' + Math.round(48 * pop) + 'px ' + FONT;
+      ctx.lineWidth = 6; ctx.strokeStyle = C.outline;
+      ctx.strokeText(fx.rageText, W / 2, 400);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(fx.rageText, W / 2, 400);
       ctx.globalAlpha = 1;
     }
     ctx.textBaseline = 'alphabetic';
@@ -2626,7 +2662,7 @@ export function createRenderer3(ctx, sprites) {
     //  r4.9 (가) 탄 공격 장전 중인 보스(규칙 run.bossAtk.cur.state 'charge' — 읽기만): 진행 0 → 1
     const ac = run.bossAtk && run.bossAtk.cur && run.bossAtk.cur.state === 'charge' ? run.bossAtk.cur : null;
     const chargeOf = (b) => (ac && ac.boss === b.id ? Math.max(0, Math.min(1, 1 - ac.t / (ac.charge || 0.3))) : null);
-    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, run.z, now, shockR, fx, chargeOf(b));
+    for (const b of (run.bosses ?? []).filter((b) => !b.dead).sort((a, b) => b.z - a.z)) drawBoss(b, run.z, now, shockR, fx, chargeOf(b), run.time);
     //  r4.8 보스 공격 예고(r4.9 — 광역의 붉은 경보 구역만) — 보스 위, 탄·부대 아래
     drawBossAtk(run, now);
     drawBullets(run);
