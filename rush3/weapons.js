@@ -28,7 +28,7 @@ export function weaponStats(id, mk = 1) {
            chain: w.chain ?? 0, chainR: w.chainR ?? 0, chainDmg: w.chainDmg ?? 0, blastR: w.blastR ?? 0, blastDmg: w.blastDmg ?? 0 };
 }
 
-// 부채꼴 발사 각도(라디안) 목록: fan 1 → [0], fan 3 → [-s, 0, +s]
+// 부채꼴 발사 각도(라디안) 목록: fan 1 → [0], fan 3 → [-s, 0, +s], fan 6 → -s … +s 를 5등분(가운데 0 없음)
 export function fanAngles(id) {
   const w = WEAPONS[id] ?? WEAPONS.rifle;
   const n = w.fan ?? 1;
@@ -39,16 +39,30 @@ export function fanAngles(id) {
   return out;
 }
 
+// 부채꼴 발마다 속도 배수(r4.7 산탄포 — 이사님 지시 2026-09-26 "총알이 산탄해서 뻗어나가도록"): 정의의 pelletVz[i](발 번호 i, 결정적 — 난수 없음).
+//  발마다 조금씩 빠르고 느려 한 번에 쏜 알갱이가 한 줄로 서지 않고 흩뿌려진다. 정의에 없으면 전부 1(= 종전 탄 그대로).
+//  속도만 다르고 방향(각도)은 그대로라 탄이 지나는 선(x = x0 + tan(각)·거리)·사거리(z 거리)는 바뀌지 않는다
+export function fanSpeeds(id) {
+  const w = WEAPONS[id] ?? WEAPONS.rifle;
+  const n = w.fan ?? 1;
+  const p = w.pelletVz;
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(p && Number.isFinite(p[i]) ? p[i] : 1);
+  return out;
+}
+
 // 아군 탄 생성. z 는 트랙 좌표, pz = z(스윕 시작). 모든 탄 gateHit 1.
 //  vx(부채꼴)·range/z0(사거리)·pierce/hit(관통)은 해당 무기일 때만 붙는다 — 기존 3종 Mk I 탄은 종전 모양 그대로
 //  angle(r3.17 아레나 자동 조준, 라디안·0 = +z 정면·양수 = +x): 있으면 vz = s.vz·cos, vx = s.vz·sin, aimed true, x0 = x(사거리는 직선 거리로).
 //   null 이면 종전 탄과 바이트 단위로 같다(도로 탄 무변화)
-export function makeBullet(weaponId, x, z, ownerId, mk = 1, vx = 0, angle = null) {
+//  vzMul(r4.7) = 발마다 속도 배수(fanSpeeds). 1 이면 종전 탄과 바이트 단위로 같다. 도로 탄의 vx 는 부르는 쪽이 같은 배수로 만든 값을 넘긴다(tan(각)·vz·vzMul)
+export function makeBullet(weaponId, x, z, ownerId, mk = 1, vx = 0, angle = null, vzMul = 1) {
   const s = weaponStats(weaponId, mk);
-  const b = { x, z, pz: z, vz: s.vz, dmg: s.dmg, w: s.w, kind: s.id, gateHit: 1, ownerId, dead: false };
+  const sp = vzMul === 1 ? s.vz : s.vz * vzMul;
+  const b = { x, z, pz: z, vz: sp, dmg: s.dmg, w: s.w, kind: s.id, gateHit: 1, ownerId, dead: false };
   if (angle !== null && angle !== undefined) {
-    b.vz = s.vz * Math.cos(angle);
-    b.vx = s.vz * Math.sin(angle);
+    b.vz = sp * Math.cos(angle);
+    b.vx = sp * Math.sin(angle);
     b.aimed = true;
     b.x0 = x;
   } else if (vx) b.vx = vx;

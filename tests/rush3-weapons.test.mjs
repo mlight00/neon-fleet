@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BAL3 } from '../rush3/balance.js';
-import { WEAPONS, WEAPON_MK, MK_MAX, weaponRank, weaponStats, makeBullet, fanAngles } from '../rush3/weapons.js';
+import { WEAPONS, WEAPON_MK, MK_MAX, weaponRank, weaponStats, makeBullet, fanAngles, fanSpeeds } from '../rush3/weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 import { applySupplyReward } from '../rush3/supply.js';
 
@@ -29,27 +29,40 @@ test('V3-WPN WPN-1: 무기 6종·순위·고유색이 표대로, Mk 표는 3단(
   assert.ok(Object.isFrozen(BAL3.weaponMk));
 });
 
-test('V3-WPN WPN-2: 산탄포 — 유닛 1명이 발사마다 3발(부채꼴 ±spreadDeg), 사거리 range 를 넘으면 소멸', () => {
+test('V3-WPN WPN-2: 산탄포 — 유닛 1명이 발사마다 6발(부채꼴 ±spreadDeg 를 5등분, r4.7), 발마다 속도 배수(pelletVz, 결정적), 사거리 range 를 넘으면 소멸', () => {
   assert.deepEqual(fanAngles('rifle'), [0]);
+  assert.deepEqual(fanSpeeds('rifle'), [1], '산탄포 밖 무기는 속도 배수 1(종전 탄 그대로)');
+  const W = WEAPONS.scatter, n = W.fan, s = W.spreadDeg * Math.PI / 180;
+  assert.equal(n, 6, 'r4.7: 6발');
   const a = fanAngles('scatter');
-  assert.equal(a.length, 3); assert.ok(a[0] < 0 && a[1] === 0 && a[2] > 0 && Math.abs(a[0]) === a[2]);
+  assert.equal(a.length, n);
+  for (let i = 0; i < n; i++) assert.ok(Math.abs(a[i] - (-s + (2 * s * i) / (n - 1))) < 1e-12, '등간격 ' + i);
+  assert.ok(a.every((x) => x !== 0), '가운데 0° 발이 없다(짝수 발)');
+  for (let i = 0; i < n; i++) assert.ok(Math.abs(a[i] + a[n - 1 - i]) < 1e-12, '좌우 대칭');
+  const sp = fanSpeeds('scatter');
+  assert.deepEqual(sp, [...W.pelletVz], '발 번호별 속도 배수 = 정의 그대로');
+  assert.ok(new Set(sp).size === n && sp.every((v) => v > 0.85 && v < 1.15), '발마다 조금씩 다르다');
   const run = createRun(synth({ startWeapon: 'scatter' }));
   assert.equal(run.weapon, 'scatter');
   //  유닛의 첫 발사 시각은 makeUnit 의 위상(fireT)에 달려 있으므로 첫 탄이 나올 때까지 돌린다
-  let n = 0; while (run.bullets.length === 0 && n < 120) { play(run, 1); n++; }
-  assert.equal(run.bullets.length, 3, '첫 발사에 3발');
-  const vx = run.bullets.map((b) => b.vx ?? 0);
-  assert.ok(vx[0] < 0 && vx[1] === 0 && vx[2] > 0, '좌·중·우');
-  assert.ok(run.bullets.every((b) => b.range === WEAPONS.scatter.range && b.z0 != null && b.z0 <= b.z), 'range·z0 기록');
-  //  사거리: range/vz 초 뒤에는 첫 3발이 전부 사라진다(적·장애물 없음)
-  const stepsToRange = Math.ceil(WEAPONS.scatter.range / WEAPONS.scatter.vz / STEP) + 2;
+  let k = 0; while (run.bullets.length === 0 && k < 200) { play(run, 1); k++; }
+  assert.equal(run.bullets.length, n, '첫 발사에 6발');
+  //  탄의 속도 벡터 = (tan(각)·vz·배수, vz·배수) — 방향은 부채꼴 각도 그대로, 속력만 발마다 다르다
+  run.bullets.forEach((b, i) => {
+    assert.ok(Math.abs(b.vz - W.vz * sp[i]) < 1e-9, '발 ' + i + ' vz');
+    assert.ok(Math.abs(Math.atan2(b.vx, b.vz) - a[i]) < 1e-12, '발 ' + i + ' 각도');
+  });
+  assert.ok(run.bullets.every((b) => b.range === W.range && b.z0 != null && b.z0 <= b.z), 'range·z0 기록');
+  //  사거리: 가장 느린 알갱이가 range 를 지날 시간 뒤에는 첫 6발이 전부 사라진다(적·장애물 없음)
+  const stepsToRange = Math.ceil(W.range / (W.vz * Math.min(...sp)) / STEP) + 2;
   const ids0 = new Set(run.bullets);
   play(run, stepsToRange);
-  assert.ok([...ids0].every((b) => !run.bullets.includes(b)), '첫 3발 소멸');
-  //  x 가 갈라진다
+  assert.ok([...ids0].every((b) => !run.bullets.includes(b)), '첫 6발 소멸');
+  //  x 가 갈라진다(다음 발사까지 — 간격 1.1초가 사거리 비행 시간보다 길다)
+  k = 0; while (run.bullets.length === 0 && k < 120) { play(run, 1); k++; }
   play(run, 1);
   const spread = run.bullets.filter((b) => b.vx).map((b) => b.x);
-  assert.ok(spread.length >= 2);
+  assert.ok(spread.length >= 2 && new Set(spread).size === spread.length);
 });
 
 test('V3-WPN WPN-3: 저격총 — 한 발이 일렬의 적 2체까지 관통(같은 적은 다시 맞지 않음), 3번째는 무사', () => {

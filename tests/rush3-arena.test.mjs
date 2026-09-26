@@ -292,16 +292,18 @@ test('V3-ARENA A-7: 자동 조준·탄 정리 — 새 탄의 속력 = 무기 vz�
   const hit = until(run, (r, ev) => ev.some((e) => e.type === 'enemyHit' && e.kind === 'elite'), at(240), 120);
   assert.ok(hit.events.some((e) => e.type === 'enemyHit' && e.kind === 'elite'), '아래 보스 명중');
   assert.ok(run.boss.hp < 500);
-  //  산탄포: 한 유닛의 3발 각도 차 = ±spreadDeg
+  //  산탄포(r4.7 6발): 한 유닛의 발 사이 각도 차 = 2·spreadDeg ÷ (발 수 − 1), 속력 = vz × 발 속도 배수
+  const SW = BAL3.weapons.scatter;
   const sc = createRun(synthArena({ startUnits: 1, startWeapon: 'scatter' }));
   enter(sc, at(240)); freeze(sc);
   sc.boss.x = 380; sc.boss.z = squadZ(sc) + 200;
   const fan = fresh(sc);
-  assert.equal(fan.length, 3);
+  assert.equal(fan.length, SW.fan);
   const ang = fan.map((b) => Math.atan2(b.vx, b.vz)).sort((a, b) => a - b);
-  const s = BAL3.weapons.scatter.spreadDeg * Math.PI / 180;
-  assert.ok(Math.abs((ang[1] - ang[0]) - s) < 1e-9 && Math.abs((ang[2] - ang[1]) - s) < 1e-9, ang.join(','));
-  assert.ok(fan.every((b) => b.range === BAL3.weapons.scatter.range && b.aimed));
+  const s = 2 * SW.spreadDeg * Math.PI / 180 / (SW.fan - 1);
+  for (let i = 1; i < ang.length; i++) assert.ok(Math.abs((ang[i] - ang[i - 1]) - s) < 1e-9, ang.join(','));
+  fan.forEach((b, i) => assert.ok(Math.abs(Math.hypot(b.vx, b.vz) - SW.vz * SW.pelletVz[i]) < 1e-9, '발 ' + i + ' 속력'));
+  assert.ok(fan.every((b) => b.range === SW.range && b.aimed));
   //  탄 정리: 옆 보스에 600 STEP — 빗나간 탄은 x 범위·behind 로 정리돼 상한 안
   const r3 = createRun(synthArena({ startUnits: 5, hp: 1e9 }));
   enter(r3, at(240)); freeze(r3);

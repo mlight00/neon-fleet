@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { createRun, stepRun, drainEvents, STEP, extraOffset } from '../rush3/combat.js';
 import { buildStage, ALL_STAGE_IDS, stageVersion } from '../rush3/stages.js';
 import { makeBullet, weaponStats } from '../rush3/weapons.js';
+import { BAL3 } from '../rush3/balance.js';
 import { makeSupply, hitSupply, applySupplyReward } from '../rush3/supply.js';
 import { hitBonusTarget } from '../rush3/bonus.js';
 import { makeUnit, layoutUnits } from '../rush3/squad.js';
@@ -112,15 +113,19 @@ test('UP-EFFECT: 다연발 k 는 로봇이 한 번 쏠 때 추가 탄 k 발(옆 
     assert.equal(fired.filter((b) => b.ownerId !== 1).length, 2, '병사는 한 발씩');
     assert.ok(fired.filter((b) => b.ownerId !== 1).every((b) => !b.extra && b.gateHit === 1));
   }
-  //  산탄포: 부채꼴 3발 × (1 + k) — 각도(vx)마다 원래 탄 + 추가 탄 k 발이 같은 vx 로
+  //  산탄포: 부채꼴 6발(r4.7) × (1 + k) — 각도(vx)마다 원래 탄 + 추가 탄 k 발이 같은 vx·같은 vz(발 속도 배수까지 통째 복제)로
+  const FAN = BAL3.weapons.scatter.fan;
   const sc = createRun(road(1, { weapon: 'scatter' }), { startWeapon: 'scatter', up: { multi: 2 } });
   sc.units[0].fireT = 0;
   const sf = firedIn(sc, () => stepOnce(sc));
-  assert.equal(sf.length, 9);
+  assert.equal(sf.length, FAN * 3);
   const byVx = new Map();
   for (const b of sf) { const key = Math.round((b.vx ?? 0) * 1e6); (byVx.get(key) ?? byVx.set(key, []).get(key)).push(b); }
-  assert.equal(byVx.size, 3, '세 각도');
-  for (const g of byVx.values()) { assert.equal(g.length, 3); assert.equal(g.filter((b) => b.extra).length, 2); assert.equal(g.filter((b) => b.gateHit === 1).length, 1); }
+  assert.equal(byVx.size, FAN, '여섯 각도');
+  for (const g of byVx.values()) {
+    assert.equal(g.length, 3); assert.equal(g.filter((b) => b.extra).length, 2); assert.equal(g.filter((b) => b.gateHit === 1).length, 1);
+    assert.ok(g.every((b) => b.vz === g[0].vz), '추가 탄도 원래 탄과 같은 속도(발 속도 배수 복제)');
+  }
   //  광장 조준탄: 추가 탄은 조준 방향(원래 탄 속도 벡터)에 수직으로 12px
   const ar = createRun(buildStage(15, { difficulty: 'brutal' }), { up: { multi: 1 } });
   ar.spawnCursor = ar.spawns.length; ar.gateRows = []; ar.supplies = []; ar.z = ar.elites[0].z; ar.prevZ = ar.z;

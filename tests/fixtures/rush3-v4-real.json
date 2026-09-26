@@ -34,7 +34,7 @@
   ],
   "summary": {
    "evLead": {
-    "wins": 18,
+    "wins": 17,
     "won": [
      1,
      3,
@@ -43,7 +43,6 @@
      6,
      7,
      8,
-     10,
      11,
      12,
      13,
@@ -56,7 +55,7 @@
      23
     ],
     "heroAlive": 18,
-    "transfers": 150,
+    "transfers": 152,
     "shieldOff": 6
    },
    "aimLead": {
@@ -70,7 +69,7 @@
      22
     ],
     "heroAlive": 6,
-    "transfers": 177,
+    "transfers": 186,
     "shieldOff": 18
    },
    "planBoss": {
@@ -267,16 +266,16 @@
   "evLead/6": {
    "won": true,
    "over": true,
-   "steps": 3228,
-   "survivors": 27,
+   "steps": 3270,
+   "survivors": 26,
    "peak": 40,
    "kills": 34,
-   "time": 53.79999999999823,
+   "time": 54.49999999999819,
    "weapon": "scatter",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 19,
+    "shot": 20,
     "touch": 0,
     "shock": 0
    },
@@ -417,23 +416,23 @@
    ]
   },
   "evLead/10": {
-   "won": true,
-   "over": true,
-   "steps": 13951,
-   "survivors": 9,
-   "peak": 50,
-   "kills": 275,
-   "time": 232.51666666674384,
+   "won": false,
+   "over": false,
+   "steps": 14400,
+   "survivors": 5,
+   "peak": 49,
+   "kills": 229,
+   "time": 240.00000000008313,
    "weapon": "scatter",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 39,
-    "touch": 4,
+    "shot": 42,
+    "touch": 5,
     "shock": 0
    },
    "hero": true,
-   "transfers": 24,
+   "transfers": 26,
    "shieldOn": 0,
    "shieldOff": 0,
    "gates": [
@@ -1187,18 +1186,18 @@
    "steps": 3640,
    "survivors": 0,
    "peak": 9,
-   "kills": 7,
+   "kills": 6,
    "time": 60.666666666664504,
    "weapon": "scatter",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 7,
-    "touch": 8,
+    "shot": 6,
+    "touch": 9,
     "shock": 0
    },
    "hero": false,
-   "transfers": 5,
+   "transfers": 8,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1336,21 +1335,21 @@
   "aimLead/10": {
    "won": false,
    "over": true,
-   "steps": 3719,
+   "steps": 3982,
    "survivors": 0,
-   "peak": 23,
-   "kills": 15,
-   "time": 61.983333333331096,
+   "peak": 33,
+   "kills": 28,
+   "time": 66.36666666666419,
    "weapon": "scatter",
    "mk": 1,
    "loss": {
     "gate": 0,
-    "shot": 21,
-    "touch": 7,
+    "shot": 32,
+    "touch": 4,
     "shock": 0
    },
    "hero": false,
-   "transfers": 5,
+   "transfers": 11,
    "shieldOn": 0,
    "shieldOff": 1,
    "gates": [
@@ -1361,8 +1360,8 @@
     ],
     [
      "g2",
-     5,
-     5
+     13,
+     13
     ],
     [
      "g3",

@@ -47,10 +47,17 @@ export const BAL3 = deepFreeze({
     //   10승·471·10.8초(기관총 11승·573·9.6초 아래, 저격·전격·산탄 위). 후보 4안 스윕에서 골랐다(간격 0.9 는 8승으로 과함)
     heavy: { id: 'heavy', rank: 3, interval: 0.8,  dmg: 3, vz: 650, w: 8, color: '#FF9A4A', name: '중화기', gateHit: 1, blastR: 22, blastDmg: 1 },
     //  r3.10(2026-09-19 이사 결정 A) 신규 3종(이미지프롬프트_v5 §5). 같은 순위끼리는 교체 없음.
-    //   scatter: 발사마다 fan 발을 ±spreadDeg 부채꼴로, 사거리 range px 뒤 소멸(근거리·게이트 특화 — 3발 모두 gateHit 1)
+    //   scatter: 발사마다 fan 발을 ±spreadDeg 부채꼴로, 사거리 range px 뒤 소멸(근거리·게이트 특화 — 모든 발 gateHit 1)
     //   sniper : 관통 pierce 체(같은 적은 다시 안 맞음), dmg 3 · arc: 직격 시 chainR 안 적 chain 체에 chainDmg 연쇄(벽 너머 제외)
-    scatter: { id: 'scatter', rank: 2, interval: 0.55, dmg: 1, vz: 520, w: 4, color: '#B6FF4A', name: '산탄포', gateHit: 1, fan: 3, spreadDeg: 14, range: 420 },
-    sniper:  { id: 'sniper',  rank: 3, interval: 0.9,  dmg: 3, vz: 900, w: 4, color: '#DDEBFF', name: '저격총', gateHit: 1, pierce: 2 },
+    //  r4.7(이사님 지시 2026-09-26 "산탄총: 이름에 맞게 총알이 산탄해서 뻗어나가도록 변경, 현재는 나뭇잎 같음"):
+    //   3발 ±14°/0.55초 → **6발 ±18°(전체 36°)/1.1초**(작고 둥근 알갱이가 넓게 퍼진다). 초당 발 수는 3/0.55 = 6/1.1 ≈ 5.45 로 같다 —
+    //   발 수가 두 배인 만큼 간격을 두 배로 늘려 초당 총 피해·초당 게이트 +1 을 종전과 비슷하게 둔다(Mk II·III 도 같은 간격 배수라 같은 원칙).
+    //   pelletVz = 발 번호별 속도 배수(결정적 — 한 번에 쏜 알갱이가 한 줄로 서지 않고 흩뿌려진다). 사거리 420 그대로. 그림은 코드로 그리는 둥근 알갱이(render)
+    scatter: { id: 'scatter', rank: 2, interval: 1.1, dmg: 1, vz: 520, w: 4, color: '#B6FF4A', name: '산탄포', gateHit: 1, fan: 6, spreadDeg: 18, range: 420,
+               pelletVz: [0.94, 1.05, 0.98, 1.03, 0.92, 1.07] },
+    //  r4.7(이사님 지시 2026-09-26 "저격총: 관통탄으로 이름 변경"): 화면 이름만 '관통탄'. 내부 id 'sniper'·그림 키(bullet_sniper)·저장은 그대로.
+    //   적 '저격수'(shooter)는 다른 대상이라 이름을 바꾸지 않는다
+    sniper:  { id: 'sniper',  rank: 3, interval: 0.9,  dmg: 3, vz: 900, w: 4, color: '#DDEBFF', name: '관통탄', gateHit: 1, pierce: 2 },
     //  stunSec(r3.31, 이사 지시 2026-09-23 "전격무기는 맞은 적들이 잠시 동안 못 움직이도록"): 직격·연쇄로 맞은 **일반 적**은 그동안 멈춘다
     //   (이동·가속·저격 예고/발사 모두 정지). 정예·아레나 보스는 제외 — 보스를 묶으면 보스전이 사라진다
     arc:     { id: 'arc',     rank: 3, interval: 0.7,  dmg: 1, vz: 750, w: 5, color: '#7F9BFF', name: '전격포', gateHit: 1, chain: 2, chainR: 90, chainDmg: 1, stunSec: 0.8 },

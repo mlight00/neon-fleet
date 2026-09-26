@@ -1,7 +1,7 @@
 // rush3/combat.js — 전투 STEP 통합(계약서 3-1·3-7·4장). 순수 규칙: 난수·화면·시계 없음(rng import 금지).
 // 모든 좌표는 트랙 z(클수록 앞). 화면 y 변환은 렌더 몫. 규칙은 STEP = 1/60 단위로만 진행한다.
 import { BAL3, DEFAULT_DIFFICULTY, difficultyMult } from './balance.js';
-import { WEAPONS, weaponRank, makeBullet, weaponStats, fanAngles, clampMk, MK_MAX } from './weapons.js';
+import { WEAPONS, weaponRank, makeBullet, weaponStats, fanAngles, fanSpeeds, clampMk, MK_MAX } from './weapons.js';
 import { makeGateRow, sweepContactGate, hitGateCell, passGateRow, updateGateArm, isGateCellFixed } from './gates.js';
 import { makeSupply, sweepContactSupply, hitSupply, passSupply, takePads, applySupplyReward, moveSupply } from './supply.js';
 import { makeUnit, layoutUnits, compressUnits, clampCenter, hitUnit, overlappingUnits, frontmostUnit } from './squad.js';
@@ -361,10 +361,12 @@ function spawnEnemy(run, kind, x, z, hp, skin) {
 //   (도로의 tan 방식과 다름). 보스가 없으면(격파 직후 같은 STEP) 종전 직진
 //  r4.4 (b) 로봇 강화(run.heroUp — 강화가 있을 때만, hero 표시 유닛에만): 간격 × intervalMul, 탄마다 dmg × dmgMul(무기 + Mk 로 만든 뒤 곱한다),
 //   부채꼴 각도마다 원래 탄 뒤에 추가 탄 extra 발(heroVolley). 병사·강화 0 판은 종전 한 경로 그대로
+//  r4.7 산탄포: 발마다 속도 배수(fanSpeeds — 발 번호로 정한 결정적 값)를 탄 속도에 곱한다. 산탄포 밖 무기는 전부 1 이라 종전 탄 그대로
 function fireUnits(run, ev, dt) {
   const mk = run.weaponMk || 1;
   const w = weaponStats(run.weapon, mk);
   const angles = fanAngles(w.id);
+  const speeds = fanSpeeds(w.id);
   const oz = squadZ(run);
   const aim = inArena(run) && run.boss && !run.boss.dead ? run.boss : null;
   const hu = run.heroUp;
@@ -377,16 +379,18 @@ function fireUnits(run, ev, dt) {
       const ox = run.x + u.dx, uz = oz - u.dy;
       if (aim) {
         const base = Math.atan2(aim.x - ox, aim.z - uz);
-        for (const a of angles) {
-          if (up) heroVolley(run, up, w.id, ox, uz, u.id, mk, 0, base + a, base);
-          else run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, 0, base + a));
+        for (let i = 0; i < angles.length; i++) {
+          const a = angles[i], vm = speeds[i];
+          if (up) heroVolley(run, up, w.id, ox, uz, u.id, mk, 0, base + a, base, vm);
+          else run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, 0, base + a, vm));
         }
       } else {
-        //  부채꼴(산탄포): 각도마다 1발, vx = tan(각)·vz. 나머지 무기는 각도 [0] 한 발
-        for (const a of angles) {
-          const vx = a ? Math.tan(a) * w.vz : 0;
-          if (up) heroVolley(run, up, w.id, ox, uz, u.id, mk, vx, null, 0);
-          else run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, vx));
+        //  부채꼴(산탄포): 각도마다 1발, vx = tan(각)·(vz × 발 속도 배수). 나머지 무기는 각도 [0] 한 발
+        for (let i = 0; i < angles.length; i++) {
+          const a = angles[i], vm = speeds[i];
+          const vx = a ? Math.tan(a) * (vm === 1 ? w.vz : w.vz * vm) : 0;
+          if (up) heroVolley(run, up, w.id, ox, uz, u.id, mk, vx, null, 0, vm);
+          else run.bullets.push(makeBullet(w.id, ox, uz, u.id, mk, vx, null, vm));
         }
       }
       u.fireT += interval;
@@ -404,15 +408,16 @@ export function extraOffset(k, gap) {
 //  로봇 한 발(부채꼴 각도 하나): 원래 탄(게이트 +1 그대로) + 추가 탄 extra 발. 추가 탄은 gateHit 0 + extra(이사님 결정 N3 —
 //   게이트 수치·증원 설비 발판을 올리지 않고 닿으면 사라진다, 적·일반 보급 통에는 효과), 피해는 원래 탄과 같다.
 //   옆 자리: 도로 탄(angle null)은 x 로, 광장 조준탄은 조준 방향(base)에 수직으로 옮긴다(부채꼴은 같은 오프셋으로 통째 복제)
-function heroVolley(run, up, id, ox, uz, ownerId, mk, vx, angle, base) {
-  const b = makeBullet(id, ox, uz, ownerId, mk, vx, angle);
+//   vm(r4.7) = 원래 탄의 발 속도 배수 — 추가 탄도 같은 값(부채꼴을 속도까지 통째로 복제)
+function heroVolley(run, up, id, ox, uz, ownerId, mk, vx, angle, base, vm = 1) {
+  const b = makeBullet(id, ox, uz, ownerId, mk, vx, angle, vm);
   b.dmg *= up.dmgMul;
   run.bullets.push(b);
   for (let k = 1; k <= up.extra; k++) {
     const off = extraOffset(k, up.gap);
     const ex = angle === null ? ox + off : ox + off * Math.cos(base);
     const ez = angle === null ? uz : uz - off * Math.sin(base);
-    const e = makeBullet(id, ex, ez, ownerId, mk, vx, angle);
+    const e = makeBullet(id, ex, ez, ownerId, mk, vx, angle, vm);
     e.dmg = b.dmg;
     e.gateHit = 0;
     e.extra = true;
@@ -891,7 +896,8 @@ function cleanup(run, ev) {
     run.eshots.length = 0;
   }
   //  탄 정리(r3.17): 아래·옆으로 조준된 탄이 영원히 남지 않게 behind·x 범위를 더한다. 도로 탄은 출발 z ≥ run.z − 159 에서 +z 로만 가고
-  //   카메라 3.2px/STEP < 최저 탄속 8.7px/STEP 이라 behind 에 결코 걸리지 않고, 산탄포 x 드리프트(±104)도 −40~520 안이다. 위로 나는 적탄(광장 사격)도 ahead 로 정리
+  //   카메라 3.2px/STEP < 최저 탄속 8.0px/STEP(r4.7 산탄포 알갱이 520 × 0.92) 이라 behind 에 결코 걸리지 않는다. 산탄포 x 드리프트는 r4.7(±18°)부터 사거리 끝에서 ±136 이라
+  //   도로 끝 유닛(x 89·391)의 바깥 알갱이는 사거리 끝 몇 px 전에 −40~520 밖으로 나가 정리된다 — 그 바깥(도로·광장 밖)에는 맞을 것이 없어 판정 차이는 없다. 위로 나는 적탄(광장 사격)도 ahead 로 정리
   run.bullets = run.bullets.filter((b) => !b.dead && b.z <= ahead && b.z >= behind && b.x > -40 && b.x < 520);
   //   ⚠️적탄의 ahead 정리는 **위로 나는 탄(vz < 0)** 에만 — 도로 저격수는 화면 밖 위(z ≤ run.z + 760)에서 아래로 쏘므로 종전 조건 그대로 둬야 한다
   run.eshots = run.eshots.filter((s) => !s.dead && s.z >= behind && (s.vz >= 0 || s.z <= ahead) && s.x > -40 && s.x < 520);

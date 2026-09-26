@@ -73,6 +73,7 @@ export const MK_LABEL = Object.freeze(['', '', ' Mk II', ' Mk III']);
 //  r4.1(2026-09-25): '가까이 ○/●' 토글 칩(종전 ZOOM, HUD 왼쪽 셋째 줄 {x16, y84, w70, h26})을 지웠다 — 보기는 '가까이' 하나뿐(project.js).
 
 //  탄 그림의 화면 길이(px, Mk I 기준). 무기마다 실루엣이 달라 길이도 다르게: 저격 바늘이 가장 길고 산탄 펠릿 뭉치는 짧고 넓다
+//   r4.7: 산탄포는 그림(bullet_scatter)을 쓰지 않고 둥근 알갱이로 그린다(drawPellet) — scatter 값은 표를 무기 6종으로 채워 두는 몫만 남는다
 export const BULLET_LEN = Object.freeze({ rifle: 24, auto: 26, heavy: 34, scatter: 22, sniper: 48, arc: 34 });
 //  탄의 진행 방향(라디안, 0 = 화면 위). vx 가 있는 탄(산탄 부채꼴·아레나 자동 조준)은 그 방향으로 그림을 돌린다
 //  체력 숫자를 생략하는 화면 위 띠: HUD 줄(제목·남은 거리·무기 칩) 아래 선.
@@ -99,6 +100,11 @@ export const EXTRA_BULLET_COLOR = '#D9A6FF';
 //   추가 탄 꼬리(EXTRA_BULLET_COLOR)와 같은 연보라 계열로 '로봇 탄 = 연보라'를 한 벌로 맞추고, 보호막 고리(HERO_RING_COLOR 흰 하늘색)와는 색이 달라
 //   로봇 자리에서 탄이 나올 때 고리와 섞여 보이지 않는다. 병사 탄에는 두르지 않는다(병사도 강해졌다고 오해하지 않게, 기획 v4.1 3-4 (가)). 검사가 이 값으로 찾는다
 export const HERO_BULLET_RIM = 'rgba(217,166,255,0.85)';
+//  r4.7 산탄포 알갱이(이사님 지시 2026-09-26 "총알이 산탄해서 뻗어나가도록 변경, 현재는 나뭇잎 같음"): 스프라이트(bullet_scatter)를 쓰지 않고
+//   코드로 그리는 **작고 둥근 알갱이** — 무기색 번짐 원 + 밝은 심 원 + 진행 반대쪽 짧은 꼬리(반지름의 tail 배). 길쭉한 모양 금지(꼬리는 짧고 반투명).
+//   막 나온 알갱이(사거리 원점에서 flashPx 안)에는 총구 섬광(흰 노랑 원이 빠르게 줄어든다)을 겹친다 — 한 번에 나온 6발이 한자리에 겹쳐 한 번 번쩍인다.
+//   검사(SCATTER)가 core·flash 색으로 그리기 호출을 찾는다
+export const PELLET = Object.freeze({ core: '#F7FFE6', flash: '#FFF6C8', tail: 2.4, glow: 1.7, flashPx: 40 });
 
 //  r4.5 강화 화면(새 상태 'upgrade', 원본 v4 3-5 '강화 화면')의 **자리표 단일 출처** — 셸(main.js)의 [구매]·[돌아가기] 히트 상자가 이 표에서 나온다
 //   (HUD_ROW 와 같은 원칙: 그리는 자리와 누르는 자리가 갈라지지 않게 좌표를 두 곳에 적지 않는다). 480×800 기준.
@@ -1289,6 +1295,8 @@ export function createRenderer3(ctx, sprites) {
       const tint = b.extra ? EXTRA_BULLET_COLOR : w.color;
       const rim = heroId !== null && b.ownerId === heroId;
       const bw0 = b.w ?? w.w;        // Mk 로 탄 폭이 커진다(트랙 기준)
+      //  r4.7 산탄포 = 둥근 알갱이(스프라이트 없이 — 그림이 있어도 쓰지 않는다)
+      if (w.id === 'scatter') { drawPellet(b, q, k, bw0, tint, rim); continue; }
       const bw = bw0 * k;
       const len = (10 + bw0 * 1.5) * k;
       const im = get('bullet_' + w.id);
@@ -1327,6 +1335,38 @@ export function createRenderer3(ctx, sprites) {
         ctx.strokeRect(q.x - bw / 2 - p, q.y - len - p, bw + p * 2, len + p * 2);
       }
     }
+  }
+
+  //  산탄포 알갱이 한 발(r4.7, PELLET). 반지름 = Mk 탄 폭(4·5·6)에 비례(그 자리 배율 k). 꼬리 방향 = 진행 반대쪽(bulletAngle 로 돌린 화면 아래)
+  //   총구 섬광: 사거리 원점(z0 · 조준탄은 x0 도)에서 지나온 거리가 PELLET.flashPx 안이면 섬광 원(지나온 만큼 작아진다)
+  function drawPellet(b, q, k, bw0, tint, rim) {
+    const r = Math.max(1.6, (0.45 * bw0 + 0.9) * k);
+    const ang = bulletAngle(b);
+    const tx = -Math.sin(ang), ty = Math.cos(ang);
+    const tail = r * PELLET.tail;
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = tint; ctx.lineWidth = r * 1.1; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + tx * tail, q.y + ty * tail); ctx.stroke();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = tint;
+    ctx.beginPath(); ctx.arc(q.x, q.y, r * PELLET.glow, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = PELLET.core;
+    ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.fill();
+    const trav = b.z0 == null ? Infinity : (b.aimed ? Math.hypot(b.z - b.z0, b.x - (b.x0 ?? b.x)) : b.z - b.z0);
+    if (trav < PELLET.flashPx) {
+      const f = 1 - Math.max(0, trav) / PELLET.flashPx;
+      ctx.globalAlpha = 0.65 * f;
+      ctx.fillStyle = PELLET.flash;
+      ctx.beginPath(); ctx.arc(q.x, q.y, r * (2 + 2.6 * f), 0, Math.PI * 2); ctx.fill();
+    }
+    if (rim) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = HERO_BULLET_RIM; ctx.lineWidth = Math.max(1, 1.4 * k);
+      ctx.beginPath(); ctx.arc(q.x, q.y, r * (PELLET.glow + 0.4), 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   //  적탄: 마젠타 구슬 + 흰 테(기존 램프탄 복제)
