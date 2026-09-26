@@ -163,6 +163,8 @@ export const ATK_DANGER = '#FF3040';
 //  r4.10 결승선(대물결 판 — 규칙 run.finishZ 를 읽기만): 도로를 가로지르는 체크무늬 두 줄(밝은·어두운 칸 cells 개, 세계 깊이 depth px) +
 //   양쪽 기둥과 그 위를 잇는 표지 띠, 가운데 '결승'(한 어절 — 줄바꿈 없음, BAL3.horde.label)
 //  r4.10 중간 보스 겉모습: 머리 위 이름표(label = BAL3.midBoss.label '중간 보스' — 금빛 글) + 그 아래 체력 막대(주황 — 보스 막대 색과 다르게) · 막대 바탕
+//  r4.10 타이틀 보스 판 표시: 스테이지 칸 왼쪽 위 모서리(칸 윗변에 걸친) 작은 금빛 왕관 — 어떤 판에 보스가 나오는지(색 + 모양, 글 없음)
+export const BOSS_BADGE = Object.freeze({ color: '#F6C84A', edge: '#14233A', w: 18, h: 13, dx: 17, dy: 1 });
 export const MID_LOOK = Object.freeze({ label: BAL3.midBoss.label, labelColor: '#FFD27A', bar: '#FF9A3D', back: 'rgba(20,35,58,0.85)' });
 export const FINISH_LOOK = Object.freeze({ light: '#F3F1E8', dark: '#14233A', cells: 16, depth: 26, post: '#9AA1AC', board: 'rgba(20,35,58,0.9)', sign: '#F6C84A', label: BAL3.horde.label });
 export const ATK_CHARGE = '#FFF1B8';
@@ -551,6 +553,23 @@ export function createRenderer3(ctx, sprites) {
     ctx.fillStyle = C.wallTop;
     roundRect(x - 6.5, y - 0.5, 13, 10, 2.5);
     ctx.fill();
+    ctx.restore();
+  }
+
+  //  r4.10 보스 판 왕관(타이틀 스테이지 칸): 가운데 (x, y) · 폭 BOSS_BADGE.w — 뾰족한 세 봉우리 + 받침. 어두운 테두리를 먼저 깔아 어느 바탕에서도 보이게
+  function drawCrownBadge(x, y) {
+    const B = BOSS_BADGE, hw = B.w / 2, hh = B.h / 2;
+    const pts = [[-hw, hh], [-hw, -hh + 3], [-hw / 2, 0], [0, -hh], [hw / 2, 0], [hw, -hh + 3], [hw, hh]];
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.beginPath();
+    pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+    ctx.closePath();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3.5; ctx.strokeStyle = B.edge; ctx.stroke();
+    ctx.fillStyle = B.color; ctx.fill();
+    ctx.fillStyle = B.edge;
+    ctx.fillRect(-hw + 2, hh - 3.5, B.w - 4, 1.5);
     ctx.restore();
   }
 
@@ -2398,6 +2417,8 @@ export function createRenderer3(ctx, sprites) {
       ctx.globalAlpha = 1;
       //  r4.3 순차 해금: 잠긴 스테이지 버튼은 흐린 버튼(disabled 알파) 위 오른쪽 위 모서리에 자물쇠 — 색만으로 구분하지 않는 형태 신호(셔터 자물쇠와 같은 모양)
       if (b.locked) drawLockBadge(b.x + b.w - 14, b.y + 16, 0.9);
+      //  r4.10 보스 판(게임 화면 줄 3·6·9·…·24): 왼쪽 위 모서리 — 칸 윗변에 걸쳐 이름 글과 겹치지 않는다
+      if (b.boss) drawCrownBadge(b.x + BOSS_BADGE.dx, b.y + BOSS_BADGE.dy);
     }
   }
 

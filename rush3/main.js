@@ -3,7 +3,7 @@
 //  rush/main.js 는 import 하지 않는다(자동 부트가 같은 캔버스에 붙는다). 골격(hitButton/toLogical/spawnBurst/
 //  autoPause/오디오 unlock/ESC/음량 버튼/로드 후 루프 시작/#game3 가드)만 참고해 옮겨 적었다.
 import { BAL3, PLAY_DIFFICULTY } from './balance.js';
-import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersion } from './stages.js';
+import { STAGE_IDS, ALL_STAGE_IDS, PROTO_IDS, buildStage, stageMeta, stageVersion, stageKindOf } from './stages.js';
 import { WEAPONS } from './weapons.js';
 import { createRun, stepRun, drainEvents, STEP } from './combat.js';
 import { createInput, isSteerKey } from './input.js';
@@ -51,6 +51,9 @@ export const HORDE_BANNER_TEXT = '대물결 접근!';
 export const FINISH_TEXT = '결승선 돌파!';
 //  r4.10 중간 보스 판: 중간 보스가 나올 때 정예 경고 슬롯 붉은 띠(한 줄 — 줄바꿈 없음)
 export const MID_BANNER_TEXT = '중간 보스 접근!';
+//  r4.10 판 안내: 출격 직후 작전 목표 배너(기존 슬롯 C — 판당 1회 BAL3.fx.objectiveBannerSec)에 판 종류 한 줄(게임 화면 줄만 — stage.endKind).
+//   구출 캡슐 판(7 — 대물결)은 그 아래 캡슐 두 줄이 이어진다. 줄은 어절 경계에서만 나눈다(한 줄씩 — 480px 배너 안)
+export const KIND_BANNER_TEXT = Object.freeze({ boss: '보스 출현', mid: '중간 보스', horde: '대물결 — 결승선까지 돌파' });
 //  r4.10 판 끝 목표 이름(결과 화면 코인 내역 — 보스 몫 V × 0.5 를 받는 목표): 보스 판 '보스' · 중간 보스 판 '중간 보스' · 대물결 판 '돌파'
 export const GOAL_NAME = Object.freeze({ boss: '보스', mid: '중간 보스', horde: '돌파' });
 /** 판 끝 목표 종류(순수 — 판 정의만 본다): 결승선이 있으면 'horde' · 중간 보스(보스 정의의 mid 표시)면 'mid' · 그 밖(보스·배수 1 줄·시제품) 'boss' */
@@ -737,7 +740,10 @@ export function boot(canvas, deps = {}) {
     const total = STAGE_IDS.reduce((n, s) => n + totalAttempts(s), 0);
     fx.guideT = total === 0 ? FX.guideSec : 0;
     //  작전 목표 배너(r3.14): 목표가 있는 판은 출격 직후 3초, 판당 1회. 첫 플레이 안내(y268)와 자리가 다르다
-    if (run.objective && run.objective.kind === 'capsule') { fx.objText = OBJECTIVE_BANNER_TEXT; fx.objT = FX.objectiveBannerSec; }
+    //  r4.10 판 종류 한 줄(게임 화면 줄 — 보스 출현 / 중간 보스 / 대물결 — 결승선까지 돌파)을 같은 배너 맨 위에. 배수 1 줄(검사 주입)은 종전 그대로
+    const kindLine = KIND_BANNER_TEXT[stage.endKind] ?? null;
+    const capsule = !!(run.objective && run.objective.kind === 'capsule');
+    if (kindLine || capsule) { fx.objText = kindLine ? Object.freeze([kindLine, ...(capsule ? OBJECTIVE_BANNER_TEXT : [])]) : OBJECTIVE_BANNER_TEXT; fx.objT = FX.objectiveBannerSec; }
     save.updateStage(id, { attempts: (save.getStage(id, ver, diff).attempts || 0) + 1 }, ver, diff);
     save.patch({ lastStage: id });
     //  r4.3 코인: 출격 번호(지갑 runNo +1, 출격 시작 쓰기와 함께 — 지갑은 별도 키라 쓰기 1회 더) → 지급 식별자 `${runNo}:main`·`${runNo}:bonus`.
@@ -1355,9 +1361,11 @@ export function boot(canvas, deps = {}) {
           + (st.rescued === true ? ' · 구출✓' : '');
         const col = i % 2, row = Math.floor(i / 2);
         const locked = id > lim;
+        //  r4.10 보스 판 표시(게임 화면 줄 — 3·6·9·…·24): 칸 왼쪽 위 모서리에 작은 왕관(render.drawButtons — boss 칸). 글은 바꾸지 않는다
+        const bossStage = stageKindOf(id, difficulty) === 'boss';
         v.buttons.push({ id: 'stage' + id, x: 60 + col * 184, y: TITLE_GRID.y + row * TITLE_GRID.dy, w: 176, h: TITLE_GRID.h, label: id + ' ' + m.title,
           sub: locked ? '잠김' : sub, primary: last === id && !locked, small: true, ...(locked ? { disabled: true, locked: true } : {}),
-          ...(prev && !locked ? { prev } : {}) });
+          ...(prev && !locked ? { prev } : {}), ...(bossStage ? { boss: true } : {}) });
       }
       v.buttons.push({ id: 'pageL', x: 60, y: TITLE_GRID.pageY, w: 100, h: 40, label: '◀ 이전', small: true, primary: false, disabled: pg === 0 });
       v.buttons.push({ id: 'pageInfo', x: 168, y: TITLE_GRID.pageY, w: 144, h: 40, label: (pg + 1) + ' / ' + pages, small: true, primary: false });

@@ -12,8 +12,8 @@ import { buildStage, ALL_STAGE_IDS, stageKindOf } from '../rush3/stages.js';
 import { STAGE_END } from '../rush3/courses.js';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 import { stageValue, bossCount, createTally, addEvents, mainCoins, scheduledEnemyCount } from '../rush3/coins.js';
-import { createRenderer3, FINISH_LOOK } from '../rush3/render.js';
-import { makeFx, HORDE_BANNER_TEXT, FINISH_TEXT, goalKind } from '../rush3/main.js';
+import { createRenderer3, FINISH_LOOK, BOSS_BADGE } from '../rush3/render.js';
+import { makeFx, HORDE_BANNER_TEXT, FINISH_TEXT, goalKind, KIND_BANNER_TEXT, OBJECTIVE_BANNER_TEXT } from '../rush3/main.js';
 import { bootApp } from './lib/rush3-shell.mjs';
 
 const BOSS_IDS = [3, 6, 9, 12, 15, 18, 21, 24];
@@ -247,4 +247,47 @@ test("HORDE 셸: 대물결 첫 겹에 '대물결 접근!'(경고음·정예 경�
   assert.equal(res.won, true);
   assert.equal(res.coins.goal, 'horde');
   assert.match(res.coinLine, /돌파 13/, '결과 내역 이름 = 돌파');
+});
+
+// ═══════════════════════════════ STAGE-KIND 판 안내(타이틀 · 출격 배너) ═══════════════════════════════
+
+test("STAGE-KIND 판 안내: 타이틀 스테이지 칸 — 보스 판(3·6·9·…·24)에만 작은 금빛 왕관(칸 왼쪽 위 모서리, 글은 그대로) · 출격 직후 작전 목표 배너 맨 위 판 종류 한 줄('보스 출현' / '중간 보스' / '대물결 — 결승선까지 돌파', 구출 캡슐 판은 그 아래 캡슐 두 줄) — 한 줄씩(어절 줄바꿈 없음)", async () => {
+  const h = await bootApp({ withOps: true, unlockThrough: 23 });
+  const btn = (id) => h.app.getButtons().find((x) => x.id === id);
+  const press = (id) => { const b = btn(id); assert.ok(b && !b.disabled, id); h.tap(b.x + b.w / 2, b.y + b.h / 2); h.frames(1); };
+  h.frames(1);
+  //  첫 쪽으로(마지막 판이 있는 쪽으로 열린다)
+  for (let i = 0; i < 3 && btn('pageL') && !btn('pageL').disabled; i++) press('pageL');
+  const seenBoss = [];
+  for (let pg = 0; pg < 3; pg++) {
+    h.texts.length = 0; h.ops.length = 0; h.frames(1);
+    const btns = h.app.getButtons().filter((b) => b.id.startsWith('stage'));
+    for (const b of btns) {
+      const id = Number(b.id.slice(5));
+      assert.equal(!!b.boss, BOSS_IDS.includes(id), `S${id} 칸 보스 표시`);
+      if (b.boss) seenBoss.push(id);
+      assert.ok(!/보스/.test(b.label) && !/보스/.test(b.sub), `S${id} 칸 글은 그대로(표시는 모양만)`);
+    }
+    const bossBtns = btns.filter((b) => b.boss);
+    const crowns = h.ops.filter((o) => o.op === 'translate' && bossBtns.some((b) => o.args[0] === b.x + BOSS_BADGE.dx && o.args[1] === b.y + BOSS_BADGE.dy));
+    assert.equal(crowns.length, bossBtns.length, `${pg + 1}쪽: 보스 칸마다 왕관 하나(왼쪽 위 모서리)`);
+    assert.ok(h.ops.filter((o) => o.op === 'fill' && o.fill === BOSS_BADGE.color).length >= bossBtns.length, `${pg + 1}쪽: 금빛 왕관`);
+    if (pg < 2) press('pageR');
+  }
+  assert.deepEqual(seenBoss.sort((a, b) => a - b), BOSS_IDS, '보스 판 8개 모두 왕관');
+  //  출격 직후 배너
+  const wantLines = { 3: [KIND_BANNER_TEXT.boss], 5: [KIND_BANNER_TEXT.mid], 4: [KIND_BANNER_TEXT.horde], 7: [KIND_BANNER_TEXT.horde, ...OBJECTIVE_BANNER_TEXT] };
+  assert.deepEqual({ ...KIND_BANNER_TEXT }, { boss: '보스 출현', mid: '중간 보스', horde: '대물결 — 결승선까지 돌파' });
+  for (const [id, lines] of Object.entries(wantLines)) {
+    h.app.toTitle();
+    h.app.startRun(Number(id));
+    const fx = h.app.getFx();
+    assert.deepEqual([...fx.objText], lines, `S${id} 배너 줄`);
+    assert.equal(fx.objT, BAL3.fx.objectiveBannerSec);
+    h.texts.length = 0; h.frames(1);
+    for (const line of lines) {
+      assert.ok(line.length <= 24, `S${id} 한 줄(${line.length}자)`);
+      assert.ok(h.texts.some((t) => t.text === line), `S${id} 첫 프레임에 '${line}'`);
+    }
+  }
 });

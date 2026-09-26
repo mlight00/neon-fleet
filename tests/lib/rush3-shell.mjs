@@ -53,5 +53,7 @@ export async function bootApp({ storage = memStorage(), search = '', dateNow = (
   await app.ready;
   const frames = (n = 1) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
   const textNow = () => { texts.length = 0; if (ops) ops.length = 0; frames(1); return texts.map((t) => t.text); };
-  return { app, save: sv, storage, texts, ops, frames, textNow, audio, win };
+  //  r4.10: 논리 좌표(480×800) 클릭 — 캔버스 CSS 240×400 이라 절반(타이틀 페이지 넘김 등 버튼 경로 그대로)
+  const tap = (x, y) => canvas.fire('pointerdown', { clientX: x / 2, clientY: y / 2, pointerType: 'mouse' });
+  return { app, save: sv, storage, texts, ops, frames, textNow, audio, win, tap };
 }
