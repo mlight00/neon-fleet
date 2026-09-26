@@ -9,7 +9,7 @@ import { startBonus, moveTargets, hitBonusTarget, endBonusIfDue } from './bonus.
 //  r4.4 판 밖 로봇 강화(순수 규칙 모듈 — 비용·구매는 셸·저장 몫, 여기서는 효과 수치만 읽는다)
 import { normUp, hasUp, effects } from './meta.js';
 //  r4.8 보스 공격 패턴 설계(순수 규칙 모듈 — 안전 구역을 먼저 정한 공격 한 번의 기하). 차례·예고 시간·탄 생성·피해는 여기(bossAttackStep)
-import { planAttack, unlockedAtk } from './bossatk.js';
+import { planAttack, unlockedAtk, atkType } from './bossatk.js';
 
 export const STEP = BAL3.STEP;
 
@@ -816,20 +816,24 @@ function bossAct(run, bo, ev, dt) {
 
 //  ── r4.8 보스 공격 패턴(게임 화면 줄 — run.bossAtk 가 있는 판만) ──────────────────────────────────────────
 //  이사님 지시(2026-09-26) "보스에 가면 … 피할 수가 없이 모든 총알을 맞게 된다" · "모든 보스가 같은 패턴의 같은 총알만 쏟아낸다".
-//  공격 한 번 = 예고(tele 초 — 위험·안전 구역을 화면에 보인다) → 발사(탄·기둥) → 그 공격의 탄이 모두 사라지면 끝 → 보스 간격 gap × 페이즈 rate 뒤 다음 예고.
-//  전체에 공격 1개(보스가 여럿이면 번호 순으로 차례). 설계(안전 구역 보장)는 bossatk.planAttack — 보장이 안 되는 패턴은 고르지 않는다. 난수 없음.
+//  r4.9 (가) 안내 규칙(이사님 실플레이 4차 "날아오는 총알의 경우는 없애자. 광역 대미지가 있는 구역에 대한 경보만 주자"):
+//   탄 공격 = 장전(charge 초 — 보스 몸 번쩍임만, 도로에 안내 없음, 이벤트 bossCharge) → 장전이 끝난 STEP 의 부대 자리로 **다시 설계**해 발사(bossFire) →
+//            그 공격의 탄이 모두 사라지면 끝. 다시 설계가 안 되면(장전 동안 부대가 설계가 안 되는 곳으로 갔다) 쏘지 않고 거둔다(retry 초 뒤 다시).
+//   광역 공격 = 경보(tele 초 — 붉은 경보 구역, 이벤트 bossTele) → 터짐 → 끝.
+//  끝 → 보스 간격 gap × 페이즈 rate 뒤 다음 공격. 전체에 공격 1개(보스가 여럿이면 번호 순으로 차례). 설계(안전 구역 보장)는 bossatk.planAttack — 보장이 안 되는 패턴은 고르지 않는다. 난수 없음.
 //  탄의 판정·피해 기록(lossByShot)·이벤트는 기존 적탄 경로(moveEshots → damageUnit)를 그대로 지난다. 탄 칸 atk(공격 번호)·pat(패턴)·look(보스 탄 모양)·life(수명)는 희소 칸
 
-//  이 보스가 공격 때문에 멈춰 있어야 하는가: 조준 대포 예고 중 · 쓸기 예고 ~ 발사 중(조준선·줄기의 출발점이 예고 그대로)
+//  이 보스가 공격 때문에 멈춰 있어야 하는가: 공격이 멈춤(pause — 조준 대포·쓸기)이면 장전·경보 중 + 쓸기 발사 중(출발점이 설계 그대로)
 function atkPaused(run, bo) {
   const c = run.bossAtk && run.bossAtk.cur;
-  return !!(c && c.pause && c.boss === bo.id && (c.state === 'tele' || (c.kind === 'sweep' && c.fired < c.xs.length)));
+  return !!(c && c.pause && c.boss === bo.id && (c.state === 'tele' || c.state === 'charge' || (c.kind === 'sweep' && c.fired < c.xs.length)));
 }
 
 //  6단계 끝(보스가 움직인 뒤): 진행 중인 공격을 한 STEP 진행하거나, 없으면 준비된 보스가 있을 때만 대기 시계를 돌려 다음 공격을 고른다.
 //   준비 = 도로 하강을 마친 hold · 광장 추격 chase(예고·돌진·회복 중에는 시작하지 않는다 — 돌진 시계도 공격 동안 멈춘다).
 //   고르기 = 번호(index)가 turn 이상인 첫 보스부터 돌아가며, 그 보스의 열린 패턴(bossatk.unlockedAtk — 페이즈마다 하나씩 더)을 공격 횟수 atkN 순서로 보고
-//   설계가 되는 첫 패턴. 아무것도 안 되면 retry 초 뒤 다시
+//   설계가 되는 첫 패턴. 아무것도 안 되면 retry 초 뒤 다시.
+//   r4.9 (가): 탄 공격은 여기서 '설계가 되는가'만 보고 장전(state 'charge')으로 들어간다 — 실제 설계는 장전이 끝난 STEP(advanceAttack)
 function bossAttackStep(run, ev, dt) {
   const A = run.bossAtk;
   if (A.cur) { advanceAttack(run, A, ev, dt); return; }
@@ -849,25 +853,36 @@ function bossAttackStep(run, ev, dt) {
       if (!plan) continue;
       bo.atkN++; bo.atkK[kind] = k + 1;
       A.turn = bo.index + 1; A.n++;
-      A.cur = { ...plan, boss: bo.id, serial: A.n, look: bo.atk.look, state: 'tele', t: plan.tele, age: 0, fired: 0 };
-      ev.push({ type: 'bossTele', id: bo.id, kind, serial: A.n, tele: plan.tele, safe: [plan.safe[0], plan.safe[1]], x: bo.x, z: bo.z });
+      if (plan.type === 'shot') {
+        //  장전: 도로에 그릴 것이 없다(설계 칸을 싣지 않는다 — 렌더는 보스 몸 번쩍임만). k 는 발사 때 다시 설계할 때 쓴다
+        A.cur = { kind, type: 'shot', boss: bo.id, serial: A.n, look: bo.atk.look, state: 'charge', t: BATK.charge, charge: BATK.charge, k, pause: !!plan.pause, age: 0, fired: 0 };
+        ev.push({ type: 'bossCharge', id: bo.id, kind, serial: A.n, charge: BATK.charge, x: bo.x, z: bo.z });
+      } else {
+        A.cur = { ...plan, boss: bo.id, serial: A.n, look: bo.atk.look, state: 'tele', t: plan.tele, age: 0, fired: 0 };
+        ev.push({ type: 'bossTele', id: bo.id, kind, serial: A.n, tele: plan.tele, x: bo.x, z: bo.z });
+      }
       return;
     }
   }
   A.wait = BATK.retry;
 }
 
-//  진행: 예고(t 가 0 이 되면 발사) → 발사 뒤(쓸기는 every 초마다 한 발씩 dur 동안) → 그 공격 번호의 탄이 하나도 없으면 끝
+//  진행: 장전(탄 — t 가 0 이 되면 그 순간의 부대 자리로 다시 설계해 발사) · 경보(광역 — t 가 0 이 되면 터짐) →
+//   발사 뒤(쓸기는 every 초마다 한 발씩 dur 동안) → 그 공격 번호의 탄이 하나도 없으면 끝
 function advanceAttack(run, A, ev, dt) {
-  const cur = A.cur;
+  let cur = A.cur;
   const bo = run.bosses.find((b) => b.id === cur.boss) ?? null;
   cur.age += dt;
-  if (cur.state === 'tele') {
-    //  예고 중에 그 보스가 쓰러지면 공격을 거둔다(쏘지 않는다)
+  if (cur.state === 'charge' || cur.state === 'tele') {
+    //  장전·경보 중에 그 보스가 쓰러지면 공격을 거둔다(쏘지 않는다)
     if (!bo || bo.dead) { endAttack(A, bo, ev, true); return; }
     cur.t -= dt;
     if (cur.t > 1e-9) return;
-    cur.state = 'act'; cur.t = 0;
+    if (cur.state === 'charge') {
+      const plan = planAttack(run, bo, cur.kind, cur.k);
+      if (!plan) { endAttack(A, bo, ev, true); return; }
+      cur = A.cur = { ...plan, boss: cur.boss, serial: cur.serial, look: cur.look, state: 'act', t: 0, age: cur.age, fired: 0 };
+    } else { cur.state = 'act'; cur.t = 0; }
     fireAttack(run, cur, ev);
   } else cur.t += dt;
   if (cur.kind === 'sweep') sweepShots(run, cur, bo);
@@ -875,7 +890,7 @@ function advanceAttack(run, A, ev, dt) {
   if (!firing && !run.eshots.some((s) => s.atk === cur.serial && !s.dead)) endAttack(A, bo, ev, false);
 }
 
-//  발사(예고가 끝난 STEP): ① 조준 대포 1발 · ② 벽 한 줄 · ⑤ 산개탄 n 발(떨어질 자리에서 퍼진다 — 수명 = 퍼질 거리 ÷ 속도) · ③ 기둥 = 탄 없이 즉시 피해. 쓸기는 sweepShots
+//  발사(장전·경보가 끝난 STEP): ① 조준 대포 1발 · ② 벽 한 줄 · ⑤ 산개탄 n 발(떨어질 자리에서 퍼진다 — 수명 = 퍼질 거리 ÷ 속도) · ③ 기둥 = 탄 없이 즉시 피해. 쓸기는 sweepShots
 function fireAttack(run, cur, ev) {
   const dmg = run.enemyDefs.elite.shot.dmg;
   if (cur.kind === 'aim') shotFrom(run, cur, cur.ox, cur.oz, cur.ux, cur.uz, dmg);

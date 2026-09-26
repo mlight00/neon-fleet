@@ -1160,8 +1160,10 @@ export function boot(canvas, deps = {}) {
         case 'arenaEnter': fx.arenaOpen = FX.arenaOpenSec; fx.arenaT = FX.arenaGuideSec; fx.arenaText = ARENA_GUIDE_TEXT; break;
         //  돌진 예고 = 중립 경고음(lotWarn 재사용). 화면의 붉은 원·점선은 이벤트가 아니라 run.boss.state 를 렌더가 직접 읽는다
         case 'bossDashWarn': fx.sfx.push(['lotWarn']); break;
-        //  r4.8 보스 공격 예고: 짧은 경고음(돌진 예고와 같은 lotWarn). 위험·안전 구역 그림은 렌더가 run.bossAtk.cur 를 직접 읽는다
+        //  r4.8 보스 공격 예고 → r4.9 (가) **광역 경보만**: 경보음(돌진 예고와 같은 lotWarn). 붉은 경보 구역 그림은 렌더가 run.bossAtk.cur 를 직접 읽는다
         case 'bossTele': fx.sfx.push(['lotWarn']); break;
+        //  r4.9 (가) 탄 공격 장전: 장전음만(도로에 안내 없음 — 번쩍임은 렌더가 보스 몸에만 그린다)
+        case 'bossCharge': fx.sfx.push(['bossCharge']); break;
         //  발사: 기둥 포격 = 기둥마다 번쩍 + 흔들림 + 폭발음 · 산개탄 = 떨어진 자리 폭발 · 조준 대포·벽·쓸기 = 금속 발사음
         case 'bossFire': {
           const col = (ATK_LOOK[ev.look] ?? ATK_LOOK.orb).color;

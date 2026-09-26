@@ -3,7 +3,8 @@
 //  순수 규칙 모듈: 난수·시계·화면·저장 없음(V3-PURE). 두 가지를 맡는다.
 //   ① 판 정의 시점: 보스 정의 → 패턴 배정(atkPlanFor — buildStage 가 게임 화면 줄에서만 부른다)
 //   ② 공격 한 번의 설계(planAttack): 지금 부대 자리·대형에서 **안전 구역을 먼저 정하고** 그 밖에 위험(탄·기둥)을 둔다.
-//      안전 구역 = x 구간 [s0, s1] — 폭 ≥ 부대 폭(2 × 반폭) + margin · 가운데에 부대 중심이 설 수 있고 · 지금 중심에서 moveMax × 예고 × reachK 안.
+//      안전 구역 = x 구간 [s0, s1] — 폭 ≥ 부대 폭(2 × 반폭) + margin · 가운데에 부대 중심이 설 수 있고 · 지금 중심에서 moveMax × 닿는 시간 × reachK 안.
+//      r4.9 (가): 닿는 시간 = 광역은 경보 초, 탄은 첫 탄이 부대 띠에 닿기까지 초(탄 공격은 도로에 안내가 없다 — 안전 구역은 규칙만 안다).
 //      위험은 부대 띠(부대가 차지하는 z 범위)에서 차지하는 x 범위로 잰다 — 부대 전체(유닛 원 끝까지)가 안전 구역 안에 있으면 어떤 탄·기둥에도 닿지 않는다.
 //      보장이 안 되면 null(그 패턴을 고르지 않는다 — 부르는 쪽이 다음 패턴으로). 진행(예고 시간·탄 생성·피해)은 combat.js 가 한다.
 //  좌표: x = 도로 가로(80~400, 광장 40~440), z = 트랙(클수록 앞). 탄의 방향 (ux, uz) 는 단위 벡터(uz < 0 = 부대 쪽 아래로).
@@ -12,6 +13,8 @@ import { formation, formationHalfWidth } from './squad.js';
 
 const BA = BAL3.bossAtk, SQ = BAL3.squad, ROAD = BAL3.road;
 export const ATK_KINDS = Object.freeze(['aim', 'wall', 'pillar', 'sweep', 'burst']);
+/** r4.9 (가) 공격 종류: 'shot'(날아오는 탄 — 도로에 안내 없음, 장전 번쩍임 뒤 발사) | 'aoe'(광역 — 붉은 경보 구역) */
+export const atkType = (kind) => (BA[kind] && BA[kind].type) || 'aoe';
 //  그림이 없는 보스(1~5번 등 skin 없음) = 기본 보스 그림 B1 그레이더
 export const ATK_DEFAULT_SKIN = 'B1_grader';
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -94,13 +97,28 @@ export function rayBand(ox, oz, ux, uz, r, zLo, zHi) {
 //  두 구간이 겹치는가(경계 포함)
 export const overlaps = (a, b) => a[0] <= b[1] && b[0] <= a[1];
 
+//  탄이 나오는 z(탄 공격): 벽 = 도로는 보스 앞 · 광장은 광장 위쪽 끝 / 그 밖(조준 대포·쓸기) = 보스 가운데
+function shotOriginZ(run, bo, kind, P) {
+  if (kind === 'wall') return bo.arena ? run.z + run.arena.bossZ[1] : bo.z - bo.r - 6;
+  return bo.z;
+}
+/** r4.9 (가) 탄 공격의 닿는 시간(초): 첫 탄이 부대 띠 앞끝(zHi)에 닿기까지. 탄은 아래로 v 보다 빨리 내려올 수 없으므로
+ *  (나온 z − 반지름 − zHi) ÷ v 가 가장 이른 값이다(비스듬한 탄은 더 늦다 — 안전 쪽으로 어림) */
+export function shotReachTime(run, bo, kind, F = squadFrame(run)) {
+  const P = BA[kind];
+  return Math.max(0, (shotOriginZ(run, bo, kind, P) - P.r - F.zHi) / P.v);
+}
+
 /** 공격 한 번의 설계. bo = 공격하는 보스(자리 bo.x·bo.z), kind = 패턴, k = 이 보스가 이 패턴을 쓴 횟수(위치 번갈이·겨누는 쪽).
- *  반환 { kind, tele, safe: [s0, s1], danger: [[x0, x1], …](부대 띠에서의 위험 x 범위), band: [zLo, zHi], zFloor, … 패턴별 칸 } | null */
+ *  닿는 시간(r4.9 (가)): 광역 = 경보 tele 초 · 탄 = 첫 탄이 부대 띠에 닿기까지(shotReachTime — 도로에 안내가 없으니 탄을 본 순간부터 잰다).
+ *  반환 { kind, type, tele(광역만, 탄 0), reachT(닿는 시간), reachD(닿는 거리), safe: [s0, s1], danger: [[x0, x1], …](부대 띠에서의 위험 x 범위), band: [zLo, zHi], zFloor, … 패턴별 칸 } | null */
 export function planAttack(run, bo, kind, k = 0) {
   const P = BA[kind];
   if (!P || !ATK_KINDS.includes(kind) || !run.units.length) return null;
   const F = squadFrame(run);
-  const D = SQ.moveMax * P.tele * BA.reachK;
+  const type = atkType(kind);
+  const T = type === 'shot' ? shotReachTime(run, bo, kind, F) : P.tele;
+  const D = SQ.moveMax * T * BA.reachK;
   const plan = kind === 'wall' ? planWall(run, bo, F, P, D, k)
     : kind === 'pillar' ? planPillar(F, P, D, k)
     : kind === 'aim' ? planAim(bo, F, P, D, k)
@@ -109,7 +127,7 @@ export function planAttack(run, bo, kind, k = 0) {
   if (!plan) return null;
   //  마지막 확인: 안전 구역이 모든 위험과 떨어져 있다
   if (plan.danger.some((d) => overlaps(d, plan.safe))) return null;
-  return { ...plan, tele: P.tele, band: [F.zLo, F.zHi], zFloor: F.zFloor, hw: F.hw, from: F.x };
+  return { ...plan, type, tele: type === 'shot' ? 0 : P.tele, reachT: T, reachD: D, band: [F.zLo, F.zHi], zFloor: F.zFloor, hw: F.hw, from: F.x };
 }
 
 //  ② 탄막 벽: 안전 구역(빈틈) = 위치 번호 k % 3 을 닿는 곳으로 당긴 자리. 탄은 빈틈 양옆에서 가장자리까지 gap 간격(병사 원이 빠져나갈 수 없다)
@@ -121,7 +139,7 @@ function planWall(run, bo, F, P, D, k) {
   for (let x = safe[1] + P.r + 2; x < F.eHi + 1; x += P.gap) xs.push(x);
   if (!xs.length) return null;
   //  탄 줄이 나오는 z: 도로 = 보스 앞 · 광장 = 광장 위쪽 끝(보스가 부대 가까이 있어도 벽이 부대 위에서 내려와 지나가게)
-  const z = bo.arena ? run.z + run.arena.bossZ[1] : bo.z - bo.r - 6;
+  const z = shotOriginZ(run, bo, 'wall', P);
   if (z - P.r <= F.zHi) return null;
   return { kind: 'wall', safe, danger: xs.map((x) => [x - P.r, x + P.r]), xs, z, r: P.r, v: P.v, pos: k % 3 };
 }
