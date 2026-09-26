@@ -61,8 +61,8 @@ test('BOUNTY-1: 배치 — 게임 줄 2~24번에만(2~12 1체 · 13~24 2체, 1�
   }
 });
 
-test('BOUNTY-2: 체력 = 그 z 까지의 상한 부대(분리벽 한쪽·병력 100·강화 0)가 사거리 진입부터 닿기까지 줄 수 있는 피해 합 × 0.9(상수 한 곳) · 랜덤 길 시드 무관 · 스폰 체력 3 이상(숫자 표시)', (t) => {
-  assert.equal(B.hpFactor, 0.9);
+test('BOUNTY-2: 체력 = 그 z 까지의 상한 부대(분리벽 한쪽·병력 100·강화 0)가 사거리 진입부터 닿기까지 줄 수 있는 피해 합 × hpFactor(0.45, 상수 한 곳 — r4.7 보정: 이사님 실플레이 소감(현상금 적이 너무 셈)으로 0.9 → 0.45) · 랜덤 길 시드 무관 · 스폰 체력 3 이상(숫자 표시)', (t) => {
+  assert.equal(B.hpFactor, 0.45);
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
     for (const b of st.bounties || []) {
@@ -76,7 +76,7 @@ test('BOUNTY-2: 체력 = 그 z 까지의 상한 부대(분리벽 한쪽·병력 
         }
       }
       assert.ok(best.units <= BAL3.squad.unitCap);
-      assert.equal(b.hp, Math.max(1, Math.round(best.d * 0.9)), `S${id} z${b.z} 체력`);
+      assert.equal(b.hp, Math.max(1, Math.round(best.d * B.hpFactor)), `S${id} z${b.z} 체력`);
       assert.deepEqual([b.units, b.weapon, b.mk], [best.units, best.weapon, best.mk]);
       assert.ok(b.hp >= 3, '체력 숫자가 보인다(스폰 체력 3 이상)');
       t.diagnostic(`BOUNTY S${id} z${b.z} x${b.x} 상한 ${b.units}명 ${b.weapon} Mk${b.mk} · 피해 합 ${b.dmg.toFixed(0)} / ${b.sec.toFixed(2)}초 → 체력 ${b.hp}`);
@@ -233,17 +233,17 @@ test('BOUNTY-6: 셸 — 현상금 적 그림(금색 테·이름표·체력 숫�
   assert.equal(r.coins.gained, 11 + r.coins.enemy + r.coins.boss + r.coins.clear, '획득 코인에 들어간다');
 });
 
-//  자리: 체력은 부대 중심 자리마다의 피해 합을 **고르게 평균**한 값 × 0.9 다(firepower.bountyDamageFor — 보스 1체 계산과 같은 방식).
+//  자리: 체력은 부대 중심 자리마다의 피해 합을 **고르게 평균**한 값 × hpFactor(0.45) 다(firepower.bountyDamageFor — 보스 1체 계산과 같은 방식).
 //   도로 가운데 쪽은 대형이 넓게 퍼져 평균보다 덜 맞고(계산 0.92~1.11 × 체력), 도로 끝은 대형이 눌려 더 맞는다(최대 평균의 1.54배).
 //   그래서 상한 부대가 **어느 자리에 서도** 잡히는지를 나온 x · 가운데 240 · 양 끝 140/340 에서 실제 stepRun 으로 잠근다
 //   (가운데에서 계산이 체력보다 조금 모자란 판도 실제로는 잡힌다 — 탄이 다가오는 적을 마주 날아가 조금 더 자주 맞는 몫(약 +15%)을 계산이 넣지 않기 때문)
-test('BOUNTY-7: 계산 ↔ 실제(동작 확인) — 계산의 상한 부대(병력·무기·Mk)가 현상금 적 앞에 서서 쏘면 어느 자리(나온 x · 가운데 240 · 양 끝 140/340)에서도 닿기 전에 잡는다 · 나온 x 에서는 사거리에 든 시간의 70% 이상을 써야 한다(끝까지 쏴야 깬다)', (t) => {
+test('BOUNTY-7: 계산 ↔ 실제(동작 확인) — 계산의 상한 부대(병력·무기·Mk)가 현상금 적 앞에 서서 쏘면 어느 자리(나온 x · 가운데 240 · 양 끝 140/340)에서도 닿기 전에 잡는다 · 나온 x 에서는 사거리에 든 시간의 35% 이상을 쓴다(r4.7 보정: 체력 계수 0.9 → 0.45 라 상한 부대는 창의 절반쯤에 잡는다 — 끝까지 쏴야 깨는 것은 상한의 절반쯤 되는 부대)', (t) => {
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
     (st.bounties || []).forEach((b, i) => {
       const r = bountyFight(id, i);
       assert.equal(r.killed, true, `S${id} #${i}: ${(r.dealtPct * 100).toFixed(0)}%`);
-      assert.ok(r.inSec >= 0.7 * b.sec, `S${id} #${i}: 사거리 안 ${r.inSec.toFixed(2)}초 / 계산 창 ${b.sec.toFixed(2)}초`);
+      assert.ok(r.inSec >= 0.35 * b.sec, `S${id} #${i}: 사거리 안 ${r.inSec.toFixed(2)}초 / 계산 창 ${b.sec.toFixed(2)}초`);
       const at = [240, 140, 340].map((x) => [x, bountyFight(id, i, { holdX: x })]);
       for (const [x, q] of at) assert.equal(q.killed, true, `S${id} #${i} 자리 x ${x}: ${(q.dealtPct * 100).toFixed(0)}%`);
       t.diagnostic(`BOUNTY-FIGHT S${id} #${i} ${r.units}명 ${r.weapon} Mk${r.mk} 체력 ${r.hp} → 사거리 안 ${r.inSec.toFixed(2)}초에 처치(창 ${b.sec.toFixed(2)}초) · 자리별 ` +

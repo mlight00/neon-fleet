@@ -131,7 +131,9 @@ export const BAL3 = deepFreeze({
   //   touchDmg 부딪혔을 때 **피해 풀**(× 줄의 touchDmg 배수 3 = 18): 앞줄(dy 작은 순)부터 병사 체력만큼 나눠 뺀다 — 체력 2 병사 약 9명.
   //            부딪히면 적은 사라지고(코인 0 — 부딪혀 사라진 적 규칙 그대로) 손실은 접촉(lossByTouch)으로 센다
   //   hpFactor 체력 = 사거리에 들어와서 부대에 닿기까지 **상한 화력으로 줄 수 있는 피해 합 × 이 값**(rush3/firepower.js bountyFloor — 상수 한 곳)
-  bounty: { label: '현상금', r: 34, vz: 130, track: 120, touchDmg: 6, hpFactor: 0.9 },
+  //            r4.7 보정(이사님 실플레이 2026-09-26 "보스는 괜찮은데 현상금 적이 너무 셈"): 0.9 → 0.45(절반). 상한 부대는 창의 절반쯤에 잡고,
+  //            상한의 절반쯤 되는 부대가 끝까지 쏴야 깨는 정도(난이도는 봇이 아니라 이사님 실플레이 기준)
+  bounty: { label: '현상금', r: 34, vz: 130, track: 120, touchDmg: 6, hpFactor: 0.45 },
 
   elites: {
     laneHw: 32,
