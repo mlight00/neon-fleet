@@ -9,7 +9,7 @@
 ## 한 바퀴 순서
 
 1. **이사님 말씀 먼저**: 대화에 새 지시나 실플레이 소감이 있으면 그것부터 처리한다(`INBOX.md` 에도 적는다).
-2. **계측**: 검사 두 묶음(`node --test tests/rush3-*.test.mjs`, `node --test tests/rush-*.test.mjs`)과 필요한 측정(로딩·오류·캡처)을 돌려 지금 상태를 숫자로 잡는다.
+2. **계측**: 검사 두 묶음(`node --test tests/rush3-*.test.mjs`, `node --test tests/rush-*.test.mjs`)과 24판 자동 점검(`python tools/health_sweep.py` — 판마다 5곳, 약 7분, 결과 `E:\workspace\claude\neon-fleet\review\health\<날짜_시각>\summary.md`)을 돌려 지금 상태를 숫자로 잡는다. 새로 나온 문제는 BACKLOG 에 올린다.
 3. **한 건 고르기**: `BACKLOG.md` 에서 점수(체감 × 확신 ÷ 위험)가 가장 높은 **자율 항목 1건**을 고른다.
 4. **구현**: worktree `E:\workspace\claude\neon-fleet\worktrees\v3-lastwar`, 브랜치 `claude/starforge-v3`.
 5. **확인**: 검사 두 묶음 전부 통과 + 바뀐 화면을 캡처해 눈으로 확인 + 전후 숫자 비교.
