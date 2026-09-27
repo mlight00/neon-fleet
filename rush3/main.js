@@ -92,6 +92,25 @@ export function hitButton(buttons, x, y) {
   for (const b of buttons) if (!b.disabled && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b.id;
   return null;
 }
+//  r4.19 누름 여유(개선 루프 8바퀴 — 휴대폰 폭 390px 에서 44px(누르기 쉬운 최소)보다 작은 버튼이 많았다: 게임 중 ⏸ 36×29 · 페이지 넘김 81×32 등).
+//   그림·그린 상자는 그대로 두고, **정확히 누른 버튼이 없을 때만** 작은 버튼의 누름 범위를 가로·세로 최소 TOUCH_MIN(논리 54px ≈ 휴대폰 44px)까지
+//   가운데 기준으로 넓혀 본다. 넓힌 범위가 겹치면 실제 상자에 더 가까운 버튼. 흐린(disabled) 버튼은 여전히 눌리지 않는다
+export const TOUCH_MIN = 54;
+export function hitButtonTouch(buttons, x, y, min = TOUCH_MIN) {
+  const exact = hitButton(buttons, x, y);
+  if (exact) return exact;
+  let best = null, bestD = Infinity;
+  for (const b of buttons) {
+    if (b.disabled) continue;
+    const padX = Math.max(0, (min - b.w) / 2), padY = Math.max(0, (min - b.h) / 2);
+    if (!padX && !padY) continue;
+    if (x < b.x - padX || x > b.x + b.w + padX || y < b.y - padY || y > b.y + b.h + padY) continue;
+    const dx = Math.max(b.x - x, 0, x - (b.x + b.w)), dy = Math.max(b.y - y, 0, y - (b.y + b.h));
+    const d = Math.hypot(dx, dy);
+    if (d < bestD) { bestD = d; best = b.id; }
+  }
+  return best;
+}
 
 /** 고정 시간 누적기(계약서 6장 루프). now 는 초 단위로 주입.
  *  frame(now): run 상태면 acc = min(acc + dt, maxSteps·step) 뒤 step 만큼 onStep(step, i) 반복(프레임당 최대 maxSteps).
@@ -1477,7 +1496,8 @@ export function boot(canvas, deps = {}) {
 
   //  버튼 처리. 눌린 버튼이 있으면 true(조향 입력으로 넘기지 않는다)
   function onPress(x, y) {
-    const id = hitButton(buttons, x, y);
+    //  r4.19: 정확히 누른 버튼이 없으면 작은 버튼의 누름 여유(hitButtonTouch)까지 본다
+    const id = hitButtonTouch(buttons, x, y);
     if (!id) return false;
     if (id === 'mute') {
       au.setMuted(!au.isMuted());

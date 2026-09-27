@@ -2,12 +2,13 @@
 //  IMP-1(r4.15): 떠오르는 글(fx.floaters)이 화면 가장자리에서 생겨도 글 전체가 화면(0~480) 안에 그려진다 — 24판 자동 점검(r4.13)이
 //   7번 판 왼쪽 끝 캡슐의 '캡슐 놓침'(x −24~72)을 찾았다. 셸의 floater 좌표는 그대로 두고 그릴 때만 안쪽으로 당긴다
 //  IMP-2(r4.18): 주소 뒤 ?fps=1 일 때만 게임 중 화면 오른쪽 아래에 초당 프레임 수·가장 느린 프레임·캔버스 화소를 보인다(없으면 아무것도 안 그린다)
+//  IMP-3(r4.19): 누름 여유 — 정확히 누른 버튼이 없을 때만 작은 버튼의 누름 범위를 최소 TOUCH_MIN(54)까지 넓힌다(그림·hitButton 불변)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRenderer3 } from '../rush3/render.js';
 import { createRun } from '../rush3/combat.js';
 import { buildStage } from '../rush3/stages.js';
-import { makeFx } from '../rush3/main.js';
+import { makeFx, hitButton, hitButtonTouch, TOUCH_MIN, HUD_BTN } from '../rush3/main.js';
 import { BAL3 } from '../rush3/balance.js';
 import { bootApp } from './lib/rush3-shell.mjs';
 
@@ -61,4 +62,36 @@ test('IMP-2: ?fps=1 성능 표시 — 게임 중에만 오른쪽 아래에 "N fp
   g.app.startRun(1);
   g.frames(60);
   assert.ok(!g.textNow().some((t) => t.includes(' fps') || t.startsWith('캔버스 ')), '주소에 ?fps=1 이 없으면 없다');
+});
+
+test('IMP-3: 누름 여유 — 정확히 누른 버튼이 먼저 · 작은 버튼(⏸ 44×36)은 아래로 9px 벗어나도 눌린다 · 넓힌 범위가 겹치면 실제 상자에 가까운 쪽 · 큰 버튼은 넓히지 않는다 · 흐린 버튼은 여전히 안 눌린다 · hitButton(정확 판정)은 그대로', () => {
+  assert.equal(TOUCH_MIN, 54);
+  const small = { id: 'p', x: 400, y: 10, w: 44, h: 36 };
+  const big = { id: 'big', x: 100, y: 300, w: 240, h: 56 };
+  const dis = { id: 'd', x: 10, y: 200, w: 60, h: 30, disabled: true };
+  const bs = [small, big, dis];
+  assert.equal(hitButtonTouch(bs, 420, 20), 'p', '정확히 누름');
+  assert.equal(hitButton(bs, 420, 52), null, '정확 판정은 그대로(상자 밖)');
+  assert.equal(hitButtonTouch(bs, 420, 54), 'p', '상자 아래 8px — 누름 여유 안(세로 (54−36)/2 = 9)');
+  assert.equal(hitButtonTouch(bs, 420, 56), null, '여유 밖(10px)');
+  assert.equal(hitButtonTouch(bs, 397, 20), 'p', '가로 여유(54−44)/2 = 5 → 왼쪽 3px 도');
+  assert.equal(hitButtonTouch(bs, 220, 297), null, '큰 버튼(56 높이)은 넓히지 않는다');
+  assert.equal(hitButtonTouch(bs, 40, 190), null, '흐린 버튼은 여유 안이어도 안 눌린다');
+  //  겹치는 여유: 위아래로 6px 떨어진 두 작은 버튼 — 사이를 누르면 가까운 쪽
+  const a = { id: 'a', x: 0, y: 0, w: 100, h: 40 }, b = { id: 'b', x: 0, y: 46, w: 100, h: 40 };
+  assert.equal(hitButtonTouch([a, b], 50, 41), 'a');
+  assert.equal(hitButtonTouch([a, b], 50, 45), 'b');
+});
+
+test('IMP-3b: 셸 — 게임 중 ⏸ 그린 상자 바로 아래(여유 안)를 누르면 일시정지 · 여유 밖을 누르면 일시정지하지 않는다', async () => {
+  const h = await bootApp({});
+  h.app.startRun(1);
+  h.frames(10);
+  const padY = (TOUCH_MIN - HUD_BTN.h) / 2;
+  h.tap(HUD_BTN.x + HUD_BTN.w / 2, HUD_BTN.y + HUD_BTN.h + padY + 12);
+  h.frames(2);
+  assert.equal(h.app.getState(), 'run', '여유 밖 = 조향(일시정지 아님)');
+  h.tap(HUD_BTN.x + HUD_BTN.w / 2, HUD_BTN.y + HUD_BTN.h + padY - 2);
+  h.frames(2);
+  assert.equal(h.app.getState(), 'paused', '그린 상자 아래 여유 안 = ⏸');
 });
