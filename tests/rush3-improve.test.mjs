@@ -6,6 +6,7 @@
 //  IMP-4(r4.20): 휴대폰 글자 크기 — 원근으로 줄지 않는 고정 크기 글은 14 논리 px 이상(휴대폰 390 폭 11.4px). 게이트 안내선 글은 달리면서 읽는 글이라 15px + 도로 오른쪽 끝 안(maxWidth).
 //   예외(그대로): 스테이지 칸 '이전 기록' 줄 11px(D9′ 작고 흐리게) · ?fps=1 개발용 표시 · 원근으로 줄어드는 세계 글(적 체력 숫자 등 — 거리감)
 //  IMP-5(r4.21): 타이틀 스테이지 칸 기록의 시간은 짧은 표기 'm:ss'(timeShort — 초 아래 버림). 긴 기록('1분 47.4초 · 구출✓')이 칸 폭을 넘쳐 78% 로 눌렸다. 결과 화면은 timeText 그대로
+//  IMP-6(r4.22): 큰 화면 선명도 — 화소 수(canvas.width)를 바꾸면 캔버스 기본 크기가 바뀌어 보이는 크기도 커지는 화면(태블릿·노트북)에서, 불러온 직후부터 화소 = 보이는 크기 × min(배율, 2)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRenderer3, ARM_LINE_TEXT } from '../rush3/render.js';
@@ -15,7 +16,9 @@ import { buildStage } from '../rush3/stages.js';
 import { makeFx, hitButton, hitButtonTouch, TOUCH_MIN, HUD_BTN, timeShort, timeText, prevRecordLine } from '../rush3/main.js';
 import { stageVersion } from '../rush3/stages.js';
 import { BAL3 } from '../rush3/balance.js';
-import { bootApp } from './lib/rush3-shell.mjs';
+import { bootApp, fakeCanvas, fakeAudio, memStorage } from './lib/rush3-shell.mjs';
+import { boot } from '../rush3/main.js';
+import { createSave3 } from '../rush3/save.js';
 
 const W = BAL3.view.w;
 //  글 폭 = 글자 수 × 12px 로 재는 기록용 ctx
@@ -167,4 +170,22 @@ test('IMP-5: 칸 기록 짧은 시간 — timeShort 는 m:ss(초 아래 버림) 
   h.save.updateStage(1, { cleared: true, attempts: 3, bestSurvivors: 100, bestTime: 107.4, rescued: true }, stageVersion(1), 'v4');
   h.textNow();
   assert.ok(h.texts.some((t) => t.text === '완료 · 100명 · 1:47 · 구출✓'), '칸 기록: ' + JSON.stringify(h.texts.filter((t) => t.text.includes('명')).map((t) => t.text)));
+});
+
+test('IMP-6: 큰 화면 선명도 — 보이는 크기가 화소 수를 따라 커지는 태블릿(820×1180, 배율 2)에서 불러온 직후 화소 = 보이는 708×1180 × 2 · 창을 줄이면 다시 맞춘다', async () => {
+  const canvas = fakeCanvas([]);
+  let vw = 820, vh = 1180;
+  //  브라우저 배치 흉내: 보이는 크기 = 캔버스 기본 크기(화소 수)를 화면 안(max-width 100vw · max-height 100vh · 비율 480:800)으로 줄인 값
+  canvas.getBoundingClientRect = () => { const w = Math.min(canvas.width, vw, vh * 0.6); return { left: 0, top: 0, width: w, height: w / 0.6 }; };
+  const L = {};
+  const win = { devicePixelRatio: 2, location: { search: '' }, addEventListener: (n, f) => { (L[n] ??= []).push(f); } };
+  const app = boot(canvas, { win, doc: null, raf: () => {}, now: () => 1000, save: createSave3(memStorage()), audio: fakeAudio(), dateNow: () => 1_700_000_000_000,
+    sprites: { get: () => null, ready: new Set() } });
+  await app.ready;
+  assert.equal(canvas.width, 1416, '보이는 폭 708 × 2 (종전: 한 번만 재서 960 — 필요한 화소의 68%)');
+  assert.equal(canvas.height, 2360);
+  vw = 600;
+  for (const f of L.resize ?? []) f({});
+  assert.equal(canvas.width, 1200, '창을 600 으로 줄이면 600 × 2');
+  assert.equal(canvas.height, 2000);
 });

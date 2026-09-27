@@ -678,12 +678,17 @@ export function boot(canvas, deps = {}) {
   const loop = makeLoop({ step: STEP, onStep: () => { stepRun(run, input.snapshot(), STEP); } });
 
   //  DPR 반영: 백킹스토어 = CSS 크기 × min(devicePixelRatio, 2)
+  //   r4.22: 화소 수를 바꾸면 캔버스의 기본 크기가 바뀌어 보이는 크기(CSS)도 따라 커진다(태블릿·큰 화면 — 480×800 에서 화면 높이까지).
+  //    한 번만 재면 창 크기가 바뀔 때까지 화소가 모자라 흐릿했다(태블릿 820×1180 에서 필요한 화소의 68%) → 보이는 크기가 멈출 때까지 다시 잰다(최대 4번)
   function fitCanvas() {
     const dpr = Math.min(win && win.devicePixelRatio ? win.devicePixelRatio : 1, BAL3.view.dprMax);
-    const r = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : { width: W, height: H };
-    const cw = Math.max(1, Math.round((r.width || W) * dpr)), ch = Math.max(1, Math.round((r.height || H) * dpr));
-    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
-    ctx.setTransform(cw / W, 0, 0, ch / H, 0, 0);
+    for (let i = 0; i < 4; i++) {
+      const r = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : { width: W, height: H };
+      const cw = Math.max(1, Math.round((r.width || W) * dpr)), ch = Math.max(1, Math.round((r.height || H) * dpr));
+      if (canvas.width === cw && canvas.height === ch) break;
+      canvas.width = cw; canvas.height = ch;
+    }
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   }
 
   function nowSec() { return nowFn() / 1000; }
