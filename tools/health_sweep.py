@@ -61,8 +61,13 @@ INIT = r"""
 })();
 """ % SEED
 
+#  r4.16: 광장 판(15·21·24)은 착지 충격·몸통 접촉으로 부대가 먼저 전멸해 보스전 대신 결과 화면이 찍혔다 — 캡처용으로 두 피해를 끈다
 GUARD = """() => { clearInterval(window.__guard); window.__guard = setInterval(() => { const a = window.__rush3App; const r = a && a.getRun();
-  if (!r || a.getState() !== 'run') return; for (const u of r.units) if (u.hp < 2) u.hp = 2; }, 16); }"""
+  if (!r || a.getState() !== 'run') return; for (const u of r.units) if (u.hp < 2) u.hp = 2;
+  if (r.arena && r.arena.boss) { r.arena.boss.touchDmg = 0; if (r.arena.boss.shock) r.arena.boss.shock.dmg = 0; } }, 16); }"""
+#  보스전 직전 병력을 30명 이상으로(캡처용 — 대형과 보스 공격이 함께 보이게)
+FILL = """async () => { const run = window.__rush3App.getRun(); if (!run || run.units.length >= 30) return run ? run.units.length : 0;
+  const sq = await import('/rush3/squad.js'); sq.addUnits(run, 30 - run.units.length); return run.units.length; }"""
 JUMP = """(z) => { const run = window.__rush3App.getRun(); run.z = run.prevZ = z;
   let i = run.spawnCursor; while (i < run.spawns.length && run.spawns[i].z <= z) i++; run.spawnCursor = i;
   run.enemies = run.enemies.filter((e) => e.z > z - 150); return i; }"""
@@ -71,7 +76,7 @@ ENDZ = "() => { const r = window.__rush3App.getRun(); return r.eliteZ ?? r.finis
 FORCE_END = """() => { const r = window.__rush3App.getRun(); if (!r) return 'no-run';
   const alive = (r.bosses || []).filter((b) => !b.dead); if (alive.length) { for (const b of alive) b.hp = 1; return 'boss'; }
   if (r.finishZ != null) { r.z = r.prevZ = r.finishZ + 2; return 'finish'; } return 'none'; }"""
-STATE = "() => { const a = window.__rush3App; const r = a.getRun(); return { state: a.getState(), z: r ? Math.round(r.z) : null, n: r ? r.units.length : 0, bosses: r ? (r.bosses || []).filter((b) => !b.dead).length : 0 }; }"
+STATE = "() => { const a = window.__rush3App; const r = a.getRun(); return { state: a.getState(), z: r ? Math.round(r.z) : null, n: r ? r.units.length : 0, bosses: r ? (r.bosses || []).filter((b) => !b.dead).length : 0, horde: r ? r.finishZ != null : false }; }"
 
 LETTERS = re.compile(r'[A-Za-z가-힣]')
 
@@ -113,7 +118,7 @@ def checkpoint(p, stage, tag, wait_ms, report):
 
 port = free_port(); base = 'http://127.0.0.1:%d' % port
 srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(port), '--bind', '127.0.0.1', '--directory', o.root], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-rows, errors, ends = [], [], {}
+rows, errors, ends, fights = [], [], {}, {}
 t_start = time.time()
 try:
     for _ in range(50):
@@ -139,7 +144,9 @@ try:
             ez = p.evaluate(ENDZ) or 6000
             p.evaluate(JUMP, ez * 0.45); checkpoint(p, sid, '2_mid', 2500, rows)
             p.evaluate(JUMP, ez - 260); checkpoint(p, sid, '3_before_end', 3000, rows)
-            p.evaluate(JUMP, ez - 30); checkpoint(p, sid, '4_end_fight', 5000, rows)
+            p.evaluate(FILL)
+            p.evaluate(JUMP, ez - 30); st4 = checkpoint(p, sid, '4_end_fight', 5000, rows)
+            fights[sid] = st4
             how = p.evaluate(FORCE_END)
             t0 = time.time(); st = None
             while time.time() - t0 < 25:
@@ -161,7 +168,10 @@ finally:
 ov_rows = [r for r in rows if r['overlaps']]
 sp_rows = [r for r in rows if r['spill']]
 stuck = [s for s, v in ends.items() if v['final'] != 'result']
-report = {'when': time.strftime('%Y-%m-%d %H:%M'), 'sec': round(time.time() - t_start), 'stages': STAGES, 'errors': errors, 'stuck': stuck,
+#  보스전 장면: 보스·중간 보스 판(대물결 판 제외)의 4번째 곳이 결과 화면이 아니라 보스전 중인가(r4.16 — 광장 판이 먼저 전멸하던 것)
+boss_stages = [s for s, v in fights.items() if not v.get('horde')]
+no_fight = [s for s in boss_stages if not (fights[s]['state'] == 'run' and fights[s]['bosses'] > 0)]
+report = {'when': time.strftime('%Y-%m-%d %H:%M'), 'sec': round(time.time() - t_start), 'stages': STAGES, 'errors': errors, 'stuck': stuck, 'noFight': no_fight,
           'ends': ends, 'overlapCount': sum(len(r['overlaps']) for r in rows), 'spillCount': sum(len(r['spill']) for r in rows), 'rows': rows}
 json.dump(report, io.open(os.path.join(o.out, 'report.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 #  사람이 읽는 요약(겹친 글은 같은 짝을 한 줄로 묶는다)
@@ -173,6 +183,7 @@ lines = ['# 24판 자동 점검 결과(%s)' % report['when'], '',
          '- 점검한 판: %d개 × 5곳 · 걸린 시간 %d초' % (len(STAGES), report['sec']),
          '- 오류(페이지 예외·콘솔 오류·HTTP 400 이상): %d건' % len(errors),
          '- 끝나지 않은 판(끝맺음을 당겨도 결과 화면이 안 나옴): %s' % (', '.join(map(str, stuck)) or '없음'),
+         '- 보스전 장면(보스·중간 보스 판 %d개): 보스전 중 %d개 · 결과 화면이 먼저 나온 판 %s' % (len(boss_stages), len(boss_stages) - len(no_fight), ', '.join(map(str, no_fight)) or '없음'),
          '- 글 겹침: %d건(서로 다른 짝 %d가지) · 글 넘침: %d건' % (report['overlapCount'], len(pairs), report['spillCount']), '']
 if errors:
     lines += ['## 오류', ''] + ['- S%02d %s' % (e['stage'], e['e'][:160]) for e in errors[:40]] + ['']
