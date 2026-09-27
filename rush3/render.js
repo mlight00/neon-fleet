@@ -3028,6 +3028,23 @@ export function createRenderer3(ctx, sprites) {
       }
     }
     drawButtons(view.buttons ?? []);
+    //  r4.18 ?fps=1 성능 표시: 게임 중(run·paused)에만 화면 오른쪽 아래 작은 상자 — 초당 프레임 수 · 최근 1초 가장 느린 프레임 간격 · 캔버스 실제 화소
+    if (view.fps && (view.state === 'run' || view.state === 'paused')) drawFps(view.fps);
+    ctx.restore();
+  }
+  function drawFps(f) {
+    const bw = 176, bh = 38, x = W - bw - 6, y = H - bh - 8;
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(5,8,14,0.72)';
+    roundRect(x, y, bw, bh, 8); ctx.fill();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = '700 13px ' + FONT;
+    ctx.fillStyle = f.fps >= 55 ? '#7CFFB2' : f.fps >= 30 ? '#FFD27A' : '#FF7A7A';
+    ctx.fillText(f.fps + ' fps · 느린 프레임 ' + f.worstMs + 'ms', x + 8, y + 12);
+    ctx.font = '600 11px ' + FONT;
+    ctx.fillStyle = 'rgba(243,241,232,0.8)';
+    ctx.fillText('캔버스 ' + f.cw + '×' + f.ch, x + 8, y + 28);
     ctx.restore();
   }
 

@@ -711,6 +711,20 @@ export function boot(canvas, deps = {}) {
   function devFlag() {
     try { return !!(win && win.location) && typeof URLSearchParams === 'function' && new URLSearchParams(win.location.search).get('dev') === '1'; } catch { return false; }
   }
+  //  r4.18 성능 표시(개선 루프 7바퀴): 주소 뒤 ?fps=1 일 때만 — 휴대폰에서 실제 프레임 수를 보려고(화면 없는 브라우저는 그래픽 칩이 없어 잴 수 없다).
+  //   최근 1초의 프레임 시각으로 초당 프레임 수·가장 느린 프레임 간격을 센다. 게임 규칙·저장과 무관
+  function fpsFlag() {
+    try { return !!(win && win.location) && typeof URLSearchParams === 'function' && new URLSearchParams(win.location.search).get('fps') === '1'; } catch { return false; }
+  }
+  const fpsOn = fpsFlag();
+  const fpsTs = [];
+  function fpsStat() {
+    if (fpsTs.length < 2) return { fps: 0, worstMs: 0, cw: canvas.width, ch: canvas.height };
+    let worst = 0;
+    for (let i = 1; i < fpsTs.length; i++) worst = Math.max(worst, fpsTs[i] - fpsTs[i - 1]);
+    const span = fpsTs[fpsTs.length - 1] - fpsTs[0];
+    return { fps: span > 0 ? Math.round((fpsTs.length - 1) * 1000 / span) : 0, worstMs: Math.round(worst), cw: canvas.width, ch: canvas.height };
+  }
   //  잠긴 판 요청: 안내 + 스테이지 선택 화면(열린 마지막 판이 있는 쪽으로)
   function refuseLocked() {
     notice = { text: LOCK_NOTICE, t: NOTICE_SEC };
@@ -1365,6 +1379,8 @@ export function boot(canvas, deps = {}) {
   function view(now) {
     //  r4.3: coinSaveOk = 코인이 저장소에 남는가(쓰기 실패·차단 환경이면 경고) · readOnly = 다른 탭이 먼저 열려 이 탭은 저장하지 않음
     const v = { state, now, buttons: [], saveOk: save.ok, coinSaveOk: save.wallet.ok, readOnly: save.readOnly };
+    //  r4.18 ?fps=1 성능 표시(게임 중에만 그린다)
+    if (fpsOn) v.fps = fpsStat();
     //  r4.12 뒤에서 받는 그림(B·C 차례) 진행 — 타이틀 아래 작은 줄. 다 받았거나 진행을 모르면(주입 묶음) null
     const lp = sprites && typeof sprites.progress === 'function' ? sprites.progress() : null;
     v.loadP = lp && lp.total > 0 && lp.done < lp.total ? lp : null;
@@ -1648,6 +1664,7 @@ export function boot(canvas, deps = {}) {
   let lastFx = null;
   function frame(nowMs) {
     const now = nowMs / 1000;
+    if (fpsOn) { fpsTs.push(nowMs); while (fpsTs.length > 2 && nowMs - fpsTs[0] > 1000) fpsTs.shift(); }
     const dt = lastFx === null ? 0 : Math.min(0.05, Math.max(0, now - lastFx));
     lastFx = now;
     //  r4.5: 프레임 번호(같은 프레임 [구매] 연타 판정) · 방금 산 줄의 금색 테 타이머
