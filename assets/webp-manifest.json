@@ -2,14 +2,14 @@
  "assets/rush/ARENA1.png": {
   "w": 480,
   "h": 812,
-  "png": 530098,
-  "webp": 30664
+  "png": 529670,
+  "webp": 30620
  },
  "assets/rush/ARENA2.png": {
   "w": 480,
   "h": 812,
-  "png": 498472,
-  "webp": 24068
+  "png": 497709,
+  "webp": 23966
  },
  "assets/rush/B1_grader.png": {
   "w": 499,
@@ -134,32 +134,32 @@
  "assets/rush/BG1.png": {
   "w": 480,
   "h": 812,
-  "png": 538160,
-  "webp": 46888
+  "png": 538780,
+  "webp": 46984
  },
  "assets/rush/BG2.png": {
   "w": 480,
   "h": 812,
-  "png": 619879,
-  "webp": 63066
+  "png": 620477,
+  "webp": 63140
  },
  "assets/rush/BG3.png": {
   "w": 480,
   "h": 812,
-  "png": 573472,
-  "webp": 49400
+  "png": 573498,
+  "webp": 49136
  },
  "assets/rush/BG4.png": {
   "w": 480,
   "h": 812,
-  "png": 647434,
-  "webp": 62044
+  "png": 647455,
+  "webp": 62038
  },
  "assets/rush/BG5.png": {
   "w": 480,
   "h": 812,
-  "png": 638202,
-  "webp": 52122
+  "png": 637959,
+  "webp": 51942
  },
  "assets/rush/BULLET_arc.png": {
   "w": 79,
