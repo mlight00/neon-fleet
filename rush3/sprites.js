@@ -111,27 +111,69 @@ export const WEAPON_ICON_BASE3 = 'assets/rush3/weapons/';
 //  시트 재생 길이(초)
 export function sheetSec(key) { const m = SHEETS3[key]; return m ? m.frames / m.fps : 0; }
 
-export function loadSprites3(base = 'assets/rush/', sheetBase = SHEET_BASE3) {
-  const imgs = new Map(), sheets = new Map(), icons = new Map(), ready = new Set();
-  //  Image 가 없는 환경(Node)에서는 즉시 빈 결과 — 게임은 폴백으로 돈다
-  if (typeof Image === 'undefined') return Promise.resolve({ get: () => null, sheet: () => null, icon: () => null, ready });
-  const load = (src, onOk) => new Promise((res) => {
+//  r4.12 불러오기 차례(개선 루프 1바퀴 — 첫 화면이 뜨기 전에 그림 139장 37MB 를 전부 받아야 했다. 데스크톱 7초, 휴대폰 회선은 그 몇 배):
+//   A = 타이틀(배경 1·주인공 로봇) → 여기서 ready 가 풀려 타이틀이 바로 뜬다 · B = 1판에 바로 쓰는 것(병사·게이트·보급·장치·기본 적 3종과 3상태·탄·
+//   히어로/병사 사격·걷기 시트·잡졸 시트·무기 아이콘) · C = 나머지(보스·광역 효과·다른 적·배경 2~5·광장). B 는 A 뒤에, C 는 B 가 끝난 뒤에 받기 시작한다
+//   (좁은 회선에서 먼저 쓸 것을 먼저). 늦게 도착한 그림은 같은 Map 에 들어가 렌더가 다음 프레임부터 그린다(없는 동안은 종전 폴백 — 그림 0장으로도 완주 가능).
+export const LOAD_TIER_A = Object.freeze(['bg1', 'm1']);
+const TIER_B_IMG = new Set(['soldier', 'supply', 'gate', 'vehicle', 'capsule', 'bonus_gift', 'bonus_coin', 'soldiers_1', 'soldiers_2', 'soldiers_3',
+  'e_grunt', 'e_rusher', 'e_shooter', 'bullet_rifle', 'bullet_auto', 'bullet_heavy', 'bullet_scatter', 'bullet_sniper', 'bullet_arc',
+  ...['E1_scrapbit', 'E5_wheeler', 'E6_signaler'].flatMap((b) => ['hit:' + b, 'dmg:' + b, 'dead:' + b])]);
+const TIER_B_SHEET = new Set(['m1_walk', 'm1_fire', 'soldier_walk', 'soldier_fire', 'm1_fire_rifle', 'm1_fire_auto', 'm1_fire_heavy',
+  'soldier_fire_rifle', 'soldier_fire_auto', 'soldier_fire_heavy', 'e_grunt_hit', 'e_grunt_death', 'e_grunt_walk', 'hs:E5_wheeler', 'hs:E6_signaler']);
+/** 그림 키의 불러오기 차례 'A' | 'B' | 'C'. kind = 'img'(SPRITE_KEYS3) | 'sheet'(SHEETS3) | 'icon'(무기 아이콘 — 모두 B) */
+export function loadTier3(kind, key) {
+  if (kind === 'icon') return 'B';
+  if (kind === 'img') return LOAD_TIER_A.includes(key) ? 'A' : TIER_B_IMG.has(key) ? 'B' : 'C';
+  return TIER_B_SHEET.has(key) ? 'B' : 'C';
+}
+//  r4.12 WebP(같은 크기 · 용량 약 1/6 — tools/webp_build.py 가 PNG 옆에 만든다): 한 번만 확인한다 — 1×1 손실+알파 WebP 를 풀어 본다.
+//   (Safari 는 WebP 를 풀 수 있지만 만들지는 못해 canvas.toDataURL 로 확인하면 아이폰에서 '안 됨'이 나온다.) 안 되면 PNG. WebP 한 장이 실패하면 그 그림만 PNG 로 다시
+export const WEBP_PROBE = 'data:image/webp;base64,UklGRkoAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAwAAAARBxAR/Q9ERP8DAABWUDggGAAAABQBAJ0BKgEAAQAAAP4AAA3AAP7mtQAAAA==';
+function probeWebp() {
+  return new Promise((res) => {
     let im;
-    try { im = new Image(); } catch { res(); return; }
-    im.onload = () => { onOk(im); res(); };
-    //  없는 그림은 조용히 폴백
-    im.onerror = () => res();
-    im.src = src;
+    try { im = new Image(); } catch { res(false); return; }
+    im.onload = () => res((im.naturalWidth || im.width) === 1);
+    im.onerror = () => res(false);
+    im.src = WEBP_PROBE;
   });
-  const jobs = Object.entries(SPRITE_KEYS3).map(([key, name]) => load(base + name + '.png', (im) => { imgs.set(key, im); ready.add(key); }));
+}
+
+/** 반환 Promise<{ get, sheet, icon, ready, progress() → { done, total }, all(Promise — 전부 끝남) }> — **A 차례가 끝나면** 풀린다.
+ *  opts.webp = false 면 WebP 확인 없이 PNG(개발 대조용) */
+export function loadSprites3(base = 'assets/rush/', sheetBase = SHEET_BASE3, opts = {}) {
+  const imgs = new Map(), sheets = new Map(), icons = new Map(), ready = new Set();
+  let done = 0, total = 0;
+  const api = { get: (k) => imgs.get(k) ?? null, sheet: (k) => sheets.get(k) ?? null, icon: (id, mk = 1) => icons.get(id + ':' + mk) ?? null,
+                ready, progress: () => ({ done, total }), all: Promise.resolve() };
+  //  Image 가 없는 환경(Node)에서는 즉시 빈 결과 — 게임은 폴백으로 돈다
+  if (typeof Image === 'undefined') return Promise.resolve(api);
+  const tiers = { A: [], B: [], C: [] };
+  const add = (tier, path, onOk) => { tiers[tier].push({ path, onOk }); total++; };
+  for (const [key, name] of Object.entries(SPRITE_KEYS3)) add(loadTier3('img', key), base + name, (im) => { imgs.set(key, im); ready.add(key); });
   for (const [key, meta] of Object.entries(SHEETS3)) {
     //  r4.8: 아직 파일이 없는 자리(pending)는 요청하지 않는다(콘솔 404 없이 코드 움직임으로)
     if (meta.pending) continue;
-    jobs.push(load(sheetBase + meta.file + '.png', (im) => { sheets.set(key, { img: im, ...meta }); ready.add(key); }));
+    add(loadTier3('sheet', key), sheetBase + meta.file, (im) => { sheets.set(key, { img: im, ...meta }); ready.add(key); });
   }
-  for (const id of WEAPON_ICON_IDS3) for (const mk of [1, 2, 3]) {
-    jobs.push(load(WEAPON_ICON_BASE3 + 'W_' + id + '_' + mk + '.png', (im) => { icons.set(id + ':' + mk, im); }));
-  }
-  return Promise.all(jobs).then(() => ({ get: (k) => imgs.get(k) ?? null, sheet: (k) => sheets.get(k) ?? null,
-                                        icon: (id, mk = 1) => icons.get(id + ':' + mk) ?? null, ready }));
+  for (const id of WEAPON_ICON_IDS3) for (const mk of [1, 2, 3]) add('B', WEAPON_ICON_BASE3 + 'W_' + id + '_' + mk, (im) => { icons.set(id + ':' + mk, im); });
+  //  한 장: 성공이든 실패든 끝나면 done 을 센다(실패한 그림은 조용히 폴백 — 기다림이 멈추지 않게). WebP 가 실패하면 그 그림만 PNG 로 한 번 더
+  const loadOne = (src, fallback, onOk) => new Promise((res) => {
+    let im;
+    try { im = new Image(); } catch { done++; res(); return; }
+    im.onload = () => { onOk(im); done++; res(); };
+    im.onerror = () => { if (fallback) loadOne(fallback, null, onOk).then(res); else { done++; res(); } };
+    im.src = src;
+  });
+  const runTier = (list, ext) => Promise.all(list.map((j) => loadOne(j.path + ext, ext === '.webp' ? j.path + '.png' : null, j.onOk)));
+  return (opts.webp === false ? Promise.resolve(false) : probeWebp()).then((webp) => {
+    const ext = webp ? '.webp' : '.png';
+    api.ext = ext;
+    return runTier(tiers.A, ext).then(() => {
+      //  B 는 지금 시작, C 는 B 가 끝난 뒤(좁은 회선에서 1판 그림을 먼저). api.all = 전부 끝남(측정·검사용)
+      api.all = runTier(tiers.B, ext).then(() => runTier(tiers.C, ext)).then(() => undefined);
+      return api;
+    });
+  });
 }

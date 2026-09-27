@@ -1,0 +1,836 @@
+{
+ "assets/rush/ARENA1.png": {
+  "w": 480,
+  "h": 812,
+  "png": 530098,
+  "webp": 30664
+ },
+ "assets/rush/ARENA2.png": {
+  "w": 480,
+  "h": 812,
+  "png": 498472,
+  "webp": 24068
+ },
+ "assets/rush/B1_grader.png": {
+  "w": 499,
+  "h": 512,
+  "png": 306482,
+  "webp": 51804
+ },
+ "assets/rush/B1_grader_dead.png": {
+  "w": 421,
+  "h": 512,
+  "png": 238082,
+  "webp": 49166
+ },
+ "assets/rush/B1_grader_dmg.png": {
+  "w": 393,
+  "h": 512,
+  "png": 205872,
+  "webp": 33060
+ },
+ "assets/rush/B1_grader_hit.png": {
+  "w": 389,
+  "h": 512,
+  "png": 207518,
+  "webp": 33746
+ },
+ "assets/rush/B2_gantrywidow.png": {
+  "w": 533,
+  "h": 512,
+  "png": 438664,
+  "webp": 87224
+ },
+ "assets/rush/B2_gantrywidow_dead.png": {
+  "w": 332,
+  "h": 512,
+  "png": 228980,
+  "webp": 56012
+ },
+ "assets/rush/B2_gantrywidow_dmg.png": {
+  "w": 413,
+  "h": 512,
+  "png": 276307,
+  "webp": 55914
+ },
+ "assets/rush/B2_gantrywidow_hit.png": {
+  "w": 332,
+  "h": 512,
+  "png": 202455,
+  "webp": 40288
+ },
+ "assets/rush/B3_railleviathan.png": {
+  "w": 468,
+  "h": 512,
+  "png": 468409,
+  "webp": 88964
+ },
+ "assets/rush/B3_railleviathan_dead.png": {
+  "w": 373,
+  "h": 512,
+  "png": 381057,
+  "webp": 62498
+ },
+ "assets/rush/B3_railleviathan_dmg.png": {
+  "w": 378,
+  "h": 512,
+  "png": 360003,
+  "webp": 62846
+ },
+ "assets/rush/B3_railleviathan_hit.png": {
+  "w": 383,
+  "h": 512,
+  "png": 367716,
+  "webp": 62810
+ },
+ "assets/rush/B4_smelter.png": {
+  "w": 518,
+  "h": 512,
+  "png": 374004,
+  "webp": 62410
+ },
+ "assets/rush/B4_smelter_dead.png": {
+  "w": 404,
+  "h": 512,
+  "png": 246592,
+  "webp": 50186
+ },
+ "assets/rush/B4_smelter_dmg.png": {
+  "w": 394,
+  "h": 512,
+  "png": 262118,
+  "webp": 43370
+ },
+ "assets/rush/B4_smelter_hit.png": {
+  "w": 397,
+  "h": 512,
+  "png": 241641,
+  "webp": 41964
+ },
+ "assets/rush/B5_crownbreaker.png": {
+  "w": 516,
+  "h": 512,
+  "png": 413755,
+  "webp": 75332
+ },
+ "assets/rush/B5_crownbreaker_dead.png": {
+  "w": 361,
+  "h": 512,
+  "png": 276945,
+  "webp": 65420
+ },
+ "assets/rush/B5_crownbreaker_dmg.png": {
+  "w": 293,
+  "h": 512,
+  "png": 190733,
+  "webp": 38940
+ },
+ "assets/rush/B5_crownbreaker_hit.png": {
+  "w": 367,
+  "h": 512,
+  "png": 237885,
+  "webp": 50774
+ },
+ "assets/rush/BG1.png": {
+  "w": 480,
+  "h": 812,
+  "png": 538160,
+  "webp": 46888
+ },
+ "assets/rush/BG2.png": {
+  "w": 480,
+  "h": 812,
+  "png": 619879,
+  "webp": 63066
+ },
+ "assets/rush/BG3.png": {
+  "w": 480,
+  "h": 812,
+  "png": 573472,
+  "webp": 49400
+ },
+ "assets/rush/BG4.png": {
+  "w": 480,
+  "h": 812,
+  "png": 647434,
+  "webp": 62044
+ },
+ "assets/rush/BG5.png": {
+  "w": 480,
+  "h": 812,
+  "png": 638202,
+  "webp": 52122
+ },
+ "assets/rush/BULLET_arc.png": {
+  "w": 79,
+  "h": 256,
+  "png": 26836,
+  "webp": 9138
+ },
+ "assets/rush/BULLET_auto.png": {
+  "w": 113,
+  "h": 256,
+  "png": 37205,
+  "webp": 10460
+ },
+ "assets/rush/BULLET_heavy.png": {
+  "w": 112,
+  "h": 256,
+  "png": 38262,
+  "webp": 9070
+ },
+ "assets/rush/BULLET_rifle.png": {
+  "w": 48,
+  "h": 256,
+  "png": 16863,
+  "webp": 4964
+ },
+ "assets/rush/BULLET_scatter.png": {
+  "w": 200,
+  "h": 256,
+  "png": 59560,
+  "webp": 16148
+ },
+ "assets/rush/BULLET_sniper.png": {
+  "w": 34,
+  "h": 256,
+  "png": 13737,
+  "webp": 5020
+ },
+ "assets/rush/D_bonus_coin.png": {
+  "w": 490,
+  "h": 512,
+  "png": 320817,
+  "webp": 33944
+ },
+ "assets/rush/D_bonus_gift.png": {
+  "w": 468,
+  "h": 512,
+  "png": 297344,
+  "webp": 31986
+ },
+ "assets/rush/D_capsule.png": {
+  "w": 341,
+  "h": 512,
+  "png": 267496,
+  "webp": 34808
+ },
+ "assets/rush/D_vehicle.png": {
+  "w": 512,
+  "h": 474,
+  "png": 361149,
+  "webp": 53136
+ },
+ "assets/rush/E10_magnethead.png": {
+  "w": 467,
+  "h": 512,
+  "png": 341839,
+  "webp": 54950
+ },
+ "assets/rush/E10_magnethead_dead.png": {
+  "w": 371,
+  "h": 512,
+  "png": 302543,
+  "webp": 65008
+ },
+ "assets/rush/E10_magnethead_dmg.png": {
+  "w": 357,
+  "h": 512,
+  "png": 265318,
+  "webp": 43950
+ },
+ "assets/rush/E10_magnethead_hit.png": {
+  "w": 354,
+  "h": 512,
+  "png": 254047,
+  "webp": 40702
+ },
+ "assets/rush/E1_scrapbit.png": {
+  "w": 550,
+  "h": 512,
+  "png": 362408,
+  "webp": 55786
+ },
+ "assets/rush/E1_scrapbit_dead.png": {
+  "w": 441,
+  "h": 502,
+  "png": 341129,
+  "webp": 37326
+ },
+ "assets/rush/E1_scrapbit_dmg.png": {
+  "w": 440,
+  "h": 502,
+  "png": 319313,
+  "webp": 32698
+ },
+ "assets/rush/E1_scrapbit_hit.png": {
+  "w": 438,
+  "h": 502,
+  "png": 307074,
+  "webp": 30430
+ },
+ "assets/rush/E2_ramhound.png": {
+  "w": 557,
+  "h": 512,
+  "png": 430963,
+  "webp": 65010
+ },
+ "assets/rush/E2_ramhound_dead.png": {
+  "w": 326,
+  "h": 512,
+  "png": 246328,
+  "webp": 52620
+ },
+ "assets/rush/E2_ramhound_dmg.png": {
+  "w": 371,
+  "h": 512,
+  "png": 249197,
+  "webp": 41666
+ },
+ "assets/rush/E2_ramhound_hit.png": {
+  "w": 376,
+  "h": 512,
+  "png": 237893,
+  "webp": 37172
+ },
+ "assets/rush/E3_wallguard.png": {
+  "w": 569,
+  "h": 512,
+  "png": 324513,
+  "webp": 42324
+ },
+ "assets/rush/E3_wallguard_dead.png": {
+  "w": 295,
+  "h": 512,
+  "png": 186776,
+  "webp": 48490
+ },
+ "assets/rush/E3_wallguard_dmg.png": {
+  "w": 306,
+  "h": 512,
+  "png": 151916,
+  "webp": 27990
+ },
+ "assets/rush/E3_wallguard_hit.png": {
+  "w": 301,
+  "h": 512,
+  "png": 138984,
+  "webp": 24038
+ },
+ "assets/rush/E4_needleeye.png": {
+  "w": 442,
+  "h": 512,
+  "png": 196777,
+  "webp": 39172
+ },
+ "assets/rush/E4_needleeye_dead.png": {
+  "w": 319,
+  "h": 512,
+  "png": 183106,
+  "webp": 41962
+ },
+ "assets/rush/E4_needleeye_dmg.png": {
+  "w": 314,
+  "h": 512,
+  "png": 176522,
+  "webp": 36456
+ },
+ "assets/rush/E4_needleeye_hit.png": {
+  "w": 307,
+  "h": 512,
+  "png": 164736,
+  "webp": 34258
+ },
+ "assets/rush/E5_wheeler.png": {
+  "w": 523,
+  "h": 512,
+  "png": 386149,
+  "webp": 48544
+ },
+ "assets/rush/E5_wheeler_dead.png": {
+  "w": 456,
+  "h": 512,
+  "png": 371713,
+  "webp": 62940
+ },
+ "assets/rush/E5_wheeler_dmg.png": {
+  "w": 434,
+  "h": 512,
+  "png": 305545,
+  "webp": 38464
+ },
+ "assets/rush/E5_wheeler_hit.png": {
+  "w": 413,
+  "h": 512,
+  "png": 306131,
+  "webp": 39104
+ },
+ "assets/rush/E6_signaler.png": {
+  "w": 316,
+  "h": 512,
+  "png": 160685,
+  "webp": 34714
+ },
+ "assets/rush/E6_signaler_dead.png": {
+  "w": 295,
+  "h": 512,
+  "png": 161813,
+  "webp": 40078
+ },
+ "assets/rush/E6_signaler_dmg.png": {
+  "w": 313,
+  "h": 512,
+  "png": 170988,
+  "webp": 36772
+ },
+ "assets/rush/E6_signaler_hit.png": {
+  "w": 304,
+  "h": 512,
+  "png": 169709,
+  "webp": 36566
+ },
+ "assets/rush/E7_cartyard.png": {
+  "w": 522,
+  "h": 512,
+  "png": 352214,
+  "webp": 55572
+ },
+ "assets/rush/E7_cartyard_dead.png": {
+  "w": 323,
+  "h": 512,
+  "png": 230000,
+  "webp": 48658
+ },
+ "assets/rush/E7_cartyard_dmg.png": {
+  "w": 336,
+  "h": 512,
+  "png": 263559,
+  "webp": 42874
+ },
+ "assets/rush/E7_cartyard_hit.png": {
+  "w": 340,
+  "h": 512,
+  "png": 261252,
+  "webp": 42008
+ },
+ "assets/rush/E8_manholejumper.png": {
+  "w": 467,
+  "h": 512,
+  "png": 379608,
+  "webp": 61366
+ },
+ "assets/rush/E8_manholejumper_dead.png": {
+  "w": 396,
+  "h": 512,
+  "png": 311684,
+  "webp": 68914
+ },
+ "assets/rush/E8_manholejumper_dmg.png": {
+  "w": 393,
+  "h": 512,
+  "png": 334052,
+  "webp": 73928
+ },
+ "assets/rush/E8_manholejumper_hit.png": {
+  "w": 416,
+  "h": 512,
+  "png": 340090,
+  "webp": 71932
+ },
+ "assets/rush/E9_spawnpod.png": {
+  "w": 396,
+  "h": 512,
+  "png": 305834,
+  "webp": 51114
+ },
+ "assets/rush/E9_spawnpod_dead.png": {
+  "w": 390,
+  "h": 512,
+  "png": 274631,
+  "webp": 65656
+ },
+ "assets/rush/E9_spawnpod_dmg.png": {
+  "w": 407,
+  "h": 512,
+  "png": 340741,
+  "webp": 63338
+ },
+ "assets/rush/E9_spawnpod_hit.png": {
+  "w": 399,
+  "h": 512,
+  "png": 324319,
+  "webp": 58980
+ },
+ "assets/rush/GATE.png": {
+  "w": 512,
+  "h": 512,
+  "png": 231493,
+  "webp": 34236
+ },
+ "assets/rush/ICON_soldiers_1.png": {
+  "w": 197,
+  "h": 256,
+  "png": 72594,
+  "webp": 15704
+ },
+ "assets/rush/ICON_soldiers_2.png": {
+  "w": 219,
+  "h": 256,
+  "png": 89951,
+  "webp": 17364
+ },
+ "assets/rush/ICON_soldiers_3.png": {
+  "w": 230,
+  "h": 256,
+  "png": 95425,
+  "webp": 18238
+ },
+ "assets/rush/M01.png": {
+  "w": 414,
+  "h": 512,
+  "png": 271189,
+  "webp": 48938
+ },
+ "assets/rush/SOLDIER.png": {
+  "w": 417,
+  "h": 512,
+  "png": 253534,
+  "webp": 38432
+ },
+ "assets/rush/SUPPLY.png": {
+  "w": 474,
+  "h": 512,
+  "png": 210144,
+  "webp": 32464
+ },
+ "assets/rush3/B1_grader_hitdie.png": {
+  "w": 980,
+  "h": 239,
+  "png": 242279,
+  "webp": 36620
+ },
+ "assets/rush3/B2_gantrywidow_hitdie.png": {
+  "w": 1084,
+  "h": 256,
+  "png": 346770,
+  "webp": 86106
+ },
+ "assets/rush3/B3_railleviathan_hitdie.png": {
+  "w": 564,
+  "h": 256,
+  "png": 264321,
+  "webp": 65272
+ },
+ "assets/rush3/B4_smelter_hitdie.png": {
+  "w": 944,
+  "h": 256,
+  "png": 323724,
+  "webp": 72382
+ },
+ "assets/rush3/B5_crownbreaker_hitdie.png": {
+  "w": 1116,
+  "h": 256,
+  "png": 400827,
+  "webp": 90614
+ },
+ "assets/rush3/E10_hitsheet.png": {
+  "w": 360,
+  "h": 256,
+  "png": 131540,
+  "webp": 28170
+ },
+ "assets/rush3/E1_death.png": {
+  "w": 2190,
+  "h": 588,
+  "png": 928505,
+  "webp": 136066
+ },
+ "assets/rush3/E1_hit.png": {
+  "w": 1464,
+  "h": 510,
+  "png": 890172,
+  "webp": 153134
+ },
+ "assets/rush3/E1_walk.png": {
+  "w": 1672,
+  "h": 200,
+  "png": 536567,
+  "webp": 114850
+ },
+ "assets/rush3/E2_drive.png": {
+  "w": 1024,
+  "h": 225,
+  "png": 338382,
+  "webp": 53302
+ },
+ "assets/rush3/E2_hitsheet.png": {
+  "w": 807,
+  "h": 256,
+  "png": 339334,
+  "webp": 58142
+ },
+ "assets/rush3/E3_walk.png": {
+  "w": 660,
+  "h": 256,
+  "png": 197641,
+  "webp": 41970
+ },
+ "assets/rush3/E4_hitsheet.png": {
+  "w": 507,
+  "h": 256,
+  "png": 160588,
+  "webp": 38014
+ },
+ "assets/rush3/E5_hitsheet.png": {
+  "w": 594,
+  "h": 256,
+  "png": 225857,
+  "webp": 44404
+ },
+ "assets/rush3/E6_hitsheet.png": {
+  "w": 612,
+  "h": 256,
+  "png": 170209,
+  "webp": 42684
+ },
+ "assets/rush3/E7_drive.png": {
+  "w": 1076,
+  "h": 256,
+  "png": 435778,
+  "webp": 82416
+ },
+ "assets/rush3/E7_hitsheet.png": {
+  "w": 753,
+  "h": 256,
+  "png": 277541,
+  "webp": 39334
+ },
+ "assets/rush3/E8_hitsheet.png": {
+  "w": 472,
+  "h": 256,
+  "png": 208630,
+  "webp": 42412
+ },
+ "assets/rush3/E9_hitsheet.png": {
+  "w": 690,
+  "h": 254,
+  "png": 237250,
+  "webp": 36504
+ },
+ "assets/rush3/M01_auto_fire.png": {
+  "w": 2400,
+  "h": 288,
+  "png": 575057,
+  "webp": 106552
+ },
+ "assets/rush3/M01_fire.png": {
+  "w": 2600,
+  "h": 283,
+  "png": 402968,
+  "webp": 75618
+ },
+ "assets/rush3/M01_heavy_fire.png": {
+  "w": 1984,
+  "h": 372,
+  "png": 545703,
+  "webp": 106284
+ },
+ "assets/rush3/M01_rifle_fire.png": {
+  "w": 2280,
+  "h": 283,
+  "png": 576820,
+  "webp": 109732
+ },
+ "assets/rush3/M01_walk.png": {
+  "w": 1236,
+  "h": 482,
+  "png": 623852,
+  "webp": 111880
+ },
+ "assets/rush3/SOLDIER_auto_fire.png": {
+  "w": 2704,
+  "h": 317,
+  "png": 505040,
+  "webp": 88730
+ },
+ "assets/rush3/SOLDIER_fire.png": {
+  "w": 2624,
+  "h": 222,
+  "png": 415003,
+  "webp": 71388
+ },
+ "assets/rush3/SOLDIER_heavy_fire.png": {
+  "w": 2008,
+  "h": 327,
+  "png": 425252,
+  "webp": 80074
+ },
+ "assets/rush3/SOLDIER_rifle_fire.png": {
+  "w": 2216,
+  "h": 286,
+  "png": 499754,
+  "webp": 85504
+ },
+ "assets/rush3/SOLDIER_walk.png": {
+  "w": 1212,
+  "h": 462,
+  "png": 569869,
+  "webp": 94942
+ },
+ "assets/rush3/fx_b1_smoke.png": {
+  "w": 1052,
+  "h": 256,
+  "png": 203841,
+  "webp": 65476
+ },
+ "assets/rush3/fx_b2_hook.png": {
+  "w": 992,
+  "h": 226,
+  "png": 206890,
+  "webp": 62912
+ },
+ "assets/rush3/fx_b2_web.png": {
+  "w": 711,
+  "h": 256,
+  "png": 280109,
+  "webp": 119596
+ },
+ "assets/rush3/fx_b3_rail.png": {
+  "w": 387,
+  "h": 384,
+  "png": 248503,
+  "webp": 78440
+ },
+ "assets/rush3/fx_b4_pool.png": {
+  "w": 834,
+  "h": 256,
+  "png": 253069,
+  "webp": 48020
+ },
+ "assets/rush3/fx_b4_rain.png": {
+  "w": 896,
+  "h": 216,
+  "png": 124112,
+  "webp": 29508
+ },
+ "assets/rush3/fx_b5_mace.png": {
+  "w": 738,
+  "h": 256,
+  "png": 174865,
+  "webp": 44784
+ },
+ "assets/rush3/fx_b5_quake.png": {
+  "w": 972,
+  "h": 224,
+  "png": 263362,
+  "webp": 62320
+ },
+ "assets/rush3/weapons/W_arc_1.png": {
+  "w": 337,
+  "h": 161,
+  "png": 66571,
+  "webp": 7030
+ },
+ "assets/rush3/weapons/W_arc_2.png": {
+  "w": 393,
+  "h": 177,
+  "png": 95427,
+  "webp": 10440
+ },
+ "assets/rush3/weapons/W_arc_3.png": {
+  "w": 406,
+  "h": 208,
+  "png": 132716,
+  "webp": 15348
+ },
+ "assets/rush3/weapons/W_auto_1.png": {
+  "w": 377,
+  "h": 200,
+  "png": 103009,
+  "webp": 9848
+ },
+ "assets/rush3/weapons/W_auto_2.png": {
+  "w": 415,
+  "h": 218,
+  "png": 120995,
+  "webp": 11382
+ },
+ "assets/rush3/weapons/W_auto_3.png": {
+  "w": 423,
+  "h": 290,
+  "png": 176795,
+  "webp": 19388
+ },
+ "assets/rush3/weapons/W_heavy_1.png": {
+  "w": 317,
+  "h": 195,
+  "png": 83167,
+  "webp": 6858
+ },
+ "assets/rush3/weapons/W_heavy_2.png": {
+  "w": 411,
+  "h": 245,
+  "png": 133883,
+  "webp": 10824
+ },
+ "assets/rush3/weapons/W_heavy_3.png": {
+  "w": 410,
+  "h": 277,
+  "png": 171663,
+  "webp": 15492
+ },
+ "assets/rush3/weapons/W_rifle_1.png": {
+  "w": 332,
+  "h": 192,
+  "png": 81966,
+  "webp": 7226
+ },
+ "assets/rush3/weapons/W_rifle_2.png": {
+  "w": 431,
+  "h": 215,
+  "png": 121413,
+  "webp": 10712
+ },
+ "assets/rush3/weapons/W_rifle_3.png": {
+  "w": 412,
+  "h": 276,
+  "png": 151313,
+  "webp": 13806
+ },
+ "assets/rush3/weapons/W_scatter_1.png": {
+  "w": 354,
+  "h": 178,
+  "png": 78165,
+  "webp": 8600
+ },
+ "assets/rush3/weapons/W_scatter_2.png": {
+  "w": 397,
+  "h": 202,
+  "png": 107790,
+  "webp": 11080
+ },
+ "assets/rush3/weapons/W_scatter_3.png": {
+  "w": 426,
+  "h": 211,
+  "png": 122850,
+  "webp": 14468
+ },
+ "assets/rush3/weapons/W_sniper_1.png": {
+  "w": 379,
+  "h": 108,
+  "png": 48143,
+  "webp": 4812
+ },
+ "assets/rush3/weapons/W_sniper_2.png": {
+  "w": 396,
+  "h": 145,
+  "png": 80531,
+  "webp": 8618
+ },
+ "assets/rush3/weapons/W_sniper_3.png": {
+  "w": 466,
+  "h": 164,
+  "png": 120513,
+  "webp": 14216
+ }
+}

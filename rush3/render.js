@@ -2585,6 +2585,18 @@ export function createRenderer3(ctx, sprites) {
   //  타이틀: 워드마크 + 히어로 + 스테이지 선택 3버튼(기록은 버튼 sub)
   function drawTitle(view) {
     drawBackground(view.now * 60, 0);
+    //  r4.12 뒤에서 받는 그림 진행(셸 view.loadP — 다 받으면 null): 화면 맨 아래 작은 줄. 받는 동안에도 바로 출격할 수 있다(없는 그림은 폴백)
+    //   밝은 배경(폐허 도로) 위에서도 읽히게 버튼과 같은 어두운 알약 바탕 + 밝은 글
+    if (view.loadP) {
+      const pw = 176, ph = 22, py = H - 30;
+      ctx.fillStyle = 'rgba(20,35,58,0.72)';
+      roundRect(W / 2 - pw / 2, py, pw, ph, ph / 2); ctx.fill();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '600 13px ' + FONT;
+      ctx.fillStyle = 'rgba(243,241,232,0.92)';
+      ctx.fillText('그림 불러오는 중 ' + Math.floor(100 * view.loadP.done / view.loadP.total) + '%', W / 2, py + ph / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
     ctx.textAlign = 'center';
     ctx.font = '700 15px ' + FONT;
     ctx.fillStyle = '#B98A1F';

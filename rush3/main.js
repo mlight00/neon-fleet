@@ -1365,6 +1365,9 @@ export function boot(canvas, deps = {}) {
   function view(now) {
     //  r4.3: coinSaveOk = 코인이 저장소에 남는가(쓰기 실패·차단 환경이면 경고) · readOnly = 다른 탭이 먼저 열려 이 탭은 저장하지 않음
     const v = { state, now, buttons: [], saveOk: save.ok, coinSaveOk: save.wallet.ok, readOnly: save.readOnly };
+    //  r4.12 뒤에서 받는 그림(B·C 차례) 진행 — 타이틀 아래 작은 줄. 다 받았거나 진행을 모르면(주입 묶음) null
+    const lp = sprites && typeof sprites.progress === 'function' ? sprites.progress() : null;
+    v.loadP = lp && lp.total > 0 && lp.done < lp.total ? lp : null;
     if (state === 'title') {
       const last = lastStageId();
       //  r4.3 순차 해금: 잠긴 판은 자물쇠·흐린 버튼(disabled — hitButton 이 건너뛴다). 안내('앞 판을 먼저 깨야 합니다')는 잠깐
@@ -1677,6 +1680,17 @@ export function boot(canvas, deps = {}) {
 
   fitCanvas();
   const base = deps.spriteBase ?? 'assets/rush/';
+  //  r4.12 타이틀 그림 2장(불러오기 A 차례)을 받는 동안 빈 화면 대신 '불러오는 중…'. 주입한 그림 묶음(검사)에는 그리지 않는다 — 검사의 프레임 수가 바뀌지 않게
+  if (!deps.sprites) {
+    const drawLoading = () => {
+      if (renderer) return;
+      ctx.fillStyle = '#05080E'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(243,241,232,0.85)'; ctx.font = '600 18px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('불러오는 중…', W / 2, H / 2);
+      raf(drawLoading);
+    };
+    drawLoading();
+  }
   const ready = Promise.resolve(deps.sprites ?? loadSprites3(base)).then((sp) => {
     sprites = sp;
     renderer = createRenderer3(ctx, sp);
