@@ -45,4 +45,5 @@
 - 그림 다듬기(Gemini 원본 → 시트): `E:\workspace\claude\neon-fleet\newmode\sprites\v9\sheet_split.py`
 - 캡처·측정 예시: `E:\workspace\claude\neon-fleet\review\20260927_r411\_capture_r411.py`, `E:\workspace\claude\neon-fleet\review\20260927_loop1\measure_load.py`
 - 글 점검(r4.20~21): 휴대폰 글자 크기 `E:\workspace\claude\neon-fleet\review\20260928_loop9\font_audit.py` · 칸에 안 들어가 눌리는 글 `E:\workspace\claude\neon-fleet\review\20260928_loop10\squeeze_audit.py`. 예시 글로 폭을 잴 때는 손으로 친 글이 아니라 실제 표기 함수(timeText 등)가 만든 글로 잰다(r4.20 에서 '0:47' 예시로 재어 틀렸다)
+- 발견용 점검(11바퀴): `E:\workspace\claude\neon-fleet\review\20260928_loop11\discover.py` — 콘솔 메시지 전부 · 강화 단계별(0·중간·최대) 글 눌림 · 같은 판 20번 메모리(가비지 수거 뒤 힙). 11바퀴 결과는 모두 깨끗했다(되풀이할 때는 코드가 바뀐 뒤에만). 소리는 이 PC 에서 아이폰 동작을 확인할 수 없다 — 소리 재생 방식 변경은 실기 확인 뒤에만
 - ⚠️ Playwright `page.screenshot` 은 찍기 전에 기다리는 동안 화면이 바뀔 수 있다. 잠깐 보이는 표시는 `canvas.toDataURL()` 로 그 순간을 저장한다.
