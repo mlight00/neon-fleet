@@ -486,6 +486,13 @@ export function timeText(sec) {
   const m = Math.floor(sec / 60), s = sec - m * 60;
   return (m > 0 ? m + '분 ' : '') + s.toFixed(1) + '초';
 }
+/** 타이틀 스테이지 칸 기록용 짧은 시간(r4.21): 'm:ss' — 초 아래는 버린다(스톱워치 표기). 결과 화면은 timeText('1분 5.0초') 그대로.
+ *  칸 글 자리(176 − 12)에 '완료 · 100명 · 1분 47.4초 · 구출✓'(14px 209px)가 들어가지 않아 가로로 78% 눌렸다 → '… · 1:47 · 구출✓'(168px) */
+export function timeShort(sec) {
+  const t = Math.max(0, Math.floor(Number(sec) || 0));
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
 
 //  ── r4.3 코인·순차 해금(기획 v4.1 3-3 (사)·3-7·3-9, 이사님 결정 N2 = (나) 순차 해금 + 기존 기록 엄격 인정) ─────────────────
 //  잠긴 판을 부를 때의 안내(스테이지 선택 화면에 잠깐 뜬다)
@@ -578,7 +585,7 @@ export function upSnapshot(run) {
 /** 스테이지 선택 칸의 '이전 기록' 한 줄(옛 지옥 칸을 이긴 적이 있을 때만, 순수). 없으면 null */
 export function prevRecordLine(st) {
   if (!st || st.cleared !== true) return null;
-  return '이전 기록 ' + (st.bestSurvivors | 0) + '명 · ' + timeText(st.bestTime || 0);
+  return '이전 기록 ' + (st.bestSurvivors | 0) + '명 · ' + timeShort(st.bestTime || 0);
 }
 
 /** 해금 범위 = 1번부터 **연속으로** 이긴 판 수 + 1(순수). wonIds = 이긴 판 번호 집합, ids = 공개 판 번호 목록(ALL_STAGE_IDS 순서).
@@ -1419,7 +1426,8 @@ export function boot(canvas, deps = {}) {
         const m = stageMeta(id), st = save.getStage(id, stageVersion(id), recSlot);
         const prev = recSlot !== PREV_REC_SLOT ? prevRecordLine(save.getStage(id, stageVersion(id), PREV_REC_SLOT)) : null;
         //  구출 기록(r3.14)은 그 기록 칸에서 한 번이라도 구출했으면 어느 상태에든 덧붙인다(없던 필드는 false 로 읽힌다)
-        const sub = (st.cleared ? '완료 · ' + st.bestSurvivors + '명 · ' + timeText(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전')
+        //  r4.21: 칸 기록의 시간은 짧은 표기(timeShort 'm:ss') — 긴 기록이 칸 폭을 넘쳐 가로로 눌리지 않게(결과 화면은 timeText 그대로)
+        const sub = (st.cleared ? '완료 · ' + st.bestSurvivors + '명 · ' + timeShort(st.bestTime) : st.attempts > 0 ? '도전 ' + st.attempts + '회' : '미도전')
           + (st.rescued === true ? ' · 구출✓' : '');
         const col = i % 2, row = Math.floor(i / 2);
         const locked = id > lim;

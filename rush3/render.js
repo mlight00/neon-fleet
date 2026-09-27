@@ -2568,7 +2568,8 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillText(b.label, cx, cy - 10 - up);
         ctx.font = '14px ' + FONT;
         ctx.fillStyle = b.primary ? 'rgba(255,255,255,0.75)' : 'rgba(243,241,232,0.75)';
-        //  maxWidth: '완료 · 63명 · 0:47 · 구출✓'(r3.14) 처럼 긴 sub 가 칸을 넘치면 가로로 조금 압축, 안 넘치면 무변화
+        //  maxWidth: '완료 · 63명 · 0:47 · 구출✓'(r3.14) 처럼 긴 sub 가 칸을 넘치면 가로로 조금 압축, 안 넘치면 무변화.
+        //   r4.21: 셸이 칸 기록 시간을 'm:ss'(timeShort)로 넘겨 가장 긴 '완료 · 100명 · 9:59 · 구출✓'도 97%(종전 '1분 47.4초' 꼴은 78%까지 눌렸다)
         ctx.fillText(b.sub, cx, cy + 12 - up * 2, b.w - 12);
         if (b.prev) {
           ctx.font = '11px ' + FONT;

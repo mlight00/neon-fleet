@@ -5,13 +5,15 @@
 //  IMP-3(r4.19): 누름 여유 — 정확히 누른 버튼이 없을 때만 작은 버튼의 누름 범위를 최소 TOUCH_MIN(54)까지 넓힌다(그림·hitButton 불변)
 //  IMP-4(r4.20): 휴대폰 글자 크기 — 원근으로 줄지 않는 고정 크기 글은 14 논리 px 이상(휴대폰 390 폭 11.4px). 게이트 안내선 글은 달리면서 읽는 글이라 15px + 도로 오른쪽 끝 안(maxWidth).
 //   예외(그대로): 스테이지 칸 '이전 기록' 줄 11px(D9′ 작고 흐리게) · ?fps=1 개발용 표시 · 원근으로 줄어드는 세계 글(적 체력 숫자 등 — 거리감)
+//  IMP-5(r4.21): 타이틀 스테이지 칸 기록의 시간은 짧은 표기 'm:ss'(timeShort — 초 아래 버림). 긴 기록('1분 47.4초 · 구출✓')이 칸 폭을 넘쳐 78% 로 눌렸다. 결과 화면은 timeText 그대로
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRenderer3, ARM_LINE_TEXT } from '../rush3/render.js';
 import { projectorFor, projectorMode } from '../rush3/project.js';
 import { createRun } from '../rush3/combat.js';
 import { buildStage } from '../rush3/stages.js';
-import { makeFx, hitButton, hitButtonTouch, TOUCH_MIN, HUD_BTN } from '../rush3/main.js';
+import { makeFx, hitButton, hitButtonTouch, TOUCH_MIN, HUD_BTN, timeShort, timeText, prevRecordLine } from '../rush3/main.js';
+import { stageVersion } from '../rush3/stages.js';
 import { BAL3 } from '../rush3/balance.js';
 import { bootApp } from './lib/rush3-shell.mjs';
 
@@ -148,4 +150,21 @@ test('IMP-4: 휴대폰 글자 크기 — 타이틀·강화 화면의 모든 글,
   const res = textsAfterCover(h.ops);
   assert.ok(res.some((t) => t.text.startsWith('보유 코인 ')), '결과 보유 코인 줄: ' + JSON.stringify(res.map((t) => t.text)));
   assert.deepEqual(smallOf(res), [], '결과');
+});
+
+test('IMP-5: 칸 기록 짧은 시간 — timeShort 는 m:ss(초 아래 버림) · 타이틀 칸 기록과 이전 기록 줄이 이 표기를 쓰고, 결과 화면 시간(timeText)은 그대로', async () => {
+  assert.equal(timeShort(65.04), '1:05');
+  assert.equal(timeShort(40.86), '0:40');
+  assert.equal(timeShort(107.4), '1:47');
+  assert.equal(timeShort(599.99), '9:59');
+  assert.equal(timeShort(0), '0:00');
+  assert.equal(timeShort(-3), '0:00');
+  assert.equal(timeShort(undefined), '0:00');
+  assert.equal(timeText(107.4), '1분 47.4초', '결과 화면 표기는 그대로');
+  assert.equal(prevRecordLine({ cleared: true, bestSurvivors: 5, bestTime: 61 }), '이전 기록 5명 · 1:01');
+  //  셸: 부대 상한(100명)·1분 47.4초·구출 기록 → 칸 기록 '완료 · 100명 · 1:47 · 구출✓'
+  const h = await bootApp({});
+  h.save.updateStage(1, { cleared: true, attempts: 3, bestSurvivors: 100, bestTime: 107.4, rescued: true }, stageVersion(1), 'v4');
+  h.textNow();
+  assert.ok(h.texts.some((t) => t.text === '완료 · 100명 · 1:47 · 구출✓'), '칸 기록: ' + JSON.stringify(h.texts.filter((t) => t.text.includes('명')).map((t) => t.text)));
 });

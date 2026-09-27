@@ -603,7 +603,8 @@ test('V3-SHELL-DIFF2ROW 셸 결선: 게임 화면은 늘 기본 줄(brutal)로 �
   texts.length = 0;
   frames(2);
   assert.ok(texts.includes('미도전'), '스테이지 칸 기록 = v4 칸(아직 없음): ' + JSON.stringify(texts.filter((t) => t.includes('명') || t.includes('도전'))));
-  assert.ok(texts.includes('이전 기록 5명 · 1분 1.0초'), '옛 지옥 칸 기록 = 이전 기록: ' + JSON.stringify(texts.filter((t) => t.includes('명'))));
+  //  r4.21: 칸 기록의 시간은 짧은 표기(timeShort) — 61초 = '1:01'
+  assert.ok(texts.includes('이전 기록 5명 · 1:01'), '옛 지옥 칸 기록 = 이전 기록: ' + JSON.stringify(texts.filter((t) => t.includes('명'))));
   assert.ok(!texts.some((t) => t.includes('99명') || t.includes('77명')), '옛 보통·어려움 칸 기록은 화면에 나오지 않는다');
   for (const w of ['보통', '어려움', '지옥', '난이도']) assert.ok(!texts.includes(w), `타이틀에 '${w}' 글자 없음(토글 3칸·라벨 삭제)`);
   //  종전 토글 자리(y 382 줄 세 칸 가운데). r4.5(v4 ⑤단계) 재기준: 그 줄은 이제 **[로봇 강화] 한 칸**(x 250~420) + 왼쪽 보유 코인 글.
