@@ -2220,7 +2220,14 @@ export function createRenderer3(ctx, sprites) {
       ctx.globalAlpha = Math.max(0, 1 - f.t / f.life);
       //  '-n'(r3.24 피격 숫자): 작은 글자(px) — 숫자가 묶여 커질 때(pop 0 → 0.12초) 잠깐 부푼다
       const px = f.px ? f.px * (f.pop !== undefined && f.pop < 0.12 ? 1.35 - f.pop * 2.9 : 1) : (f.big ? 34 : 22);
-      outlinedText(f.text, f.x, f.y, px, f.color, 'bold', f.px ? 4 : 5);
+      //  r4.15(개선 루프 4바퀴 — 24판 자동 점검 r4.13 이 찾음): 화면 가장자리에서 생긴 글(예: 7번 판 왼쪽 끝 캡슐의 '캡슐 놓침' x −24~72)이
+      //   화면 밖으로 잘리지 않게, 글 폭(외곽선 포함)의 절반만큼 안쪽으로 당겨 그린다. 규칙·셸의 floater 좌표는 그대로
+      const lw = f.px ? 4 : 5;
+      ctx.font = 'bold ' + px + 'px ' + FONT;
+      const mt = ctx.measureText(f.text);
+      const half = ((mt && mt.width) || 0) / 2 + lw;
+      const x = Math.max(half + 2, Math.min(W - half - 2, f.x));
+      outlinedText(f.text, x, f.y, px, f.color, 'bold', lw);
     }
     ctx.globalAlpha = 1;
   }
