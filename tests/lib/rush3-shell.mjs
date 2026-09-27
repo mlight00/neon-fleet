@@ -16,8 +16,8 @@ export function fakeCanvas(texts, ops = null) {
       if (k in t) return t[k];
       if (typeof k !== 'string') return undefined;
       return (...args) => {
-        if (k === 'fillText') texts.push({ text: String(args[0]), x: args[1], y: args[2], fill: t.fillStyle });
-        if (ops) ops.push({ op: k, args, fill: t.fillStyle, stroke: t.strokeStyle, alpha: t.globalAlpha });
+        if (k === 'fillText') texts.push({ text: String(args[0]), x: args[1], y: args[2], fill: t.fillStyle, font: t.font, maxW: args[3] });
+        if (ops) ops.push({ op: k, args, fill: t.fillStyle, stroke: t.strokeStyle, alpha: t.globalAlpha, font: t.font });
         if (k.startsWith('create')) return grad;
         if (k === 'measureText') return { width: String(args[0]).length * 8 };
         return undefined;

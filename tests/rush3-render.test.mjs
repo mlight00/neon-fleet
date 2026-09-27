@@ -222,6 +222,8 @@ test('V3-RENDER-TRAP: 함정 행은 닫혀 있어도 셔터 표현을 하나도 
   assert.ok(trap.ops.some((o) => o.op === 'scale' && o.args[0] > 1), '자물쇠를 크게 그린다(배율)');
   assert.ok(trap.ops.some((o) => o.op === 'arc'), '자물쇠 고리');
   assert.ok(texts.includes(TRAP_BADGE_TEXT), '배지: ' + JSON.stringify(texts));
+  //  r4.20(IMP-4): 고정 크기 글 14px 이상(휴대폰 390 폭 11.4px)
+  assert.match(trap.ops.find((o) => o.op === 'fillText' && o.args[0] === TRAP_BADGE_TEXT).font, /\b14px/);
   assert.ok(texts.includes('−10') && texts.includes('확정'), '숫자와 확정 꼬리표: ' + JSON.stringify(texts));
   const num = trap.ops.find((o) => o.op === 'fillText' && o.args[0] === '−10');
   assert.equal(num.alpha, 0.92, '봉쇄 바 때문에 숫자를 흐리게 만들지 않는다');
@@ -264,6 +266,7 @@ test('V3-RENDER-TRAP: 결과 화면 [다시 도전] 아래에 "랜덤 길은 새
   const note = withLot.find((o) => o.op === 'fillText' && o.args[0] === RETRY_LOTTERY_NOTE);
   assert.ok(note, '부연을 그린다: ' + JSON.stringify(textsOf(withLot)));
   assert.equal(RETRY_LOTTERY_NOTE, '랜덤 길은 새로 추첨');
+  assert.match(note.font, /\b14px/, 'r4.20(IMP-4): 고정 크기 글 14px 이상');
   //  버튼 **아래**여야 한다 — 버튼 상자 안에 그리면 버튼 글자와 겹친다
   assert.ok(note.args[2] > retry.y + retry.h, '버튼 아래 y: ' + note.args[2]);
   assert.equal(note.args[1], retry.x + retry.w / 2, '버튼 가운데 정렬');

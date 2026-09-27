@@ -333,6 +333,7 @@ test('V3-CAPSULE CAP-8: 렌더 — 유리 캡슐(capsuleGlass)·목표 표지·�
   assert.equal(c2.opened, false);
   const ops = drawRun(run);
   assert.ok(textOf(ops, '목표'), "'목표' 표지");
+  assert.match(textOf(ops, '목표').font, /\b14px/, 'r4.20(IMP-4): 고정 크기 글 14px 이상');
   //  활성 STEP 에 이미 날아와 있던 탄이 맞아 숫자는 80 아래일 수 있다 — 현재 내구값을 본다
   const dur = textOf(ops, String(Math.max(0, Math.ceil(c2.durability))));
   assert.ok(dur && dur.fill === C.bulletHeavy && dur.args[1] === 120, '내구 숫자가 캡슐 x 에(주황)');

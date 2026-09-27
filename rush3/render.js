@@ -641,7 +641,7 @@ export function createRenderer3(ctx, sprites) {
     ctx.lineWidth = 2;
     roundRect(bx - bw / 2, by - bh / 2, bw, bh, 8);
     ctx.stroke();
-    outlinedText(TRAP_BADGE_TEXT, bx, by, 13, C.hud, 'bold', 3);
+    outlinedText(TRAP_BADGE_TEXT, bx, by, 14, C.hud, 'bold', 3);
     ctx.textBaseline = 'alphabetic';
     ctx.restore();
   }
@@ -711,11 +711,12 @@ export function createRenderer3(ctx, sprites) {
         ctx.setLineDash([]);
         ctx.restore();
         //  선 옆 작은 글(N2-⑤). ⚠️주체는 게이트다 — "플레이어가 선을 넘는다"로 읽히면 통로 확정선과 헷갈린다
+        //   r4.20: 달리면서 읽는 글이라 15px(휴대폰 390 폭 12.2px — 종전 12px 는 9.8px). 폭 약 262px 이 도로 폭(292) 안에 들고, maxWidth 로 도로 오른쪽 끝을 넘지 않는다
         ctx.save();
         ctx.textAlign = 'left';
         ctx.textBaseline = 'alphabetic';
         ctx.globalAlpha = 0.92;
-        outlinedText(ARM_LINE_TEXT, a.x + 6, a.y - 7, 12, C.hud, '600', 3);
+        outlinedText(ARM_LINE_TEXT, a.x + 6, a.y - 7, 15, C.hud, '600', 3, b.x - a.x - 12);
         ctx.restore();
       }
     }
@@ -937,7 +938,7 @@ export function createRenderer3(ctx, sprites) {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = C.gold;
     roundRect(x - bw / 2, by - bh / 2, bw, bh, 9); ctx.fill();
-    ctx.font = 'bold 12px ' + FONT;
+    ctx.font = 'bold 14px ' + FONT;
     ctx.fillStyle = C.outline;
     ctx.fillText('목표', x, by);
     ctx.textBaseline = 'alphabetic';
@@ -2565,7 +2566,7 @@ export function createRenderer3(ctx, sprites) {
         const up = b.prev ? 4 : 0;
         ctx.font = '700 17px ' + FONT;
         ctx.fillText(b.label, cx, cy - 10 - up);
-        ctx.font = '13px ' + FONT;
+        ctx.font = '14px ' + FONT;
         ctx.fillStyle = b.primary ? 'rgba(255,255,255,0.75)' : 'rgba(243,241,232,0.75)';
         //  maxWidth: '완료 · 63명 · 0:47 · 구출✓'(r3.14) 처럼 긴 sub 가 칸을 넘치면 가로로 조금 압축, 안 넘치면 무변화
         ctx.fillText(b.sub, cx, cy + 12 - up * 2, b.w - 12);
@@ -2596,7 +2597,7 @@ export function createRenderer3(ctx, sprites) {
     else if (v.saveOk === false) text = SAVE_WARN.record;
     if (!text) return;
     ctx.textAlign = 'center';
-    ctx.font = '600 13px ' + FONT;
+    ctx.font = '600 14px ' + FONT;
     ctx.fillStyle = C.gateNeg;
     ctx.fillText(text, W / 2, H - 22);
   }
@@ -2611,7 +2612,7 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = 'rgba(20,35,58,0.72)';
       roundRect(W / 2 - pw / 2, py, pw, ph, ph / 2); ctx.fill();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = '600 13px ' + FONT;
+      ctx.font = '600 14px ' + FONT;
       ctx.fillStyle = 'rgba(243,241,232,0.92)';
       ctx.fillText('그림 불러오는 중 ' + Math.floor(100 * view.loadP.done / view.loadP.total) + '%', W / 2, py + ph / 2 + 1);
       ctx.textBaseline = 'alphabetic';
@@ -2737,11 +2738,11 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillStyle = C.gold;
         ctx.fillText('획득 코인 +' + fmtInt(r.coins.gained) + tail, W / 2, 156, W - 40);
         if (r.coinLine) {
-          ctx.font = '600 13px ' + FONT;
+          ctx.font = '600 14px ' + FONT;
           ctx.fillStyle = 'rgba(243,241,232,0.8)';
           ctx.fillText(r.coinLine, W / 2, 178, W - 40);
         }
-        ctx.font = '600 13px ' + FONT;
+        ctx.font = '600 14px ' + FONT;
         ctx.fillStyle = 'rgba(246,200,74,0.85)';
         ctx.fillText('보유 코인 ' + fmtInt(r.coins.balance) + tail, W / 2, 196);
         ctx.globalAlpha = 1;
@@ -2813,7 +2814,7 @@ export function createRenderer3(ctx, sprites) {
       ctx.fillStyle = C.gatePos;
       wrapText(r.advice, W / 2, y + 4, W - 56, 22);
       if (!r.won && r.missedLine) {
-        ctx.font = '600 13px ' + FONT;
+        ctx.font = '600 14px ' + FONT;
         ctx.fillStyle = 'rgba(255,154,74,0.8)';
         ctx.fillText(r.missedLine, W / 2, y + 4 + 22 * wrapLines(r.advice, W - 56, 'bold 17px ' + FONT) + 6);
       }
@@ -2834,7 +2835,7 @@ export function createRenderer3(ctx, sprites) {
       const retry = (view.buttons ?? []).find((b) => b.id === 'retry');
       if (retry) {
         ctx.textAlign = 'center';
-        ctx.font = '600 13px ' + FONT;
+        ctx.font = '600 14px ' + FONT;
         ctx.fillStyle = 'rgba(246,200,74,0.85)';
         ctx.fillText(RETRY_LOTTERY_NOTE, retry.x + retry.w / 2, retry.y + retry.h + 16);
       }
@@ -2881,7 +2882,7 @@ export function createRenderer3(ctx, sprites) {
     }
     //  구매 막힘 이유(읽기 전용 탭·코인 저장 실패) — 한 줄, 붉은 글
     if (u.blocked) {
-      ctx.font = '600 13px ' + FONT;
+      ctx.font = '600 14px ' + FONT;
       ctx.fillStyle = C.gateNeg;
       ctx.fillText(u.blocked, W / 2, U.blockY, W - 40);
     }
@@ -2912,7 +2913,7 @@ export function createRenderer3(ctx, sprites) {
         else { ctx.strokeStyle = 'rgba(243,241,232,0.55)'; ctx.lineWidth = 1.5; ctx.strokeRect(bx + 0.75, c.y + 19.75, 10.5, 10.5); }
         bx += 16;
       }
-      ctx.font = '600 13px ' + FONT;
+      ctx.font = '600 14px ' + FONT;
       ctx.fillStyle = 'rgba(243,241,232,0.7)';
       ctx.fillText(row.level + '/' + row.max + '단계', bx + 4, c.y + 30);
       //  '추천'(첫 구매 주 가설 = 다연발, 한 번만): 카드 오른쪽 위 금색 꼬리표
@@ -2930,7 +2931,7 @@ export function createRenderer3(ctx, sprites) {
       const [l1, l2, l3] = row.lines || [];
       if (l1) { ctx.font = 'bold 16px ' + FONT; ctx.fillStyle = C.hero; ctx.fillText(l1, x0, c.y + 64, U.textMaxW); }
       if (l2) { ctx.font = '600 14px ' + FONT; ctx.fillStyle = 'rgba(246,200,74,0.95)'; ctx.fillText(l2, x0, c.y + 90, U.textMaxW); }
-      if (l3) { ctx.font = '13px ' + FONT; ctx.fillStyle = 'rgba(243,241,232,0.62)'; ctx.fillText(l3, x0, c.y + 114, U.textMaxW); }
+      if (l3) { ctx.font = '14px ' + FONT; ctx.fillStyle = 'rgba(243,241,232,0.62)'; ctx.fillText(l3, x0, c.y + 114, U.textMaxW); }
     }
     ctx.textAlign = 'center';
     drawSaveWarn({ saveOk: view.saveOk, coinSaveOk: view.coinSaveOk, readOnly: view.readOnly });
