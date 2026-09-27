@@ -1626,6 +1626,17 @@ export function createRenderer3(ctx, sprites) {
   //  아군 탄: 무기별 **그림**(bullet_<weapon>, 위를 향한 자세)을 진행 방향(bulletAngle)으로 돌려 그리고
   //   뒤에 무기색 꼬리(알파 그라디언트)를 깐다. 위치·크기는 그 자리 배율(q.s)을 곱해 원근을 따른다.
   //   Mk 강화의 탄 폭(b.w)이 그림 크기에도 반영된다. 그림이 없으면 종전 막대 폴백(같은 색·같은 자리).
+  //  r4.17 탄 꼬리 그라디언트(무기색 → 투명, 단위 높이 0→1) — 색마다 한 번만 만든다. 그리는 쪽이 세로로 늘인다(ctx.scale)
+  const tailGradCache = new Map();
+  function tailGrad(tint) {
+    let g = tailGradCache.get(tint);
+    if (!g) {
+      g = ctx.createLinearGradient(0, 0, 0, 1);
+      g.addColorStop(0, tint); g.addColorStop(1, 'rgba(255,255,255,0)');
+      tailGradCache.set(tint, g);
+    }
+    return g;
+  }
   function drawBullets(run) {
     //  r4.5 로봇 탄 테: 강화가 1단계 이상인 판(run.heroUp — 강화 0 이면 null)에서만, 로봇(hero 표시 유닛)이 쏜 탄(ownerId)에만.
     //   규칙은 건드리지 않는다(탄에 새 칸을 싣지 않고 ownerId 로 가린다). 로봇이 쓰러진 뒤(보호를 끈 판)는 테가 없다
@@ -1653,13 +1664,14 @@ export function createRenderer3(ctx, sprites) {
         ctx.save();
         ctx.translate(q.x, q.y);
         if (ang !== 0) ctx.rotate(ang);
-        //  꼬리: 탄 뒤쪽(아래)으로 무기색이 옅어지는 띠
+        //  꼬리: 탄 뒤쪽(아래)으로 무기색이 옅어지는 띠. r4.17: 그라디언트는 무기색마다 한 번만 만든 단위 높이(0→1)를 세로로 늘여 쓴다
+        //   (종전에는 탄 한 발마다 매 프레임 새로 만들었다 — 병사 100명·탄 500발 장면이면 프레임당 500개)
         const tail = hh * 0.9;
-        const gr = ctx.createLinearGradient(0, 0, 0, tail);
-        gr.addColorStop(0, tint); gr.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.globalAlpha = 0.55;
-        ctx.fillStyle = gr;
-        ctx.fillRect(-Math.max(2, bw * 0.4), 0, Math.max(4, bw * 0.8), tail);
+        ctx.fillStyle = tailGrad(tint);
+        ctx.scale(1, tail);
+        ctx.fillRect(-Math.max(2, bw * 0.4), 0, Math.max(4, bw * 0.8), 1);
+        ctx.scale(1, 1 / tail);
         ctx.globalAlpha = 1;
         ctx.drawImage(im, -iw / 2, -hh * 0.75, iw, hh);
         //  로봇 탄 테(r4.5): 탄 그림을 감싸는 옅은 연보라 타원 한 줄

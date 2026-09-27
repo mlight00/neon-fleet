@@ -59,7 +59,17 @@ test('V3-BULLETS 그리기: 그림이 있으면 탄마다 translate→(rotate)�
   const draws = b.ops.filter((o) => o.op === 'drawImage' && o.args[0] === fake);
   assert.equal(draws.length, live, '탄마다 그림 한 장');
   assert.equal(b.ops.filter((o) => o.op === 'rotate').length, run.bullets.filter((x) => !x.dead && (x.vx || 0) !== 0).length, '회전은 vx 있는 탄만');
-  //  꼬리(createLinearGradient)가 탄마다 한 번, 그림 앞에
+  //  꼬리(createLinearGradient)는 그림보다 먼저. r4.17: 그라디언트는 무기색마다 한 번만 만든다(탄마다 새로 만들지 않는다) —
+  //   꼬리 채움은 탄마다(세로로 늘인 단위 높이 fillRect) 그림 앞에
   const iGrad = b.ops.findIndex((o) => o.op === 'createLinearGradient'), iDraw = b.ops.findIndex((o) => o.op === 'drawImage' && o.args[0] === fake);
   assert.ok(iGrad >= 0 && iGrad < iDraw, '꼬리는 그림보다 먼저');
+  const tints = new Set(run.bullets.filter((x) => !x.dead).map((x) => (x.extra ? 'extra' : x.kind)));
+  assert.ok(b.ops.filter((o) => o.op === 'createLinearGradient').length <= tints.size, '그라디언트는 색마다 한 번');
+  //  두 번째 프레임에는 새로 만들지 않는다(같은 그리기 도구)
+  const c = recCtx();
+  const r2 = createRenderer3(c.ctx, sprites);
+  r2.draw({ state: 'run', now: 1, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true });
+  const first = c.ops.filter((o) => o.op === 'createLinearGradient').length;
+  r2.draw({ state: 'run', now: 1.02, run, fx: fxLike(), hud: { distM: 10 }, buttons: [], saveOk: true });
+  assert.equal(c.ops.filter((o) => o.op === 'createLinearGradient').length, first, '다음 프레임은 만든 그라디언트를 다시 쓴다');
 });
