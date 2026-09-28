@@ -649,6 +649,8 @@ export function boot(canvas, deps = {}) {
 
   const ctx = canvas.getContext('2d');
   let state = 'title', run = null, renderer = null, buttons = [], fx = makeFx();
+  //  r4.24 마지막 프레임을 그릴 때 쓴 부대 전진 위치(카메라 z — 90Hz·144Hz 외삽 포함). 검사·확인용(getCamZ)
+  let camZ = null;
   //  r4.11 불러온 그림 묶음(ready 뒤) — 보스 처치 연출이 몸 시트 유무를 본다(없으면 종전 섬광·다단 폭발)
   let sprites = null;
   //  overT: 판 종료 뒤 결과 화면까지 남은 여운(초). -1 = 아직 종료를 보지 못함
@@ -1724,7 +1726,15 @@ export function boot(canvas, deps = {}) {
         if (overT <= 0) finishRun();
       }
     }
-    renderer.draw(view(now));
+    //  r4.24 90Hz·144Hz 화면 매끄럽게: 규칙은 1/60초 고정 스텝이라 90Hz 에서는 세 프레임 중 한 프레임이 앞 장면을 되풀이했다(도로·게이트가 툭툭 끊김).
+    //   스텝 사이 프레임에는 부대 전진 위치(run.z — 카메라)만 남은 시간만큼 다음 스텝 쪽으로 앞당겨 그린다(외삽). 정확히 60Hz 면 남은 시간이 0 이라 종전과 같다.
+    //   run.z 는 그리는 동안만 바꾸고 곧바로 되돌린다(HUD 거리 등 view 값은 그 전에 계산 — 규칙·기록 불변)
+    const v = view(now);
+    const lead = state === 'run' && run && loop.isRunning() && loop.getAcc() > 0 ? (run.z - run.prevZ) * Math.min(1, loop.getAcc() / STEP) : 0;
+    const z0 = run ? run.z : 0;
+    camZ = run ? z0 + lead : null;
+    if (lead) run.z = z0 + lead;
+    try { renderer.draw(v); } finally { if (lead) run.z = z0; }
     raf(frame);
   }
 
@@ -1750,7 +1760,8 @@ export function boot(canvas, deps = {}) {
   //  r4.2: 외부 API 의 getDifficulty/setDifficulty 는 지웠다(난이도 선택 삭제)
   //  r4.3: giveUp(⏸ → [작전 중단] 과 같은 경로) · getResult(결과 화면 값) · getNotice(스테이지 선택 안내)
   //  r4.5: openUpgrade('title' | 'result') · closeUpgrade([돌아가기]와 같은 경로) · buyTrack(트랙 — [구매]와 같은 경로) · getButtons(지금 화면의 버튼 — 검사·캡처용)
-  const api = { dbg, ready, startRun, pause, resume, toTitle, giveUp, getState: () => state, getRun: () => run, getFx: () => fx, getResult: () => result,
+  //  r4.24: getCamZ(마지막 프레임을 그린 카메라 z — 검사·확인용)
+  const api = { dbg, ready, startRun, pause, resume, toTitle, giveUp, getState: () => state, getRun: () => run, getFx: () => fx, getResult: () => result, getCamZ: () => camZ,
                 getNotice: () => (notice ? notice.text : null), openUpgrade, closeUpgrade, buyTrack, getButtons: () => buttons, loop, input };
   //  r4.5 개발 확인용(?dev=1 일 때만): 캡처 스크립트가 결과 화면·강화 화면을 부를 수 있게 앱 손잡이를 창에 둔다(게임 동작에는 영향 없음 — __rush3Dbg 와 같은 결)
   if (win && devFlag()) win.__rush3App = api;

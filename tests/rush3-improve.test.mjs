@@ -7,6 +7,7 @@
 //   예외(그대로): 스테이지 칸 '이전 기록' 줄 11px(D9′ 작고 흐리게) · ?fps=1 개발용 표시 · 원근으로 줄어드는 세계 글(적 체력 숫자 등 — 거리감)
 //  IMP-5(r4.21): 타이틀 스테이지 칸 기록의 시간은 짧은 표기 'm:ss'(timeShort — 초 아래 버림). 긴 기록('1분 47.4초 · 구출✓')이 칸 폭을 넘쳐 78% 로 눌렸다. 결과 화면은 timeText 그대로
 //  IMP-6(r4.22): 큰 화면 선명도 — 화소 수(canvas.width)를 바꾸면 캔버스 기본 크기가 바뀌어 보이는 크기도 커지는 화면(태블릿·노트북)에서, 불러온 직후부터 화소 = 보이는 크기 × min(배율, 2)
+//  IMP-7(r4.24): 90Hz·144Hz 매끄럽게 — 고정 스텝(60Hz) 사이 프레임에는 그리는 카메라 z 만 남은 시간만큼 앞당긴다(외삽). 정확히 60Hz 면 카메라 = run.z(종전과 같다)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRenderer3, ARM_LINE_TEXT } from '../rush3/render.js';
@@ -188,4 +189,35 @@ test('IMP-6: 큰 화면 선명도 — 보이는 크기가 화소 수를 따라 �
   for (const f of L.resize ?? []) f({});
   assert.equal(canvas.width, 1200, '창을 600 으로 줄이면 600 × 2');
   assert.equal(canvas.height, 2000);
+});
+
+//  화면 주사율 hz 로 셸을 돌려 [그린 카메라 z, 규칙 run.z] 를 프레임마다 모은다(출발 뒤 warm 프레임을 버린다)
+async function camTrace(hz, warm = 120, n = 90) {
+  const queue = [];
+  let nowMs = 1000;
+  const app = boot(fakeCanvas([]), { win: { devicePixelRatio: 1, location: { search: '' }, addEventListener() {} }, doc: null, raf: (f) => queue.push(f), now: () => nowMs,
+    save: createSave3(memStorage()), audio: fakeAudio(), dateNow: () => 1_700_000_000_000, sprites: { get: () => null, ready: new Set() } });
+  await app.ready;
+  const tick = () => { nowMs += 1000 / hz; queue.shift()(nowMs); };
+  app.startRun(1);
+  for (let i = 0; i < warm; i++) tick();
+  const cams = [], zs = [];
+  for (let i = 0; i < n; i++) { tick(); cams.push(app.getCamZ()); zs.push(app.getRun().z); }
+  return { cams, zs };
+}
+const deltas = (a) => a.slice(1).map((v, i) => v - a[i]);
+
+test('IMP-7: 90Hz·144Hz 매끄럽게 — 규칙 run.z 는 멈추는 프레임이 있어도(고정 스텝) 그리는 카메라 z 는 매 프레임 고르게 나아간다 · 정확히 60Hz 면 카메라 = run.z', async () => {
+  for (const hz of [90, 144]) {
+    const { cams, zs } = await camTrace(hz);
+    const dz = deltas(zs), dc = deltas(cams);
+    const still = dz.filter((x) => x === 0).length;
+    assert.ok(still > 0, `${hz}Hz: 규칙 run.z 는 멈추는 프레임이 있다(${still}/${dz.length})`);
+    assert.ok(dc.every((x) => x > 0), `${hz}Hz: 카메라는 매 프레임 나아간다 — 멈춘 프레임 ${dc.filter((x) => x <= 0).length}`);
+    const mean = dc.reduce((a, x) => a + x, 0) / dc.length;
+    const worst = Math.max(...dc.map((x) => Math.abs(x - mean) / mean));
+    assert.ok(worst < 0.05, `${hz}Hz: 프레임마다 나아가는 양이 고르다(평균에서 최대 ${(worst * 100).toFixed(1)}% 차이)`);
+  }
+  const { cams, zs } = await camTrace(60);
+  assert.deepEqual(cams, zs, '60Hz: 카메라 = run.z(종전과 같다)');
 });
