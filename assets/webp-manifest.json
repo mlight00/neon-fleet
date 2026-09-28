@@ -648,28 +648,28 @@
   "webp": 111880
  },
  "assets/rush3/SOLDIER_auto_fire.png": {
-  "w": 2704,
-  "h": 317,
-  "png": 505040,
-  "webp": 88730
+  "w": 1640,
+  "h": 193,
+  "png": 267311,
+  "webp": 66142
  },
  "assets/rush3/SOLDIER_fire.png": {
-  "w": 2624,
-  "h": 222,
-  "png": 415003,
-  "webp": 71388
+  "w": 1928,
+  "h": 163,
+  "png": 274137,
+  "webp": 70140
  },
  "assets/rush3/SOLDIER_heavy_fire.png": {
-  "w": 2008,
-  "h": 327,
-  "png": 425252,
-  "webp": 80074
+  "w": 1152,
+  "h": 188,
+  "png": 213003,
+  "webp": 55814
  },
  "assets/rush3/SOLDIER_rifle_fire.png": {
-  "w": 2216,
-  "h": 286,
-  "png": 499754,
-  "webp": 85504
+  "w": 1264,
+  "h": 163,
+  "png": 236863,
+  "webp": 59834
  },
  "assets/rush3/SOLDIER_walk.png": {
   "w": 1212,

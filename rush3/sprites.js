@@ -41,14 +41,15 @@ export const SHEETS3 = Object.freeze({
   m1_walk:       Object.freeze({ file: 'M01_walk',  cols: 6, frames: 12, fw: 206, fh: 241, fps: 12, loop: true,  refH: 225 }),
   m1_fire:       Object.freeze({ file: 'M01_fire',  cols: 8, frames: 8,  fw: 325, fh: 283, fps: 12, loop: true,  refH: 225 }),
   soldier_walk:  Object.freeze({ file: 'SOLDIER_walk', cols: 6, frames: 12, fw: 202, fh: 231, fps: 12, loop: true, refH: 207 }),
-  soldier_fire:  Object.freeze({ file: 'SOLDIER_fire', cols: 8, frames: 8,  fw: 328, fh: 222, fps: 12, loop: true, refH: 207 }),
+  //  r4.23: 병사 사격 시트 4장(soldier_fire·_rifle·_auto·_heavy)은 화면에 필요한 해상도로 줄였다(태블릿 최대 배율 2.95 에서도 1.3배 여유 — 칸·refH 를 같은 비율로 줄여 그려지는 크기는 그대로)
+  soldier_fire:  Object.freeze({ file: 'SOLDIER_fire', cols: 8, frames: 8,  fw: 241, fh: 163, fps: 12, loop: true, refH: 152.0 }),
   //  무기별 사격 시트(2026-09-19, 장착 그림 → 에테르AI): render 는 m1_fire_<weapon> 이 있으면 그것을, 없으면 m1_fire 를 쓴다
   m1_fire_rifle: Object.freeze({ file: 'M01_rifle_fire', cols: 8, frames: 8, fw: 285, fh: 283, fps: 12, loop: true, refH: 271 }),
   m1_fire_auto: Object.freeze({ file: 'M01_auto_fire', cols: 8, frames: 8, fw: 300, fh: 288, fps: 12, loop: true, refH: 275 }),
   m1_fire_heavy: Object.freeze({ file: 'M01_heavy_fire', cols: 8, frames: 8, fw: 248, fh: 372, fps: 12, loop: true, refH: 264 }),
-  soldier_fire_rifle: Object.freeze({ file: 'SOLDIER_rifle_fire', cols: 8, frames: 8, fw: 277, fh: 286, fps: 12, loop: true, refH: 266 }),
-  soldier_fire_auto: Object.freeze({ file: 'SOLDIER_auto_fire', cols: 8, frames: 8, fw: 338, fh: 317, fps: 12, loop: true, refH: 250 }),
-  soldier_fire_heavy: Object.freeze({ file: 'SOLDIER_heavy_fire', cols: 8, frames: 8, fw: 251, fh: 327, fps: 12, loop: true, refH: 264 }),
+  soldier_fire_rifle: Object.freeze({ file: 'SOLDIER_rifle_fire', cols: 8, frames: 8, fw: 158, fh: 163, fps: 12, loop: true, refH: 151.6 }),
+  soldier_fire_auto: Object.freeze({ file: 'SOLDIER_auto_fire', cols: 8, frames: 8, fw: 205, fh: 193, fps: 12, loop: true, refH: 152.2 }),
+  soldier_fire_heavy: Object.freeze({ file: 'SOLDIER_heavy_fire', cols: 8, frames: 8, fw: 144, fh: 188, fps: 12, loop: true, refH: 151.8 }),
   e_grunt_hit:   Object.freeze({ file: 'E1_hit',    cols: 6, frames: 12, fw: 244, fh: 255, fps: 24, loop: false, refH: 200 }),
   e_grunt_death: Object.freeze({ file: 'E1_death',  cols: 6, frames: 12, fw: 365, fh: 294, fps: 12, loop: false, refH: 200 }),
   //  r4.8 걷기 동작 시트 자리(이사님 지시 2026-09-26 "적들이 걸어서 내려오는 듯한 스프라이트도 추가하자") → r4.11 파일 반입(2026-09-27 Gemini v9, 8칸 한 주기).
