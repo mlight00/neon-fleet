@@ -9,6 +9,7 @@
 //  IMP-6(r4.22): 큰 화면 선명도 — 화소 수(canvas.width)를 바꾸면 캔버스 기본 크기가 바뀌어 보이는 크기도 커지는 화면(태블릿·노트북)에서, 불러온 직후부터 화소 = 보이는 크기 × min(배율, 2)
 //  IMP-7(r4.24): 90Hz·144Hz 매끄럽게 — 고정 스텝(60Hz) 사이 프레임에는 그리는 카메라 z 만 남은 시간만큼 앞당긴다(외삽). 정확히 60Hz 면 카메라 = run.z(종전과 같다)
 //  IMP-8(r4.25): 링크 미리보기·아이콘 — rush3.html 의 og 제목·설명·그림(1200×630 JPEG, 절대 주소)과 아이콘 링크가 실제 파일을 가리키고 크기가 맞다
+//  IMP-9(r4.26): 고주사율 매끄럽게 2 — 스텝 직전 위치를 기억해 두고 그릴 때만 탄·적·보스를 같은 비율로 앞당긴다(leadEntities). 60Hz 면 앞당김 0
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRenderer3, ARM_LINE_TEXT } from '../rush3/render.js';
@@ -19,7 +20,7 @@ import { makeFx, hitButton, hitButtonTouch, TOUCH_MIN, HUD_BTN, timeShort, timeT
 import { stageVersion } from '../rush3/stages.js';
 import { BAL3 } from '../rush3/balance.js';
 import { bootApp, fakeCanvas, fakeAudio, memStorage } from './lib/rush3-shell.mjs';
-import { boot } from '../rush3/main.js';
+import { boot, rememberEntityPos, leadEntities } from '../rush3/main.js';
 import { createSave3 } from '../rush3/save.js';
 import { readFileSync, existsSync } from 'node:fs';
 
@@ -264,4 +265,44 @@ test('IMP-8: 링크 미리보기·아이콘 — og 제목·설명이 있고, og 
     if (l.sizes) assert.equal(String(sz.w), l.sizes, l.href + ' 선언한 크기');
     else assert.equal(sz.w, 180, 'apple-touch-icon 180');
   }
+});
+
+test('IMP-9: 탄·적·보스 앞당기기 — 기억한 위치가 있는 것만 (지금 − 기억) × a 만큼 앞으로 · 되돌리면 정확히 제자리 · a = 0 이면 그대로 · 방금 생긴 것·멈춘 것은 그대로', () => {
+  const run = { bullets: [{ x: 100, z: 500 }], enemies: [{ x: 200, z: 900 }, { x: 50, z: 50 }], bosses: [{ x: 240, z: 1200 }] };
+  const prev = new WeakMap();
+  rememberEntityPos(run, prev);
+  run.bullets[0].x += 2; run.bullets[0].z += 15;   // 탄 전진
+  run.enemies[0].z -= 3;                             // 적 접근(둘째 적·보스는 멈춤)
+  run.bullets.push({ x: 10, z: 10 });               // 방금 생긴 탄(기억 없음)
+  const undo = leadEntities(run, prev, 0.5);
+  assert.equal(undo.n, 2, '움직인 탄 1 + 적 1');
+  assert.deepEqual([run.bullets[0].x, run.bullets[0].z], [103, 522.5]);
+  assert.deepEqual([run.enemies[0].x, run.enemies[0].z], [200, 895.5]);
+  assert.deepEqual([run.bullets[1].x, run.bullets[1].z], [10, 10], '방금 생긴 탄은 그대로');
+  assert.deepEqual([run.enemies[1].x, run.enemies[1].z, run.bosses[0].z], [50, 50, 1200], '멈춘 것은 그대로');
+  undo();
+  assert.deepEqual([run.bullets[0].x, run.bullets[0].z, run.enemies[0].z], [102, 515, 897], '되돌리면 규칙 위치 그대로');
+  assert.equal(leadEntities(run, prev, 0).n, 0, 'a = 0 이면 아무것도 옮기지 않는다');
+});
+
+test('IMP-9b: 셸 — 90Hz 에서 스텝이 없는 프레임에도 탄·적을 앞당겨 그린다 · 정확히 60Hz 면 앞당김 0(종전과 같다)', async () => {
+  async function trace(hz) {
+    const queue = [];
+    let nowMs = 1000;
+    const app = boot(fakeCanvas([]), { win: { devicePixelRatio: 1, location: { search: '' }, addEventListener() {} }, doc: null, raf: (f) => queue.push(f), now: () => nowMs,
+      save: createSave3(memStorage()), audio: fakeAudio(), dateNow: () => 1_700_000_000_000, sprites: { get: () => null, ready: new Set() } });
+    await app.ready;
+    const tick = () => { nowMs += 1000 / hz; queue.shift()(nowMs); };
+    app.startRun(1);
+    for (let i = 0; i < 150; i++) tick();
+    const out = [];
+    for (let i = 0; i < 90; i++) { const z = app.getRun().z; tick(); out.push({ still: app.getRun().z === z, ...app.getLeadStats(), bullets: app.getRun().bullets.length }); }
+    return out;
+  }
+  const f90 = await trace(90);
+  const still = f90.filter((f) => f.still && f.bullets > 0);
+  assert.ok(still.length > 20, '90Hz: 스텝 없는 프레임이 있다(' + still.length + ')');
+  assert.ok(still.every((f) => f.a > 0 && f.n > 0), '90Hz: 그 프레임마다 탄·적을 앞당긴다 — 못 한 프레임 ' + still.filter((f) => !(f.n > 0)).length);
+  const f60 = await trace(60);
+  assert.ok(f60.every((f) => f.a === 0 && f.n === 0), '60Hz: 앞당김 0');
 });
