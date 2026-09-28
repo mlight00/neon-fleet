@@ -8,6 +8,7 @@
 //  IMP-5(r4.21): 타이틀 스테이지 칸 기록의 시간은 짧은 표기 'm:ss'(timeShort — 초 아래 버림). 긴 기록('1분 47.4초 · 구출✓')이 칸 폭을 넘쳐 78% 로 눌렸다. 결과 화면은 timeText 그대로
 //  IMP-6(r4.22): 큰 화면 선명도 — 화소 수(canvas.width)를 바꾸면 캔버스 기본 크기가 바뀌어 보이는 크기도 커지는 화면(태블릿·노트북)에서, 불러온 직후부터 화소 = 보이는 크기 × min(배율, 2)
 //  IMP-7(r4.24): 90Hz·144Hz 매끄럽게 — 고정 스텝(60Hz) 사이 프레임에는 그리는 카메라 z 만 남은 시간만큼 앞당긴다(외삽). 정확히 60Hz 면 카메라 = run.z(종전과 같다)
+//  IMP-8(r4.25): 링크 미리보기·아이콘 — rush3.html 의 og 제목·설명·그림(1200×630 JPEG, 절대 주소)과 아이콘 링크가 실제 파일을 가리키고 크기가 맞다
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRenderer3, ARM_LINE_TEXT } from '../rush3/render.js';
@@ -20,6 +21,7 @@ import { BAL3 } from '../rush3/balance.js';
 import { bootApp, fakeCanvas, fakeAudio, memStorage } from './lib/rush3-shell.mjs';
 import { boot } from '../rush3/main.js';
 import { createSave3 } from '../rush3/save.js';
+import { readFileSync, existsSync } from 'node:fs';
 
 const W = BAL3.view.w;
 //  글 폭 = 글자 수 × 12px 로 재는 기록용 ctx
@@ -220,4 +222,46 @@ test('IMP-7: 90Hz·144Hz 매끄럽게 — 규칙 run.z 는 멈추는 프레임�
   }
   const { cams, zs } = await camTrace(60);
   assert.deepEqual(cams, zs, '60Hz: 카메라 = run.z(종전과 같다)');
+});
+
+//  그림 크기만 읽는다(풀지 않는다): PNG = IHDR · JPEG = SOF 표지
+function imgSize(buf) {
+  if (buf.readUInt32BE(0) === 0x89504e47) return { type: 'png', w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    let i = 2;
+    while (i < buf.length) {
+      if (buf[i] !== 0xff) { i++; continue; }
+      const m = buf[i + 1], len = buf.readUInt16BE(i + 2);
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { type: 'jpeg', h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+
+test('IMP-8: 링크 미리보기·아이콘 — og 제목·설명이 있고, og 그림은 라이브 절대 주소가 저장소의 1200×630 JPEG 를 가리키며, 아이콘 링크 세 개가 선언한 크기의 PNG 파일을 가리킨다', () => {
+  const html = readFileSync(new URL('../rush3.html', import.meta.url), 'utf8');
+  const meta = (prop) => { const m = new RegExp('<meta (?:property|name)="' + prop + '" content="([^"]+)"').exec(html); return m ? m[1] : null; };
+  assert.equal(meta('og:title'), '스타포지 러시');
+  assert.ok((meta('og:description') || '').length >= 10, 'og 설명');
+  assert.equal(meta('og:url'), 'https://mlight00.github.io/neon-fleet/rush3.html');
+  const img = meta('og:image');
+  const LIVE = 'https://mlight00.github.io/neon-fleet/';
+  assert.ok(img && img.startsWith(LIVE), 'og 그림은 라이브 절대 주소: ' + img);
+  const local = new URL('../' + img.slice(LIVE.length), import.meta.url);
+  assert.ok(existsSync(local), '저장소에 og 그림 파일: ' + img.slice(LIVE.length));
+  assert.deepEqual(imgSize(readFileSync(local)), { type: 'jpeg', w: 1200, h: 630 });
+  assert.equal(meta('og:image:width'), '1200');
+  assert.equal(meta('og:image:height'), '630');
+  const links = [...html.matchAll(/<link rel="(icon|apple-touch-icon)"[^>]*href="([^"]+)"/g)].map((m) => ({ rel: m[1], href: m[2], sizes: (/sizes="(\d+)x(\d+)"/.exec(m[0]) || [])[1] }));
+  assert.equal(links.length, 3, JSON.stringify(links));
+  for (const l of links) {
+    const f = new URL('../' + l.href, import.meta.url);
+    assert.ok(existsSync(f), l.href);
+    const sz = imgSize(readFileSync(f));
+    assert.equal(sz.type, 'png', l.href);
+    assert.equal(sz.w, sz.h, l.href + ' 정사각형');
+    if (l.sizes) assert.equal(String(sz.w), l.sizes, l.href + ' 선언한 크기');
+    else assert.equal(sz.w, 180, 'apple-touch-icon 180');
+  }
 });
