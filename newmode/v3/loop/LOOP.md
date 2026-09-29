@@ -53,5 +53,6 @@
 - 화면 점검(12바퀴): 캔버스 선명도(기기 네 가지) `E:\workspace\claude\neon-fleet\review\20260928_loop12\canvas_fit.py` · 그림 해상도(원본 칸 vs 가장 크게 그린 크기) `E:\workspace\claude\neon-fleet\review\20260928_loop12\measure_res.py`
 - 움직임 점검(14바퀴): 주사율별 카메라 끊김 `E:\workspace\claude\neon-fleet\review\20260928_loop14\cam_smooth.mjs`(노드) · 실제 브라우저 90Hz 흉내 `cam_browser.py` · 적이 부대 앞까지 올 때 그림 최대 크기 `measure_enemy_max.py`
 - 무작위 조작 점검(16바퀴): `E:\workspace\claude\neon-fleet\review\20260928_loop16\chaos.mjs`(노드, 약 3분) — 24판 × 씨앗 2, 오류·NaN·멈춘 판. 승패는 난이도 판단에 쓰지 않는다
+- 90Hz 무작위 조작 점검(19바퀴): `E:\workspace\claude\neon-fleet\review\20260929_loop19\chaos90.mjs` — 앞당겨 그리기(r4.24·26)는 60Hz 가 아닐 때만 돌므로 그리기를 바꾼 뒤에는 이것으로도 확인한다
 - ⚠️ 성능 측정(`tools/perf_probe.py`)은 검사 묶음 등 다른 무거운 일과 **동시에 돌리지 않는다**(18바퀴: 뒤에서 돈 검사와 겹쳐 32→41ms 로 잘못 나왔다). 바꾼 것의 효과는 켬·끔을 번갈아 두 번 이상 재서 흔들림과 가른다
 - ⚠️ Playwright `page.screenshot` 은 찍기 전에 기다리는 동안 화면이 바뀔 수 있다. 잠깐 보이는 표시는 `canvas.toDataURL()` 로 그 순간을 저장한다.
