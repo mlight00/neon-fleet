@@ -56,6 +56,8 @@ INIT = r"""
     let top = bl === 'middle' ? y - size / 2 : (bl === 'top' || bl === 'hanging') ? y : bl === 'bottom' || bl === 'ideographic' ? y - size : y - size * 0.8;
     window.__cur.push({ t: s, l: tr.a * left + tr.e, tp: tr.d * top + tr.f, w: tr.a * w, h: tr.d * size, a: this.globalAlpha, L: window.__layer });
   };
+  //  r4.30: 테두리 글자 그림 기억(render.createTextCache)을 끈다 — 켜 두면 기억한 글은 drawImage 로 찍혀 이 가로채기에 잡히지 않고, 작업 캔버스에 그린 글이 엉뚱한 자리로 잡힌다
+  window.__rush3TextCacheOff = true;
   for (const k of ['fillText', 'strokeText']) { const f = CanvasRenderingContext2D.prototype[k];
     CanvasRenderingContext2D.prototype[k] = function (t, x, y, m) { try { rec.call(this, t, x, y, m); } catch (e) {} return f.call(this, t, x, y, m); }; }
 })();

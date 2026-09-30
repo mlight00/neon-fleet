@@ -234,7 +234,70 @@ export const HUD_ROW = Object.freeze({
   box: Object.freeze({ coin: HUD_COIN, weapon: HUD_WEAPON, pause: HUD_PAUSE }),
 });
 
-export function createRenderer3(ctx, sprites) {
+//  ── r4.30 테두리 글자 그림 기억(개선 루프 21바퀴 — BACKLOG 3-17) ──
+//  웨이브 절정(적 110여 체)에서 체력 숫자 등 테두리 글자(strokeText + fillText)가 프레임 시간의 약 1/5 을 차지했다
+//   (진단: 테두리를 끄면 같은 4초에 그린 화면 68 → 82.5장 — E:\workspace\claude\neon-fleet\review\20260930_loop21).
+//  같은 글·글꼴·색·테두리 굵기·정렬·선 이음·화면 배율이 **두 번째로** 나오면 작업 캔버스에 한 번 그려 기억하고, 그다음부터는 그 그림을
+//   기기 화소 격자에 맞춰 찍는다(drawImage 한 번). 첫 번째는 종전대로 그린다 — 매 프레임 바뀌는 글(남은 거리 등)이 기억 칸만 늘리지 않게.
+//  기억하지 않고 종전대로 그리는 경우(false): 캔버스를 만들 수 없는 환경(Node 검사의 가짜 캔버스 — 이때는 변환도 읽지 않는다) · 반투명(globalAlpha < 1 —
+//   테두리가 채움 뒤로 비치는 정도가 달라진다) · 그림자·필터·합성 모드 · 회전·기울인 변환 · 한 장이 너무 큰 글(배너) · 개발용 끄개
+//   globalThis.__rush3TextCacheOff(글자 그리기를 가로채는 점검 도구 — tools/health_sweep.py 등은 반드시 켠다)
+export const TEXT_CACHE = Object.freeze({ max: 500, evict: 100, maxArea: 512 * 256, minSeen: 2 });
+/** ctx = 본 캔버스 2D 문맥 · makeCanvas(w, h) = 작업 캔버스(없으면 document.createElement) · outline = 테두리 색.
+ *  반환 { draw(text, x, y, font, color, lw) → 기억 그림으로 그렸으면 true, size() } */
+export function createTextCache(ctx, { makeCanvas = null, outline = '#000', max = TEXT_CACHE.max, evict = TEXT_CACHE.evict, maxArea = TEXT_CACHE.maxArea, minSeen = TEXT_CACHE.minSeen } = {}) {
+  const mk = makeCanvas || ((typeof document !== 'undefined' && document && typeof document.createElement === 'function')
+    ? (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; } : null);
+  const enabled = !!mk && !!ctx && typeof ctx.getTransform === 'function' && typeof ctx.setTransform === 'function' && typeof ctx.drawImage === 'function';
+  const cache = new Map(), seen = new Map();
+  function build(key, text, font, color, lw, align, base, join, m) {
+    ctx.font = font;
+    const mt = ctx.measureText(text);
+    const L = mt && mt.actualBoundingBoxLeft, R = mt && mt.actualBoundingBoxRight, A = mt && mt.actualBoundingBoxAscent, D = mt && mt.actualBoundingBoxDescent;
+    if (![L, R, A, D].every(Number.isFinite)) return null;
+    //  테두리는 글자 윤곽 밖으로 lw/2 나간다 — 여유 lw + 2 · 기준점(ax, ay)은 정수 기기 화소
+    const pad = lw + 2;
+    const ax = Math.ceil((L + pad) * m.a), ay = Math.ceil((A + pad) * m.d);
+    const w = ax + Math.ceil((R + pad) * m.a), h = ay + Math.ceil((D + pad) * m.d);
+    if (!(w > 0 && h > 0) || w * h > maxArea) return null;
+    const c = mk(w, h);
+    const g = c && typeof c.getContext === 'function' ? c.getContext('2d') : null;
+    if (!g) return null;
+    g.setTransform(m.a, 0, 0, m.d, ax, ay);
+    g.font = font; g.textAlign = align; g.textBaseline = base; g.lineJoin = join;
+    g.lineWidth = lw; g.strokeStyle = outline; g.strokeText(text, 0, 0);
+    g.fillStyle = color; g.fillText(text, 0, 0);
+    return { c, ax, ay };
+  }
+  function draw(text, x, y, font, color, lw) {
+    if (!enabled || (typeof globalThis !== 'undefined' && globalThis.__rush3TextCacheOff)) return false;
+    if (ctx.globalAlpha !== 1 || ctx.globalCompositeOperation !== 'source-over') return false;
+    if (ctx.shadowBlur || ctx.shadowOffsetX || ctx.shadowOffsetY) return false;
+    if (ctx.filter && ctx.filter !== 'none') return false;
+    const m = ctx.getTransform();
+    if (!m || m.b !== 0 || m.c !== 0 || !(m.a > 0) || !(m.d > 0)) return false;
+    const align = ctx.textAlign, base = ctx.textBaseline, join = ctx.lineJoin;
+    const key = font + '|' + text + '|' + color + '|' + lw + '|' + align + '|' + base + '|' + join + '|' + m.a.toFixed(4) + '|' + m.d.toFixed(4);
+    let e = cache.get(key);
+    if (e === undefined) {
+      const n = (seen.get(key) || 0) + 1;
+      if (n < minSeen) { if (seen.size > max * 8) seen.clear(); seen.set(key, n); return false; }
+      seen.delete(key);
+      try { e = build(key, text, font, color, lw, align, base, join, m); } catch { e = null; }
+      if (cache.size >= max) { let k = 0; for (const old of cache.keys()) { cache.delete(old); if (++k >= evict) break; } }
+      cache.set(key, e);
+    }
+    if (!e) return false;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(e.c, Math.round(m.a * x + m.e) - e.ax, Math.round(m.d * y + m.f) - e.ay);
+    ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
+    return true;
+  }
+  return { draw, size: () => cache.size, enabled };
+}
+
+//  opts.makeCanvas(w, h) = 작업 캔버스 만들기(r4.30 테두리 글자 그림 기억 — 검사가 주입한다. 없으면 document.createElement, DOM 이 없으면 기억하지 않는다)
+export function createRenderer3(ctx, sprites, opts = {}) {
   const get = (k) => (sprites && typeof sprites.get === 'function' ? sprites.get(k) : null);
   //  동작 시트(sprites.sheet(key) → { img, cols, frames, fw, fh, fps, loop, refH } 또는 null → 정지 그림/폴백)
   const sheet = (k) => (sprites && typeof sprites.sheet === 'function' ? sprites.sheet(k) : null);
@@ -328,8 +391,16 @@ export function createRenderer3(ctx, sprites) {
     ctx.closePath();
   }
 
+  //  r4.30 테두리 글자 그림 기억(위 createTextCache — 반투명·폭 제한·기울인 변환·DOM 없는 환경은 종전대로)
+  const textCache = createTextCache(ctx, { makeCanvas: opts.makeCanvas || null, outline: C.outline });
   //  외곽선 글자(밝은 배경 위에서도 읽히게)
   function outlinedText(text, x, y, px, color, weight = 'bold', lw = 5, maxWidth) {
+    //  r4.30: 폭 제한이 없는 글은 기억 그림으로 — 글자 크기는 0.5px 단위로 맞춘다(기억 칸이 원근 배율마다 늘지 않게, 차이 0.25px 이하).
+    //   그렸으면 종전과 같은 문맥 상태(글꼴·선 굵기·테두리·채움 색)를 남기고 끝낸다
+    if (!(maxWidth > 0) && textCache.enabled) {
+      const qfont = weight + ' ' + Math.round(px * 2) / 2 + 'px ' + FONT;
+      if (textCache.draw(String(text), x, y, qfont, color, lw)) { ctx.font = qfont; ctx.lineWidth = lw; ctx.strokeStyle = C.outline; ctx.fillStyle = color; return; }
+    }
     ctx.font = weight + ' ' + px + 'px ' + FONT;
     ctx.lineWidth = lw;
     ctx.strokeStyle = C.outline;
