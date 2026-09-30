@@ -57,5 +57,7 @@
 - 난이도 계측(r4.29, 봇 판단 아님): 무리 위협 비율 `E:\workspace\claude\neon-fleet\review\20260930_hard\threat2.mjs` · 같이 나오는 무리 합 `overlap.mjs` · 봇 기록(승패는 기록만) `botrec.mjs` · 규칙 계산 비용 `rules_cost.mjs`. 전후 비교용 옛 코드 사본은 `git archive HEAD rush3.html rush3 rush assets/rush assets/rush3 assets/sound assets/fonts assets/webp-manifest.json` 을 E 드라이브에 풀어 쓴다(`perf_before_root` — 약 100MB)
 - ⚠️ 성능 장면 C(대물결 끝)는 결승선 200px 앞으로 건너뛰면서 웨이브 스폰을 모두 건너뛰어 **적이 0** 이다(17~20바퀴 내내 그랬다). 적이 많은 장면은 E(r4.29 — 19번 웨이브 한가운데). 결과의 `maxEnemies` 로 장면에 적이 실제로 있었는지 먼저 본다
 - 90Hz 무작위 조작의 3번 판(씨앗 11·29)은 보스전이 길어 150초를 넘길 수 있다 — 멈춘 것이 아니다(r4.29: 씨앗 11 이 182초에 결과 화면 — `E:\workspace\claude\neon-fleet\review\20260930_hard\chaos90_s3.mjs`, 16바퀴에도 218초)
+- ⚠️ r4.30 부터 테두리 글자는 두 번째부터 그림(drawImage)으로 찍힌다. 글자 그리기(fillText·strokeText)를 가로채는 점검 도구(글자 크기·글 눌림·글 폭 재기 등)는 페이지에서 `window.__rush3TextCacheOff = true` 를 먼저 켠다(`tools/health_sweep.py` 는 켜 둠)
+- 그리기만 바꾼 개선의 모양 확인(21바퀴): 화면 요청(requestAnimationFrame)에 고정 시각을 넘겨 장면을 멈춘 뒤 켬·끔을 찍어 화소를 비교한다 — 같은 조건 두 장이 화소까지 같은지로 멈춤부터 확인(`E:\workspace\claude\neon-fleet\review\20260930_loop21\pixel_compare.py` · `screens_compare.py`). 원인 가르기는 한 가지를 끈 채 같은 장면의 4초 화면 수를 번갈아 잰다(`ab_stroke.py` · `ab_cache.py`)
 - ⚠️ 성능 측정(`tools/perf_probe.py`)은 검사 묶음 등 다른 무거운 일과 **동시에 돌리지 않는다**(18바퀴: 뒤에서 돈 검사와 겹쳐 32→41ms 로 잘못 나왔다). 바꾼 것의 효과는 켬·끔을 번갈아 두 번 이상 재서 흔들림과 가른다
 - ⚠️ Playwright `page.screenshot` 은 찍기 전에 기다리는 동안 화면이 바뀔 수 있다. 잠깐 보이는 표시는 `canvas.toDataURL()` 로 그 순간을 저장한다.
