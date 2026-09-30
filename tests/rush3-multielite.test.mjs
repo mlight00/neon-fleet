@@ -8,6 +8,7 @@ import { createRun, stepRun, drainEvents, makeBoss, STEP } from '../rush3/combat
 import { buildStage, stageVersion, ALL_STAGE_IDS } from '../rush3/stages.js';
 import { BAL3 } from '../rush3/balance.js';
 import { createRenderer3 } from '../rush3/render.js';
+import { bossName } from '../rush3/names.js';
 import { boot } from '../rush3/main.js';
 import { createSave3 } from '../rush3/save.js';
 import { pickX, playPolicy } from './lib/rush3-policies.mjs';
@@ -365,9 +366,11 @@ test('V3-MULTIELITE ME-8: 렌더 — 3체 중 1 격파 상태에서 HUD 3칸(격
   const fx = makeFxLike();
   createRenderer3(ctx, null).draw({ state: 'run', now: 1, run, fx, hud: { distM: 0 }, buttons: [], saveOk: true });
   const texts = textsOf(ops);
-  assert.ok(texts.includes('정예 전투! 남은 목표 2/3'), texts.filter((t) => t.startsWith('정예')).join('|'));
+  //  r4.28: '보스 전투! 남은 목표 N/M' · 칸 글 = 보스 이름 + 남은 체력(옛 역할 이름 hp/max)
+  assert.ok(texts.includes('보스 전투! 남은 목표 2/3'), texts.filter((t) => t.startsWith('보스')).join('|'));
   assert.ok(texts.includes('격파'), 'HUD 격파 칸');
-  assert.ok(texts.includes('소환 1800/1800') && texts.includes('장갑 2280/2280'), 'HUD 역할 칸: ' + texts.filter((t) => /\d+\/\d+/.test(t)).join('|'));
+  { const segs = run.bosses.filter((b) => !b.dead).map((b) => bossName(b) + ' ' + Math.ceil(b.hp));
+    assert.ok(segs.length === 2 && segs.every((x) => texts.includes(x)), 'HUD 칸(이름 + 남은 체력): ' + segs.join('|') + ' / ' + texts.join('|')); }
   assert.ok(texts.includes('소환') && texts.includes('장갑'), '보스 발밑 역할 이름');
   assert.equal(texts.includes('포격'), false, '죽은 gunner 는 그리지 않는다');
   assert.ok(texts.includes('1800') && texts.includes('2280') && !texts.includes('1560'), '살아 있는 보스 hp 숫자만');
@@ -383,7 +386,7 @@ test('V3-MULTIELITE ME-8: 렌더 — 3체 중 1 격파 상태에서 HUD 3칸(격
   //  경고 배너 문구: eliteText 가 있으면 그것, 없으면 종전 문구
   const { ctx: c3, ops: o3 } = recCtx();
   createRenderer3(c3, null).draw({ state: 'run', now: 1, run, fx: makeFxLike({ eliteT: 0.5 }), hud: { distM: 0 }, buttons: [], saveOk: true });
-  assert.ok(textsOf(o3).includes('정예 접근!'));
+  assert.ok(textsOf(o3).includes('보스 접근!'));
   const { ctx: c4, ops: o4 } = recCtx();
   createRenderer3(c4, null).draw({ state: 'run', now: 1, run, fx: makeFxLike({ eliteT: 0.5, eliteText: '정예 3체 접근!' }), hud: { distM: 0 }, buttons: [], saveOk: true });
   assert.ok(textsOf(o4).includes('정예 3체 접근!'));
@@ -393,8 +396,8 @@ test('V3-MULTIELITE ME-8: 렌더 — 3체 중 1 격파 상태에서 HUD 3칸(격
   const { ctx: c5, ops: o5 } = recCtx();
   createRenderer3(c5, null).draw({ state: 'run', now: 1, run: run1, fx: makeFxLike(), hud: { distM: 0 }, buttons: [], saveOk: true });
   const t5 = textsOf(o5);
-  assert.ok(t5.includes('정예 전투!'));
-  assert.ok(t5.some((t) => /^정예 \d+ \/ 120$/.test(t)), t5.filter((t) => t.startsWith('정예')).join('|'));
+  assert.ok(t5.includes(bossName(run1.boss) + ' 전투!'));
+  assert.ok(t5.some((t) => t.startsWith(bossName(run1.boss) + ' ') && t.endsWith(' / 120')), t5.join('|'));
   assert.equal(t5.some((t) => t.includes('남은 목표')), false);
   //  전부 격파 뒤: 막대 없음·'작전 완료'
   for (const b of run.bosses) { b.hp = 0; b.dead = true; }
@@ -456,10 +459,10 @@ test('V3-MULTIELITE ME-9: 셸 — 2체 등장 프레임에 elite 효과음·보�
   //  등장 프레임: elite 효과음 1·BGM 1(2체가 같은 프레임에 나와도)
   assert.equal(h.audio.played.filter((n) => n === 'elite').length, 1, '등장 효과음 1회: ' + h.audio.played.join(','));
   assert.equal(h.audio.bgm.length, 1, '보스 BGM 1회: ' + h.audio.bgm.join(','));
-  assert.equal(h.app.getFx().eliteText, '정예 2체 접근!');
+  assert.equal(h.app.getFx().eliteText, '보스 2체 접근!');
   h.texts.length = 0; h.frames(1);
-  assert.ok(h.texts.includes('정예 2체 접근!'), h.texts.filter((t) => t.startsWith('정예')).join('|'));
-  assert.ok(h.texts.includes('정예 전투! 남은 목표 2/2'));
+  assert.ok(h.texts.includes('보스 2체 접근!'), h.texts.filter((t) => t.startsWith('보스')).join('|'));
+  assert.ok(h.texts.includes('보스 전투! 남은 목표 2/2'));
   const d = dbg();
   assert.equal(d.bossesLeft, 2); assert.deepEqual(d.bosses.map((b) => [b.id, b.role, b.dead]), [['b1', 'gunner', false], ['b2', 'summoner', false]]);
   assert.equal(typeof d.bossX, 'number');
@@ -468,11 +471,11 @@ test('V3-MULTIELITE ME-9: 셸 — 2체 등장 프레임에 elite 효과음·보�
   shellDrive(h, () => dbg().bossesLeft === 1);
   assert.equal(dbg().bossesLeft, 1, '한 마리 격파');
   assert.ok(h.audio.played.includes('kill') && !h.audio.played.includes('win'), '첫 처치 효과음: ' + h.audio.played.filter((n) => n === 'kill' || n === 'win').join(','));
-  assert.match(h.app.getFx().bossBannerText, /^정예 [12] 격파 — 남은 목표 1$/);
+  { const kb = run().bosses.find((b) => b.dead); assert.equal(h.app.getFx().bossBannerText, bossName(kb) + ' 격파 — 남은 목표 1'); }
   assert.ok(h.app.getFx().bossBannerT > 0);
   h.texts.length = 0; h.frames(1);
-  assert.ok(h.texts.some((t) => /^정예 [12] 격파 — 남은 목표 1$/.test(t)), h.texts.filter((t) => t.startsWith('정예')).join('|'));
-  assert.ok(h.texts.includes('정예 전투! 남은 목표 1/2'));
+  assert.ok(h.texts.includes(h.app.getFx().bossBannerText), h.texts.filter((t) => t.includes('격파')).join('|'));
+  assert.ok(h.texts.includes('보스 전투! 남은 목표 1/2'));
   assert.ok(h.texts.includes('격파'), 'HUD 격파 칸');
   assert.equal(run().won, false);
   //  마지막 처치: win 음 → 결과 → 저장 칸은 version 2

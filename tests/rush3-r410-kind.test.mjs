@@ -13,7 +13,8 @@ import { STAGE_END } from '../rush3/courses.js';
 import { createRun, stepRun, drainEvents, STEP } from '../rush3/combat.js';
 import { stageValue, bossCount, createTally, addEvents, mainCoins, scheduledEnemyCount } from '../rush3/coins.js';
 import { createRenderer3, FINISH_LOOK, BOSS_BADGE } from '../rush3/render.js';
-import { makeFx, HORDE_BANNER_TEXT, FINISH_TEXT, goalKind, KIND_BANNER_TEXT, OBJECTIVE_BANNER_TEXT } from '../rush3/main.js';
+import { makeFx, HORDE_BANNER_TEXT, FINISH_TEXT, goalKind, KIND_BANNER_TEXT, OBJECTIVE_BANNER_TEXT, kindBannerLine } from '../rush3/main.js';
+import { stageBossName } from '../rush3/names.js';
 import { bootApp } from './lib/rush3-shell.mjs';
 
 const BOSS_IDS = [3, 6, 9, 12, 15, 18, 21, 24];
@@ -276,8 +277,13 @@ test("STAGE-KIND 판 안내: 타이틀 스테이지 칸 — 보스 판(3·6·9·
   }
   assert.deepEqual(seenBoss.sort((a, b) => a - b), BOSS_IDS, '보스 판 8개 모두 왕관');
   //  출격 직후 배너
-  const wantLines = { 3: [KIND_BANNER_TEXT.boss], 5: [KIND_BANNER_TEXT.mid], 4: [KIND_BANNER_TEXT.horde], 7: [KIND_BANNER_TEXT.horde, ...OBJECTIVE_BANNER_TEXT] };
-  assert.deepEqual({ ...KIND_BANNER_TEXT }, { boss: '보스 출현', mid: '중간 보스', horde: '대물결 — 결승선까지 돌파' });
+  //  r4.28: 보스·강적 판은 종류 글 + ': ' + 이름 · 웨이브 판은 종류 글만
+  const nameOf = (id) => stageBossName(buildStage(id, { difficulty: 'brutal' }));
+  const wantLines = { 3: [kindBannerLine('boss', nameOf(3))], 5: [kindBannerLine('mid', nameOf(5))], 4: [KIND_BANNER_TEXT.horde], 7: [KIND_BANNER_TEXT.horde, ...OBJECTIVE_BANNER_TEXT] };
+  assert.deepEqual({ ...KIND_BANNER_TEXT }, { boss: '보스 출현', mid: '강적 출현', horde: '웨이브 — 결승선까지 돌파' });
+  assert.equal(kindBannerLine('boss', nameOf(3)), '보스 출현: 매연 불도저');
+  assert.equal(kindBannerLine('mid', nameOf(5)), '강적 출현: 고철 대장');
+  assert.equal(kindBannerLine('horde', null), '웨이브 — 결승선까지 돌파');
   for (const [id, lines] of Object.entries(wantLines)) {
     h.app.toTitle();
     h.app.startRun(Number(id));

@@ -3,6 +3,7 @@
 //  rush/render.js 에서 복제. 게이트·보급·부대·벽·HUD·결과·타이틀은 신규. 시계는 view.now 만 쓴다.
 //  화면 좌표는 r3.20 부터 원근 투영(rush3/project.js)이 만든다: (x, d = z − run.z) → { x, y, s }. 종전 평면 변환 y = LINE_Y − d 는 flat 모드(?flat=1)로 남는다.
 import { BAL3 } from './balance.js';
+import { bossName } from './names.js';
 import { PERSPECTIVE, projectorFor, projectorMode } from './project.js';
 import { WEAPONS } from './weapons.js';
 import { gateColor, gateLabel } from './gates.js';
@@ -1493,7 +1494,7 @@ export function createRenderer3(ctx, sprites) {
     const f = Math.max(0, Math.min(1, b.hp / (b.max || 1)));
     if (f > 0) { ctx.fillStyle = MID_LOOK.bar; roundRect(x - bw / 2, by, bw * f, bh, bh / 2); ctx.fill(); }
     ctx.textAlign = 'center';
-    outlinedText(MID_LOOK.label, x, by - 7 * k, fs(15, k, 13), MID_LOOK.labelColor, 'bold', 4);
+    outlinedText(bossName(b), x, by - 7 * k, fs(15, k, 13), MID_LOOK.labelColor, 'bold', 4);
     drawHpTag(x, y + r + 20 * k, b.hp, k, hr ? hr.pop : 0);
   }
   //  r4.10 중간 보스 돌진 경보(규칙 bo.charge — 읽기만): 경보 동안(그리고 돌진해 치기 전까지) 돌진할 줄(몸 폭)을 붉은 경보 구역으로 — 보스 광역 경보와 같은 그리기(warnShape)
@@ -2331,7 +2332,8 @@ export function createRenderer3(ctx, sprites) {
       //  r3.17 아레나: 광장 보스전은 '아레나 전투!'(도로 정예 문구는 그대로)
       //  r4.10 대물결 판(결승선 run.finishZ): '결승선까지 Nm'(판 길이 = 결승선) → 넘으면 '작전 완료'
       //  r4.10 중간 보스: '중간 보스 전투!'
-      const goal = run.boss ? (run.boss.mid ? '중간 보스 전투!' : run.phase === 'arena' ? '아레나 전투!' : bTotal > 1 ? '정예 전투! 남은 목표 ' + bLeft + '/' + bTotal : '정예 전투!')
+      //  r4.28: 보스·강적 이름으로 — '<이름> 전투!'(강적·광장·보스 1체) · 여럿이면 '보스 전투! 남은 목표 N/M'
+      const goal = run.boss ? (bTotal > 1 && !run.boss.mid && run.phase !== 'arena' ? '보스 전투! 남은 목표 ' + bLeft + '/' + bTotal : bossName(run.boss) + ' 전투!')
         : (run.bossDefeated || (run.finishZ != null && run.won)) ? '작전 완료' : run.finishZ != null ? '결승선까지 ' + hud.distM + 'm' : '남은 거리 ' + hud.distM + 'm';
       outlinedText(goal, HUD_ROW.left, HUD_ROW.distCy, HUD_ROW.distFs, run.boss ? C.gateNeg : C.hero, 'bold', 5);
     }
@@ -2397,10 +2399,11 @@ export function createRenderer3(ctx, sprites) {
         ctx.fillStyle = run.boss.rage ? RAGE_COLOR : C.eshot;
         roundRect(90, 76, 300 * Math.max(0, run.boss.hp / run.boss.max), 16, 8); ctx.fill();
         ctx.textAlign = 'center';
-        outlinedText('정예 ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
+        outlinedText(bossName(run.boss) + ' ' + Math.max(0, Math.ceil(run.boss.hp)) + ' / ' + run.boss.max, W / 2, 111, 15, C.hud, 'bold', 4);
         if (bs) ctx.restore();
       } else {
-        const n = bosses.length, gap = 6, segW = (300 - gap * (n - 1)) / n, fs = n >= 3 ? 12 : 13;
+        //  r4.28: 칸 글 = 보스 이름 + 남은 체력(이름이 들어가 '/최대'는 뺐다 — 막대가 비율을 보여 준다). 둘이면 14px(r4.20 고정 글 14px 이상), 셋 이상은 칸이 좁아 12px · 칸 폭을 넘지 않게 maxWidth
+        const n = bosses.length, gap = 6, segW = (300 - gap * (n - 1)) / n, fs = n >= 3 ? 12 : 14;
         ctx.textAlign = 'center';
         for (let i = 0; i < n; i++) {
           const b = bosses[i], x = 90 + i * (segW + gap);
@@ -2412,8 +2415,8 @@ export function createRenderer3(ctx, sprites) {
             ctx.fillStyle = b.rage ? RAGE_COLOR : C.eshot;
             roundRect(x, 76, segW * Math.max(0, Math.min(1, b.hp / b.max)), 16, 8); ctx.fill();
           }
-          const label = BAL3.elites?.roles?.[b.role ?? 'elite']?.label ?? '정예';
-          outlinedText(b.dead ? '격파' : label + ' ' + Math.max(0, Math.ceil(b.hp)) + '/' + b.max, x + segW / 2, 111, fs, b.dead ? C.gateZero : C.hud, 'bold', 4);
+          const label = bossName(b);
+          outlinedText(b.dead ? '격파' : label + ' ' + Math.max(0, Math.ceil(b.hp)), x + segW / 2, 111, fs, b.dead ? C.gateZero : C.hud, 'bold', 4, segW - 4);
           if (bs) ctx.restore();
         }
       }
@@ -2484,7 +2487,7 @@ export function createRenderer3(ctx, sprites) {
       ctx.font = '900 30px ' + FONT;
       ctx.fillStyle = '#FFFFFF';
       //  r3.16 복수 정예: 셸이 '정예 2체 접근!' 처럼 문구를 넘기면 그것을, 없으면(옛 fx 꼴) 종전 문구
-      ctx.fillText(fx.eliteText ?? '정예 접근!', W / 2, 224);
+      ctx.fillText(fx.eliteText ?? '보스 접근!', W / 2, 224);
       ctx.globalAlpha = 1;
     }
     //  정예 처치 배너(r3.16 복수 정예): 하나를 잡았는데 목표가 남았을 때 같은 슬롯 A(y196 h56)에 붉은 띠로 '정예 N 격파 — 남은 목표 M'. fx 새 칸은 ?? 로 관용

@@ -14,6 +14,7 @@ import { loadSprites3, sheetSec, hitSheetKey3 } from './sprites.js';
 import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
 import { adviceLine, ADVICE_DEFAULT } from './advice.js';
+import { bossName, stageBossName } from './names.js';
 import { createTally, addEvents, tallyTotal, mainCoins, bonusCoins } from './coins.js';
 import { hashSeed } from '../rush/rng.js';
 
@@ -47,15 +48,25 @@ export const OBJECTIVE_BANNER_TEXT = Object.freeze(['작전 목표: 캡슐 구�
 //  아레나 안내 배너(r3.17): 광장 전환 시 판마다 1회(fx.arenaText/arenaT, BAL3.fx.arenaGuideSec). 슬롯 C(셔터·목표 아래). 줄은 어절 경계에서만 나눈다
 export const ARENA_GUIDE_TEXT = Object.freeze(['드래그로 피하세요', '광장에서는 위아래로도 움직입니다']);
 //  r4.10 대물결 판(게임 화면 줄 1·4·7·…): 대물결 첫 겹이 들어올 때 정예 경고와 같은 슬롯 A 붉은 띠 · 결승선을 넘는 순간 금색 띠(한 줄 — 줄바꿈 없음)
-export const HORDE_BANNER_TEXT = '대물결 접근!';
+//   r4.28 이사님 지시(2026-09-30) "대물결 이런 제목도 웨이브라고 표시하고" — 화면 글은 '웨이브'(코드 이름 horde 는 그대로)
+export const HORDE_BANNER_TEXT = '웨이브 접근!';
 export const FINISH_TEXT = '결승선 돌파!';
 //  r4.10 중간 보스 판: 중간 보스가 나올 때 정예 경고 슬롯 붉은 띠(한 줄 — 줄바꿈 없음)
-export const MID_BANNER_TEXT = '중간 보스 접근!';
+//   r4.28: 실제 배너는 강적 이름 + ' 접근!'(names.bossName). 이 글은 이름을 모를 때의 대신 글
+export const MID_BANNER_TEXT = '강적 접근!';
 //  r4.10 판 안내: 출격 직후 작전 목표 배너(기존 슬롯 C — 판당 1회 BAL3.fx.objectiveBannerSec)에 판 종류 한 줄(게임 화면 줄만 — stage.endKind).
 //   구출 캡슐 판(7 — 대물결)은 그 아래 캡슐 두 줄이 이어진다. 줄은 어절 경계에서만 나눈다(한 줄씩 — 480px 배너 안)
-export const KIND_BANNER_TEXT = Object.freeze({ boss: '보스 출현', mid: '중간 보스', horde: '대물결 — 결승선까지 돌파' });
+//   r4.28: 보스·강적 판은 이 글 뒤에 ': ' + 이름(names.stageBossName — 예 '보스 출현: 폭주 기관차' · '강적 출현: 돌격 사냥개'). 옛 '중간 보스'는 '강적'
+export const KIND_BANNER_TEXT = Object.freeze({ boss: '보스 출현', mid: '강적 출현', horde: '웨이브 — 결승선까지 돌파' });
+/** 판 시작 줄(r4.28): 판 종류 글 + 보스·강적 이름. 웨이브·이름 없는 판은 종류 글만. 종류가 없으면 null */
+export function kindBannerLine(kind, name) {
+  const base = KIND_BANNER_TEXT[kind];
+  if (!base) return null;
+  return kind !== 'horde' && name ? base + ': ' + name : base;
+}
 //  r4.10 판 끝 목표 이름(결과 화면 코인 내역 — 보스 몫 V × 0.5 를 받는 목표): 보스 판 '보스' · 중간 보스 판 '중간 보스' · 대물결 판 '돌파'
-export const GOAL_NAME = Object.freeze({ boss: '보스', mid: '중간 보스', horde: '돌파' });
+//   r4.28: 결과 줄은 보스·강적 이름(coins.goalName)을 먼저 쓰고, 이름이 없을 때만 이 글
+export const GOAL_NAME = Object.freeze({ boss: '보스', mid: '강적', horde: '돌파' });
 /** 판 끝 목표 종류(순수 — 판 정의만 본다): 결승선이 있으면 'horde' · 중간 보스(보스 정의의 mid 표시)면 'mid' · 그 밖(보스·배수 1 줄·시제품) 'boss' */
 export function goalKind(stage) {
   if (!stage) return 'boss';
@@ -588,7 +599,9 @@ export function upgradeLines(up, track, ref = null) {
     const dmg = (j) => w.dmg * (1 + UP_EFFECT.powerStep * j);
     lines.push(top ? '최대 단계 · 로봇 직격 피해 ' + fix1(dmg(k)) : '로봇 직격 피해 ' + fix1(dmg(k)) + ' → ' + fix1(dmg(k + 1)));
     const hp = ref && ref.bossHp > 0 ? ref.bossHp : null;
-    lines.push(hp ? (ref.stageId + (ref.mid ? '번 중간 보스(체력 ' : '번 보스(체력 ') + hp + '): ' + shotsToKill(hp, dmg(k)) + '발' + (top ? '' : ' → ' + shotsToKill(hp, dmg(k + 1)) + '발')) : null);
+    //  r4.28: 'N번 <보스·강적 이름>(체력 …)' — 이름이 없으면 '보스'·'강적'
+    //   이름이 들어가 '(체력 N)'은 뺐다 — 가장 긴 '24번 크라운 브레이커(체력 12000): 12000발 → 9231발'(355px)이 카드 글 자리 290 을 넘쳤다. 발 수가 체력을 대신 보여 준다
+    lines.push(hp ? (ref.stageId + '번 ' + (ref.name || (ref.mid ? '강적' : '보스')) + ': ' + shotsToKill(hp, dmg(k)) + '발' + (top ? '' : ' → ' + shotsToKill(hp, dmg(k + 1)) + '발')) : null);
     lines.push('소총 기준 · 폭발·연쇄에는 적용 안 됨');
   } else if (track === 'rate') {
     const iv = (j) => w.interval * Math.pow(UP_EFFECT.rateMul, j);
@@ -650,7 +663,7 @@ export function coinBreakdown(c) {
   const NB = ' ';
   const parts = ['적' + NB + (c.enemy | 0)];
   //  r4.10: 판 끝 목표 몫의 이름 = 판 종류(c.goal — '보스' · '중간 보스' · '돌파' — 이름 안의 띄어쓰기도 줄바꿈 없는 공백). 칸이 없는 옛 꼴은 '보스'
-  if (c.boss > 0) parts.push((GOAL_NAME[c.goal] ?? GOAL_NAME.boss).replace(/ /g, NB) + NB + c.boss);
+  if (c.boss > 0) parts.push(((c.goal !== 'horde' && c.goalName) || GOAL_NAME[c.goal] || GOAL_NAME.boss).replace(/ /g, NB) + NB + c.boss);
   if (c.bounty > 0) parts.push('현상금' + NB + '+' + c.bounty);
   if (c.clear > 0) parts.push((c.clearKind === 'first' ? '첫' + NB + '클리어' : '재클리어') + NB + c.clear);
   if (c.bonus > 0) parts.push('보너스' + NB + c.bonus);
@@ -835,7 +848,7 @@ export function boot(canvas, deps = {}) {
     fx.guideT = total === 0 ? FX.guideSec : 0;
     //  작전 목표 배너(r3.14): 목표가 있는 판은 출격 직후 3초, 판당 1회. 첫 플레이 안내(y268)와 자리가 다르다
     //  r4.10 판 종류 한 줄(게임 화면 줄 — 보스 출현 / 중간 보스 / 대물결 — 결승선까지 돌파)을 같은 배너 맨 위에. 배수 1 줄(검사 주입)은 종전 그대로
-    const kindLine = KIND_BANNER_TEXT[stage.endKind] ?? null;
+    const kindLine = kindBannerLine(stage.endKind, stageBossName(stage));
     const capsule = !!(run.objective && run.objective.kind === 'capsule');
     if (kindLine || capsule) { fx.objText = kindLine ? Object.freeze([kindLine, ...(capsule ? OBJECTIVE_BANNER_TEXT : [])]) : OBJECTIVE_BANNER_TEXT; fx.objT = FX.objectiveBannerSec; }
     save.updateStage(id, { attempts: (save.getStage(id, ver, diff).attempts || 0) + 1 }, ver, diff);
@@ -843,7 +856,7 @@ export function boot(canvas, deps = {}) {
     //  r4.3 코인: 출격 번호(지갑 runNo +1, 출격 시작 쓰기와 함께 — 지갑은 별도 키라 쓰기 1회 더) → 지급 식별자 `${runNo}:main`·`${runNo}:bonus`.
     //   판 안 누계(tally)는 셸 변수 coin 에 둔다(규칙 모듈은 모른다). settled = 정산 결과(판당 kind 마다 1회)
     //  r4.10 goal = 판 끝 목표 종류(결과 화면 내역 이름 '보스'·'중간 보스'·'돌파' — goalKind)
-    coin = { runNo: save.wallet.startRun(), tally: createTally(stage, { dev: run.devWeapon }), settled: { main: null, bonus: null }, goal: goalKind(stage) };
+    coin = { runNo: save.wallet.startRun(), tally: createTally(stage, { dev: run.devWeapon }), settled: { main: null, bonus: null }, goal: goalKind(stage), goalName: stageBossName(stage) };
     state = 'run';
     loop.start(nowSec());
     au.bgmPlay(BGM.stage[Math.max(0, Math.min(2, id - 1))]);
@@ -928,12 +941,12 @@ export function boot(canvas, deps = {}) {
     if (!ALL_STAGE_IDS.includes(id)) id = ALL_STAGE_IDS[0];
     if (!bossHpCache.has(id)) {
       //  r4.10: 게임 줄 대물결 판은 보스가 없다(null — 보스 줄 없음) · 중간 보스 판은 중간 보스 체력(mid 표시)
-      let hp = null, mid = false;
-      try { const st = buildStage(id, { difficulty, lotterySeed: 0 }); const e = st.elites && st.elites[0]; hp = (e && e.hp) || null; mid = !!(e && e.mid); } catch { hp = null; }
-      bossHpCache.set(id, { hp, mid });
+      let hp = null, mid = false, name = null;
+      try { const st = buildStage(id, { difficulty, lotterySeed: 0 }); const e = st.elites && st.elites[0]; hp = (e && e.hp) || null; mid = !!(e && e.mid); name = e ? bossName(e) : null; } catch { hp = null; }
+      bossHpCache.set(id, { hp, mid, name });
     }
     const b = bossHpCache.get(id);
-    return { stageId: id, bossHp: b.hp, ...(b.mid ? { mid: true } : {}) };
+    return { stageId: id, bossHp: b.hp, ...(b.mid ? { mid: true } : {}), ...(b.name ? { name: b.name } : {}) };
   }
   /** 강화 화면 열기(from = 'title' | 'result'). 처음 살 수 있는 상태로 연 방문이면 다연발 '추천'(사용자당 1회 — 저장 seenUpRec) */
   function openUpgrade(from) {
@@ -1044,7 +1057,7 @@ export function boot(canvas, deps = {}) {
     const c = coin, sm = c && c.settled.main, sb = c && c.settled.bonus;
     const coins = c ? {
       gained: (sm ? sm.total : 0) + (sb ? sb.total : 0),
-      enemy: sm ? sm.enemy : 0, boss: sm ? sm.boss : 0, goal: c.goal ?? 'boss', bounty: sm ? (sm.bounty || 0) : 0, clear: sm ? sm.clear : 0, clearKind: sm ? sm.clearKind : null, bonus: sb ? sb.bonus : 0,
+      enemy: sm ? sm.enemy : 0, boss: sm ? sm.boss : 0, goal: c.goal ?? 'boss', goalName: c.goalName ?? null, bounty: sm ? (sm.bounty || 0) : 0, clear: sm ? sm.clear : 0, clearKind: sm ? sm.clearKind : null, bonus: sb ? sb.bonus : 0,
       balance: save.wallet.get().coins, dev: !!run.devWeapon,
     } : null;
     const nextId = won && ALL_STAGE_IDS.includes(id + 1) ? id + 1 : null;
@@ -1270,7 +1283,9 @@ export function boot(canvas, deps = {}) {
         case 'elite':
           if ((ev.index ?? 0) > 0) break;
           //  r4.10 중간 보스(ev.mid)는 '중간 보스 접근!'
-          fx.eliteT = FX.eliteBannerSec; fx.eliteText = ev.mid ? MID_BANNER_TEXT : (ev.total ?? 1) > 1 ? '정예 ' + ev.total + '체 접근!' : '정예 접근!';
+          //  r4.28: 이름으로 — '<이름> 접근!'(강적·보스 1체) · 여럿이면 '보스 N체 접근!'
+          { const who = run.bosses.find((b) => b.id === ev.id);
+            fx.eliteT = FX.eliteBannerSec; fx.eliteText = (ev.total ?? 1) > 1 && !ev.mid ? '보스 ' + ev.total + '체 접근!' : (who ? bossName(who) : ev.mid ? '강적' : '보스') + ' 접근!'; }
           fx.sfx.push(['elite']); au.bgmPlay(BGM.boss[Math.max(0, Math.min(2, run.stageId - 1))]);
           break;
         //  정예 처치: 파편·흔들림은 매번, 효과음은 마지막(left 0)이면 승리음, 아니면 처치음. 남은 목표 배너는 bossesLeft 가 세운다
@@ -1290,7 +1305,8 @@ export function boot(canvas, deps = {}) {
           break;
         }
         case 'bossesLeft':
-          if (ev.left > 0) { fx.bossBannerText = '정예 ' + (ev.index + 1) + ' 격파 — 남은 목표 ' + ev.left; fx.bossBannerT = FX.bossKillBannerSec; }
+          //  r4.28: '<격파한 보스 이름> 격파 — 남은 목표 N'
+          if (ev.left > 0) { const kb = run.bosses.find((b) => b.index === ev.index); fx.bossBannerText = (kb ? bossName(kb) : '보스 ' + (ev.index + 1)) + ' 격파 — 남은 목표 ' + ev.left; fx.bossBannerT = FX.bossKillBannerSec; }
           break;
         //  승리 확정 프레임(r3.15 검수 반영): 본전투 기록을 지금 쓴다 — 보너스전·여운 중 나가도 확정된 승리가 남는다
         //   r4.3: 본전투 코인 정산을 commitMain **보다 먼저**(여운·보너스 중에 나가도 지급은 이미 끝났다)

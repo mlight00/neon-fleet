@@ -775,7 +775,7 @@ test('RESULT 3-9 글자·배치: 맨 위 제목(성공/실패/중단) → 획득
   assert.equal(coinBreakdown({ enemy: 7, boss: 0, clear: 5, clearKind: 'replay', bonus: 20 }), '적 7 · 재클리어 5 · 보너스 20');
   //  r4.10 판 끝 목표 이름: 보스 · 중간 보스(띄어쓰기도 줄바꿈 없는 공백) · 돌파 — 칸이 없는 옛 꼴은 보스
   assert.equal(coinBreakdown({ enemy: 7, boss: 14, goal: 'boss' }), '적\u00a07 · 보스\u00a014');
-  assert.equal(coinBreakdown({ enemy: 7, boss: 14, goal: 'mid' }), '적\u00a07 · 중간\u00a0보스\u00a014');
+  assert.equal(coinBreakdown({ enemy: 7, boss: 14, goal: 'mid' }), '적\u00a07 · 강적\u00a014');
   assert.equal(coinBreakdown({ enemy: 7, boss: 14, goal: 'horde' }), '적\u00a07 · 돌파\u00a014');
   assert.equal(coinBreakdown({ enemy: 7, boss: 14 }), '적\u00a07 · 보스\u00a014');
   assert.equal(coinBreakdown({ dev: true }), '개발용 판 — 코인 없음');

@@ -342,14 +342,14 @@ test('UP-BLOCK: 읽기 전용 탭은 구매를 거절한다(wallet.buy → "read
 test('UP-TEXT: 강화 화면 미리보기 = 지금 든 무기(기본 소총) 기준 "지금 → 다음" — 직격 화력 1.0 → 1.3 · 1번 보스 180 을 180발 → 139발, 연사 0.50초 → 0.44초, 다연발 1발 → 2발(게이트는 원래 1발만)', () => {
   const ref = { stageId: 1, bossHp: 180 };
   const p0 = upgradeLines(Z0, 'power', ref);
-  assert.deepEqual(p0, { name: '직격 화력', level: 0, max: 5, cost: 40, lines: ['로봇 직격 피해 1.0 → 1.3', '1번 보스(체력 180): 180발 → 139발', '소총 기준 · 폭발·연쇄에는 적용 안 됨'] });
+  assert.deepEqual(p0, { name: '직격 화력', level: 0, max: 5, cost: 40, lines: ['로봇 직격 피해 1.0 → 1.3', '1번 보스: 180발 → 139발', '소총 기준 · 폭발·연쇄에는 적용 안 됨'] });
   const r0 = upgradeLines(Z0, 'rate', ref);
   assert.deepEqual(r0.lines, ['로봇 발사 간격 0.50초 → 0.44초', '1초에 2.0발 → 2.3발', '소총 기준 · 게이트 숫자도 더 빨리 오름']);
   const m0 = upgradeLines(Z0, 'multi', ref);
   assert.deepEqual(m0.lines, ['로봇이 한 번에 1발 → 2발', '게이트는 원래 1발만 오름', '추가 탄(연보라)은 적·보급 통에만 맞음']);
   //  최대 단계 = '최대 단계 · 지금 값', 비용 null
   const pm = upgradeLines({ power: 5 }, 'power', ref);
-  assert.equal(pm.cost, null); assert.equal(pm.lines[0], '최대 단계 · 로봇 직격 피해 2.5'); assert.equal(pm.lines[1], '1번 보스(체력 180): 72발');
+  assert.equal(pm.cost, null); assert.equal(pm.lines[0], '최대 단계 · 로봇 직격 피해 2.5'); assert.equal(pm.lines[1], '1번 보스: 72발');
   assert.equal(upgradeLines({ multi: 3 }, 'multi').lines[0], '최대 단계 · 로봇이 한 번에 4발');
   //  단계별 값이 규칙 효과와 같다(meta.effects) — 발 수는 규칙처럼 여유값을 둔 계산(보스 330·피해 2.2 = 150발, UP-INT 와 같은 값)
   assert.equal(shotsToKill(180, effects({ power: 1 }).dmgMul), 139);

@@ -14,6 +14,7 @@ import { squadFrame, shapeHitsBox } from '../rush3/bossatk.js';
 import { stageValue, runCoins } from '../rush3/coins.js';
 import { createRenderer3, MID_LOOK, ATK_DANGER } from '../rush3/render.js';
 import { makeFx, MID_BANNER_TEXT, coinBreakdown, upgradeLines } from '../rush3/main.js';
+import { bossName, MID_NAMES } from '../rush3/names.js';
 import { bootApp } from './lib/rush3-shell.mjs';
 
 const MID_IDS = [2, 5, 8, 11, 14, 17, 20, 23];
@@ -159,10 +160,13 @@ test('MIDBOSS 처치 = 승리 + 판 끝 목표 몫 코인(V × 0.5 — 결과 �
     const c = runCoins(run.stage ?? buildStage(id, { difficulty: 'brutal' }), log, { cleared: true, firstClear: false });
     assert.equal(c.boss, Math.round(stageValue(id) * 0.5), `S${id}: 판 끝 목표 몫 = V × 0.5`);
   }
-  assert.equal(coinBreakdown({ enemy: 3, boss: 14, goal: 'mid' }), '적 3 · 중간 보스 14');
+  //  r4.28: 이름이 있으면 이름(결과 줄) · 없으면 '강적'
+  assert.equal(coinBreakdown({ enemy: 3, boss: 14, goal: 'mid' }), '적 3 · 강적 14');
+  assert.equal(coinBreakdown({ enemy: 3, boss: 14, goal: 'mid', goalName: '가시바퀴' }), '적 3 · 가시바퀴 14');
   //  강화 화면 직격 화력 미리보기: 중간 보스 판은 '중간 보스' · 대물결 판(보스 없음)은 그 줄이 없다
   const Z0 = { power: 0, rate: 0, multi: 0 };
-  assert.match(upgradeLines(Z0, 'power', { stageId: 2, bossHp: 2765, mid: true }).lines[1], /^2번 중간 보스\(체력 2765\): 2765발 → \d+발$/);
+  assert.match(upgradeLines(Z0, 'power', { stageId: 2, bossHp: 2765, mid: true, name: '가시바퀴' }).lines[1], /^2번 가시바퀴: 2765발 → \d+발$/);
+  assert.match(upgradeLines(Z0, 'power', { stageId: 2, bossHp: 2765, mid: true }).lines[1], /^2번 강적: /);
   assert.equal(upgradeLines(Z0, 'power', { stageId: 4, bossHp: null }).lines[1], null);
   //  겹침 접촉: 중간 보스가 부대 위에 올라앉아도(돌진 밖) 접촉 피해가 없다
   const r = midRun(5, 30, 240);
@@ -197,17 +201,18 @@ const drawOps = (run) => { const { ctx, ops } = recCtx(); createRenderer3(ctx, n
 const hasColor = (ops, c) => ops.some((o) => ((o.op === 'fill' || o.op === 'fillRect') && o.fill === c) || (o.op === 'stroke' && o.stroke === c));
 
 test("MIDBOSS 그림: 머리 위 이름표 '중간 보스' + 체력 막대(주황 — 남은 체력 비율) · 이름표는 HUD 띠 아래 · 돌진 경보 = 붉은 경보 줄(광역 경보와 같은 색 — 경보 동안만) · HUD 정예 막대 대신 목표 줄 '중간 보스 전투!' · 그리기는 run 을 읽기만 한다", () => {
-  assert.equal(MID_LOOK.label, '중간 보스');
+  //  r4.28: 머리 위 이름표 = 강적 이름(names.bossName — MID_LOOK.label 은 더 쓰지 않는다)
+  assert.equal(bossName({ mid: true, look: { kind: 'rusher' } }), MID_NAMES.E5_wheeler);
   for (const id of MID_IDS) {
     const run = midRun(id, 30, 240);
     const snap = JSON.stringify(run);
     const ops = drawOps(run);
     assert.equal(JSON.stringify(run), snap, `S${id}: 그리기 전후 run 이 같다`);
-    const tag = ops.find((o) => o.op === 'fillText' && o.args[0] === MID_LOOK.label);
+    const tag = ops.find((o) => o.op === 'fillText' && o.args[0] === bossName(run.boss));
     assert.ok(tag, `S${id}: 이름표`);
     assert.ok(tag.args[2] > 80, `S${id}: 이름표가 HUD 띠(목표 줄 y 62) 아래 — y ${tag.args[2].toFixed(1)}`);
     assert.ok(hasColor(ops, MID_LOOK.bar), `S${id}: 체력 막대`);
-    assert.ok(ops.some((o) => o.op === 'fillText' && o.args[0] === '중간 보스 전투!'), `S${id}: HUD 목표 줄`);
+    assert.ok(ops.some((o) => o.op === 'fillText' && o.args[0] === bossName(run.boss) + ' 전투!'), `S${id}: HUD 목표 줄`);
     assert.ok(!ops.some((o) => o.op === 'fillText' && /^정예 /.test(String(o.args[0]))), `S${id}: HUD 정예 막대 글 없음`);
     assert.ok(!hasColor(ops, ATK_DANGER), `S${id}: 경보 전에는 붉은 줄 없음`);
   }
@@ -237,15 +242,15 @@ test("MIDBOSS 셸: 중간 보스가 나오면 '중간 보스 접근!'(정예 경
     h.app.input.state.pointerX = c ? c.goal.x : (r.boss ? r.boss.x : 240);
     const before = h.audio.played.length;
     h.texts.length = 0; h.frames(1);
-    if (h.texts.some((x) => x.text === MID_BANNER_TEXT)) banner = true;
+    if (r.boss && h.texts.some((x) => x.text === bossName(r.boss) + ' 접근!')) banner = true;
     if (h.audio.played.slice(before).includes('lotWarn')) warn = true;
   }
-  assert.ok(banner, "'중간 보스 접근!' 배너");
+  assert.ok(banner, "'<강적 이름> 접근!' 배너");
   assert.ok(warn, '돌진 경보음');
   assert.equal(h.app.getState(), 'result');
   const res = h.app.getResult();
   assert.equal(res.won, true);
   assert.equal(res.coins.goal, 'mid');
-  assert.match(res.coinLine, /중간 보스 \d+/, "결과 내역 이름 '중간 보스'");
+  assert.ok(res.coinLine.includes(MID_NAMES.E5_wheeler.replace(/ /g, ' ') + ' '), '결과 내역 이름 = 강적 이름: ' + res.coinLine);
   assert.equal(stageKindOf(2, 'brutal'), 'mid');
 });

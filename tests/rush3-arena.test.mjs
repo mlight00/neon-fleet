@@ -12,6 +12,7 @@ import { makeBullet, weaponStats } from '../rush3/weapons.js';
 import { formationHalfWidth, SQUAD_DEFAULTS } from '../rush3/squad.js';
 import { createInput, isSteerKey } from '../rush3/input.js';
 import { createRenderer3 } from '../rush3/render.js';
+import { bossName } from '../rush3/names.js';
 import { boot, ARENA_GUIDE_TEXT } from '../rush3/main.js';
 import { projectorFor } from '../rush3/project.js';
 //  r3.20 검수 반영(2026-09-20): 셸의 세로 드래그(dragDy)도 부대 줄 기울기 near 로 나눈다 — 화면 −100 논리 px = −100/near 트랙 px
@@ -510,8 +511,9 @@ test('V3-ARENA A-12: 렌더 — 광장 바닥 40~440·히어로 y = LINE_Y + ay�
   //  히어로 폴백(그림 없음): moveTo(px, py − 23), now = π/9 → bob ≈ 0
   const heroY = LINE_Y + run.ay - SQ.heroSize / 2;
   assert.ok(ops.some((o) => o.op === 'moveTo' && Math.abs(o.args[1] - heroY) < 1e-6), '히어로 y ' + heroY);
-  assert.ok(texts(ops).includes('아레나 전투!'), texts(ops).filter((s) => String(s).includes('전투')).join('|'));
-  assert.ok(texts(ops).some((t) => /^정예 \d+ \/ 500$/.test(String(t))), 'HUD 정예 막대 그대로');
+  //  r4.28: 목표 줄·체력 막대 = 보스 이름(옛 '아레나 전투!'·'정예 N / M')
+  assert.ok(texts(ops).includes(bossName(run.boss) + ' 전투!'), texts(ops).filter((s) => String(s).includes('전투')).join('|'));
+  assert.ok(texts(ops).some((t) => String(t).startsWith(bossName(run.boss) + ' ') && String(t).endsWith(' / 500')), 'HUD 보스 막대(이름 + 체력 / 최대)');
   //  예고 원 + 점선
   until(run, (r) => r.boss.state === 'warn', at(240));
   const sy = (z) => LINE_Y - (z - run.z);
@@ -581,7 +583,7 @@ test('V3-ARENA A-13: 셸 — 진입 프레임에 배너·열림 연출·lotWarn/
   assert.deepEqual(fx.arenaText, ARENA_GUIDE_TEXT);
   assert.ok(audio.played.includes('elite') && audio.bgm.some((b) => b.includes('boss')), '정예 등장 결선 재사용');
   shown.length = 0; frames(1);
-  assert.ok(shown.includes(ARENA_GUIDE_TEXT[0]) && shown.includes('아레나 전투!'), shown.filter((s) => s.includes('드래그') || s.includes('전투')).join('|'));
+  assert.ok(shown.includes(ARENA_GUIDE_TEXT[0]) && shown.includes(bossName(run().boss) + ' 전투!'), shown.filter((s) => s.includes('드래그') || s.includes('전투')).join('|'));
   //  마우스 세로 이동(캔버스 CSS 240×400 = 논리 절반): 첫 이동은 기준만 잡고, 둘째 이동 −50 CSS = −100 화면 논리 px = −100/near 트랙 px → 다음 STEP 에 ay < 0
   app.input.state.pointerX = 240;
   canvas.fire('pointermove', { clientX: 120, clientY: 300, pointerType: 'mouse', pointerId: 1 });
