@@ -1,3 +1,18 @@
+# 스타포지 러시 v3 — 작업 상태 (2026-09-30 저녁)
+
+라이브 https://mlight00.github.io/neon-fleet/rush3.html · master = `4ae4ff0`(r4.29 + 문서) · 브랜치 `claude/starforge-v3`
+검사: `node --test tests/rush3-*.test.mjs` 542 · `node --test tests/rush-*.test.mjs` 32 (전부 통과)
+
+## 개선 루프(2026-09-27 이사님 지시 "스스로 계속 업그레이드") · 9/30 이사님 지시
+
+- 규칙 `newmode/v3/loop/LOOP.md` · 기록 `CHANGELOG.md`(r4.12 ~ r4.29) · 후보 `BACKLOG.md` · 지시 대기열 `INBOX.md`(루프가 가장 먼저 읽는다).
+- 예약: 매일 10:23 · 16:23(CronCreate a68f11ea — 이 세션 안에서만 산다, 10/5 저절로 끝남 → 그때 다시 걸지 여쭙기).
+- 9/30 지시 처리: 아이폰 소리 시험 보류(3-9·3-10) · r4.28 보스 5·강적 8 이름(`rush3/names.js`) · r4.29 난이도 올림 — 무리 체력 바닥(`BAL3.crowd`: 일반 무리 위협 0.6 → 1.0(6번부터) · 웨이브 1.0 → 1.6(10번부터)) + 웨이브 적 수 × 3.
+- **다음(이사님 답 대기)**: r4.29 실플레이 소감 "몇 번 판부터 어렵다" → `BAL3.crowd` 출발값·상한 한 줄 보정. 이번 변경은 1~3번이 가장 크고(4~7배) 8·9번이 가장 작다(약 1.3배). 결정 대기 목록은 `BACKLOG.md` 아래쪽.
+- 난이도는 봇으로 판단하지 않는다(봇 승패는 기록만). 계측 도구 `E:\workspace\claude\neon-fleet\review\20260930_hard\`(threat2 · overlap · botrec · rules_cost · capture_r429 · perf_before_root = 바꾸기 전 사본).
+
+---
+
 # 스타포지 러시 v3 — 작업 상태 (2026-09-27 새벽)
 
 라이브 https://mlight00.github.io/neon-fleet/rush3.html · master = `2dbcb0e`(r4.11) · 브랜치 `claude/starforge-v3`
