@@ -139,6 +139,16 @@ export function leadEntities(run, prev, a) {
   return undo;
 }
 
+/** r4.27 부대 좌우(run.x → 목표 tx)·광장 위아래(run.ay → 목표 tay) 앞당기기: 목표 쪽으로 움직일 때만 (지금 − 직전) × a 만큼, 목표를 넘지 않게.
+ *  멀어지는 쪽(방향을 바꾼 순간)·멈춤·a = 0 이면 지금 값 그대로 — 손을 떼거나 방향을 바꿀 때 한 프레임 튀어 보이지 않는다 */
+export function leadToward(cur, prev, target, a) {
+  if (!(a > 0) || !Number.isFinite(cur) || !Number.isFinite(prev) || !Number.isFinite(target)) return cur;
+  const d = cur - prev, toT = target - cur;
+  if (d === 0 || toT === 0 || Math.sign(d) !== Math.sign(toT)) return cur;
+  const nx = cur + d * a;
+  return d > 0 ? Math.min(nx, target) : Math.max(nx, target);
+}
+
 export function makeLoop({ step = STEP, onStep, maxSteps = 5 } = {}) {
   let acc = 0, last = null, running = false;
   const EPS = 1e-9;
@@ -675,7 +685,7 @@ export function boot(canvas, deps = {}) {
   let state = 'title', run = null, renderer = null, buttons = [], fx = makeFx();
   //  r4.24 마지막 프레임을 그릴 때 쓴 부대 전진 위치(카메라 z — 90Hz·144Hz 외삽 포함). 검사·확인용(getCamZ)
   let camZ = null;
-  //  r4.26 마지막 프레임의 앞당김 { a: 비율(0~1), n: 앞당긴 탄·적·보스 수 } — 검사·확인용(getLeadStats)
+  //  r4.26 마지막 프레임의 앞당김 { a: 비율(0~1), n: 앞당긴 탄·적·보스 수, x: 그린 부대 좌우 위치(r4.27) } — 검사·확인용(getLeadStats)
   let leadStats = { a: 0, n: 0 };
   //  r4.11 불러온 그림 묶음(ready 뒤) — 보스 처치 연출이 몸 시트 유무를 본다(없으면 종전 섬광·다단 폭발)
   let sprites = null;
@@ -705,7 +715,9 @@ export function boot(canvas, deps = {}) {
   const heroGuard = deps.heroGuard ?? true;
   //  r4.26: 스텝마다 직전 위치를 기억(그릴 때 탄·적·보스를 앞당기는 데 쓴다 — frame())
   const prevPos = new WeakMap();
-  const loop = makeLoop({ step: STEP, onStep: () => { rememberEntityPos(run, prevPos); stepRun(run, input.snapshot(), STEP); } });
+  //  r4.27: 부대 좌우·광장 위아래의 스텝 직전 값(그릴 때 목표 쪽으로만 앞당긴다 — leadToward)
+  let prevRunX = null, prevRunAy = null;
+  const loop = makeLoop({ step: STEP, onStep: () => { rememberEntityPos(run, prevPos); prevRunX = run.x; prevRunAy = run.ay; stepRun(run, input.snapshot(), STEP); } });
 
   //  DPR 반영: 백킹스토어 = CSS 크기 × min(devicePixelRatio, 2)
   //   r4.22: 화소 수를 바꾸면 캔버스의 기본 크기가 바뀌어 보이는 크기(CSS)도 따라 커진다(태블릿·큰 화면 — 480×800 에서 화면 높이까지).
@@ -1764,9 +1776,15 @@ export function boot(canvas, deps = {}) {
     const z0 = run ? run.z : 0;
     camZ = run ? z0 + lead : null;
     const undo = a ? leadEntities(run, prevPos, a) : null;
-    leadStats = { a, n: undo ? undo.n : 0 };
+    //   r4.27: 부대 좌우·광장 위아래도 목표 쪽으로만 앞당긴다(목표를 넘지 않게)
+    const x0 = run ? run.x : 0, ay0 = run ? run.ay : undefined;
+    if (a) {
+      run.x = leadToward(x0, prevRunX, run.tx, a);
+      if (Number.isFinite(ay0)) run.ay = leadToward(ay0, prevRunAy, run.tay, a);
+    }
+    leadStats = { a, n: undo ? undo.n : 0, x: run ? run.x : null };
     if (lead) run.z = z0 + lead;
-    try { renderer.draw(v); } finally { if (lead) run.z = z0; if (undo) undo(); }
+    try { renderer.draw(v); } finally { if (lead) run.z = z0; if (undo) undo(); if (a) { run.x = x0; if (Number.isFinite(ay0)) run.ay = ay0; } }
     raf(frame);
   }
 

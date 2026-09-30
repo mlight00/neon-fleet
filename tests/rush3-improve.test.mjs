@@ -10,6 +10,7 @@
 //  IMP-7(r4.24): 90Hz·144Hz 매끄럽게 — 고정 스텝(60Hz) 사이 프레임에는 그리는 카메라 z 만 남은 시간만큼 앞당긴다(외삽). 정확히 60Hz 면 카메라 = run.z(종전과 같다)
 //  IMP-8(r4.25): 링크 미리보기·아이콘 — rush3.html 의 og 제목·설명·그림(1200×630 JPEG, 절대 주소)과 아이콘 링크가 실제 파일을 가리키고 크기가 맞다
 //  IMP-9(r4.26): 고주사율 매끄럽게 2 — 스텝 직전 위치를 기억해 두고 그릴 때만 탄·적·보스를 같은 비율로 앞당긴다(leadEntities). 60Hz 면 앞당김 0
+//  IMP-10(r4.27): 부대 좌우·광장 위아래 앞당기기 — 목표(tx·tay) 쪽으로 움직일 때만, 목표를 넘지 않게(leadToward). 방향을 바꾼 순간·멈춤·60Hz 는 그대로
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRenderer3, ARM_LINE_TEXT } from '../rush3/render.js';
@@ -20,7 +21,7 @@ import { makeFx, hitButton, hitButtonTouch, TOUCH_MIN, HUD_BTN, timeShort, timeT
 import { stageVersion } from '../rush3/stages.js';
 import { BAL3 } from '../rush3/balance.js';
 import { bootApp, fakeCanvas, fakeAudio, memStorage } from './lib/rush3-shell.mjs';
-import { boot, rememberEntityPos, leadEntities } from '../rush3/main.js';
+import { boot, rememberEntityPos, leadEntities, leadToward } from '../rush3/main.js';
 import { createSave3 } from '../rush3/save.js';
 import { readFileSync, existsSync } from 'node:fs';
 
@@ -305,4 +306,40 @@ test('IMP-9b: 셸 — 90Hz 에서 스텝이 없는 프레임에도 탄·적을 �
   assert.ok(still.every((f) => f.a > 0 && f.n > 0), '90Hz: 그 프레임마다 탄·적을 앞당긴다 — 못 한 프레임 ' + still.filter((f) => !(f.n > 0)).length);
   const f60 = await trace(60);
   assert.ok(f60.every((f) => f.a === 0 && f.n === 0), '60Hz: 앞당김 0');
+});
+
+test('IMP-10: 부대 좌우 앞당기기 — 목표 쪽으로 움직일 때만 (지금 − 직전) × a · 목표를 넘지 않는다 · 목표에서 멀어지는 쪽(방향 바꾼 순간)·멈춤·a = 0 은 그대로', () => {
+  assert.equal(leadToward(200, 195, 260, 0.5), 202.5, '오른쪽으로 가는 중(목표 260)');
+  assert.equal(leadToward(200, 205, 100, 0.5), 197.5, '왼쪽으로 가는 중(목표 100)');
+  assert.equal(leadToward(258, 250, 260, 0.5), 260, '목표를 넘지 않는다(258 + 4 → 260)');
+  assert.equal(leadToward(200, 195, 150, 0.5), 200, '방금 방향을 바꿨다(오른쪽으로 오던 중 목표가 왼쪽) → 그대로');
+  assert.equal(leadToward(200, 200, 260, 0.5), 200, '멈춰 있다');
+  assert.equal(leadToward(260, 255, 260, 0.5), 260, '이미 목표');
+  assert.equal(leadToward(200, 195, 260, 0), 200, 'a = 0');
+  assert.equal(leadToward(200, null, 260, 0.5), 200, '직전 값이 없다');
+});
+
+test('IMP-10b: 셸 — 90Hz 에서 오른쪽 키를 누르는 동안 그린 부대 위치가 매 프레임 오른쪽으로 나아가고 목표를 넘지 않는다 · 60Hz 면 그린 위치 = 규칙 위치', async () => {
+  async function trace(hz) {
+    const queue = [];
+    let nowMs = 1000;
+    const app = boot(fakeCanvas([]), { win: { devicePixelRatio: 1, location: { search: '' }, addEventListener() {} }, doc: null, raf: (f) => queue.push(f), now: () => nowMs,
+      save: createSave3(memStorage()), audio: fakeAudio(), dateNow: () => 1_700_000_000_000, sprites: { get: () => null, ready: new Set() } });
+    await app.ready;
+    const tick = () => { nowMs += 1000 / hz; queue.shift()(nowMs); };
+    app.startRun(1);
+    for (let i = 0; i < 30; i++) tick();
+    app.input.onKey('ArrowRight', true);
+    const out = [];
+    for (let i = 0; i < Math.round(hz * 0.4); i++) { tick(); const r = app.getRun(); out.push({ drawn: app.getLeadStats().x, x: r.x, tx: r.tx }); }
+    app.input.onKey('ArrowRight', false);
+    return out;
+  }
+  const f90 = await trace(90);
+  const d = f90.slice(1).map((f, i) => f.drawn - f90[i].drawn);
+  assert.ok(d.every((v) => v > 0), '90Hz: 그린 위치가 매 프레임 오른쪽으로 — 멈춘 프레임 ' + d.filter((v) => !(v > 0)).length + '/' + d.length);
+  assert.ok(f90.every((f) => f.drawn <= f.tx + 1e-9), '목표를 넘지 않는다');
+  assert.ok(f90.some((f) => f.drawn > f.x), '규칙 위치보다 앞선 프레임이 있다(앞당김)');
+  const f60 = await trace(60);
+  assert.ok(f60.every((f) => f.drawn === f.x), '60Hz: 그린 위치 = 규칙 위치');
 });
