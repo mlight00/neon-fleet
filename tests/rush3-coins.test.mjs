@@ -14,7 +14,7 @@ import { createSave3, KEY3, WALLET_KEY, TAB_KEY, COIN_MAX, PAID_KEEP, normWallet
 import { createRenderer3, HUD_ROW, SAVE_WARN } from '../rush3/render.js';
 import { boot, HUD_BTN, TITLE_GRID, LOCK_NOTICE, ALL_CLEAR_LINE, unlockedThrough, causeLine, coinBreakdown } from '../rush3/main.js';
 import { ADVICE_DEFAULT } from '../rush3/advice.js';
-import { pickInput, weakenBosses, weakenBounties, wipeSquad } from './lib/rush3-policies.mjs';
+import { pickInput, weakenBosses, weakenBounties, weakenCrowd, wipeSquad } from './lib/rush3-policies.mjs';
 import { seedOldClears } from './lib/rush3-unlock.mjs';
 
 const C = BAL3.colors;
@@ -32,6 +32,8 @@ function playEvents(id, policy, difficulty = 'brutal', maxSteps = 14400, opts = 
   const sched = () => events.filter((e) => e.type === 'kill' && !e.summoned && !e.bounty).length;
   while (!run.over && n < maxSteps) {
     if (opts.win) weakenBosses(run); if (opts.weakBounty) weakenBounties(run);
+    //  opts.weakCrowd = 일반 적이 나오면 체력 1(weakenCrowd — r4.29 무리 체력 바닥으로 봇이 N 마리를 잡기 전에 져, '정확히 N 마리 잡고 진 판'을 만드는 검사 도구, 난이도와 무관)
+    if (opts.weakCrowd) weakenCrowd(run);
     if (opts.loseAt != null && sched() >= opts.loseAt) wipeSquad(run);
     //  opts.keepAlive = 병사가 쓰러지지 않게(표본을 모으는 검사 도구 — 소환 처치 표본을 보스전 끝까지 모은다, 난이도와 무관)
     if (opts.keepAlive) for (const u of run.units) u.hp = 1e9;
@@ -142,7 +144,8 @@ test('COIN-1: 공식 P2 — V(s) = 24 + 2s, 일정 스폰 1마리 = V ÷ 일정 
   //   r4.10: 게임 줄 1번은 대물결 판 — 대물결 겹(잡졸 8 × 1.8 = 14)도 일정 스폰이라 분모 44 + 14 = 58(적 몫 합계 V 는 그대로)
   const st1 = buildStage(1, { difficulty: 'brutal' });
   const hordeN = st1.spawns.filter((sp) => sp.horde).reduce((a, sp) => a + sp.n, 0);
-  assert.equal(hordeN, 14, '1번 대물결 = 가벼운 잡졸 무리 14');
+  //   r4.29 웨이브 적 수 × BAL3.crowd.waveCountMul(3): 잡졸 8 × 3 × 1.8 = 43 → 분모 44 + 43 = 87(적 몫 합계 V 는 그대로 — 한 마리 몫이 줄 뿐)
+  assert.equal(hordeN, 43, '1번 웨이브 = 잡졸 무리 43(r4.29 적 수 × 3)');
   assert.equal(scheduledEnemyCount(st1) - hordeN, 44);
   assert.equal(scheduledEnemyCount(st1), N1);
   assert.equal(scheduledEnemyCount(buildStage(2, { difficulty: 'brutal' })), 38);
@@ -162,7 +165,8 @@ test('COIN-1: 공식 P2 — V(s) = 24 + 2s, 일정 스폰 1마리 = V ÷ 일정 
   assert.deepEqual(runCoins(r.stage, r.events, { cleared: true, firstClear: false }), { enemy: main - 13, boss: 13, bounty: 0, clear: 5, bonus: 0, total: main + 5 });
   assert.deepEqual([EV1_FIRST, EV1_REPLAY, EV1_MAIN], [main + 26, main + 5, main]);
   //  2번 패배 = 일정 스폰 10마리 × V(2) 28 ÷ 38 = 7.37 → 7(F '2번에서 한 번 지면 7코인') — r4.10: 패배는 10마리째에 부대 전멸로 만든다(검사 도구)
-  const r2 = playEvents(2, 'evLead', 'brutal', 14400, { loseAt: 10 });
+  //   r4.29: 무리 체력 바닥으로 봇이 10마리를 잡기 전에 져서, 일반 적은 나오면 체력 1(weakCrowd — 검사 도구, 난이도와 무관)
+  const r2 = playEvents(2, 'evLead', 'brutal', 14400, { loseAt: 10, weakCrowd: true });
   assert.equal(r2.run.won, false);
   assert.equal(r2.events.filter((e) => e.type === 'kill' && !e.summoned && !e.bounty).length, 10);
   assert.deepEqual([runCoins(r2.stage, r2.events, { cleared: false }).enemy, runCoins(r2.stage, r2.events, { cleared: false }).boss], [7, 0]);

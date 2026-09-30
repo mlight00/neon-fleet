@@ -13,7 +13,7 @@ import { coinBreakdown } from '../rush3/main.js';
 import { BOUNTY_LOOK, hitRole } from '../rush3/render.js';
 import { bountyFight } from './lib/rush3-bountyfight.mjs';
 import { bootApp } from './lib/rush3-shell.mjs';
-import { weakenBosses, weakenBounties, pickInput } from './lib/rush3-policies.mjs';
+import { weakenBosses, weakenBounties, weakenCrowd, pickInput } from './lib/rush3-policies.mjs';
 
 const B = BAL3.bounty;
 //  합성 판(규칙 단위 검사): 게임 줄(brutal) 표로 만든 run 에 현상금 적 1체
@@ -212,6 +212,8 @@ test('BOUNTY-6: 셸 — 현상금 적 그림(금색 테·이름표·체력 숫�
     h.app.input.state.pointerX = b ? b.x : pickInput('evLead', run).pointerX;
     if (b && b.z - run.z < 250) weakenBounties(run, 3);
     weakenBosses(run);
+    //  r4.29: 무리 체력 바닥(BAL3.crowd)으로 이 봇 부대가 현상금 적 전에 덮인다 — 일반 적은 나오면 체력 1(weakenCrowd, 검사 도구 — 규칙 불변)
+    weakenCrowd(run);
     h.texts.length = 0; h.ops.length = 0;
     const c0 = h.app.dbg().coins;
     h.frames(1);

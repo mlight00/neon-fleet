@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """r4.17 휴대폰 성능 측정(개선 루프 6바퀴): 무거운 장면의 프레임 시간을 CPU 를 N배 느리게 흉내 내어(CDP Emulation.setCPUThrottlingRate) 잰다.
    장면: A = 일반 구간 병사 150명·적 다수(13판 중간) · B = 광장 보스전 병사 100명(24판) · C = 대물결 끝 병사 120명(22판) · D = 보스 광역 공격 병사 100명(12판 쇳물)
+        · E(r4.29) = 웨이브 한가운데 병사 120명(19판 — 웨이브 적 수 × 3 뒤 가장 많은 135체. 웨이브 시작 100px 앞으로 건너뛰어 데우는 2초 동안 세 겹이 다 들어온다)
+        ⚠️C 는 결승선 200px 앞으로 건너뛰면서 웨이브 스폰을 모두 건너뛰어 적이 0 이다(끝 구간 장면) — 적이 많은 장면은 E
    재는 것(장면마다 2초 데우고 6초): 프레임 간격 중간값·95%값·16.7ms(60fps) 넘은 비율 · 한 프레임 스크립트 시간(rAF 콜백 안 — 규칙 STEP + 그리기) 중간값·95%값.
    캡처용 조작(앞 구간 건너뛰기·병력 채우기·병사 보호·광장 충격 끄기)은 장면을 만들려는 것일 뿐 규칙·난이도와 무관하다. 임시 정적 서버는 끝나면 끈다.
    사용: python tools/perf_probe.py [--rate 4] [--out 폴더] [--root 저장소] [--scenes A,B,C,D]"""
@@ -31,7 +33,9 @@ INIT = r"""
 } catch (e) {}
   window.__rec = false; window.__ts = []; window.__js = [];
   const raf = window.requestAnimationFrame.bind(window);
-  window.requestAnimationFrame = (cb) => raf((t) => { const s = performance.now(); cb(t); if (window.__rec) { window.__ts.push(t); window.__js.push(performance.now() - s); } });
+  window.__maxE = 0;
+  window.requestAnimationFrame = (cb) => raf((t) => { const s = performance.now(); cb(t); if (window.__rec) { window.__ts.push(t); window.__js.push(performance.now() - s);
+    try { const r = window.__rush3App && window.__rush3App.getRun(); if (r) window.__maxE = Math.max(window.__maxE, r.enemies.length); } catch (e) {} } });
 })();
 """ % SEED
 GUARD = """() => { clearInterval(window.__guard); window.__guard = setInterval(() => { const a = window.__rush3App; const r = a && a.getRun();
@@ -46,7 +50,8 @@ ENDZ = "() => { const r = window.__rush3App.getRun(); return r.eliteZ ?? r.finis
 COUNTS = "() => { const r = window.__rush3App.getRun(); return { units: r.units.length, enemies: r.enemies.length, bullets: r.bullets.length, eshots: (r.eshots || []).length, bosses: (r.bosses || []).filter((b) => !b.dead).length, state: window.__rush3App.getState() }; }"
 #  장면: (이름, 판, 위치(끝맺음 기준 비율 또는 끝맺음 − px), 병력)
 SCENES = {'A': ('일반 구간 병사 150명', 13, ('frac', 0.55), 150), 'B': ('광장 보스전 병사 100명', 24, ('end', -30), 100),
-          'C': ('대물결 끝 병사 120명', 22, ('end', -200), 120), 'D': ('보스 광역 공격 병사 100명', 12, ('end', -30), 100)}
+          'C': ('대물결 끝 병사 120명', 22, ('end', -200), 120), 'D': ('보스 광역 공격 병사 100명', 12, ('end', -30), 100),
+          'E': ('웨이브 한가운데 병사 120명', 19, ('end', -1300), 120)}
 
 def pct(xs, q):
     if not xs: return None
@@ -78,9 +83,9 @@ try:
             cdp = c.new_cdp_session(p)
             cdp.send('Emulation.setCPUThrottlingRate', {'rate': o.rate})
             p.wait_for_timeout(2000)
-            p.evaluate('() => { window.__ts = []; window.__js = []; window.__rec = true; }')
+            p.evaluate('() => { window.__ts = []; window.__js = []; window.__maxE = 0; window.__rec = true; }')
             p.wait_for_timeout(6000)
-            ts, js = p.evaluate('() => { window.__rec = false; return [window.__ts, window.__js]; }')
+            ts, js, maxE = p.evaluate('() => { window.__rec = false; return [window.__ts, window.__js, window.__maxE]; }')
             cnt = p.evaluate(COUNTS)
             cdp.send('Emulation.setCPUThrottlingRate', {'rate': 1})
             p.screenshot(path=os.path.join(o.out, 'scene_%s.png' % key))
@@ -88,7 +93,7 @@ try:
             r = {'scene': name, 'stage': sid, 'frames': len(ts), 'fps': round(len(gaps) / (sum(gaps) / 1000), 1) if gaps else 0,
                  'gapMedMs': round(pct(gaps, 0.5), 1) if gaps else None, 'gapP95Ms': round(pct(gaps, 0.95), 1) if gaps else None,
                  'over16_7': round(sum(1 for g in gaps if g > 17.5) / max(1, len(gaps)), 2),
-                 'jsMedMs': round(pct(js, 0.5), 2) if js else None, 'jsP95Ms': round(pct(js, 0.95), 2) if js else None, 'counts': cnt}
+                 'jsMedMs': round(pct(js, 0.5), 2) if js else None, 'jsP95Ms': round(pct(js, 0.95), 2) if js else None, 'maxEnemies': maxE, 'counts': cnt}
             res[key] = r
             print(key, json.dumps(r, ensure_ascii=False), flush=True)
             c.close()

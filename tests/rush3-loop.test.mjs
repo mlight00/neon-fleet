@@ -1,6 +1,6 @@
 // rush3-loop — 셸 묶음(계약서 8장 V3-DETERMINISM·V3-INPUT + boot 스모크). DOM 없이 main.js 를 import 한다.
 import { test } from 'node:test';
-import { pickInput, weakenBosses, weakenBounties } from './lib/rush3-policies.mjs';
+import { pickInput, weakenBosses, weakenBounties, weakenCrowd } from './lib/rush3-policies.mjs';
 import assert from 'node:assert/strict';
 import { projectorFor } from '../rush3/project.js';
 import { hitButton, makeLoop, boot, missedLine, timeText, lotteryLine,
@@ -804,7 +804,8 @@ async function armLotteryGate(pick, guardMax = 6000) {
   const row = () => run().gateRows.find((r) => r.id === rowId);
   assert.ok(row(), pick + ': 랜덤 길 게이트 행이 있다');
   let guard = 0;
-  while (!row().armed && guard++ < guardMax) { app.input.state.pointerX = run().z >= 4000 ? 330 : 240; frames(1); }
+  //  r4.29: 무리 체력 바닥(BAL3.crowd)으로 이 단순 조작 부대가 랜덤 길 전에 덮인다 — 일반 적·현상금 적은 나오면 체력 1(weakenCrowd·weakenBounties, 검사 도구, 규칙 불변)
+  while (!row().armed && guard++ < guardMax) { weakenCrowd(run()); weakenBounties(run()); app.input.state.pointerX = run().z >= 4000 ? 330 : 240; frames(1); }
   assert.ok(guard < guardMax, pick + ': 랜덤 길 게이트의 셔터가 열렸다');
   return { rowId, tip: app.getFx().gateTip[rowId], row: row() };
 }
@@ -927,14 +928,15 @@ async function trapWindows(pick) {
   //  앞 게이트(z4000)의 소리가 섞이지 않게 z 4200 이후부터 듣는다
   //  r4.7: 게임 줄 3번 현상금 적(z 4100)은 나오면 체력 1(weakenBounties — 이 단순 조작 부대가 덮이지 않고 랜덤 길까지 가게. 검사 도구, 규칙 불변)
   let guard = 0;
-  while (run().z < 4200 && guard++ < 4000) { weakenBounties(run()); app.input.state.pointerX = run().z >= 4000 ? 330 : 240; frames(1); }
+  //  r4.29: 무리 체력 바닥(BAL3.crowd)으로 탄이 적에 막혀 게이트 소리 창이 비고 부대도 덮인다 — 일반 적도 나오면 체력 1(weakenCrowd, 검사 도구, 규칙 불변)
+  while (run().z < 4200 && guard++ < 4000) { weakenCrowd(run()); weakenBounties(run()); app.input.state.pointerX = run().z >= 4000 ? 330 : 240; frames(1); }
   assert.ok(guard < 4000, pick + ': z4200 까지 왔다');
   const hidden = [], shownClosed = [];
   let tipWhileClosed = 'none';
   guard = 0;
   while (!row().armed && guard++ < 4000) {
     const from = audio.played.length;
-    weakenBounties(run());
+    weakenCrowd(run()); weakenBounties(run());
     app.input.state.pointerX = 330;
     frames(1);
     const heard = audio.played.slice(from).map((p) => p[0]);

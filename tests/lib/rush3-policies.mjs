@@ -200,6 +200,13 @@ export function weakenBounties(run, hp = 1) {
   for (const e of (run && run.enemies) || []) if (e.kind === 'bounty' && !e.dead && e.hp > hp) e.hp = hp;
 }
 
+//  r4.29 셸 흐름 검사 도구: 일정 스폰·소환 적(현상금 제외 — 위 weakenBounties)이 나오면 체력을 hp 로 깎는다. 무리 체력 바닥(BAL3.crowd, r4.29)으로
+//   단순 조작 부대의 탄이 적에 막혀 게이트까지 가지 못하거나 부대가 덮여, 게이트 소리·랜덤 길처럼 **판 뒤쪽**을 보는 검사가 그 자리까지 가지 못한다 —
+//   규칙은 그대로 두고 run 의 값만 바꾼다(난이도와 무관)
+export function weakenCrowd(run, hp = 1) {
+  for (const e of (run && run.enemies) || []) if (e.kind !== 'bounty' && !e.dead && e.hp > hp) e.hp = hp;
+}
+
 //  r4.10 셸 흐름 검사 도구: 부대를 전멸시켜 '진 판'을 만든다(다음 STEP 에 규칙이 병력 0 → 패배를 낸다). 게임 줄 대물결 판(1·4·7·…)은
 //   봇이 결승선을 넘어 이기는 일이 잦아, 패배 흐름(정산·결과 화면·Enter)을 보는 검사가 이 도구로 패배를 만든다 — 규칙은 그대로 두고 run 의 값만 바꾼다(난이도와 무관)
 export function wipeSquad(run) {

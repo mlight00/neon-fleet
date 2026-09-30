@@ -378,3 +378,68 @@ export function bountyFloor(stage, z, B = BT) {
   FLOOR_CACHE.set(key, res);
   return { ...res };
 }
+
+//  ── 무리 체력 바닥(r4.29 — 이사님 지시 2026-09-30 "현재 9스테이지까지 깼는데 난이도가 아직도 너무너무너무 쉬워" · "실제 웨이브로 느껴지도록 적 숫자를 더 늘려줘") ──
+//  위협 비율 f = 무리 체력 합 ÷ (그 무리 발동 z 까지의 상한 부대 **무리 화력** × 접근 시간 W).
+//   무리 화력 = 상한 병력 × 한 번에 쏘는 발 수 × 한 발 피해 ÷ 발사 간격 — 모든 발이 어느 적에든 맞는다고 본 상한(보스 계산의 '목표에 닿는 발'보다 크다).
+//   W = 스폰 거리(enterZ) ÷ (그 적의 접근 속도 + 전진 속도) — 저격수는 서 있어 전진 속도만 · 돌격체는 가속(45 → 290) 뒤 평균 150 으로 본다.
+//   f = 1 이면 가장 잘 해도 마지막 적이 부대에 닿을 때쯤 다 잡는다(닿은 적 1 = 병사 1 손실 — combat.contacts).
+//  일반 무리는 fRegular — 모자란 무리만 체력을 올린다(내리지 않는다 — 13~24번처럼 이미 높은 무리는 그대로).
+//  웨이브(horde 겹)는 겹 전체 fWave 를 겹마다 나눠 가진다. 게임 화면 줄은 적 수가 늘어(waveCountMul 배) 겹 체력 합 = max(목표, 종전 체력 합(배수 전 적 수 waveBaseN × 체력)) 을
+//   늘어난 적 수로 나눈다 — 한 마리 체력은 낮아질 수 있지만(적 수로 미는 웨이브) 웨이브 전체 힘은 종전보다 약해지지 않는다
+export function crowdDpsAt(stage, z, routes = routeChoices(stage)) {
+  let best = 0;
+  for (const route of routes) {
+    const lo = routeLoadout(stage, route, z);
+    for (const w of weaponOptions(stage.startWeapon, lo.crates)) {
+      const st = weaponStats(w.weapon, w.mk);
+      const dps = dpsOf(w.weapon, w.mk, lo.units * (st.fan || 1));
+      if (dps > best) best = dps;
+    }
+  }
+  return best;
+}
+const RUSHER_AVG_VZ = 150;
+/** 접근 시간(초): 스폰 거리 ÷ (적 접근 속도 + 전진 속도) */
+export function approachSec(kind) {
+  const d = BAL3.enemies[kind] || BAL3.enemies.grunt;
+  const vz = kind === 'rusher' ? RUSHER_AVG_VZ : (d.vz || 0);
+  return ENTER_Z / (vz + BAL3.scroll);
+}
+/** 판 번호의 f 바닥: min(max, f1 + step × (판 − 1)) */
+export function crowdFFor(id, part) {
+  const n = Number.isFinite(id) && id >= 1 ? id : 1;
+  return Math.min(part.max, part.f1 + part.step * (n - 1));
+}
+/** 무리 체력 바닥. stage = buildStage 가 만든 판(spawns 에 n·hp·z·kind·horde). 반환 { fRegular, fWave, hp: [스폰마다 새 체력 | null(현상금)], rows: [보고용] }.
+ *  계산 결과는 판 지문으로 캐시한다(buildStage 가 자주 불린다 — bossFloor 와 같은 방식) */
+export function crowdFloor(stage, C = BAL3.crowd) {
+  const key = floorKey(stage, 'crowd:' + JSON.stringify(C) + ':' + stage.id + ':' + JSON.stringify((stage.spawns || []).map((s) => [s.z, s.kind, s.n, s.hp, !!s.horde, s.waveBaseN ?? null])));
+  const hit = FLOOR_CACHE.get(key);
+  if (hit) return { ...hit, hp: [...hit.hp], rows: hit.rows.map((r) => ({ ...r })) };
+  const fRegular = crowdFFor(stage.id, C.regular), fWave = crowdFFor(stage.id, C.wave);
+  const routes = routeChoices(stage);
+  const memo = new Map();
+  const dpsAt = (z) => { if (!memo.has(z)) memo.set(z, crowdDpsAt(stage, z, routes)); return memo.get(z); };
+  const spawns = stage.spawns || [];
+  const parts = spawns.filter((s) => s.horde && s.kind !== 'bounty').length || 1;
+  const rows = [];
+  const hp = spawns.map((sp) => {
+    if (sp.kind === 'bounty') return null;
+    const n = sp.n ?? 1, cur = sp.hp ?? 0, dps = dpsAt(sp.z), W = approachSec(sp.kind);
+    const f = sp.horde ? fWave / parts : fRegular;
+    const need = f * dps * W;
+    let next;
+    if (sp.horde) { const old = (sp.waveBaseN ?? n) * cur; next = Math.max(1, Math.ceil(Math.max(need, old) / n)); }
+    else next = n * cur >= need ? cur : Math.ceil(need / n);
+    //  보고용 f(소수 둘째 자리): 종전 = 종전 적 수(웨이브 겹은 배수 전 waveBaseN) × 종전 체력, 새 값 = 지금 적 수 × 새 체력
+    const fOf = (count, h) => (dps > 0 ? Math.round((count * h) / (dps * W) * 100) / 100 : null);
+    rows.push({ z: sp.z, kind: sp.kind, n, horde: !!sp.horde, dps: Math.round(dps * 10) / 10, W: Math.round(W * 100) / 100, before: cur, hp: next,
+                fBefore: fOf(sp.horde ? (sp.waveBaseN ?? n) : n, cur), fAfter: fOf(n, next) });
+    return next;
+  });
+  const res = { fRegular, fWave, hp, rows };
+  if (FLOOR_CACHE.size > 500) FLOOR_CACHE.clear();
+  FLOOR_CACHE.set(key, res);
+  return { ...res, hp: [...hp], rows: rows.map((r) => ({ ...r })) };
+}

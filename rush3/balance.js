@@ -125,6 +125,15 @@ export const BAL3 = deepFreeze({
   //   상한 화력 = rush3/firepower.js(그 판을 가장 잘 했을 때 보스 앞 부대가 보스에 **실제로 닿는** 초당 피해 — 강화 0). 보스 여럿은 합으로, 비율 유지.
   //   이 숫자 하나만 바꾸면 24판 보스 체력이 함께 따라간다
   bossMinFightSec: 30,
+  //  r4.29 무리 체력 바닥 · 웨이브 적 수(이사님 지시 2026-09-30 "현재 9스테이지까지 깼는데 난이도가 아직도 너무너무너무 쉬워" ·
+  //   "실제 웨이브로 느껴지도록 적 숫자를 더 늘려줘"). 게임 화면 줄(difficulty 표의 crowdFloor 가 참인 줄 = brutal)에서만 buildStage 가 쓴다.
+  //   위협 비율 f = 무리 체력 합 ÷ (그 무리 발동 z 까지 가장 잘 했을 때 부대의 무리 화력 × 접근 시간) — rush3/firepower.crowdFloor.
+  //   f = 1 이면 가장 잘 쏴도 마지막 적이 부대에 닿을 때쯤 다 잡는다(닿은 적 1 = 병사 1 손실). f 가 모자란 무리만 체력을 올린다(내리지 않는다).
+  //   regular = 일반 무리 f 바닥: min(max, f1 + step × (판 − 1)) — 1번 0.6 → 6번부터 1.0 (종전 1~9번 중앙값 0.11~0.77 · 13~24번 1.0~2.4)
+  //   wave    = 웨이브 겹 전체 f 바닥(겹마다 나눠 가진다): 1번 1.0 → 10번부터 1.6 (종전 1번 0.10 · 4~10번 0.8~0.9 · 13~22번 1.6~3.1)
+  //   waveCountMul = 웨이브 적 수 배수(정의 n × 이 값 → 기본 줄 spawnCount 도 곱한다) · waveRowN = 웨이브 한 줄 적 수(줄 수 = 올림(적 수 ÷ 이 값), 줄 간격 40px)
+  //   ⚠️손잡이 — 이사님 실플레이 소감으로만 올리고 내린다(봇 승패로 정하지 않는다). 보스·강적·현상금 체력은 이 칸과 무관(bossMinFightSec · midBossSec · bounty)
+  crowd: Object.freeze({ regular: Object.freeze({ f1: 0.6, step: 0.08, max: 1.0 }), wave: Object.freeze({ f1: 1.0, step: 0.067, max: 1.6 }), waveCountMul: 3, waveRowN: 10 }),
   //  r4.10 판 끝맺음(이사님 실플레이 5차 2026-09-26 "보스가 모든 스테이지에 나오다보니 지루한 느낌이 든다 … 보스 등장 횟수를 3, 6, 9, 12, 15, 18, 21, 24 스테이지로
   //   줄이고 일반 스테이지는 많은 수의 일반 적이나 좀 더 강한 중간 보스로 대체하자"). 게임 화면 줄(difficulty 표의 bossStages 가 있는 줄 = brutal)에서만
   //   buildStage 가 보스 없는 판의 끝을 **대물결**(결승선 돌파) 또는 **중간 보스**로 바꾼다(판 종류 표 = courses.STAGE_END). 검사용 배수 1 줄(normal)은 모든 판 보스 그대로.
@@ -307,7 +316,7 @@ export const BAL3 = deepFreeze({
     //   r4.7(이사님 실플레이 뒤 지시 2026-09-26 — 결정 D2′ '지옥 값 그대로'를 **보스 체력·보스 탄 피해·현상금 적에 한해** 푼다): bossShotDmg 1/3 · bossFloor true · bounty true
     //   r4.10(이사님 실플레이 5차 2026-09-26): 보스는 3의 배수 판에만(bossStages) — 나머지는 대물결·중간 보스
     brutal: { id: 'brutal', enemyHp: 2,   eshotDmg: 3, touchDmg: 3, eliteHp: 1.5,  spawnCount: 1.8, waves: 2, waveGap: 360, eliteFireRate: 1.5,  shooterFireRate: 1, gateCapMul: 1, eliteSummonRate: 2, extraSpawns: true,
-              bossShotDmg: 1 / 3, bossFloor: true, bounty: true, bossHw: 64, bossPatterns: true, bossStages: [3, 6, 9, 12, 15, 18, 21, 24] },
+              bossShotDmg: 1 / 3, bossFloor: true, bounty: true, bossHw: 64, bossPatterns: true, bossStages: [3, 6, 9, 12, 15, 18, 21, 24], crowdFloor: true },
   },
   //  적 체력 스테이지 배율(r3.21, 이사 결정 2026-09-20 B안 ①): 스테이지 번호 구간별 배수. 잡졸·돌격체·저격수(스폰 정의 hp 명시 포함)와
   //   정예·아레나 보스의 **소환 잡졸**에 곱한다(stages.makeSpawn 이 ev.hp 를 항상 명시하고, combat.enemyDefsFor 가 같은 배율을 표에 박아 소환 경로도 같다).

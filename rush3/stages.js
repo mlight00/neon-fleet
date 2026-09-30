@@ -6,7 +6,7 @@ import { WEAPONS } from './weapons.js';
 import { formation } from './squad.js';
 import { CAPSULE_N_DEFAULT } from './supply.js';
 import { hashSeed, mulberry32 } from '../rush/rng.js';
-import { bossFloor, bountyFloor } from './firepower.js';
+import { bossFloor, bountyFloor, crowdFloor } from './firepower.js';
 import { atkPlanFor } from './bossatk.js';
 
 //  STAGE_IDS = 검사·봇 실측·계약서 기준 코스(1~3, 코스 버전 2). ALL_STAGE_IDS = 셸(타이틀·다음 작전)이 보는 공개 목록 1~24(4~24 는 courses.js).
@@ -304,6 +304,14 @@ function keepOutOfWalls(x, z, r, walls) {
 //   시드는 i 만 쓰므로 늘어난 뒤에도 앞 n 개의 지터는 종전과 같다(cols 가 바뀌면 대역 폭은 달라진다).
 //  적 체력(r3.21 B안): ev.hp 를 **항상** 명시 = round((정의 hp ?? 표 hp) × 스테이지 구간 배율(hpMul) × 난이도 enemyHp). 정의에 hp 가 있는 무리(장갑체 10 등)도
 //   같은 배율을 받는다 — '명시 hp 는 그대로' 원칙(r3.3)은 이사 결정으로 폐기. combat.spawnEnemy 는 ev.hp 를 그대로 쓴다(소환 잡졸은 enemyDefs 표가 같은 배율).
+/** r4.29 게임 화면 줄 웨이브 겹: 적 수 × waveCountMul · 줄 수 = 올림(기본 줄 적 수 ÷ waveRowN) ·
+ *  waveBaseN = 배수 전 정의로 makeSpawn 이 냈을 적 수(줄 뿌리기 = round(n × spawnCount)) — crowdFloor 가 종전 체력 합(waveBaseN × 체력)을 정확히 안다 */
+function waveSpawnDef(sp, mult) {
+  const C = BAL3.crowd;
+  const n = sp.n * C.waveCountMul;
+  const total = Math.max(1, Math.round(n * (mult.spawnCount ?? 1)));
+  return { ...sp, n, rows: Math.max(sp.rows ?? 1, Math.ceil(total / C.waveRowN)), waveBaseN: Math.max(1, Math.round(sp.n * (mult.spawnCount ?? 1))) };
+}
 function makeSpawn(id, sp, walls, mult, hpMul) {
   const r = BAL3.enemies[sp.kind].r;
   //  r3.9: xs 명시 무리는 waves 번 반복 — 같은 xs·같은 통로 규격으로 waveGap px 뒤에 다시 들어온다(출현 빈도 = 난이도)
@@ -340,6 +348,8 @@ function makeSpawn(id, sp, walls, mult, hpMul) {
   if (sp.skin) ev.skin = sp.skin;
   //  r4.10 대물결 겹 표시(희소 — 게임 화면 줄의 대물결 판만). 규칙은 다른 스폰과 똑같이 다루고, 셸(대물결 배너)·검사가 읽는다
   if (sp.horde) ev.horde = true;
+  //  r4.29 웨이브 겹의 배수 전 적 수(게임 화면 줄) — crowdFloor 가 종전 체력 합(waveBaseN × 체력)을 알도록
+  if (sp.waveBaseN) ev.waveBaseN = sp.waveBaseN;
   return ev;
 }
 
@@ -463,7 +473,9 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     walls,
     //  r3.22 지옥 전용 추가 배치 → r4.2 이름 extraSpawns: 배수 표 줄의 extraSpawns 가 참인 줄(기본 줄 brutal)에서만 정의의 extraSpawns 를
     //   spawns **뒤에** 붙인다(뒤에서 z 순 정렬 — 붙이는 순서는 r3.22 와 같다). 검사용 배수 1 줄(normal)의 배치는 불변. spawns 에 합쳐 두지 않는다(V3-DIFF2ROW)
-    spawns: (mult.extraSpawns && d.extraSpawns ? d.spawns.concat(d.extraSpawns) : d.spawns).map(sp => makeSpawn(id, sp, solid, hpMult, hpMul)),
+    //  r4.29 웨이브 적 수(이사님 지시 2026-09-30 "실제 웨이브로 느껴지도록 적 숫자를 더 늘려줘"): 줄 표의 crowdFloor 가 참인 줄(게임 화면)에서만 웨이브 겹(horde) n × BAL3.crowd.waveCountMul,
+    //   줄 수 = 올림(적 수 ÷ waveRowN) — 한 줄에 몰려 겹치지 않게(줄 간격 40px). 체력 바닥은 아래 crowdFloor(판이 다 만들어진 뒤)
+    spawns: (mult.extraSpawns && d.extraSpawns ? d.spawns.concat(d.extraSpawns) : d.spawns).map(sp => makeSpawn(id, mult.crowdFloor && sp.horde ? waveSpawnDef(sp, mult) : sp, solid, hpMult, hpMul)),
     //  정예(r3.16 복수 정예): 정의 `elites: [...]`(1~3체) 또는 단수 `elite`(배열 1개로 정규화). 원소 z 는 정의의 eliteZ(전원 같은 z 에서 함께 등장).
     //   난이도 배수 eliteHp 는 원소마다 반올림 적용(종전과 같은 자리). role/x/patrol 은 정의에 있을 때만 싣는다 — 단수 정의의 원소는
     //   종전 stage.elite 와 **키 집합까지 같은 모양**({ z, hp, summon(, skin) })이라 C-2·C-6·STG·DIFF 의 읽기가 그대로 통과한다.
@@ -513,6 +525,14 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   //   stage.bossFloor = 계산 내역(보고·검사용 — 규칙은 읽지 않는다). 검사용 배수 1 줄(normal)은 이 칸이 없고 체력도 종전 그대로
   //   r4.10 중간 보스 판(보스 정의 = 중간 보스 1체)은 같은 계산기로 **상한 화력 × BAL3.midBossSec(12초)** — 원값 1 이라 체력 = ceil(12 × 상한 화력).
   //    계산 내역은 stage.midFloor(보스 칸 bossFloor 와 따로 — 보스 판 검사·되돌리기가 섞이지 않게)
+  //  r4.29 무리 체력 바닥(이사님 지시 2026-09-30 "9스테이지까지 … 너무너무너무 쉬워"): 줄 표의 crowdFloor 가 참인 줄(게임 화면 = brutal)에서만.
+  //   무리마다 위협 비율 f(무리 체력 합 ÷ (그 z 까지 상한 무리 화력 × 접근 시간))가 BAL3.crowd 바닥보다 낮으면 체력을 올린다(firepower.crowdFloor — 내리지 않는다).
+  //   stage.crowdFloor = 계산 내역(보고·검사용 — 규칙은 읽지 않는다). 현상금 적은 아래에서 붙어 이 계산에 들지 않는다. 검사용 배수 1 줄(normal)은 칸이 없고 종전 그대로
+  if (mult.crowdFloor && stage.spawns.length) {
+    const cf = crowdFloor(stage);
+    stage.spawns.forEach((sp, i) => { if (cf.hp[i] != null) sp.hp = cf.hp[i]; });
+    stage.crowdFloor = { fRegular: cf.fRegular, fWave: cf.fWave, rows: cf.rows };
+  }
   if (mult.bossFloor && stage.elites.length) {
     const mid = stage.elites.every((e) => e.mid);
     const f = bossFloor(stage, mid ? BAL3.midBossSec : BAL3.bossMinFightSec);

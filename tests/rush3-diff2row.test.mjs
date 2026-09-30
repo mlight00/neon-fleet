@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { buildStage, ALL_STAGE_IDS, stageKindOf } from '../rush3/stages.js';
 import { createRun } from '../rush3/combat.js';
 import { BAL3 } from '../rush3/balance.js';
+import { crowdFFor } from '../rush3/firepower.js';
 
 const SNAP = JSON.parse(readFileSync(new URL('./fixtures/rush3-stages-pre-r4.2.json', import.meta.url), 'utf8'));
 //  스냅숏을 찍을 때와 같은 인코더(-0·비유한수는 문자열로 남겨 JSON 이 지우지 못하게)
@@ -63,13 +64,30 @@ function undoR410Stage(st, id, row) {
   delete st.endKind; delete st.hordeZ; delete st.finishZ; delete st.midFloor; delete st.bossHw;
   return st;
 }
+//  r4.29(이사님 지시 2026-09-30 "현재 9스테이지까지 깼는데 난이도가 아직도 너무너무너무 쉬워" · "실제 웨이브로 느껴지도록 적 숫자를 더 늘려줘"):
+//   게임 줄의 무리 체력 바닥(stage.crowdFloor — 무리마다 올리기 전 체력 before 를 남긴다)과 웨이브 겹 적 수 × 3 을 되돌린다.
+//   웨이브 겹은 r4.10 되돌리기가 통째로 빼므로 여기서는 일반 무리 체력만 before 로 — 무리는 (z · 종류 · 수) 로 찾는다(같은 열쇠의 행이 여럿이면 값이 같아야 한다).
+//   맨 먼저(r4.7 되돌리기 **앞에**) 부른다
+function undoR429Stage(st) {
+  const rows = (st.crowdFloor && st.crowdFloor.rows) || [];
+  for (const sp of st.spawns) {
+    if (sp.kind === 'bounty' || sp.horde) continue;
+    const hit = rows.filter((r) => !r.horde && r.z === sp.z && r.kind === sp.kind && r.n === sp.n);
+    assert.ok(hit.length >= 1, `무리 체력 바닥 내역에 z ${sp.z} ${sp.kind} ${sp.n} 행이 있다`);
+    assert.ok(hit.every((r) => r.before === hit[0].before && r.hp === hit[0].hp), `z ${sp.z} ${sp.kind} ${sp.n} 행들이 같은 값`);
+    assert.equal(sp.hp, hit[0].hp, `z ${sp.z} ${sp.kind}: 스폰 체력 = 내역의 새 체력`);
+    sp.hp = hit[0].before;
+  }
+  delete st.crowdFloor;
+  return st;
+}
 function undoR47Run(rp, row) {
   const { bounty, ...defs } = rp.enemyDefs;
   const E = defs.elite;
   return { ...rp, enemyDefs: { ...defs, elite: { ...E, shot: { ...E.shot, dmg: Math.round(1 * row.eshotDmg) } } } };
 }
 
-test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 지옥 판과 — r4.7 의 보스 체력·보스 탄·현상금 적 몫, r4.8 의 밀집 대형·보스 패턴 칸, r4.10 의 판 종류(보스 3의 배수 판만 · 대물결·중간 보스)만 되돌리면 — 바이트 단위로 같다(1~24, 추가 배치 S1·S5·S8 포함) · createRun 파생값도 같다", () => {
+test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 지옥 판과 — r4.7 의 보스 체력·보스 탄·현상금 적 몫, r4.8 의 밀집 대형·보스 패턴 칸, r4.10 의 판 종류(보스 3의 배수 판만 · 대물결·중간 보스), r4.29 의 무리 체력 바닥·웨이브 적 수만 되돌리면 — 바이트 단위로 같다(1~24, 추가 배치 S1·S5·S8 포함) · createRun 파생값도 같다", () => {
   const row = BAL3.difficulty.brutal;
   for (const id of ALL_STAGE_IDS) {
     const st = buildStage(id, { difficulty: 'brutal' });
@@ -90,9 +108,13 @@ test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 �
       assert.equal(kind, 'horde', `S${id} 보스 없는 판 = 대물결(r4.10)`);
       assert.ok(!('bossFloor' in st) && !('bossHw' in st), `S${id} 보스 없는 판에 보스 칸 없음`);
     }
-    assert.equal(S(undoR410Stage(undoR47Stage(st), id, row)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
+    //  r4.29 몫이 실제로 들어 있다: 무리 체력 바닥 내역(f 바닥 = 판 번호로 정한 값) · 웨이브 겹은 배수 전 적 수 칸(waveBaseN — 적 수는 그보다 많다)
+    assert.ok(st.crowdFloor && st.crowdFloor.rows.length > 0, `S${id} 무리 체력 바닥 내역(r4.29)`);
+    assert.deepEqual([st.crowdFloor.fRegular, st.crowdFloor.fWave], [crowdFFor(id, BAL3.crowd.regular), crowdFFor(id, BAL3.crowd.wave)], `S${id} f 바닥`);
+    assert.ok(st.spawns.filter((sp) => sp.horde).every((sp) => Number.isInteger(sp.waveBaseN) && sp.n > sp.waveBaseN), `S${id} 웨이브 겹 배수 전 적 수 칸`);
+    assert.equal(S(undoR410Stage(undoR47Stage(undoR429Stage(st)), id, row)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
     //  createRun 파생값(적 표·광장 보스 배수 등): 판 종류를 되돌린 판으로 만든 run(광장이 20 → 21 로 옮겨 가 광장 배수가 판을 따라간다)
-    const rp = runPart(createRun(undoR410Stage(undoR47Stage(buildStage(id, { difficulty: 'brutal' })), id, row)));
+    const rp = runPart(createRun(undoR410Stage(undoR47Stage(undoR429Stage(buildStage(id, { difficulty: 'brutal' }))), id, row)));
     assert.equal(rp.enemyDefs.elite.shot.dmg, 1, `S${id} 보스 탄 1`);
     assert.equal(rp.enemyDefs.shooter.shot.dmg, 3, `S${id} 저격수 탄 3 그대로`);
     assert.equal(S(undoR47Run(rp, row)), S(SNAP.run_brutal[id]), `S${id} 기본 줄(옛 지옥) createRun`);

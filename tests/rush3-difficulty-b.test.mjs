@@ -16,6 +16,7 @@ import { SQUAD_DEFAULTS, formation } from '../rush3/squad.js';
 import { createRenderer3, HUD_ROW, HP_TAG_MIN_Y } from '../rush3/render.js';
 import { projectorFor } from '../rush3/project.js';
 import { playPolicy } from './lib/rush3-policies.mjs';
+import { crowdRow, formulaHp } from './lib/rush3-crowd.mjs';
 
 const DIFFS = ['normal', 'brutal'];
 
@@ -28,6 +29,9 @@ function explicitHp(id, d, sp) {
 
 //  courses.js 의 역할 근사 스킨 → 정의 hp(ARMOR 10 · POD 14 · MAGNET 9 · CART 20). 나머지 스킨·무스킨은 표 hp
 const SKIN_HP = { E3_wallguard: 10, E9_spawnpod: 14, E10_magnethead: 9, E7_cartyard: 20 };
+
+//  r4.29 무리 체력 바닥(게임 줄 — stage.crowdFloor): 공식 대조(DB-2)는 바닥 전 체력(내역의 before)으로 한다 — 바닥이 올린 값은 V3-R429 CROWD 검사가 따로 잠근다
+const spawnHp = formulaHp;
 const at = (x) => ({ pointerX: x, dragDx: 0, keyDir: 0 });
 function synth(over = {}) {
   return { id: 'db', version: 1, title: 'diffb', startUnits: 5, startWeapon: 'rifle', length: 100000, eliteZ: null,
@@ -82,7 +86,9 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = roun
         //  정의에 체력을 직접 적은 스폰(r3.25 지옥 1번 단단한 잡졸 등)이 먼저 — 없으면 스킨 체력 → 표 체력
         const defHp = explicitHp(id, d, sp) ?? SKIN_HP[sp.skin] ?? BAL3.enemies[sp.kind].hp;
         assert.ok(Number.isInteger(sp.hp) && sp.hp > 0, `S${id} ${d} 스폰 hp 정수`);
-        assert.equal(sp.hp, Math.round(defHp * mul * eh), `S${id} ${d} ${sp.kind}${sp.skin ? '(' + sp.skin + ')' : ''} z${sp.z} hp`);
+        //  r4.29: 게임 줄은 무리 체력 바닥 내역에 모든 무리가 있고(실제 체력 = 내역 hp), 공식 값은 내역의 before
+        if (st.crowdFloor) { const r = crowdRow(st, sp); assert.ok(r, `S${id} ${d} z${sp.z} ${sp.kind} 무리 체력 바닥 내역`); assert.equal(sp.hp, r.hp, `S${id} ${d} z${sp.z} 실제 체력 = 내역 hp`); }
+        assert.equal(spawnHp(st, sp), Math.round(defHp * mul * eh), `S${id} ${d} ${sp.kind}${sp.skin ? '(' + sp.skin + ')' : ''} z${sp.z} hp`);
       }
       //  정예: 구간 배율 없음 — normal 값 × eliteHp(1~3 은 ×1)
       //  r4.7: 기본 줄은 그 값이 보스 체력 바닥의 base(stage.bossFloor.base)이고 실제 체력은 30초 × 상한 화력까지 오른다(옛 값 아래로는 안 내려간다)
@@ -101,7 +107,8 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = roun
     //   번호(k)가 아니라 **이벤트 z·종류**로 짝을 맞춘다(추가 무리는 배수 1 줄에 짝이 없어 비교에서 빠진다)
     for (let k = 0; k < base.spawns.length; k++) {
       const b0 = base.spawns[k];
-      const hp = DIFFS.map((d) => buildStage(id, { difficulty: d }).spawns.find((x) => x.z === b0.z && x.kind === b0.kind && x.skin === b0.skin).hp);
+      //  r4.29: 게임 줄은 공식 값(무리 체력 바닥 before)으로 비교한다 — 바닥은 올리기만 하므로 실제 체력은 더 크다
+      const hp = DIFFS.map((d) => { const st = buildStage(id, { difficulty: d }); return spawnHp(st, st.spawns.find((x) => x.z === b0.z && x.kind === b0.kind && x.skin === b0.skin && !x.horde)); });
       assert.ok(hp[0] <= hp[1], `S${id} 무리 ${k}(z${b0.z} ${b0.kind}) 난이도 단조 ${hp}`);
     }
   }
@@ -117,12 +124,15 @@ test('V3-DIFFB DB-2: makeSpawn — 1~24 × 2줄(r4.2) 모든 스폰의 hp = roun
   //  1~3: 배수 1 줄의 잡졸·정예 체력은 r3.9(33568b2)와 동일 · 기본 줄(지옥)만 × enemyHp·eliteHp(r3.22) · 4 부터는 두 줄 모두 배수(r4.2: 어려움 칸 삭제)
   const s2 = buildStage(2).spawns.map((s) => s.hp);
   //  r4.7 현상금 적(kind 'bounty' — 게임 줄 전용)은 빼고 본다
-  assert.deepEqual(buildStage(2, { difficulty: 'brutal' }).spawns.filter((s) => s.kind !== 'bounty').map((s) => s.hp), s2.map((h) => Math.round(h * BAL3.difficulty.brutal.enemyHp)), 'S2 지옥 = 보통 × enemyHp');
+  //  r4.29: 게임 줄은 공식 값(무리 체력 바닥 before)으로 — 실제 체력은 바닥이 올린다(V3-R429 CROWD)
+  const s2b = buildStage(2, { difficulty: 'brutal' });
+  assert.deepEqual(s2b.spawns.filter((s) => s.kind !== 'bounty').map((s) => spawnHp(s2b, s)), s2.map((h) => Math.round(h * BAL3.difficulty.brutal.enemyHp)), 'S2 지옥 = 보통 × enemyHp');
   //  r4.7: 기본 줄의 × eliteHp 값은 보스 체력 바닥의 base(실제 체력은 30초 × 상한 화력까지 오른다 — V3-R47 BOSS-30S)
   assert.deepEqual(DIFFS.map((d) => { const st = buildStage(3, { difficulty: d }); return st.bossFloor ? st.bossFloor.base[0] : st.elite.hp; }), [500, Math.round(500 * BAL3.difficulty.brutal.eliteHp)]);
-  assert.deepEqual(DIFFS.map((d) => buildStage(4, { difficulty: d }).spawns[0].hp), [4, 8]);
+  assert.deepEqual(DIFFS.map((d) => { const st = buildStage(4, { difficulty: d }); return spawnHp(st, st.spawns[0]); }), [4, 8]);
   assert.equal(buildStage(13).spawns.find((s) => s.skin === 'E3_wallguard').hp, 70, '장갑체 10 × 7');
-  assert.equal(buildStage(21, { difficulty: 'brutal' }).spawns.find((s) => s.skin === 'E7_cartyard').hp, 480, '카트 20 × 12 × 2');
+  const s21b = buildStage(21, { difficulty: 'brutal' });
+  assert.equal(spawnHp(s21b, s21b.spawns.find((s) => s.skin === 'E7_cartyard')), 480, '카트 20 × 12 × 2');
 });
 
 test('V3-DIFFB DB-3: enemyDefsFor(difficulty, hpMul, difficultyHp) — 표 hp × hpMul × enemyHp(반올림, difficultyHp false 면 enemyHp 대신 1), run.enemyDefs 가 stage.enemyHpMul·difficultyHp 를 받는다, 정예·아레나 보스 소환 잡졸도 같은 체력, spawnEnemy 가 hpMax 를 기록', () => {

@@ -11,9 +11,19 @@ import { readFileSync } from 'node:fs';
 import { BAL3, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, PLAY_DIFFICULTY, difficultyMult } from '../rush3/balance.js';
 import { buildStage, STAGE_IDS, DEFS, stageKindOf } from '../rush3/stages.js';
 import { createRun, stepRun, drainEvents, enemyDefsFor, STEP } from '../rush3/combat.js';
-import { playPolicy } from './lib/rush3-policies.mjs';
+import { playPolicy, pickInput } from './lib/rush3-policies.mjs';
+import { formulaHp } from './lib/rush3-crowd.mjs';
 
 const DIFFS = ['normal', 'brutal'];
+
+//  r4.29: 무리 체력 바닥(BAL3.crowd — 게임 줄)으로 봇 부대가 판 끝 전에 질 수 있다. '코스가 판 끝까지 이어지고 판이 끝나는가'(기능)는
+//   병사가 쓰러지지 않게(검사 도구 — 난이도와 무관) 보고, 그대로 한 판의 승패·도달 z 는 기록만 한다(난이도는 이사님 실플레이로 — 봇으로 판단하지 않는다)
+function reachEnd(id, bot, difficulty = 'brutal') {
+  const run = createRun(buildStage(id, { difficulty }));
+  let n = 0;
+  while (!run.over && n++ < 14400) { for (const u of run.units) u.hp = 1e9; stepRun(run, pickInput(bot, run), STEP); drainEvents(run); }
+  return run;
+}
 
 //  합성 스테이지(게이트·통·벽 없음). spawns 의 hp 는 ev.hp(스폰 정의 고정값) 경로
 function synth(over = {}) {
@@ -153,7 +163,8 @@ test('V3-DIFF DIFF-4: buildStage — 1~3 기준 코스는 정예 hp·잡졸 hp �
         const a = base[k], b = s[k];
         assert.deepEqual([b.z, b.kind, b.corridorHw], [a.z, a.kind, a.corridorHw], `S${id} ${d} 무리 ${k}: 이벤트 z·종류·통로 불변`);
         assert.equal(a.hp, BAL3.enemies[a.kind].hp, `S${id} normal 무리 ${k}: hp = 표 hp(구간 배율 1)`);
-        assert.equal(b.hp, d === 'brutal' ? Math.round(a.hp * m.enemyHp) : a.hp, `S${id} ${d} 무리 ${k}: hp(1~3 은 지옥에서만 × enemyHp — r3.22)`);
+        //  r4.29: 게임 줄은 공식 값(무리 체력 바닥 전 — 내역 before)으로 대조한다. 바닥이 올린 값은 V3-R429 CROWD
+        assert.equal(d === 'brutal' ? formulaHp(buildStage(id, { difficulty: d }), b) : b.hp, d === 'brutal' ? Math.round(a.hp * m.enemyHp) : a.hp, `S${id} ${d} 무리 ${k}: hp(1~3 은 지옥에서만 × enemyHp — r3.22)`);
         assert.equal(b.n, a.n * m.waves, `S${id} ${d} 무리 ${k}: n = 원래 n × waves`);
         const walls = buildStage(id, { difficulty: d }).walls;
         for (let w = 0; w < m.waves; w++) for (let i = 0; i < a.n; i++) {
@@ -267,11 +278,14 @@ test('V3-SIM-DIFF SD-1: normal 은 종전 그대로 — aim 3스테이지 완주
 
 //  r4.2: SD-2(어려움 aim S1·S3 완주 · S2 정예전 기록)는 어려움 줄을 지워 삭제했다.
 
-test('V3-SIM-DIFF SD-3: brutal — aim S1 은 판 끝(r4.10 대물결 — 옛 정예 자리)까지 도달(결과는 기록), S2·S3 는 결과만 기록', () => {
+test('V3-SIM-DIFF SD-3: brutal — aim S1 은 판 끝(r4.10 웨이브 — 옛 정예 자리)까지 코스가 이어진다(r4.29: 병사 무적 검사 도구로 — 그대로 한 판은 기록), S2·S3 는 결과만 기록', (t) => {
   const s1 = R('brutal', 1, 'aim');
-  //  r4.10: 게임 줄 1번은 대물결 판 — 보스 대신 옛 정예 자리(hordeZ)에서 대물결이 오고 결승선을 넘으면 승리
-  assert.ok(s1.run.z >= buildStage(1, { difficulty: 'brutal' }).hordeZ, 'brutal S1 aim: 대물결(판 끝)까지 도달');
+  //  r4.10: 게임 줄 1번은 웨이브 판 — 보스 대신 옛 정예 자리(hordeZ)에서 웨이브가 오고 결승선을 넘으면 승리
+  const reach = reachEnd(1, 'aim');
+  assert.ok(reach.z >= buildStage(1, { difficulty: 'brutal' }).hordeZ, 'brutal S1 aim: 웨이브(판 끝)까지 코스가 이어진다');
+  assert.equal(reach.over, true);
   assert.equal(s1.run.over, true);
+  t.diagnostic(`SD-3 기록 brutal S1 aim(그대로 한 판) won=${s1.run.won} z=${Math.round(s1.run.z)} / 웨이브 z ${buildStage(1, { difficulty: 'brutal' }).hordeZ}`);
   for (const id of [2, 3]) assert.equal(R('brutal', id, 'aim').run.over, true);
 });
 
@@ -324,13 +338,16 @@ for (const d of ['brutal']) for (const id of STAGE_IDS) BOSS_TABLE.push(bossRow(
 //   대항 검수 반영(2026-09-20): 1~3 기준 코스는 구간 배율 ×1 과 같은 원칙으로 난이도 체력 배수도 ×1(BAL3.enemyHpByStage difficultyHp: false) →
 //   세 난이도의 1~3 이 r3.9(33568b2)와 완전히 같아져 **hard S1·S2·S3 + brutal S1 잠금**을 되살렸다. 대조점도 r3.9 값(hard S2 4명 · brutal S1 14명) 그대로.
 //  r4.2: 어려움 줄 삭제 — 남는 잠금은 기본 줄(brutal) 1번의 두 단언(planBoss 패배 · evLead 승리 26명)이다
-test('V3-SIM-DIFF SD-7 기록: 기본 줄(brutal) S1 — planBoss·evLead 모두 판 끝(r4.10 대물결 — 옛 보스 자리)까지 가고 판이 끝난다(승패는 기록만 — r4.7 이사님 지시로 난이도를 봇 승패로 판단하지 않는다)', (t) => {
+test('V3-SIM-DIFF SD-7 기록: 기본 줄(brutal) S1 — planBoss·evLead 모두 판 끝(r4.10 웨이브 — 옛 보스 자리)까지 코스가 이어지고(r4.29: 병사 무적 검사 도구로) 판이 끝난다(승패는 기록만 — r4.7 이사님 지시로 난이도를 봇 승패로 판단하지 않는다)', (t) => {
   for (const r of BOSS_TABLE) t.diagnostic('SIM-BOSS ' + JSON.stringify(r));
   //  r3.22~r4.6 은 'evLead 가 26명으로 이긴다'를 잠갔다. r4.7(이사님 지시 2026-09-26 "난이도는 너의 봇테스트로 하지 말도록")부터
   //   보스 체력은 상한 화력 계산(30초)으로 정하고 봇 승패를 잠그지 않는다 — 판이 끝나는가(보스 등장·over)만 잠그고 결과는 기록한다
   for (const bot of ['planBoss', 'evLead']) {
     const b = bot === 'planBoss' ? BR('brutal', 1) : playPolicy(1, 'evLead', 14400, 'brutal');
-    assert.ok(b.run.z >= buildStage(1, { difficulty: 'brutal' }).hordeZ, `brutal S1 ${bot}: 판 끝(대물결)까지 간다`);
+    //  r4.29: 도달은 병사 무적(검사 도구)으로 — 그대로 한 판은 판이 끝나는가만 잠그고 결과는 기록
+    const reach = reachEnd(1, bot);
+    assert.ok(reach.z >= buildStage(1, { difficulty: 'brutal' }).hordeZ, `brutal S1 ${bot}: 판 끝(웨이브)까지 코스가 이어진다`);
+    assert.equal(reach.over, true, `brutal S1 ${bot}: (무적) 판이 끝난다`);
     assert.equal(b.run.over, true, `brutal S1 ${bot}: 판이 끝난다`);
     t.diagnostic(`SIM-BOSS-RECORD brutal S1 ${bot} won=${b.run.won} units=${b.run.units.length}/${b.run.peak} 보스잔여hp=${b.run.boss ? Math.ceil(b.run.boss.hp) : 0} time=${b.run.time.toFixed(1)}`);
   }
