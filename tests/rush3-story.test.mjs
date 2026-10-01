@@ -40,3 +40,76 @@ test('STORY-6: 저장 seenStory — 기본 [] · 정규화(아는 id 만 · 중�
   st.setItem('starforgeRush.v3', JSON.stringify({ v: 3, stages: {}, seenStory: 'oops' }));
   assert.deepEqual(createSave3(st).get().seenStory, []);
 });
+
+// ─────────────────────────────── 셸 흐름(상태 'story') ───────────────────────────────
+import { bootApp } from './lib/rush3-shell.mjs';
+import { pickInput, weakenBosses, weakenCrowd, weakenBounties, wipeSquad } from './lib/rush3-policies.mjs';
+
+const enter = (h) => h.win.fire('keydown', { code: 'Enter' });
+//  판을 끝까지(검사 도구 — 보스·일반 적·현상금 적 체력 1, 이길 때는 병사 무적 · 질 때는 부대 전멸). 상태가 'run' 인 동안만(승리 여운 포함)
+function driveToEnd(h, { lose = false } = {}) {
+  let n = 0;
+  while (h.app.getState() === 'run' && n++ < 30000) {
+    const run = h.app.getRun();
+    weakenBosses(run); weakenCrowd(run); weakenBounties(run);
+    if (lose) wipeSquad(run); else for (const u of run.units) u.hp = 1e9;
+    h.app.input.state.pointerX = pickInput('evLead', run).pointerX;
+    h.frames(1);
+  }
+  return n;
+}
+
+test('STORY-2: 프롤로그 — 새 저장으로 출격하면 판 대신 S0 · 0.5초 안의 누르기는 무시 · 누르면 그 판 시작 · 다음 출격엔 없음 · ?dev=1 · story 꺼짐이면 없음', async () => {
+  const h = await bootApp({ story: true });
+  h.app.startRun(1);
+  assert.equal(h.app.getState(), 'story');
+  assert.equal(h.app.getStory().id, 'S0');
+  h.frames(10); h.tap(240, 400);
+  assert.equal(h.app.getState(), 'story', '0.5초 안에는 넘어가지 않는다');
+  h.frames(30); h.tap(240, 400);
+  assert.equal(h.app.getState(), 'run');
+  assert.equal(h.app.getRun().stageId, 1);
+  assert.deepEqual(h.save.get().seenStory, ['S0']);
+  h.app.toTitle(); h.app.startRun(1);
+  assert.equal(h.app.getState(), 'run', '본 프롤로그는 다시 나오지 않는다');
+  for (const opts of [{ story: true, search: '?dev=1' }, {}]) {
+    const d = await bootApp(opts);
+    d.app.startRun(1);
+    assert.equal(d.app.getState(), 'run', JSON.stringify(opts));
+  }
+});
+
+test('STORY-3: 보스 판 승리 — 여운 뒤 결과 화면 대신 S1 · Enter(0.5초 뒤) → 결과 화면(같은 결과) · 본 목록에 S1 · 다시 이기면 바로 결과 화면', async () => {
+  const h = await bootApp({ story: true, unlockThrough: 2 });
+  h.save.patch({ seenStory: ['S0'] });
+  h.app.startRun(3);
+  driveToEnd(h);
+  assert.equal(h.app.getState(), 'story');
+  assert.equal(h.app.getStory().id, 'S1');
+  const r = h.app.getResult();
+  assert.equal(r.won, true);
+  enter(h); assert.equal(h.app.getState(), 'story');
+  h.frames(31); enter(h);
+  assert.equal(h.app.getState(), 'result');
+  assert.equal(h.app.getResult(), r, '결과는 컷 전에 만든 그대로');
+  assert.deepEqual(h.save.get().seenStory, ['S0', 'S1']);
+  h.app.startRun(3);
+  driveToEnd(h);
+  assert.equal(h.app.getState(), 'result', '본 컷은 다시 나오지 않는다');
+});
+
+test('STORY-4: 컷이 없는 경우 — 진 보스 판 · 포기 · 웨이브 판 승리', async () => {
+  const lose = await bootApp({ story: true, unlockThrough: 2 });
+  lose.save.patch({ seenStory: ['S0'] });
+  lose.app.startRun(3); driveToEnd(lose, { lose: true });
+  assert.equal(lose.app.getState(), 'result'); assert.equal(lose.app.getResult().won, false);
+  const quit = await bootApp({ story: true, unlockThrough: 2 });
+  quit.save.patch({ seenStory: ['S0'] });
+  quit.app.startRun(3); quit.frames(30); quit.app.giveUp();
+  assert.equal(quit.app.getState(), 'result');
+  const wave = await bootApp({ story: true });
+  wave.save.patch({ seenStory: ['S0'] });
+  wave.app.startRun(1); driveToEnd(wave);
+  assert.equal(wave.app.getState(), 'result'); assert.equal(wave.app.getResult().won, true);
+  assert.deepEqual(wave.save.get().seenStory, ['S0']);
+});

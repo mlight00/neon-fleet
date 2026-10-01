@@ -37,7 +37,8 @@ export function fakeAudio() {
 }
 /** 실제 boot() 한 벌. search = URL 뒤 '?…'. unlockThrough = 옛 기록으로 1~n 번을 이긴 사용자(순차 해금 — n+1 번까지 열린다).
  *  반환 { app, save, texts, ops, frames(n), textNow() } */
-export async function bootApp({ storage = memStorage(), search = '', dateNow = () => 1_700_000_000_000, save, withOps = false, unlockThrough = 0 } = {}) {
+//  story(2026-10-01) = 스토리 스틸컷을 켠다(기본 꺼짐 — 종전 검사는 그대로 · 실제 진입점만 켠다)
+export async function bootApp({ storage = memStorage(), search = '', dateNow = () => 1_700_000_000_000, save, withOps = false, unlockThrough = 0, story = false } = {}) {
   const texts = [];
   const ops = withOps ? [] : null;
   const canvas = fakeCanvas(texts, ops);
@@ -48,7 +49,7 @@ export async function bootApp({ storage = memStorage(), search = '', dateNow = (
   const sv = save ?? createSave3(storage);
   if (unlockThrough > 0) seedOldClears(sv, unlockThrough);
   const audio = fakeAudio();
-  const deps = { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save: sv, audio, dateNow, sprites: { get: () => null, ready: new Set() } };
+  const deps = { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save: sv, audio, dateNow, sprites: { get: () => null, ready: new Set() }, story };
   const app = boot(canvas, deps);
   await app.ready;
   const frames = (n = 1) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };

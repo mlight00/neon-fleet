@@ -15,6 +15,7 @@ import { createAudio3 } from './audio.js';
 import { createSave3 } from './save.js';
 import { adviceLine, ADVICE_DEFAULT } from './advice.js';
 import { bossName, stageBossName } from './names.js';
+import { storyById, storyIdForStage, storyImagePath, STORY_INPUT_LOCK } from './story.js';
 import { createTally, addEvents, tallyTotal, mainCoins, bonusCoins } from './coins.js';
 import { hashSeed } from '../rush/rng.js';
 
@@ -704,6 +705,42 @@ export function boot(canvas, deps = {}) {
   let sprites = null;
   //  overT: 판 종료 뒤 결과 화면까지 남은 여운(초). -1 = 아직 종료를 보지 못함
   let overT = -1, result = null;
+  //  ── 스토리 스틸컷(이사님 결정 2026-10-01 — rush3/story.js · 설계서 docs/superpowers/specs/2026-10-01-story-stillcuts-design.md) ──
+  //   진입점이 story: true 로 켠다 · ?dev=1(점검·캡처 도구)이면 끈다 · 검사 셸은 기본 꺼짐(bootApp({ story: true }) 로 켠다).
+  //   story = 지금 보이는 컷 { id, t0, next, preview } | null — next = { kind: 'result' }(보스 승리) | { kind: 'start', id }(프롤로그) | { kind: 'title' }(개발 미리보기)
+  const storyOn = deps.story === true && !devFlag();
+  let story = null;
+  const storyImgs = new Map();
+  const storySeen = (id) => save.get().seenStory.includes(id);
+  //  그림은 art 가 true 인 컷만(파일이 생기기 전에는 불러오지 않는다 — 404 없음). DOM 이 없는 환경(Node 검사)은 불러오지 않는다(대사 화면만)
+  function prefetchStory(id) {
+    const s = storyById(id);
+    if (!s || !s.art || storyImgs.has(id) || typeof Image === 'undefined') return;
+    const im = new Image();
+    im.decoding = 'async';
+    im.src = storyImagePath(id);
+    storyImgs.set(id, im);
+  }
+  const storyImg = (id) => { const im = storyImgs.get(id); return im && im.complete && im.naturalWidth > 0 ? im : null; };
+  function showStory(id, next, { preview = false } = {}) {
+    prefetchStory(id);
+    story = { id, t0: nowSec(), next, preview };
+    state = 'story';
+    au.bgmPlay(BGM.title);
+    return true;
+  }
+  //  계속(누르기·Enter·Space·ESC): 나타난 뒤 STORY_INPUT_LOCK(0.5초) 안에는 무시 — 게임 중 누르던 손가락·연타로 바로 넘어가지 않게.
+  //   본 목록에 더한 뒤 결과 화면 / 원래 판 시작 / 타이틀(미리보기 — 저장 안 함)
+  function endStory() {
+    if (state !== 'story' || !story || nowSec() - story.t0 < STORY_INPUT_LOCK) return false;
+    const { id, next, preview } = story;
+    story = null;
+    if (!preview && !storySeen(id)) save.patch({ seenStory: [...save.get().seenStory, id] });
+    if (next.kind === 'result') state = 'result';
+    else if (next.kind === 'start') startRun(next.id);
+    else toTitle();
+    return true;
+  }
   //  notice(r4.3) = 스테이지 선택 화면에 잠깐 뜨는 안내 { text, t 남은 초 } | null — 잠긴 판을 불렀을 때 '앞 판을 먼저 깨야 합니다'
   let notice = null;
   const NOTICE_SEC = 2.5;
@@ -824,6 +861,12 @@ export function boot(canvas, deps = {}) {
     const locked = isLocked(id);
     const devPass = locked && devFlag() && devStageId() === id;
     if (locked && !devPass) { refuseLocked(); return false; }
+    //  스토리 프롤로그(S0): 아직 안 봤으면 출격 직전에 한 번(개발용 판 제외) — 누르면 이 판을 시작한다(endStory → startRun)
+    const devRun = devPass || PROTO_IDS.includes(id) || !!devStartWeapon().startWeapon;
+    if (storyOn && !devRun && !storySeen('S0')) return showStory('S0', { kind: 'start', id });
+    //  이 판의 보스 컷(아직 안 봤으면) 그림만 미리 — 첫 화면을 느리게 하지 않는다
+    const stageStory = storyIdForStage(id);
+    if (storyOn && stageStory && !storySeen(stageStory)) prefetchStory(stageStory);
     notice = null;
     //  랜덤 길 시드는 **판마다** 다르다(계약서 3-9 = '재도전 동일 배치' 원칙의 명시적 예외).
     //   시계는 셸에만 둔다 — 규칙 계층(stages.buildStage)은 인자로 받은 시드로 mulberry32 를 한 번 돌릴 뿐이다.
@@ -925,6 +968,7 @@ export function boot(canvas, deps = {}) {
     //  r3.15 검수 반영: 승리가 확정됐는데 결과 화면 전(보너스 20초 창·여운)에 ⏸→[스테이지 선택]으로 나가면 finishRun 을 거치지 않는다.
     //   본전투 기록은 'win' 프레임에 commitMain 이 이미 썼고(판당 1회), 여기서는 안전망으로 한 번 더 부른다(표식이 있으면 즉시 반환)
     if (run && run.won && !run.over) commitMain(run);
+    story = null;
     state = 'title';
     loop.stop(nowSec());
     run = null;
@@ -1086,6 +1130,9 @@ export function boot(canvas, deps = {}) {
     state = 'result';
     loop.stop(nowSec());
     au.bgmPlay(BGM.title);
+    //  스토리 스틸컷: 보스 판 승리(포기·개발용 판 제외)에서 그 장면을 아직 안 봤으면 결과 화면 앞에 한 장 — 정산·기록은 이미 끝났다(결과는 그대로)
+    const sid = won && !aborted && !run.devWeapon ? storyIdForStage(id) : null;
+    if (storyOn && sid && !storySeen(sid)) showStory(sid, { kind: 'result' });
   }
 
   //  연출 이벤트 소비(프레임 1회, drainEvents). 규칙 상태는 읽기만 한다
@@ -1544,6 +1591,10 @@ export function boot(canvas, deps = {}) {
           { id: 'mute', x: 192, y: 548, w: 96, h: 44, label: au.isMuted() ? '🔇' : '음량 ' + Math.round(au.getVolume() * 100) + '%' },
           { id: 'vol_up', x: 296, y: 548, w: 64, h: 44, label: '+' },
         ];
+      } else if (state === 'story' && story) {
+        //  스토리 컷 화면(render.drawStory): 표시 이름 · 대사 두 줄 · 그림(불러왔으면) · 나타난 지 t 초 · 계속을 받는가(ready)
+        const s = storyById(story.id), t = Math.max(0, now - story.t0);
+        v.story = { id: story.id, label: s.label, lines: s.lines, img: storyImg(story.id), t, ready: t >= STORY_INPUT_LOCK };
       } else if (state === 'result') {
         v.result = result;
         //  랜덤 길이 있는 판(결과 한 줄이 있는 판)은 [다시 도전] 아래에 부연 한 줄이 들어간다(render.RETRY_LOTTERY_NOTE).
@@ -1623,6 +1674,8 @@ export function boot(canvas, deps = {}) {
 
   canvas.addEventListener('pointerdown', (e) => {
     au.unlock();
+    //  스토리 컷: 화면 어디를 눌러도 계속(0.5초 잠금 뒤)
+    if (state === 'story') { endStory(); return; }
     if (state === 'title' || state === 'result' || state === 'upgrade') au.bgmPlay(BGM.title);
     const [x, y] = toLogical(e);
     if (onPress(x, y)) return;
@@ -1656,6 +1709,7 @@ export function boot(canvas, deps = {}) {
         else if (state === 'paused') resume();
         //  r4.5: 강화 화면의 ESC = [돌아가기](들어온 화면으로). Enter·Space 는 강화 화면에서 아무 일도 하지 않는다(실수로 사지 않게)
         else if (state === 'upgrade') closeUpgrade();
+        else if (state === 'story') endStory();
         return;
       }
       if (input.onKey(code, true)) { if (e.preventDefault) e.preventDefault(); return; }
@@ -1665,6 +1719,7 @@ export function boot(canvas, deps = {}) {
         //  r4.3 결과 화면 기본 버튼(3-9): 승리 = [다음 작전], 패배·포기 = [다시 도전](종전엔 승패와 상관없이 재도전). 24번 승리(다음 없음)는 [다시 도전]
         else if (state === 'result') startRun(result.won && result.nextId ? result.nextId : result.stageId);
         else if (state === 'paused') resume();
+        else if (state === 'story') endStory();
       }
     });
     win.addEventListener('keyup', (e) => { input.onKey(keyCode(e), false); });
@@ -1828,10 +1883,15 @@ export function boot(canvas, deps = {}) {
   //  r4.5: openUpgrade('title' | 'result') · closeUpgrade([돌아가기]와 같은 경로) · buyTrack(트랙 — [구매]와 같은 경로) · getButtons(지금 화면의 버튼 — 검사·캡처용)
   //  r4.24: getCamZ(마지막 프레임을 그린 카메라 z — 검사·확인용)
   const api = { dbg, ready, startRun, pause, resume, toTitle, giveUp, getState: () => state, getRun: () => run, getFx: () => fx, getResult: () => result, getCamZ: () => camZ, getLeadStats: () => leadStats,
-                getNotice: () => (notice ? notice.text : null), openUpgrade, closeUpgrade, buyTrack, getButtons: () => buttons, loop, input };
+                getNotice: () => (notice ? notice.text : null), openUpgrade, closeUpgrade, buyTrack, getButtons: () => buttons, loop, input,
+                //  스토리(2026-10-01): showStory(id) = 개발 미리보기(아무 컷이나 — 저장하지 않고, 계속하면 타이틀) · getStory = 지금 컷 | null
+                showStory: (id) => (storyById(id) ? showStory(id, { kind: 'title' }, { preview: true }) : false), getStory: () => story };
   //  r4.5 개발 확인용(?dev=1 일 때만): 캡처 스크립트가 결과 화면·강화 화면을 부를 수 있게 앱 손잡이를 창에 둔다(게임 동작에는 영향 없음 — __rush3Dbg 와 같은 결)
   if (win && devFlag()) win.__rush3App = api;
+  //  스토리 프롤로그 그림은 첫 화면이 뜬 뒤 불러온다(아직 안 봤을 때만)
+  if (storyOn && !storySeen('S0')) prefetchStory('S0');
   return api;
 }
 
-if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'));
+//  실제 게임 진입점 — 스토리 스틸컷은 여기서만 켠다(story: true · ?dev=1 이면 boot 가 끈다)
+if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'), { story: true });
