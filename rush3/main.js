@@ -1573,6 +1573,11 @@ export function boot(canvas, deps = {}) {
         return { id: 'buy_' + row.track, ...box, label: '구매', sub: row.cost + ' 코인', primary: ok, disabled: !ok };
       });
       v.buttons.push({ id: 'back', ...UPGRADE_UI.back, label: '돌아가기' });
+    } else if (state === 'story' && story) {
+      //  스토리 컷 화면(render.drawStory): 표시 이름 · 대사 두 줄 · 그림(불러왔으면) · 나타난 지 t 초 · 계속을 받는가(ready).
+      //   프롤로그는 판(run)이 아직 없으므로 run 블록 앞에 둔다 — 판 장면(v.run)은 넘기지 않는다(컷 화면만)
+      const s = storyById(story.id), t = Math.max(0, now - story.t0);
+      v.story = { id: story.id, label: s.label, lines: s.lines, img: storyImg(story.id), t, ready: t >= STORY_INPUT_LOCK };
     } else if (run) {
       v.run = run;
       const paused = state === 'paused';
@@ -1591,10 +1596,6 @@ export function boot(canvas, deps = {}) {
           { id: 'mute', x: 192, y: 548, w: 96, h: 44, label: au.isMuted() ? '🔇' : '음량 ' + Math.round(au.getVolume() * 100) + '%' },
           { id: 'vol_up', x: 296, y: 548, w: 64, h: 44, label: '+' },
         ];
-      } else if (state === 'story' && story) {
-        //  스토리 컷 화면(render.drawStory): 표시 이름 · 대사 두 줄 · 그림(불러왔으면) · 나타난 지 t 초 · 계속을 받는가(ready)
-        const s = storyById(story.id), t = Math.max(0, now - story.t0);
-        v.story = { id: story.id, label: s.label, lines: s.lines, img: storyImg(story.id), t, ready: t >= STORY_INPUT_LOCK };
       } else if (state === 'result') {
         v.result = result;
         //  랜덤 길이 있는 판(결과 한 줄이 있는 판)은 [다시 도전] 아래에 부연 한 줄이 들어간다(render.RETRY_LOTTERY_NOTE).

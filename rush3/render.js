@@ -4,6 +4,7 @@
 //  화면 좌표는 r3.20 부터 원근 투영(rush3/project.js)이 만든다: (x, d = z − run.z) → { x, y, s }. 종전 평면 변환 y = LINE_Y − d 는 flat 모드(?flat=1)로 남는다.
 import { BAL3 } from './balance.js';
 import { bossName } from './names.js';
+import { STORY_FADE } from './story.js';
 import { PERSPECTIVE, projectorFor, projectorMode } from './project.js';
 import { WEAPONS } from './weapons.js';
 import { gateColor, gateLabel } from './gates.js';
@@ -242,6 +243,11 @@ export const HUD_ROW = Object.freeze({
 //  기억하지 않고 종전대로 그리는 경우(false): 캔버스를 만들 수 없는 환경(Node 검사의 가짜 캔버스 — 이때는 변환도 읽지 않는다) · 반투명(globalAlpha < 1 —
 //   테두리가 채움 뒤로 비치는 정도가 달라진다) · 그림자·필터·합성 모드 · 회전·기울인 변환 · 한 장이 너무 큰 글(배너) · 개발용 끄개
 //   globalThis.__rush3TextCacheOff(글자 그리기를 가로채는 점검 도구 — tools/health_sweep.py 등은 반드시 켠다)
+//  스토리 스틸컷 화면(이사님 결정 2026-10-01 — rush3/story.js · 설계서 docs/superpowers/specs/2026-10-01-story-stillcuts-design.md):
+//   아래 대사 띠(x 14 ~ 466, y 600 ~ 776) · 대사는 줄마다 띠 안 폭(textW 408)에 맞는 크기(fs 19 → 최소 fsMin 15px, 자동 줄바꿈 없음 — 어절 쪼개짐 금지) ·
+//   왼쪽 위 표시 이름 · 오른쪽 아래 계속 안내(잠금이 풀린 뒤 천천히 깜빡임) · bg = 그림이 없을 때(폴백) 바탕색
+export const STORY_UI = Object.freeze({ x: 14, y: 600, w: 452, h: 176, pad: 22, textW: 408, line1: 52, lineGap: 46, fs: 19, fsMin: 15,
+  bg: '#0B1220', box: 'rgba(8,12,22,0.80)', labelFs: 16, hintFs: 14, hint: '화면을 누르면 계속 ▶' });
 export const TEXT_CACHE = Object.freeze({ max: 500, evict: 100, maxArea: 512 * 256, minSeen: 2 });
 /** ctx = 본 캔버스 2D 문맥 · makeCanvas(w, h) = 작업 캔버스(없으면 document.createElement) · outline = 테두리 색.
  *  반환 { draw(text, x, y, font, color, lw) → 기억 그림으로 그렸으면 true, size() } */
@@ -3071,6 +3077,35 @@ export function createRenderer3(ctx, sprites, opts = {}) {
     if (view.state !== 'result') drawBanners(fx);
   }
 
+  //  글이 maxW 에 들어가는 가장 큰 글자 크기(start → min, 1px 씩). 못 맞추면 min — 자동 줄바꿈은 하지 않는다
+  function fitPx(text, maxW, start, min, weight = 'bold') {
+    for (let px = start; px > min; px--) { ctx.font = weight + ' ' + px + 'px ' + FONT; if (ctx.measureText(text).width <= maxW) return px; }
+    return min;
+  }
+  //  스토리 스틸컷(STORY_UI): 그림은 화면 전체 cover(비율 유지 · 가운데 · 넘치는 쪽 자름) · STORY_FADE(0.3초) 동안 나타난다.
+  //   그림이 없거나 아직 못 불렀으면 어두운 바탕(폴백) — 대사 화면은 늘 나온다. 판 장면·HUD 는 그리지 않는다
+  function drawStory(view) {
+    const s = view.story, U = STORY_UI;
+    ctx.fillStyle = U.bg; ctx.fillRect(0, 0, W, H);
+    if (!s) return;
+    const a = Math.min(1, s.t / STORY_FADE);
+    if (s.img) {
+      const k = Math.max(W / s.img.width, H / s.img.height), dw = s.img.width * k, dh = s.img.height * k;
+      ctx.globalAlpha = a;
+      ctx.drawImage(s.img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    }
+    ctx.globalAlpha = a;
+    ctx.fillStyle = U.box; roundRect(U.x, U.y, U.w, U.h, 14); ctx.fill();
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    outlinedText(s.label, 18, 34, U.labelFs, C.gold, 'bold', 4);
+    s.lines.forEach((line, i) => outlinedText(line, U.x + U.pad, U.y + U.line1 + i * U.lineGap, fitPx(line, U.textW, U.fs, U.fsMin), C.hero, 'bold', 4));
+    if (s.ready) {
+      ctx.textAlign = 'right';
+      ctx.globalAlpha = a * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(s.t * 4)));
+      outlinedText(U.hint, U.x + U.w - U.pad, U.y + U.h - 24, U.hintFs, C.hud, 'bold', 3);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
   function draw(view) {
     const fx = view.fx;
     //  이번 프레임의 투영기: ?flat=1(개발 대조) > 기본 '가까이'(r4.1 — 표준·토글 삭제). 타이틀 배경도 같은 투영으로 그린다
@@ -3087,6 +3122,9 @@ export function createRenderer3(ctx, sprites, opts = {}) {
     } else if (view.state === 'upgrade') {
       //  r4.5 강화 화면: 결과 화면에서 들어와도(셸에 run 이 남아 있어도) 판 장면을 그리지 않고 강화 화면만 — view.run 검사보다 먼저
       drawUpgrade(view);
+    } else if (view.state === 'story') {
+      //  스토리 스틸컷: 셸에 run 이 남아 있어도(보스 승리 뒤) 판 장면 없이 컷 화면만 — view.run 검사보다 먼저
+      drawStory(view);
     } else if (view.run) {
       drawScene(view);
       if (view.state === 'paused') {

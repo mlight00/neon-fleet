@@ -113,3 +113,20 @@ test('STORY-4: 컷이 없는 경우 — 진 보스 판 · 포기 · 웨이브 �
   assert.equal(wave.app.getState(), 'result'); assert.equal(wave.app.getResult().won, true);
   assert.deepEqual(wave.save.get().seenStory, ['S0']);
 });
+
+// ─────────────────────────────── 화면(render.drawStory) ───────────────────────────────
+import { STORY_UI } from '../rush3/render.js';
+
+test('STORY-5: 화면 — 표시 이름 · 대사 두 줄 · 0.5초 뒤 계속 안내 · 그림이 없으면 대사 화면만(그림 그리기 없음) · 판 장면을 그리지 않는다', async () => {
+  const h = await bootApp({ story: true, withOps: true });
+  h.app.startRun(1);
+  let t = h.textNow();
+  assert.ok(t.includes('프롤로그') && t.includes('도시가 고철 군단에게 넘어갔다.') && t.includes('포지 게이트로 부대를 키워 도시를 되찾아라.'), JSON.stringify(t));
+  assert.ok(!t.includes(STORY_UI.hint), '잠금 동안 계속 안내 없음');
+  h.frames(31);
+  t = h.textNow();
+  assert.ok(t.includes(STORY_UI.hint), JSON.stringify(t));
+  assert.equal(h.ops.filter((o) => o.op === 'drawImage').length, 0, '그림이 없으면 그리지 않는다');
+  assert.ok(!t.some((x) => /STAGE|남은 거리|결승선까지/.test(x)), '판 장면(HUD)을 그리지 않는다: ' + JSON.stringify(t));
+  assert.deepEqual([STORY_UI.textW, STORY_UI.fs, STORY_UI.fsMin], [408, 19, 15]);
+});
