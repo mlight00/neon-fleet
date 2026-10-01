@@ -1,8 +1,9 @@
 // rush3/story.js — 스토리 스틸컷(이사님 결정 2026-10-01 — 설계서 docs/superpowers/specs/2026-10-01-story-stillcuts-design.md).
 //  도시 탈환전 9장: S0 프롤로그(아직 안 봤으면 출격 직전) · S1~S7 보스 판 승리(3·6·9·12·15·18·21) · S8 에필로그(24 승리).
-//  대사는 게임이 글자로 그린다(그림에 글자 없음 — 한글이 깨지거나 어절이 쪼개지지 않게). art = 그림 파일이 있는가 — 생기기 전에는 false(불러오지 않는다)
+//  대사는 게임이 글자로 그린다(그림에 글자 없음 — 한글이 깨지거나 어절이 쪼개지지 않게). art = 그림 파일이 있는가 — 생기기 전에는 false(불러오지 않는다).
+//   2026-10-01 그림 9장 완료(BACKLOG 3-18 — 크롬 Gemini, 카툰풍 · 글자 없음 · 표식 거꾸로 빼기 · 3:5 960×1600 WebP, 원본 newmode/sprites/story/raw) → 모두 true
 //  순수: 난수·시계·저장·화면 없음
-const S = (id, stage, label, l1, l2) => Object.freeze({ id, stage, label, art: false, lines: Object.freeze([l1, l2]) });
+const S = (id, stage, label, l1, l2) => Object.freeze({ id, stage, label, art: true, lines: Object.freeze([l1, l2]) });
 export const STORY = Object.freeze([
   S('S0', null, '프롤로그', '도시가 고철 군단에게 넘어갔다.', '포지 게이트로 부대를 키워 도시를 되찾아라.'),
   S('S1', 3, '이야기 1', '모든 고철 기계에 같은 왕관 표식이 있다.', '누군가 이 군단을 지휘하고 있다.'),

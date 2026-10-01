@@ -2,13 +2,14 @@
 //  도시 탈환전 9장: S0 프롤로그(아직 안 봤으면 출격 직전) · S1~S8 게임 줄 보스 판 승리(그 장면을 아직 안 봤으면 결과 화면 앞).
 //  스토리는 실제 게임 진입점에서만 켠다(boot(…, { story: true }) · ?dev=1 이면 꺼짐). 검사 셸은 bootApp({ story: true }) 로 켠다
 import { test } from 'node:test';
+import { existsSync, statSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { STORY, STORY_IDS, storyById, storyIdForStage, storyImagePath, normSeenStory, STORY_INPUT_LOCK, STORY_FADE } from '../rush3/story.js';
 import { ALL_STAGE_IDS, stageKindOf } from '../rush3/stages.js';
 import { createSave3 } from '../rush3/save.js';
 import { memStorage } from './lib/rush3-shell.mjs';
 
-test('STORY-1: 9장 — S0 프롤로그(판 없음) + 게임 줄 보스 판 8개(판 종류 표 순서) · 대사 2줄 · 금지어 없음 · art 는 아직 false · 경로 · 얼림', () => {
+test('STORY-1: 9장 — S0 프롤로그(판 없음) + 게임 줄 보스 판 8개(판 종류 표 순서) · 대사 2줄 · 금지어 없음 · 그림(art) 9장 모두 파일 있음 · 한 장 300KB 이하 · 경로 · 얼림', () => {
   assert.deepEqual(STORY_IDS, ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8']);
   const bossStages = ALL_STAGE_IDS.filter((id) => stageKindOf(id, 'brutal') === 'boss');
   assert.deepEqual(bossStages, [3, 6, 9, 12, 15, 18, 21, 24]);
@@ -18,7 +19,11 @@ test('STORY-1: 9장 — S0 프롤로그(판 없음) + 게임 줄 보스 판 8개
   for (const s of STORY) {
     assert.equal(s.lines.length, 2, s.id);
     for (const l of s.lines) { assert.ok(typeof l === 'string' && l.trim().length > 0, s.id); assert.ok(!/중간 보스|대물결/.test(l), s.id + ' 금지어'); }
-    assert.equal(s.art, false, s.id + ' 그림은 2단계');
+    //  2026-10-01 그림 9장(BACKLOG 3-18): art 가 true 면 파일이 있어야 한다(없는 그림을 불러 404 를 내지 않게) · 휴대폰 데이터를 아끼려 한 장 300KB 이하
+    assert.equal(s.art, true, s.id + ' 그림 있음');
+    const f = new URL('../' + storyImagePath(s.id), import.meta.url);
+    assert.ok(existsSync(f), s.id + ' 그림 파일');
+    assert.ok(statSync(f).size <= 300 * 1024, s.id + ' 그림 크기 ' + statSync(f).size);
     assert.ok(Object.isFrozen(s) && Object.isFrozen(s.lines));
   }
   assert.deepEqual(STORY[8].lines, ['스타 코어 회수. 스타포지 완전 가동.', '도시를 되찾았다. 첫 번째 로봇도 이제 우리 편이다.']);
