@@ -60,5 +60,6 @@
 - ⚠️ r4.30 부터 테두리 글자는 두 번째부터 그림(drawImage)으로 찍힌다. 글자 그리기(fillText·strokeText)를 가로채는 점검 도구(글자 크기·글 눌림·글 폭 재기 등)는 페이지에서 `window.__rush3TextCacheOff = true` 를 먼저 켠다(`tools/health_sweep.py` 는 켜 둠)
 - 그리기만 바꾼 개선의 모양 확인(21바퀴): 화면 요청(requestAnimationFrame)에 고정 시각을 넘겨 장면을 멈춘 뒤 켬·끔을 찍어 화소를 비교한다 — 같은 조건 두 장이 화소까지 같은지로 멈춤부터 확인(`E:\workspace\claude\neon-fleet\review\20260930_loop21\pixel_compare.py` · `screens_compare.py`). 원인 가르기는 한 가지를 끈 채 같은 장면의 4초 화면 수를 번갈아 잰다(`ab_stroke.py` · `ab_cache.py`)
 - 스토리 스틸컷(r4.32~): 실제 진입점에서만 켜지고 `?dev=1` 이면 꺼진다 — 점검·캡처 도구(모두 ?dev=1)는 그대로 돈다. 컷 화면을 볼 때는 `__rush3App.showStory('S0'…'S8')`(저장 안 함) · 실제 흐름은 ?dev 없이 새 저장으로(`E:\workspace\claude\neon-fleet\review\20261001_story\capture_story.py`)
+- 스토리 그림(r4.33): 원본·참고 그림·처리 `E:\workspace\claude\neon-fleet\newmode\sprites\story`(raw · ref · out · `process_story.py` — Gemini 표식 거꾸로 빼기 · 3:5 960×1600 WebP). 그림을 바꾸면 이 스크립트를 다시 돌리고 STORY-1(파일 있음·300KB 이하)을 확인한다
 - ⚠️ 성능 측정(`tools/perf_probe.py`)은 검사 묶음 등 다른 무거운 일과 **동시에 돌리지 않는다**(18바퀴: 뒤에서 돈 검사와 겹쳐 32→41ms 로 잘못 나왔다). 바꾼 것의 효과는 켬·끔을 번갈아 두 번 이상 재서 흔들림과 가른다
 - ⚠️ Playwright `page.screenshot` 은 찍기 전에 기다리는 동안 화면이 바뀔 수 있다. 잠깐 보이는 표시는 `canvas.toDataURL()` 로 그 순간을 저장한다.
