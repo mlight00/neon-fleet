@@ -13,6 +13,7 @@
 //   읽기 전용(setReadOnly — 먼저 열린 탭이 살아 있을 때)이면 v3 키·지갑 키 모두 쓰지 않는다.
 //  r4.4 (b): 로봇 강화 단계의 정규화·구매 판정은 순수 규칙 모듈 meta.js 의 것을 그대로 쓴다(최대 단계·비용이 한 곳에만 있게)
 import { UP_MAX, normUp, nextCost, buy as buyUp } from './meta.js';
+import { normSeenStory } from './story.js';
 
 export const KEY3 = 'starforgeRush.v3';
 export const BAK3 = 'starforgeRush.v3.bak';
@@ -143,7 +144,8 @@ const PICK_DEFAULT = 'brutal';
 //   칸은 형식 호환용으로만 남긴다 — 옛 저장에 true 가 있어도 해가 없다
 //  r4.5(v4 ⑤단계, 기획 v4.1 3-4 (나)·3-9): seenUpHint = 승리 결과 화면의 '로봇 강화 가능' 안내를 본 적이 있는가 · seenUpRec = 강화 화면의 다연발 '추천' 표시를 본 적이 있는가.
 //   seenShutter 와 같은 꼴(사용자당 1회, true 만 의미 — 비불리언은 false). 옛 코드 탭이 v3 키를 통째로 덮으면 사라져 안내가 한 번 더 뜰 뿐이다(해 없음)
-function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false, zoom: false, seenUpHint: false, seenUpRec: false }; }
+//  seenStory(2026-10-01 스토리 스틸컷 — 이사님 결정) = 본 컷 id 목록(rush3/story.js normSeenStory: 아는 id 만 · 중복 없음 · 배열 아니면 []). 빠진 키 = [](스키마 v 3 그대로)
+function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false, zoom: false, seenUpHint: false, seenUpRec: false, seenStory: [] }; }
 //  전체 정규화(형식이 맞는 원문에만 적용)
 function normalize(d) {
   const out = defaults();
@@ -157,6 +159,7 @@ function normalize(d) {
   //  r4.5: 두 곳(defaults·normalize) 모두에 있어야 patch 때 조용히 버려지지 않는다
   out.seenUpHint = d.seenUpHint === true;
   out.seenUpRec = d.seenUpRec === true;
+  out.seenStory = normSeenStory(d.seenStory);
   return out;
 }
 
