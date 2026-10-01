@@ -259,7 +259,7 @@ export function takePads(s, run, events) {
   return any;
 }
 
-// 보상 적용 헬퍼(9단계용, 선택). weaponRank 가 없으면 무기 보상은 건너뛴다(weaponSame 으로 알림).
+// 보상 적용 헬퍼(9단계용, 선택). weaponRank 가 없으면 무기 보상은 건너뛴다(weaponSame 으로 알림) — r4.31 부터 weaponRank 는 '아는 무기인가'(> 0)만 본다.
 // soldier 는 squad.addUnits 직접(cap 클램프, layoutUnits 포함). supplies 에서 id 로 chain 통을 찾아 activateChain. 반환 = 적용했는지.
 export function applySupplyReward(reward, run, events, opts = {}) {
   if (reward.kind === 'soldier') {
@@ -292,7 +292,10 @@ export function applySupplyReward(reward, run, events, opts = {}) {
       events.push({ type: 'weaponSame', weapon: w, x: reward.x, z: reward.z });
       return false;
     }
-    if (typeof rank === 'function' && rank(w) > rank(run.weapon)) {
+    //  r4.31(이사님 결정 2026-10-01 — 실플레이 "11스테이지에서 관통탄을 먹은 상태에서 기관총을 습득했는데 탄환 변경이 이루어지지 않았다"):
+    //   다른 무기 통은 **등급과 상관없이 언제나** 그 무기로 바꾼다(Mk I). 종전(2026-09-10~)에는 지금보다 등급(rank)이 높을 때만 바꿔
+    //   관통탄(3) 뒤 기관총(2) 통이 '같은 무기'만 띄우고 아무 일도 없었다(11·20·24번). 등급이 곧 세기도 아니다 — 무기를 고르는 것은 플레이어
+    if (typeof rank === 'function' && rank(w) > 0) {
       run.weapon = w;
       run.weaponMk = 1;
       events.push({ type: 'weaponSwap', weapon: w, x: reward.x, z: reward.z });

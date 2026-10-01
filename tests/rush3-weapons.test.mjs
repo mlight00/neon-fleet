@@ -100,7 +100,7 @@ test('V3-WPN WPN-4: 전격포 — 직격한 적 근처(chainR 안) 적에게 연
   assert.ok(h2.dead); assert.equal(behind.hp, 2, '벽 너머는 연쇄 없음');
 });
 
-test('V3-WPN WPN-5: 강화 — 같은 무기 통을 먹으면 Mk 가 오르고(최대 III), 상위 무기 통은 교체 + Mk I 로, 하위·만렙은 weaponSame', () => {
+test('V3-WPN WPN-5: 강화 — 같은 무기 통을 먹으면 Mk 가 오르고(최대 III), 다른 무기 통은 등급과 상관없이 교체 + Mk I 로(r4.31), 만렙은 weaponSame', () => {
   const run = createRun(synth({ startWeapon: 'rifle' }));
   assert.equal(run.weaponMk, 1);
   const ev = [];
@@ -114,9 +114,15 @@ test('V3-WPN WPN-5: 강화 — 같은 무기 통을 먹으면 Mk 가 오르고(�
   //  상위 무기로 교체되면 Mk I 부터
   assert.equal(applySupplyReward(crate('auto'), run, ev, { weaponRank, mkMax: MK_MAX }), true);
   assert.equal(run.weapon, 'auto'); assert.equal(run.weaponMk, 1); assert.equal(ev.at(-1).type, 'weaponSwap');
-  //  같은 순위의 다른 무기(산탄포 rank 2)는 교체되지 않는다
-  assert.equal(applySupplyReward(crate('scatter'), run, ev, { weaponRank, mkMax: MK_MAX }), false);
-  assert.equal(run.weapon, 'auto');
+  //  r4.31(r4.31 이사님 결정 2026-10-01): 같은 순위의 다른 무기(산탄포 rank 2)도, 낮은 순위(소총 rank 1)도 교체된다(Mk I) — 종전에는 weaponSame
+  assert.equal(applySupplyReward(crate('scatter'), run, ev, { weaponRank, mkMax: MK_MAX }), true);
+  assert.equal(run.weapon, 'scatter'); assert.equal(ev.at(-1).type, 'weaponSwap');
+  run.weaponMk = 2;
+  assert.equal(applySupplyReward(crate('rifle'), run, ev, { weaponRank, mkMax: MK_MAX }), true);
+  assert.deepEqual([run.weapon, run.weaponMk, ev.at(-1).type], ['rifle', 1, 'weaponSwap'], '낮은 등급으로도 교체 · Mk I 부터');
+  //  모르는 무기 id 는 교체하지 않는다(weaponRank 0)
+  assert.equal(applySupplyReward(crate('nope'), run, ev, { weaponRank, mkMax: MK_MAX }), false);
+  assert.equal(run.weapon, 'rifle');
   //  Mk 가 오르면 실제 발사 간격이 줄고 탄 피해·폭이 표대로 — stepRun 경로
   const r3 = createRun(synth({ startWeapon: 'rifle' }), { startMk: 3 });
   assert.equal(r3.weaponMk, 3);

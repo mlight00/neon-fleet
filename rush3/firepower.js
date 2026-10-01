@@ -185,15 +185,15 @@ export function routeLoadout(stage, route, zLimit) {
 }
 
 /** 무기 후보: 판 시작 무기(Mk I, 같은 무기 통이 있으면 그만큼 +) + 얻은 무기 통마다(통 수 = Mk, 최대 III).
- *  교체 규칙(supply.applySupplyReward): 다른 무기 통은 **지금 무기보다 순위(rank)가 높을 때만** 교체된다(같은 순위·낮은 순위 = 교체 없음).
- *   → 시작 무기보다 순위가 높지 않은 무기는 얻을 수 없다(후보에서 뺀다). 통은 안 쏘고 지나칠 수 있으므로 다른 무기 통을 건너뛰고
- *   한 무기의 통만 모으는 길이 있다 — 통 수 = Mk 는 그 길의 값이다. 1~24 는 모두 소총(순위 1)으로 시작해 이 거름으로 결과가 바뀌지 않는다 */
+ *  교체 규칙(supply.applySupplyReward, r4.31 이사님 결정): 다른 무기 통은 **언제나** 그 무기로 바꾼다(Mk I) — 얻은 무기 통의 무기는 모두 후보다.
+ *   종전 '시작 무기보다 순위가 높은 무기만' 거름은 r4.31 에서 지웠다(1~24 는 모두 소총 순위 1 로 시작해 그때도 거르는 무기가 없었다 — 계산 결과 불변).
+ *   통은 안 쏘고 지나칠 수 있으므로 다른 무기 통을 건너뛰고 한 무기의 통만 모으는 길이 있다 — 통 수 = Mk 는 그 길의 값이다 */
 export function weaponOptions(startWeapon, crates) {
   const out = [];
   const sw = WEAPONS[startWeapon] ? startWeapon : 'rifle';
   out.push({ weapon: sw, mk: Math.min(MK_MAX, 1 + (crates[sw] || 0)) });
   for (const [w, c] of Object.entries(crates)) {
-    if (w === sw || !WEAPONS[w] || !(WEAPONS[w].rank > WEAPONS[sw].rank)) continue;
+    if (w === sw || !WEAPONS[w]) continue;
     out.push({ weapon: w, mk: Math.min(MK_MAX, c) });
   }
   return out;

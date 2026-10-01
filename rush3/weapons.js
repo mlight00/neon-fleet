@@ -1,7 +1,7 @@
 // rush3/weapons.js — 무기 6종 정의·강화(Mk)·탄 생성(계약서 3-4장 + r3.10). 순수, 난수 없음.
 import { BAL3 } from './balance.js';
 
-// id → 무기 정의(동결). rank 가 현재보다 클 때만 교체(적용은 supply.applySupplyReward)
+// id → 무기 정의(동결). rank = 무기 등급(표시·검사용). r4.31 부터 다른 무기 통은 등급과 상관없이 언제나 교체(적용은 supply.applySupplyReward)
 export const WEAPONS = BAL3.weapons;
 // 강화 표 [Mk I, Mk II, Mk III]
 export const WEAPON_MK = BAL3.weaponMk;

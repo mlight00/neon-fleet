@@ -135,7 +135,7 @@ test('V3-SUPPLY: 열린 통은 통과해도 missed 가 아니다', () => {
   assert.equal(run.missedSupplies, 0);
 });
 
-test('V3-SUPPLY: weapon 통 보상은 pendingRewards 에 무기 id 로 쌓이고, 같은 무기는 Mk 강화(r3.10)·하급은 무시(weaponSame)', () => {
+test('V3-SUPPLY: weapon 통 보상은 pendingRewards 에 무기 id 로 쌓이고, 같은 무기는 Mk 강화(r3.10)·다른 무기는 등급과 상관없이 교체(r4.31 이사님 결정 2026-10-01 — 종전 하급 무시)', () => {
   const run = makeRun(1), ev = [];
   const same = makeSupply({ id: 'w1', z: 4000, x: 240, kind: 'weapon', durability: 1, payload: { weapon: 'auto' } });
   const lower = makeSupply({ id: 'w2', z: 4100, x: 240, kind: 'weapon', durability: 1, payload: { weapon: 'rifle' } });
@@ -145,9 +145,9 @@ test('V3-SUPPLY: weapon 통 보상은 pendingRewards 에 무기 id 로 쌓이고
   assert.equal(run.weapon, 'auto', 'hitSupply 는 무기를 바꾸지 않는다');
   assert.equal(applySupplyReward(run.pendingRewards[0], run, ev, { weaponRank: rank }), true, '같은 무기 = Mk 강화');
   assert.equal(run.weapon, 'auto'); assert.equal(run.weaponMk, 2); assert.equal(ev.at(-1).type, 'weaponMk');
-  assert.equal(applySupplyReward(run.pendingRewards[1], run, ev, { weaponRank: rank }), false);
-  assert.equal(run.weapon, 'auto', '하급 무시');
-  assert.equal(ev.filter((e) => e.type === 'weaponSame').length, 1);
+  assert.equal(applySupplyReward(run.pendingRewards[1], run, ev, { weaponRank: rank }), true);
+  assert.equal(run.weapon, 'rifle', '낮은 등급이어도 교체(r4.31)'); assert.equal(run.weaponMk, 1); assert.equal(ev.at(-1).type, 'weaponSwap');
+  assert.equal(ev.filter((e) => e.type === 'weaponSame').length, 0);
   assert.equal(applySupplyReward(run.pendingRewards[2], run, ev, { weaponRank: rank }), true);
   assert.equal(run.weapon, 'heavy');
   assert.equal(ev.at(-1).type, 'weaponSwap');

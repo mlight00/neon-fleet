@@ -57,8 +57,8 @@ test('FIREPOWER-1: 병력 상한 — 분리벽은 한쪽 통로만(더 좋은 �
 test('FIREPOWER-2: 무기 — 얻을 수 있는 무기 통 중 보스에 닿는 초당 피해가 가장 큰 무기·Mk(같은 무기 통 수 = Mk, 판 시작 무기 포함) · 보스 z 뒤의 통은 없다', () => {
   assert.deepEqual(weaponOptions('rifle', { auto: 2, heavy: 1 }), [{ weapon: 'rifle', mk: 1 }, { weapon: 'auto', mk: 2 }, { weapon: 'heavy', mk: 1 }]);
   assert.deepEqual(weaponOptions('rifle', { rifle: 1, auto: 5 }), [{ weapon: 'rifle', mk: 2 }, { weapon: 'auto', mk: 3 }], 'Mk 최대 III');
-  //  교체 규칙: 시작 무기보다 순위가 높지 않은 무기 통은 교체가 안 돼 얻을 수 없다(기관총 2 → 산탄포 2 ✗ · 소총 1 ✗ · 중화기 3 ○)
-  assert.deepEqual(weaponOptions('auto', { scatter: 2, rifle: 1, heavy: 1 }), [{ weapon: 'auto', mk: 1 }, { weapon: 'heavy', mk: 1 }]);
+  //  교체 규칙(r4.31 이사님 결정 2026-10-01): 다른 무기 통은 등급과 상관없이 언제나 교체 → 얻은 무기 통의 무기는 모두 후보(종전: 시작 무기보다 순위가 높은 것만)
+  assert.deepEqual(weaponOptions('auto', { scatter: 2, rifle: 1, heavy: 1 }), [{ weapon: 'auto', mk: 1 }, { weapon: 'scatter', mk: 2 }, { weapon: 'rifle', mk: 1 }, { weapon: 'heavy', mk: 1 }]);
   const st = fpStage({ startUnits: 40, supplies: [sup('c1', 1000, 240, 'weapon', { weapon: 'auto' }), sup('c2', 2000, 240, 'weapon', { weapon: 'auto' }), sup('c3', 3000, 240, 'weapon', { weapon: 'heavy' }), sup('c4', 9500, 240, 'weapon', { weapon: 'sniper' })] });
   const b = best(st);
   const cands = [['rifle', 1], ['auto', 2], ['heavy', 1]].map(([w, mk]) => ({ w, mk, dps: bossDpsFor(st, 40, w, mk).dps }));
