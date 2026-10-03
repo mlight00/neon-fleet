@@ -145,7 +145,16 @@ const PICK_DEFAULT = 'brutal';
 //  r4.5(v4 ⑤단계, 기획 v4.1 3-4 (나)·3-9): seenUpHint = 승리 결과 화면의 '로봇 강화 가능' 안내를 본 적이 있는가 · seenUpRec = 강화 화면의 다연발 '추천' 표시를 본 적이 있는가.
 //   seenShutter 와 같은 꼴(사용자당 1회, true 만 의미 — 비불리언은 false). 옛 코드 탭이 v3 키를 통째로 덮으면 사라져 안내가 한 번 더 뜰 뿐이다(해 없음)
 //  seenStory(2026-10-01 스토리 스틸컷 — 이사님 결정) = 본 컷 id 목록(rush3/story.js normSeenStory: 아는 id 만 · 중복 없음 · 배열 아니면 []). 빠진 키 = [](스키마 v 3 그대로)
-function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false, zoom: false, seenUpHint: false, seenUpRec: false, seenStory: [] }; }
+//  친구 테스트 리뷰 설문(2026-10-03 — rush3/review.js): playSec = 끝난 판의 판 시간 합(초 — 설문 '플레이 시간') · reviewAnon = 익명 번호(0-9a-z 4~16자, 없으면 '') ·
+//   reviewAsked = 초대 카드를 띄운 적이 있는가 · reviewSent = 보낸 횟수 · reviewPending = 아직 못 보낸 값 쌍 [[entry.N, 값], …] | null(다음 실행에 다시 보낸다)
+function defaults() { return { v: 3, stages: {}, lastStage: null, difficulty: PICK_DEFAULT, volume: 1, mute: false, seenShutter: false, seenVehicle: false, zoom: false, seenUpHint: false, seenUpRec: false, seenStory: [],
+  playSec: 0, reviewAnon: '', reviewAsked: false, reviewSent: 0, reviewPending: null }; }
+//  못 보낸 값 쌍: 1~20쌍 · 칸 이름 'entry.숫자' · 값은 문자열 400자 이하. 아니면 null(버림)
+function normPending(p) {
+  if (!Array.isArray(p) || p.length === 0 || p.length > 20) return null;
+  const ok = p.every((x) => Array.isArray(x) && x.length === 2 && typeof x[0] === 'string' && /^entry\.\d+$/.test(x[0]) && typeof x[1] === 'string' && x[1].length <= 400);
+  return ok ? p.map(([k, v]) => [k, v]) : null;
+}
 //  전체 정규화(형식이 맞는 원문에만 적용)
 function normalize(d) {
   const out = defaults();
@@ -160,6 +169,11 @@ function normalize(d) {
   out.seenUpHint = d.seenUpHint === true;
   out.seenUpRec = d.seenUpRec === true;
   out.seenStory = normSeenStory(d.seenStory);
+  out.playSec = Math.max(0, num(d.playSec, 0));
+  out.reviewAnon = typeof d.reviewAnon === 'string' && /^[0-9a-z]{4,16}$/.test(d.reviewAnon) ? d.reviewAnon : '';
+  out.reviewAsked = d.reviewAsked === true;
+  out.reviewSent = Math.max(0, Math.trunc(num(d.reviewSent, 0)));
+  out.reviewPending = normPending(d.reviewPending);
   return out;
 }
 

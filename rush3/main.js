@@ -16,6 +16,8 @@ import { createSave3 } from './save.js';
 import { adviceLine, ADVICE_DEFAULT } from './advice.js';
 import { bossName, stageBossName } from './names.js';
 import { storyById, storyIdForStage, storyImagePath, STORY_INPUT_LOCK } from './story.js';
+import { REVIEW_FORM, REVIEW_GAME_VER, REVIEW_BUTTON, buildReviewPairs, reviewMissing, shouldInvite, deviceLabel, makeAnon, recordLine } from './review.js';
+import { createReviewUi } from './reviewui.js';
 import { createTally, addEvents, tallyTotal, mainCoins, bonusCoins } from './coins.js';
 import { hashSeed } from '../rush/rng.js';
 
@@ -550,6 +552,8 @@ export const ALL_CLEAR_LINE = '모든 작전 완료 — 24개 작전을 전부 �
 //   **살 수 있는 단계가 있을 때만**(그리고 코인이 저장되는 탭일 때만) 작게(180×40, 15px) 보조 버튼으로 — 강조하지 않는다(패배·포기에서 구매로 몰지 않는다).
 //   ③단계의 자리(240×44)를 작게 줄였다. 화면 높이 800 안이다(랜덤 길 승리 판 최저 734, 첫 구매 안내 글 752, 맨 아래 경고 778)
 export const RESULT_UPGRADE_SLOT = Object.freeze({ x: 150, dy: 52, w: 180, h: 40 });
+//  결과 화면 [리뷰 남기기](2026-10-03 친구 테스트 리뷰 설문 — rush3/review.js): 오른쪽 위 작은 보조 버튼(122×40, 15px). 설문이 켜진 실행(진입점 review: true)에서만
+export const RESULT_REVIEW_SLOT = Object.freeze({ x: 344, y: 14, w: 122, h: 40 });
 
 //  ── r4.5 로봇 강화 화면(v4 ⑤단계, 원본 v4 3-5 '강화 화면' · 기획 v4.1 3-4 (가)(나) · 3-9) ─────────────────────────────────────
 //  새 상태 'upgrade'. 들어오는 곳 = 타이틀 [로봇 강화] · 결과 화면 보조 버튼 [로봇 강화]. [돌아가기]는 **들어온 화면으로 복귀**한다(결과에서 왔으면
@@ -736,10 +740,76 @@ export function boot(canvas, deps = {}) {
     const { id, next, preview } = story;
     story = null;
     if (!preview && !storySeen(id)) save.patch({ seenStory: [...save.get().seenStory, id] });
-    if (next.kind === 'result') state = 'result';
+    if (next.kind === 'result') { state = 'result'; maybeInvite(); }
     else if (next.kind === 'start') startRun(next.id);
     else toTitle();
     return true;
+  }
+  //  ── 친구 테스트 리뷰 설문(이사님 결정 2026-10-03 — rush3/review.js · 설계서 docs/superpowers/specs/2026-10-03-friend-review-survey-design.md) ──
+  //   진입점이 review: true 로 켠다 · ?dev=1(점검·캡처 도구)이면 끈다 — 단 ?dev=1&review=1 은 켠다(확인용) · 검사 셸은 기본 꺼짐.
+  //   상태 'review' = 결과 화면 위에 설문 창(DOM, reviewui.js)이 열린 동안. 그림은 결과 화면 그대로(버튼 없음) · 게임 키·캔버스 누르기는 받지 않는다(ESC = 닫기).
+  //   검사는 deps.reviewUi(창 공장 (cb) → { open, close, isOpen }) · deps.fetch(전송) · deps.makeAnon(익명 번호)으로 주입한다
+  const reviewParam = (() => { try { return !!(win && win.location) && typeof URLSearchParams === 'function' && new URLSearchParams(win.location.search).get('review') === '1'; } catch { return false; } })();
+  const reviewOn = deps.review === true && (!devFlag() || reviewParam);
+  const fetchFn = deps.fetch !== undefined ? deps.fetch : (typeof fetch === 'function' ? (u, o) => fetch(u, o) : null);
+  const makeAnonFn = deps.makeAnon ?? makeAnon;
+  let reviewUi = null;
+  //  자동 기록(설문 7~11번 칸) — 익명 번호는 처음 쓸 때 만들어 저장한다
+  function reviewRecord() {
+    let anon = save.get().reviewAnon;
+    if (!anon) { anon = makeAnonFn(); save.patch({ reviewAnon: anon }); }
+    const sv = save.get(), nav = win && win.navigator;
+    return { reach: unlockedMax(), cleared: wonStageIds().size, runs: save.wallet.get().runNo, mins: sv.playSec / 60, story: sv.seenStory.length,
+             device: deviceLabel(nav ? nav.userAgent : '', nav ? nav.maxTouchPoints : 0), ver: REVIEW_GAME_VER, anon };
+  }
+  function reviewUiGet() {
+    if (!reviewUi) {
+      const make = deps.reviewUi ?? (doc ? (cb) => createReviewUi(doc, cb) : null);
+      reviewUi = make ? make({ onSubmit: submitReview, onClose: closeReview, viewUrl: REVIEW_FORM.viewUrl, now: nowSec }) : null;
+    }
+    return reviewUi;
+  }
+  //  설문 창 열기(mode = 'form' | 'invite') — 결과 화면에서만
+  function openReview(mode = 'form') {
+    if (!reviewOn || state !== 'result' || !result) return false;
+    const ui = reviewUiGet();
+    if (!ui) return false;
+    state = 'review';
+    ui.open({ mode: mode === 'invite' ? 'invite' : 'form', line: recordLine(reviewRecord()), sent: save.get().reviewSent });
+    return true;
+  }
+  //  닫기(창의 [닫기]·[나중에] · ESC) → 결과 화면
+  function closeReview() {
+    if (state !== 'review') return false;
+    if (reviewUi) reviewUi.close();
+    state = 'result';
+    return true;
+  }
+  //  전송: fetch no-cors — 응답은 읽을 수 없어서 끝나면(resolve) 성공으로 본다. reject = 인터넷 끊김
+  async function sendReviewPairs(pairs) {
+    if (!fetchFn || !pairs || !pairs.length) return false;
+    try {
+      await fetchFn(REVIEW_FORM.action, { method: 'POST', mode: 'no-cors', body: new URLSearchParams(pairs) });
+      return true;
+    } catch { return false; }
+  }
+  //  [보내기]: 필수 확인 → 보낼 값을 먼저 저장(reviewPending — 보내는 도중 창을 닫아도 다음 실행에 다시 보낸다) → 전송 → 성공이면 비우고 reviewSent +1
+  async function submitReview(ans) {
+    const missing = reviewMissing(ans);
+    if (missing.length) return { ok: false, missing };
+    const pairs = buildReviewPairs(ans, reviewRecord());
+    save.patch({ reviewPending: pairs });
+    const ok = await sendReviewPairs(pairs);
+    if (ok) save.patch({ reviewPending: null, reviewSent: save.get().reviewSent + 1 });
+    return { ok };
+  }
+  //  초대 카드: 판 수 3 이상 · 아직 초대 안 함 · 보낸 적 없음 → 띄우는 순간 reviewAsked(다시 안 띄움)
+  function maybeInvite() {
+    if (!reviewOn || state !== 'result' || !result) return false;
+    const sv = save.get();
+    if (!shouldInvite({ runs: save.wallet.get().runNo, asked: sv.reviewAsked, sent: sv.reviewSent })) return false;
+    save.patch({ reviewAsked: true });
+    return openReview('invite');
   }
   //  notice(r4.3) = 스테이지 선택 화면에 잠깐 뜨는 안내 { text, t 남은 초 } | null — 잠긴 판을 불렀을 때 '앞 판을 먼저 깨야 합니다'
   let notice = null;
@@ -969,6 +1039,7 @@ export function boot(canvas, deps = {}) {
     //   본전투 기록은 'win' 프레임에 commitMain 이 이미 썼고(판당 1회), 여기서는 안전망으로 한 번 더 부른다(표식이 있으면 즉시 반환)
     if (run && run.won && !run.over) commitMain(run);
     story = null;
+    if (reviewUi && reviewUi.isOpen()) reviewUi.close();
     state = 'title';
     loop.stop(nowSec());
     run = null;
@@ -1095,6 +1166,8 @@ export function boot(canvas, deps = {}) {
     const isBestBonus = !!bo && bo.score > (cur.bestBonus || 0);
     if (bo) patch.bestBonus = Math.max(cur.bestBonus || 0, bo.score);
     if (!run.devWeapon) save.updateStage(id, patch, ver, diff);
+    //  친구 테스트 리뷰 설문(2026-10-03): 플레이 시간 = 끝난 판의 판 시간 합(개발용 판 제외)
+    if (!run.devWeapon) save.patch({ playSec: save.get().playSec + Math.max(0, Number(run.time) || 0) });
     const o = run.objective;
     const bonus = bo ? { score: bo.score, tier: bo.tier, hits: bo.hits, isBestBonus } : null;
     //  코인(r4.3, 3-9): 정산은 이미 끝났다(settleRun — 승리·패배 이벤트, 보너스 종료, 포기). 여기서는 읽기만 한다
@@ -1133,6 +1206,8 @@ export function boot(canvas, deps = {}) {
     //  스토리 스틸컷: 보스 판 승리(포기·개발용 판 제외)에서 그 장면을 아직 안 봤으면 결과 화면 앞에 한 장 — 정산·기록은 이미 끝났다(결과는 그대로)
     const sid = won && !aborted && !run.devWeapon ? storyIdForStage(id) : null;
     if (storyOn && sid && !storySeen(sid)) showStory(sid, { kind: 'result' });
+    //  리뷰 초대(판 수 3 이상에서 1회) — 스토리 컷이 먼저 나오면 컷이 끝나 결과 화면이 될 때(endStory)
+    maybeInvite();
   }
 
   //  연출 이벤트 소비(프레임 1회, drainEvents). 규칙 상태는 읽기만 한다
@@ -1610,7 +1685,12 @@ export function boot(canvas, deps = {}) {
           const S = RESULT_UPGRADE_SLOT;
           bs.push({ id: 'upgrade', x: S.x, y: titleY + S.dy, w: S.w, h: S.h, label: '로봇 강화', small: true });
         }
+        //  친구 테스트 리뷰 설문(2026-10-03): 오른쪽 위 작은 보조 버튼 [리뷰 남기기](설문이 켜진 실행만) — 기본 버튼(Enter)은 그대로
+        if (reviewOn) bs.push({ id: 'review', ...RESULT_REVIEW_SLOT, label: REVIEW_BUTTON, small: true });
         v.buttons = bs;
+      } else if (state === 'review') {
+        //  설문 창이 열린 동안: 그림은 결과 화면 그대로 · 버튼 없음(창이 받는다)
+        v.result = result;
       }
     }
     buttons = v.buttons;
@@ -1655,6 +1735,7 @@ export function boot(canvas, deps = {}) {
       else if (id === 'next' && result.nextId) startRun(result.nextId);
       else if (id === 'title') toTitle();
       else if (id === 'upgrade') openUpgrade('result');
+      else if (id === 'review') openReview('form');
     }
     return true;
   }
@@ -1677,6 +1758,8 @@ export function boot(canvas, deps = {}) {
     au.unlock();
     //  스토리 컷: 화면 어디를 눌러도 계속(0.5초 잠금 뒤)
     if (state === 'story') { endStory(); return; }
+    //  리뷰 설문 창이 열린 동안은 게임이 누르기를 받지 않는다(창이 위에서 받는다)
+    if (state === 'review') return;
     if (state === 'title' || state === 'result' || state === 'upgrade') au.bgmPlay(BGM.title);
     const [x, y] = toLogical(e);
     if (onPress(x, y)) return;
@@ -1701,6 +1784,8 @@ export function boot(canvas, deps = {}) {
     win.addEventListener('keydown', (e) => {
       au.unlock();
       const code = keyCode(e);
+      //  리뷰 설문 창이 열린 동안: 글자 입력(Enter·Space 포함)은 창이 받는다 — 게임 키로 쓰지 않는다. ESC 만 창 닫기
+      if (state === 'review') { if (code === 'Escape' && !e.repeat) closeReview(); return; }
       //  브라우저 자동반복 keydown(키를 누르고 있는 동안 초당 수십 회)은 입력으로 보지 않는다 — 계약서 6장.
       //  반복까지 input.onKey 로 넘기면 매 반복이 pointerX 를 지워, "키를 누른 채 마우스를 움직이면 마우스가 이긴다"가 깨진다.
       //  (조향 키는 브라우저 기본 스크롤만 계속 막고, ESC·Space·Enter 의 반복은 동작을 다시 일으키지 않는다)
@@ -1886,13 +1971,19 @@ export function boot(canvas, deps = {}) {
   const api = { dbg, ready, startRun, pause, resume, toTitle, giveUp, getState: () => state, getRun: () => run, getFx: () => fx, getResult: () => result, getCamZ: () => camZ, getLeadStats: () => leadStats,
                 getNotice: () => (notice ? notice.text : null), openUpgrade, closeUpgrade, buyTrack, getButtons: () => buttons, loop, input,
                 //  스토리(2026-10-01): showStory(id) = 개발 미리보기(아무 컷이나 — 저장하지 않고, 계속하면 타이틀) · getStory = 지금 컷 | null
-                showStory: (id) => (storyById(id) ? showStory(id, { kind: 'title' }, { preview: true }) : false), getStory: () => story };
+                showStory: (id) => (storyById(id) ? showStory(id, { kind: 'title' }, { preview: true }) : false), getStory: () => story,
+                //  리뷰 설문(2026-10-03): openReview(mode) · closeReview · submitReview(답) → Promise<{ ok }> · getReviewOpen
+                openReview, closeReview, submitReview, getReviewOpen: () => state === 'review' };
   //  r4.5 개발 확인용(?dev=1 일 때만): 캡처 스크립트가 결과 화면·강화 화면을 부를 수 있게 앱 손잡이를 창에 둔다(게임 동작에는 영향 없음 — __rush3Dbg 와 같은 결)
   if (win && devFlag()) win.__rush3App = api;
   //  스토리 프롤로그 그림은 첫 화면이 뜬 뒤 불러온다(아직 안 봤을 때만)
   if (storyOn && !storySeen('S0')) prefetchStory('S0');
+  //  리뷰 설문: 지난번에 못 보낸 응답(reviewPending)이 있으면 한 번 조용히 다시 보낸다
+  if (reviewOn && save.get().reviewPending) {
+    sendReviewPairs(save.get().reviewPending).then((ok) => { if (ok && save.get().reviewPending) save.patch({ reviewPending: null, reviewSent: save.get().reviewSent + 1 }); });
+  }
   return api;
 }
 
 //  실제 게임 진입점 — 스토리 스틸컷은 여기서만 켠다(story: true · ?dev=1 이면 boot 가 끈다)
-if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'), { story: true });
+if (typeof document !== 'undefined' && document.getElementById?.('game3')) boot(document.getElementById('game3'), { story: true, review: true });

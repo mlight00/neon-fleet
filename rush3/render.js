@@ -3137,7 +3137,8 @@ export function createRenderer3(ctx, sprites, opts = {}) {
         ctx.font = '14px ' + FONT;
         ctx.fillStyle = 'rgba(243,241,232,0.7)';
         ctx.fillText('ESC 키로도 다시 시작할 수 있다', W / 2, 336);
-      } else if (view.state === 'result') {
+      } else if (view.state === 'result' || view.state === 'review') {
+        //  리뷰 설문 창(DOM, 2026-10-03)이 열린 동안에도 결과 화면을 그대로 그린다(버튼은 셸이 비운다)
         drawResult(view);
       }
     }

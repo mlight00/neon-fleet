@@ -38,18 +38,25 @@ export function fakeAudio() {
 /** 실제 boot() 한 벌. search = URL 뒤 '?…'. unlockThrough = 옛 기록으로 1~n 번을 이긴 사용자(순차 해금 — n+1 번까지 열린다).
  *  반환 { app, save, texts, ops, frames(n), textNow() } */
 //  story(2026-10-01) = 스토리 스틸컷을 켠다(기본 꺼짐 — 종전 검사는 그대로 · 실제 진입점만 켠다)
-export async function bootApp({ storage = memStorage(), search = '', dateNow = () => 1_700_000_000_000, save, withOps = false, unlockThrough = 0, story = false } = {}) {
+//  review(2026-10-03 친구 테스트 리뷰 설문) = 결과 화면 [리뷰 남기기]·초대를 켠다(기본 꺼짐). reviewUi = 가짜 창 공장 · fetch = 가짜 전송 ·
+//   makeAnon = 익명 번호 고정 · nav = 가짜 navigator({ userAgent, maxTouchPoints })
+export async function bootApp({ storage = memStorage(), search = '', dateNow = () => 1_700_000_000_000, save, withOps = false, unlockThrough = 0, story = false,
+                                review = false, reviewUi, fetch, makeAnon, nav } = {}) {
   const texts = [];
   const ops = withOps ? [] : null;
   const canvas = fakeCanvas(texts, ops);
   const L = {};
-  const win = { devicePixelRatio: 1, location: { search }, addEventListener: (n, f) => { (L[n] ??= []).push(f); }, fire: (n, e = {}) => { for (const f of L[n] ?? []) f(e); } };
+  const win = { devicePixelRatio: 1, location: { search }, navigator: nav, addEventListener: (n, f) => { (L[n] ??= []).push(f); }, fire: (n, e = {}) => { for (const f of L[n] ?? []) f(e); } };
   const queue = [];
   let nowMs = 1000;
   const sv = save ?? createSave3(storage);
   if (unlockThrough > 0) seedOldClears(sv, unlockThrough);
   const audio = fakeAudio();
-  const deps = { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save: sv, audio, dateNow, sprites: { get: () => null, ready: new Set() }, story };
+  const deps = { win, doc: null, raf: (f) => queue.push(f), now: () => nowMs, save: sv, audio, dateNow, sprites: { get: () => null, ready: new Set() }, story, review };
+  //  주입하지 않은 칸은 넘기지 않는다(셸의 기본값 — 실제 fetch·DOM 창 — 을 쓰게)
+  if (reviewUi) deps.reviewUi = reviewUi;
+  if (fetch) deps.fetch = fetch;
+  if (makeAnon) deps.makeAnon = makeAnon;
   const app = boot(canvas, deps);
   await app.ready;
   const frames = (n = 1) => { for (let i = 0; i < n; i++) { nowMs += 1000 / 60; queue.shift()(nowMs); } };
