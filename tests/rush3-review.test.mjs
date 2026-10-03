@@ -115,6 +115,7 @@ test('REVIEW-6: 저장 새 칸 — 기본값 · 정규화 · patch 유지 · 다
 
 // ─────────────────────────────── 셸 흐름(상태 'review') ───────────────────────────────
 import { bootApp } from './lib/rush3-shell.mjs';
+import { HUD_ROW } from '../rush3/render.js';
 import { pickInput, weakenBosses, weakenCrowd, weakenBounties } from './lib/rush3-policies.mjs';
 
 //  가짜 창 공장: 셸이 넘긴 콜백(cb)을 기억하고, open/close 를 기록한다
@@ -158,7 +159,10 @@ test('REVIEW-7: 결과 화면 [리뷰 남기기] — 켜질 때만 · 누르면 
   quickRun(h);
   assert.equal(h.app.getState(), 'result');
   const b = h.app.getButtons().find((x) => x.id === 'review');
-  assert.deepEqual(b && [b.label, b.x, b.y, b.w, b.h, b.small], ['리뷰 남기기', 344, 14, 122, 40, true]);
+  assert.deepEqual(b && [b.label, b.x, b.y, b.w, b.h, b.small], ['리뷰 남기기', 262, 14, 204, 40, true]);
+  //  결과 화면 뒤에 흐리게 남는 무기 칩을 통째로 덮는다(반만 덮으면 글이 삐져나온다)
+  const wb = HUD_ROW.box.weapon;
+  assert.ok(b.x <= wb.x && b.x + b.w >= wb.x + wb.w && b.y <= wb.y && b.y + b.h >= wb.y + wb.h && b.x + b.w <= 480, JSON.stringify(wb));
   h.tap(b.x + b.w / 2, b.y + b.h / 2);
   assert.equal(h.app.getState(), 'review');
   assert.equal(ui.opens.length, 1);

@@ -112,7 +112,7 @@ export function createReviewUi(doc, { onSubmit, onClose, viewUrl = '', now = () 
         const inp = el(long ? 'textarea' : 'input');
         if (!long) inp.type = 'text';
         inp.maxLength = REVIEW_LIMITS[q.key] || 100;
-        inp.placeholder = long ? '자유롭게 적어 주세요' : '단톡방 이름이면 누구 의견인지 알 수 있어요';
+        inp.placeholder = long ? '자유롭게 적어 주세요' : '단톡방 이름이면 좋아요';
         inp.setAttribute('aria-label', q.label);
         inp.setAttribute('autocomplete', 'off');
         inp.addEventListener('input', () => { ans[q.key] = inp.value; });
