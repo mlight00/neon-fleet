@@ -1,3 +1,16 @@
+# 스타포지 러시 v3 — 작업 상태 (2026-10-03 · 친구 테스트 리뷰 설문 r4.34)
+
+라이브 https://mlight00.github.io/neon-fleet/rush3.html · master = r4.34(cf12329) + 문서 · 브랜치 `claude/starforge-v3`
+검사: `node --test tests/rush3-*.test.mjs` 565 · `node --test tests/rush-*.test.mjs` 32 (전부 통과)
+
+- 10/3 이사님 지시 "친구 단톡방 연휴 테스트 + 게임이 끝나면 설문으로 리뷰 수집" → r4.34 라이브: 결과 화면 [리뷰 남기기] · 판 수 3 이상 결과 화면에서 초대 1회 · 6문항 + 자동 기록 5칸 → 구글 설문지(coo@medicalaesthetic.co.kr — LaserMoon 은 저장 공간 초과, company@ 는 재로그인 필요라 이사님 결정으로 coo@).
+- 설문지 편집 https://docs.google.com/forms/d/1Voq_-dGpEAUQARQ3J41oXH6QTb44xYOraY00_gaVARQ/edit · 요약 https://docs.google.com/forms/d/1Voq_-dGpEAUQARQ3J41oXH6QTb44xYOraY00_gaVARQ/viewanalytics · 응답 시트 "스타포지 러시 친구 테스트 리뷰(응답)". 시험 응답 2건(별명 [테스트])은 지우지 않았다(이사님이 지우시거나 요약에서 뺀다).
+- 확인 자료 `E:\workspace\claude\neon-fleet\review\20261003_review\`(form.json · e2e_review.py = 실제 전송 · capture_review.py = 전송 없음 · 캡처 · sheet_check_20261003.csv · 단톡방_안내문.txt).
+- 테스트가 끝나면 진입점 `review: true` 한 줄을 지우고 설문지 응답 받기를 끈다(이사님 말씀 뒤). 릴리스마다 REVIEW_GAME_VER 올리기(LOOP.md).
+- 루프 예약 a68f11ea 는 10/5 저절로 끝남 → 그때 다시 걸지 여쭙기.
+
+---
+
 # 스타포지 러시 v3 — 작업 상태 (2026-09-30 저녁 · 루프 21바퀴 뒤)
 
 라이브 https://mlight00.github.io/neon-fleet/rush3.html · master = r4.30 + 문서 · 브랜치 `claude/starforge-v3`
