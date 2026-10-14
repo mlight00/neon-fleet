@@ -76,7 +76,8 @@ export const DEFS = {
     elite: { z: 7200, hp: 120, summon: false },
   },
   2: {
-    version: 2, title: '갈림길', startUnits: 2, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
+    //  r4.35 무기 배치(이사님 결정 2026-10-14): 오른쪽 통 기관총 → 화염방사기 — version 2 → 3(옛 기록은 2 칸에 보존)
+    version: 3, title: '갈림길', startUnits: 2, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
     gates: [
       //  안전한 작은 확정 보상(좌) vs 병력을 모아야 여는 큰 음수(우) — 양쪽 모두 음수인 행을 늘리지 않는다
       //  ⚠️안내는 **이 판에서 지금 할 수 있는 행동**만 적는다(2026-09-17 2차 검수 N1). S2 는 2명으로 시작하고
@@ -90,12 +91,12 @@ export const DEFS = {
       //  분리벽 안 필수 선택: 병력(좌) vs 화력(우). 벽 + 차폐(coverZ)가 함께 있어야 배제가 성립한다
       { z: 2300, x: 120, kind: 'soldier', durability: 6, n: 3, pairId: 'w1', coverZ: 1953,
         hint: '분리벽 왼쪽 통로에는 병사 3명이 있습니다. 벽 앞 표지를 보고 미리 차선을 고르세요' },
-      { z: 2300, x: 326, kind: 'weapon', durability: 12, weapon: 'auto', pairId: 'w1', coverZ: 1953,
-        hint: '분리벽 오른쪽 기관총을 확보하면 다음 무리를 빨리 정리할 수 있어요' },
+      { z: 2300, x: 326, kind: 'weapon', durability: 12, weapon: 'flame', hpWeapon: 'auto', pairId: 'w1', coverZ: 1953,
+        hint: '분리벽 오른쪽 화염방사기를 확보하면 몰려오는 무리를 한꺼번에 태울 수 있어요' },
       { z: 5800, x: 150, kind: 'soldier', durability: 15, n: 5,
         hint: '두 번째 게이트에서 오른쪽을 골랐다면 이 통은 왼쪽으로 옮겨야 얻습니다' },
     ],
-    walls: [{ z0: 1800, z1: 3000, signs: { L: { kind: 'soldier', n: 3 }, R: { kind: 'weapon', weapon: 'auto' } } }],
+    walls: [{ z0: 1800, z1: 3000, signs: { L: { kind: 'soldier', n: 3 }, R: { kind: 'weapon', weapon: 'flame' } } }],
     spawns: [
       //  회피 통로 무리: 오른쪽 도로 끝까지 165px 이 비어 있다(필요 폭 = 2 × 반폭 61 + 10 = 132)
       { z: 3600, kind: 'grunt', n: 4, xs: [95, 137, 179, 221], corridorHw: 61 },
@@ -273,7 +274,22 @@ function makeSupplyDef(idx, s) {
            payload, opened: false, missed: false, locked: false, skipped: false, pads: [],
            coverZ: s.coverZ ?? null, pairId: s.pairId ?? null, hint: s.hint ?? null,
            move: s.move ? { x0: s.move.x0, x1: s.move.x1, period: s.move.period } : null,
-           armZ: s.armZ === true ? BAL3.supply.armZ : (s.armZ ?? null) };
+           armZ: s.armZ === true ? BAL3.supply.armZ : (s.armZ ?? null),
+           //  r4.35 바꾸기 전 무기(체력 기준 BAL3.weaponHpRule 계산에만 — 게임 규칙은 읽지 않는다). 바꾼 통에만 붙는다
+           ...(s.kind === 'weapon' && s.hpWeapon ? { hpWeapon: s.hpWeapon } : {}) };
+}
+
+//  r4.35 체력 기준(BAL3.weaponHpRule): 바꾼 무기 통의 무기를 바꾸기 전 무기(hpWeapon)로 되돌린 '기준 판'(체력 계산 전용 얕은 사본 — 규칙·그림은 쓰지 않는다).
+//   바꾼 통이 없거나 규칙이 'new' 면 null. combineHp = 두 계산의 결합('old' = 기준 판 값 · 'max' = 높은 쪽 · null = 올리지 않음)
+function hpRefStage(stage) {
+  if (BAL3.weaponHpRule === 'new' || !stage.supplies.some((s) => s.hpWeapon)) return null;
+  return { ...stage, supplies: stage.supplies.map((s) => (s.hpWeapon ? { ...s, payload: { ...s.payload, weapon: s.hpWeapon } } : s)) };
+}
+function combineHp(a, b) {
+  if (BAL3.weaponHpRule === 'old') return b;
+  if (a == null) return b;
+  if (b == null) return a;
+  return Math.max(a, b);
 }
 
 //  signs = 벽 앞머리에 그리는 통로 안내 표지(연출이 아니라 계약 데이터 — V3-STAGES 가 실제 통 내용과 대조한다)
@@ -528,16 +544,21 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   //  r4.29 무리 체력 바닥(이사님 지시 2026-09-30 "9스테이지까지 … 너무너무너무 쉬워"): 줄 표의 crowdFloor 가 참인 줄(게임 화면 = brutal)에서만.
   //   무리마다 위협 비율 f(무리 체력 합 ÷ (그 z 까지 상한 무리 화력 × 접근 시간))가 BAL3.crowd 바닥보다 낮으면 체력을 올린다(firepower.crowdFloor — 내리지 않는다).
   //   stage.crowdFloor = 계산 내역(보고·검사용 — 규칙은 읽지 않는다). 현상금 적은 아래에서 붙어 이 계산에 들지 않는다. 검사용 배수 1 줄(normal)은 칸이 없고 종전 그대로
+  //  r4.35 무기 배치를 바꾼 판은 바꾸기 전 무기로도 재서 결합한다(BAL3.weaponHpRule — hpRefStage · combineHp). 바꾼 통이 없는 판은 종전 그대로
+  const hpRef = hpRefStage(stage);
   if (mult.crowdFloor && stage.spawns.length) {
     const cf = crowdFloor(stage);
-    stage.spawns.forEach((sp, i) => { if (cf.hp[i] != null) sp.hp = cf.hp[i]; });
+    const cr = hpRef ? crowdFloor(hpRef) : null;
+    stage.spawns.forEach((sp, i) => { const v = cr ? combineHp(cf.hp[i], cr.hp[i]) : cf.hp[i]; if (v != null) sp.hp = v; });
     stage.crowdFloor = { fRegular: cf.fRegular, fWave: cf.fWave, rows: cf.rows };
   }
   if (mult.bossFloor && stage.elites.length) {
     const mid = stage.elites.every((e) => e.mid);
     const f = bossFloor(stage, mid ? BAL3.midBossSec : BAL3.bossMinFightSec);
-    stage.elites.forEach((e, i) => { e.hp = f.hp[i]; });
-    stage[mid ? 'midFloor' : 'bossFloor'] = { sec: f.sec, units: f.units, weapon: f.weapon, mk: f.mk, dps: f.dps, base: f.base, hp: f.hp, minSec: f.minSec };
+    const fr = hpRef ? bossFloor(hpRef, mid ? BAL3.midBossSec : BAL3.bossMinFightSec) : null;
+    const hp = fr ? f.hp.map((h, i) => combineHp(h, fr.hp[i])) : f.hp;
+    stage.elites.forEach((e, i) => { e.hp = hp[i]; });
+    stage[mid ? 'midFloor' : 'bossFloor'] = { sec: f.sec, units: f.units, weapon: f.weapon, mk: f.mk, dps: f.dps, base: f.base, hp, minSec: f.minSec };
   }
   //  r4.7 현상금 적(이사님 지시 2026-09-26 "체력이 특수한 높은 일반 적을 배치해서 … 끝까지 쏴야 깰 수 있는 긴장감 … 대신 코인 같은 보상"):
   //   줄 표의 bounty 가 참인 줄(게임 화면 = brutal)에서만 판 정의의 bounties [{ z(발동 z), x }] 를 스폰 1체로 붙인다(물결·무리 수 배수 없음 — makeSpawn 을 거치지 않는다).
@@ -545,8 +566,9 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   if (mult.bounty && d.bounties && d.bounties.length) {
     stage.bounties = d.bounties.map((b) => {
       const f = bountyFloor(stage, b.z);
-      stage.spawns.push({ z: b.z, kind: 'bounty', n: 1, xs: [b.x], zs: [b.z + ENTER], corridorHw: null, hp: f.hp });
-      return { z: b.z, x: b.x, hp: f.hp, units: f.units, weapon: f.weapon, mk: f.mk, dmg: f.dmg, sec: f.sec };
+      const hp = hpRef ? combineHp(f.hp, bountyFloor(hpRef, b.z).hp) : f.hp;
+      stage.spawns.push({ z: b.z, kind: 'bounty', n: 1, xs: [b.x], zs: [b.z + ENTER], corridorHw: null, hp });
+      return { z: b.z, x: b.x, hp, units: f.units, weapon: f.weapon, mk: f.mk, dmg: f.dmg, sec: f.sec };
     });
   }
   stage.spawns.sort((a, b) => a.z - b.z);

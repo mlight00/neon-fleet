@@ -113,16 +113,18 @@ export const STAGE_END = Object.freeze({
 export function makeCourses({ coverZFor }) {
   const C = {};
   //  4 세 갈래 — 한 행에 세 칸(BG1). 시제품 proto3 를 정식 길이로
-  C[4] = { version: 2, title: '세 갈래', bg: 1, startUnits: 4, startWeapon: 'rifle', length: 8000, eliteZ: 7600,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 2 → 3(옛 기록은 2 칸에 보존)
+  C[4] = { version: 3, title: '세 갈래', bg: 1, startUnits: 4, startWeapon: 'rifle', length: 8000, eliteZ: 7600,
     gates: [g3(1500, -4, 3, -6, { hint: '세 칸: 가운데가 늘 정답은 아닙니다' }), g3(4200, 2, -8, 5), g3(6200, -3, -10, 4, { max: 20 })],
-    supplies: [soldier(2500, 150, 4, 8), weapon(3300, 330, 'auto', 12), soldier(5200, 240, 5, 14)],
+    supplies: [soldier(2500, 150, 4, 8), weapon(3300, 330, 'scatter', 12, { hpWeapon: 'auto' }), soldier(5200, 240, 5, 14)],
     walls: [],
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(3600, 'rusher', [160, 320], HOUND), mass(5000, 'grunt', 10, 2), wave(6800, 'shooter', [150, 330])],
     elite: { z: 7600, hp: 160, summon: false } };
   //  5 가림막 — 가려진 것은 쏠 수 없다(BG2)
-  C[5] = { version: 2, title: '가림막', bg: 2, startUnits: 4, startWeapon: 'rifle', length: 8400, eliteZ: 8000,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 2 → 3(옛 기록은 2 칸에 보존)
+  C[5] = { version: 3, title: '가림막', bg: 2, startUnits: 4, startWeapon: 'rifle', length: 8400, eliteZ: 8000,
     gates: [g3(1600, -4, 4, -5, { hint: '가운데 앞 둔덕이 탄을 막습니다. 비스듬히 쏘거나 지나서 쏘세요' }), g3(4000, 3, -9, 2), g2(6400, -12, 6, { max: 20 })],
-    supplies: [soldier(2600, 120, 4, 8), soldier(2600, 360, 3, 6), weapon(4900, 240, 'auto', 12)],
+    supplies: [soldier(2600, 120, 4, 8), soldier(2600, 360, 3, 6), weapon(4900, 240, 'missile', 12, { hpWeapon: 'auto' })],
     walls: [cover(190, 290, 1220), cover(80, 186, 3620), cover(240, 400, 6020)],
     spawns: [wave(2100, 'grunt', [140, 240, 340]), wave(3300, 'shooter', [200, 280]), mass(5300, 'grunt', 12, 2), wave(6900, 'rusher', [120, 360], HOUND)],
     //  r3.22 지옥 전용: 잘하는 봇이 손실 0 으로 이기던 판 → 둔덕 뒤 저격수 2 추가(r4.2 이름만 extraSpawns — 기본 줄 brutal 에서만 붙는다, version 불변)
@@ -157,9 +159,10 @@ export function makeCourses({ coverZFor }) {
   //   본전투(길이 7800·정예 7400·게이트·통·스폰)는 근사 시절 그대로. 표적 4개(y400·y320·y240·y160, 위상 0/.75/.5/.25): 가까운 것은 느리고 값이 작고, 먼 것은 단단하고 값이 크다.
   //   내구 12/16/20/32·재등장 0.5/0.5/0.5/0.8 은 봇 실측(2026-09-19)으로 점수가 병력·무기에 비례하게 잡은 값(내구 6/10/16·재등장 1.5 는 30 처치에서 포화했다).
   //   넷째 표적(dz 320, 140~340)은 검수 반영 — 표적 3개일 때 기관총 50명 이상이면 셋이 동시에 죽어 '맞힐 게 없는' 프레임이 실제로 보였다(캡처 shot-4)
-  C[8] = { version: 3, title: '남은 군단', bg: 1, startUnits: 3, startWeapon: 'rifle', length: 7800, eliteZ: 7400,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 3 → 4(옛 기록은 3 칸에 보존)
+  C[8] = { version: 4, title: '남은 군단', bg: 1, startUnits: 3, startWeapon: 'rifle', length: 7800, eliteZ: 7400,
     gates: [g2(1300, 3, -5), g3(3600, 4, 6, -12, { max: 24 }), g2(5600, -10, -10, { max: 20, hint: '양쪽 다 음수: 쏴서 0 까지 올리거나 병력을 아끼세요' })],
-    supplies: [soldier(2200, 150, 5, 10), soldier(2200, 330, 5, 10), weapon(4500, 240, 'auto', 12), soldier(6500, 240, 8, 20)],
+    supplies: [soldier(2200, 150, 5, 10), soldier(2200, 330, 5, 10), weapon(4500, 240, 'sniper', 12, { hpWeapon: 'auto' }), soldier(6500, 240, 8, 20)],
     walls: [],
     spawns: [wave(1800, 'grunt', [140, 340]), mass(3000, 'grunt', 10, 2), wave(4200, 'rusher', [120, 240, 360], HOUND), mass(6200, 'grunt', 16, 2)],
     //  r3.22 지옥 전용: 잡졸·돌격체뿐이라 40명 중 2명만 잃던 판 → 저격수 3 추가(r4.2 이름만 extraSpawns — 기본 줄 brutal 에서만 붙는다, version 불변)
@@ -181,9 +184,10 @@ export function makeCourses({ coverZFor }) {
   //   r3.18 대항 검수 반영: hp 1400 → 2400 + 보호막(BAL3.arena.boss.guard — 첫 착지 충격까지 피격 무효). 1400 은 무입력 도착 병력(76명 중화기 ≈ 380 dps)에
   //   첫 돌진 전(3.1초)에 죽었다. 봇 실측(sweep.mjs, 2400): 보통 무입력 11.5초·충격 2회 뒤 승리(생존 37/76), planBoss 9.6~9.8초·충격 2회(세 난이도 승리).
   //   3200 부터는 보통 무입력도 전멸(충격 4회)
-  C[15] = { version: 4, title: '광장', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 4 → 5(옛 기록은 4 칸에 보존)
+  C[15] = { version: 5, title: '광장', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
     gates: [g2(1400, 4, -8), g3(4400, -6, 5, -8, { max: 20 }), g2(7200, 6, -16, { max: 30 })],
-    supplies: [weapon(2200, 240, 'auto', 12), soldier(3300, 120, 5, 10), soldier(3300, 360, 5, 10), weapon(5600, 240, 'heavy', 18), soldier(8000, 240, 8, 20)],
+    supplies: [weapon(2200, 240, 'missile', 12, { hpWeapon: 'auto' }), soldier(3300, 120, 5, 10), soldier(3300, 360, 5, 10), weapon(5600, 240, 'heavy', 18), soldier(8000, 240, 8, 20)],
     walls: [],
     spawns: [mass(2600, 'grunt', 10, 2), wave(3900, 'rusher', [100, 200, 280, 380], HOUND), wave(5000, 'shooter', [160, 240, 320]), mass(6500, 'grunt', 16, 2), wave(8400, 'rusher', [140, 340], HOUND)],
     arena: arena(9200, { hp: 2400, skin: 'B3_railleviathan', speed: 100,
@@ -191,10 +195,11 @@ export function makeCourses({ coverZFor }) {
   //  11 사냥터(r3.17 아레나 실제 장치 — 보스 B4 가 5초마다 잡졸 2 를 소환(부대를 양축으로 추격)하고 2.6초마다 돌진·충격(r80, hp −2).
   //   배우는 것 = "피할 수 없는 자리가 생긴다"(범위 + 소환). version 2, 근사 시절 기록은 1 칸에 보존)(BG4)
   //   r3.18 대항 검수 반영: hp 1800 → 2600 + 보호막. 봇 실측(sweep.mjs, 2600): planBoss 보통 10.6초(생존 77/88)·지옥 14.1초·충격 4회(생존 50/65). 무입력은 세 난이도 모두 전멸(충격 dmg 2)
-  C[20] = { version: 4, title: '사냥터', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 4 → 5(옛 기록은 4 칸에 보존)
+  C[20] = { version: 5, title: '사냥터', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
     gates: [g3(1500, -5, 4, -7), g3(4600, 3, -10, 6, { max: 24 }), g2(7400, -18, 8, { max: 30 })],
-    supplies: [soldier(2300, 240, 5, 10), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 5, 10), weapon(0, 326, 'arc', 14), 'w1'), soldier(6000, 150, 6, 16), weapon(6000, 330, 'auto', 12)],
-    walls: [wall(3000, 4200, { kind: 'soldier', n: 5 }, { kind: 'weapon', weapon: 'arc' })],
+    supplies: [soldier(2300, 240, 5, 10), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 5, 10), weapon(0, 326, 'sniper', 14, { hpWeapon: 'arc' }), 'w1'), soldier(6000, 150, 6, 16), weapon(6000, 330, 'auto', 12)],
+    walls: [wall(3000, 4200, { kind: 'soldier', n: 5 }, { kind: 'weapon', weapon: 'sniper' })],
     spawns: [wave(2000, 'grunt', [120, 200, 280, 360]), wave(5200, 'shooter', [130, 240, 350]), mass(6800, 'grunt', 16, 2), wave(8000, 'rusher', [110, 200, 280, 370], HOUND), mass(8600, 'grunt', 10, 2)],
     arena: arena(9400, { hp: 2600, skin: 'B4_smelter', speed: 120,
                          dash: { every: 2.6, first: 1.5, warn: 0.8, speed: 640, range: 460, recover: 0.6 }, shock: { r: 80, dmg: 2 },
@@ -216,9 +221,10 @@ export function makeCourses({ coverZFor }) {
     spawns: [wave(2000, 'grunt', [120, 240, 360]), wave(3900, 'rusher', [200, 280], HOUND), wave(5300, 'grunt', [95, 137, 179, 221], { corridorHw: 61 }), wave(5300, 'shooter', [300, 370]), mass(6800, 'grunt', 14, 2), wave(9200, 'shooter', [120, 240, 360]), mass(9500, 'grunt', 10, 2)],
     elite: { z: 10000, hp: 560, summon: true, skin: 'B3_railleviathan' } };
   //  13~14 장갑체(E3): 오래 쏴야 하는 적(BG4)
-  C[13] = { version: 2, title: '장갑체', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 2 → 3(옛 기록은 2 칸에 보존)
+  C[13] = { version: 3, title: '장갑체', bg: 4, startUnits: 5, startWeapon: 'rifle', length: 8600, eliteZ: 8200,
     gates: [g2(1400, 3, -6), g3(4300, -6, 5, -8, { max: 20 }), g2(6800, -12, 6, { max: 24 })],
-    supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 150, 5, 10), soldier(5400, 330, 6, 16)],
+    supplies: [weapon(2200, 240, 'flame', 12, { hpWeapon: 'auto' }), soldier(3400, 150, 5, 10), soldier(5400, 330, 6, 16)],
     walls: [],
     spawns: [wave(1900, 'grunt', [200, 280], ARMOR), wave(3000, 'grunt', [120, 240, 360]), wave(4900, 'grunt', [160, 320], ARMOR), mass(6000, 'grunt', 10, 2), wave(7400, 'grunt', [120, 240, 360], ARMOR)],
     elite: { z: 8200, hp: 400, summon: false, skin: 'B3_railleviathan' } };
@@ -229,42 +235,48 @@ export function makeCourses({ coverZFor }) {
     spawns: [wave(2000, 'grunt', [140, 340], ARMOR), wave(3100, 'rusher', [200, 280], HOUND), wave(5000, 'grunt', [120, 240, 360], ARMOR), mass(6400, 'grunt', 12, 2), wave(7800, 'grunt', [100, 180, 300, 380], ARMOR)],
     elite: { z: 8800, hp: 460, summon: false, skin: 'B3_railleviathan' } };
   //  15~16 복병(E8): 차선을 넘나드는 돌격체(BG4)
-  C[10] = { version: 3, title: '복병', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 3 → 4(옛 기록은 3 칸에 보존)
+  C[10] = { version: 4, title: '복병', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 8800, eliteZ: 8400,
     gates: [g2(1400, 2, -7), g3(4200, 4, -10, 6, { max: 20 }), g2(6800, -14, 8, { max: 24 })],
-    supplies: [soldier(2200, 150, 5, 10), weapon(3300, 330, 'scatter', 10), soldier(5400, 240, 6, 16)],
+    supplies: [soldier(2200, 150, 5, 10), weapon(3300, 330, 'flame', 10, { hpWeapon: 'scatter' }), soldier(5400, 240, 6, 16)],
     walls: [],
     spawns: [wave(1900, 'rusher', [120, 360], JUMPER), wave(3000, 'grunt', [140, 240, 340]), wave(4800, 'rusher', [100, 200, 280, 380], JUMPER), mass(6000, 'grunt', 10, 2), wave(7400, 'rusher', [160, 240, 320], JUMPER)],
     elites: [elite(600, 'gunner', 160), elite(720, 'summoner', 320, { skin: 'B2_gantrywidow' })] };
-  C[16] = { version: 2, title: '맨홀 거리', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 2 → 3(옛 기록은 2 칸에 보존)
+  C[16] = { version: 3, title: '맨홀 거리', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9400, eliteZ: 9000,
     gates: [g3(1500, -4, 4, -6), g2(4500, -12, 5, { max: 24 }), g3(7200, 6, -14, 8, { max: 30 })],
-    supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 3200, 3700, soldier(0, 120, 6, 14), weapon(0, 326, 'heavy', 18), 'w1'), soldier(6000, 240, 8, 20)],
+    supplies: [weapon(2300, 240, 'flame', 12, { hpWeapon: 'auto' }), ...pair(coverZFor, 3200, 3700, soldier(0, 120, 6, 14), weapon(0, 326, 'heavy', 18), 'w1'), soldier(6000, 240, 8, 20)],
     walls: [wall(3200, 4400, { kind: 'soldier', n: 6 }, { kind: 'weapon', weapon: 'heavy' })],
     spawns: [wave(2000, 'rusher', [140, 340], JUMPER), wave(5100, 'rusher', [95, 137, 179, 221], { corridorHw: 61, ...JUMPER }), wave(5100, 'shooter', [300, 370]), mass(6600, 'grunt', 14, 2), wave(8000, 'rusher', [120, 240, 360], JUMPER)],
     elite: { z: 9000, hp: 500, summon: true, skin: 'B4_smelter' } };
   //  17~18 생성기(E9): 처리 우선순위(BG4)
-  C[17] = { version: 2, title: '생성기', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 2 → 3(옛 기록은 2 칸에 보존)
+  C[17] = { version: 3, title: '생성기', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9000, eliteZ: 8600,
     gates: [g2(1400, 3, -8), g3(4300, -6, 6, -8, { max: 24 }), g2(6900, 8, -18, { max: 30 })],
-    supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 150, 6, 14), soldier(5500, 330, 7, 18)],
+    supplies: [weapon(2200, 240, 'arc', 12, { hpWeapon: 'auto' }), soldier(3400, 150, 6, 14), soldier(5500, 330, 7, 18)],
     walls: [],
     spawns: [wave(1900, 'shooter', [240], POD), wave(2600, 'grunt', [120, 200, 280, 360]), wave(4900, 'shooter', [150, 330], POD), mass(5800, 'grunt', 12, 2), wave(7500, 'shooter', [120, 240, 360], POD)],
     elite: { z: 8600, hp: 480, summon: true, skin: 'B4_smelter' } };
-  C[18] = { version: 2, title: '포드 밭', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 2 → 3(옛 기록은 2 칸에 보존)
+  C[18] = { version: 3, title: '포드 밭', bg: 4, startUnits: 6, startWeapon: 'rifle', length: 9600, eliteZ: 9200,
     gates: [g3(1500, -5, 4, -7), g2(4400, -14, 6, { max: 24 }), g3(7200, 6, -16, 8, { max: 30 })],
-    supplies: [soldier(2300, 120, 5, 10), soldier(2300, 360, 5, 10), weapon(3600, 240, 'arc', 14), soldier(6000, 240, 8, 20)],
+    supplies: [soldier(2300, 120, 5, 10), soldier(2300, 360, 5, 10), weapon(3600, 240, 'missile', 14, { hpWeapon: 'arc' }), soldier(6000, 240, 8, 20)],
     walls: [cover(80, 186, 4020), cover(293, 400, 4020)],
     spawns: [wave(2000, 'shooter', [160, 320], POD), wave(3100, 'grunt', [140, 240, 340]), wave(5000, 'shooter', [120, 240, 360], POD), mass(6600, 'grunt', 16, 2), wave(8000, 'rusher', [100, 200, 280, 380], HOUND)],
     elite: { z: 9200, hp: 540, summon: true, skin: 'B4_smelter' } };
   //  19~20 방해형(E10)(BG5)
-  C[19] = { version: 2, title: '자석 머리', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9200, eliteZ: 8800,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 2 → 3(옛 기록은 2 칸에 보존)
+  C[19] = { version: 3, title: '자석 머리', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9200, eliteZ: 8800,
     gates: [g2(1400, 4, -8), g3(4300, 5, -12, 7, { max: 24 }), g2(7000, -16, 8, { max: 30 })],
-    supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 150, 6, 14), weapon(5400, 330, 'heavy', 18), soldier(6200, 120, 6, 16)],
+    supplies: [weapon(2200, 240, 'scatter', 12, { hpWeapon: 'auto' }), soldier(3400, 150, 6, 14), weapon(5400, 330, 'heavy', 18), soldier(6200, 120, 6, 16)],
     walls: [],
     spawns: [wave(1900, 'shooter', [240], MAGNET), wave(2700, 'grunt', [120, 200, 280, 360]), wave(4900, 'shooter', [150, 330], MAGNET), mass(6000, 'grunt', 14, 2), wave(7700, 'shooter', [120, 240, 360], MAGNET)],
     elite: { z: 8800, hp: 520, summon: false, skin: 'B4_smelter' } };
-  C[11] = { version: 3, title: '간섭 지대', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 3 → 4(옛 기록은 3 칸에 보존)
+  C[11] = { version: 4, title: '간섭 지대', bg: 5, startUnits: 6, startWeapon: 'rifle', length: 9800, eliteZ: 9400,
     gates: [g3(1500, -5, 5, -7), g2(4500, -14, 7, { max: 30 }), g3(7300, 8, -18, 10, { max: 30 })],
-    supplies: [...pair(coverZFor, 2200, 2700, soldier(0, 120, 6, 14), weapon(0, 326, 'sniper', 14), 'w1'), soldier(5600, 240, 8, 20), weapon(6400, 240, 'auto', 12)],
-    walls: [wall(2200, 3400, { kind: 'soldier', n: 6 }, { kind: 'weapon', weapon: 'sniper' })],
+    supplies: [...pair(coverZFor, 2200, 2700, soldier(0, 120, 6, 14), weapon(0, 326, 'arc', 14, { hpWeapon: 'sniper' }), 'w1'), soldier(5600, 240, 8, 20), weapon(6400, 240, 'auto', 12)],
+    walls: [wall(2200, 3400, { kind: 'soldier', n: 6 }, { kind: 'weapon', weapon: 'arc' })],
     spawns: [wave(4100, 'shooter', [95, 137, 179, 221], { corridorHw: 61, ...MAGNET }), wave(4100, 'grunt', [300, 370]), mass(5200, 'grunt', 12, 2), wave(6900, 'shooter', [160, 320], MAGNET), mass(8200, 'grunt', 16, 2)],
     elite: { z: 9400, hp: 600, summon: true, skin: 'B3_railleviathan' } };
   //  21~22 카트야드(E7): 굼뜬 장갑 목표(BG5)
@@ -274,9 +286,10 @@ export function makeCourses({ coverZFor }) {
     walls: [cover(190, 290, 4020)],
     spawns: [wave(1900, 'grunt', [240], CART), wave(2800, 'grunt', [120, 200, 280, 360]), wave(5000, 'grunt', [160, 320], CART), mass(6200, 'grunt', 14, 2), wave(7800, 'grunt', [120, 240, 360], CART)],
     elite: { z: 9000, hp: 560, summon: false, skin: 'B3_railleviathan' } };
-  C[22] = { version: 2, title: '고철 행렬', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10000, eliteZ: 9600,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 2 → 3(옛 기록은 2 칸에 보존)
+  C[22] = { version: 3, title: '고철 행렬', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10000, eliteZ: 9600,
     gates: [g3(1500, -6, 5, -8), g2(4600, -16, 8, { max: 30 }), g3(7500, 8, -20, 10, { max: 36 })],
-    supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 3200, 3700, soldier(0, 120, 7, 16), weapon(0, 326, 'arc', 14), 'w1'), soldier(6200, 240, 9, 22), chain(8200, 340, 6, 12, 8)],
+    supplies: [weapon(2300, 240, 'flame', 12, { hpWeapon: 'auto' }), ...pair(coverZFor, 3200, 3700, soldier(0, 120, 7, 16), weapon(0, 326, 'arc', 14), 'w1'), soldier(6200, 240, 9, 22), chain(8200, 340, 6, 12, 8)],
     walls: [wall(3200, 4400, { kind: 'soldier', n: 7 }, { kind: 'weapon', weapon: 'arc' })],
     spawns: [wave(2000, 'grunt', [140, 340], CART), wave(5100, 'grunt', [95, 137, 179, 221], { corridorHw: 61 }), wave(5100, 'shooter', [300, 370]), wave(6800, 'grunt', [120, 240, 360], CART), mass(7200, 'grunt', 16, 2), wave(8800, 'rusher', [100, 200, 280, 380], HOUND)],
     elite: { z: 9600, hp: 640, summon: true, skin: 'B4_smelter' } };
@@ -284,9 +297,10 @@ export function makeCourses({ coverZFor }) {
   //   HUD 막대 3칸·'남은 목표 N/3'. version 2, 단수 정예 시절 기록은 1 칸에 보존)(BG5)
   //   r3.18 대항 검수 반영: 체력 합 940 → 5640(260/300/380 → 1560/1800/2280, ×6). 근사 시절 값은 무입력 도착 병력(128명 중화기 ≈ 640 dps)에 1.9초 만에 전멸했다.
   //   봇 실측(sweep.mjs, hp×6): 보통 무입력 10.3초·planBoss 10.2초(포격 4.4 → 소환 9.7 → 장갑 10.2), 지옥 planBoss 11.4초·생존 113/122
-  C[23] = { version: 3, title: '세 정예', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10600, eliteZ: 10200,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 3 → 4(옛 기록은 3 칸에 보존)
+  C[23] = { version: 4, title: '세 정예', bg: 5, startUnits: 7, startWeapon: 'rifle', length: 10600, eliteZ: 10200,
     gates: [g2(1400, 4, -10), g3(4400, -8, 8, -10, { max: 30 }), g2(7200, 10, -24, { max: 36 }), g3(9000, -10, 10, -12, { max: 30 })],
-    supplies: [weapon(2200, 240, 'auto', 12), soldier(3400, 120, 6, 14), soldier(3400, 360, 6, 14), weapon(5600, 240, 'heavy', 18), soldier(6400, 240, 9, 22), soldier(8000, 150, 6, 16)],
+    supplies: [weapon(2200, 240, 'missile', 12, { hpWeapon: 'auto' }), soldier(3400, 120, 6, 14), soldier(3400, 360, 6, 14), weapon(5600, 240, 'heavy', 18), soldier(6400, 240, 9, 22), soldier(8000, 150, 6, 16)],
     walls: [cover(190, 290, 4020), cover(80, 186, 8620)],
     spawns: [wave(1900, 'grunt', [140, 340], ARMOR), wave(3000, 'rusher', [120, 240, 360], JUMPER), wave(5000, 'shooter', [150, 330], POD), mass(6000, 'grunt', 16, 2), wave(7800, 'grunt', [120, 240, 360], CART), wave(9400, 'shooter', [120, 240, 360], MAGNET), mass(9700, 'grunt', 12, 2)],
     elites: [elite(1560, 'gunner', 130, { skin: 'B3_railleviathan' }), elite(1800, 'summoner', 350, { skin: 'B2_gantrywidow' }), elite(2280, 'tank', 240, { skin: 'B4_smelter', patrol: 0 })] };
@@ -294,9 +308,10 @@ export function makeCourses({ coverZFor }) {
   //   마지막 저격수 무리(POD)는 10200 → 9700 으로 당겼다 — 스폰 z ≤ arena.z − 800 불변식(정지된 광장 위에 도로 적이 남지 않게). version 2, 근사 시절 기록은 1 칸에 보존)(BG5)
   //   r3.18 대항 검수 반영: hp 3000 → 4200 + 보호막. 봇 실측(sweep.mjs, 4200): planBoss 보통 12.1초·충격 3회(생존 113/150), 지옥 14.1초·충격 5회(생존 73/142).
   //   5000 은 지옥 생존 51, 6600 은 어려움·지옥 planBoss 전멸 — 사람은 봇보다 못 피하므로 4200 에서 멈춘다
-  C[24] = { version: 3, title: '크라운 브레이커', bg: 5, startUnits: 8, startWeapon: 'rifle', length: 11200, eliteZ: 10800,
+  //  r4.35 무기 배치(이사님 결정 2026-10-14 — 설계서 2026-10-14-weapon-variety-design): 무기 통 종류 변경 — version 3 → 4(옛 기록은 3 칸에 보존)
+  C[24] = { version: 4, title: '크라운 브레이커', bg: 5, startUnits: 8, startWeapon: 'rifle', length: 11200, eliteZ: 10800,
     gates: [g3(1500, -6, 6, -8), g2(4200, -18, 8, { max: 30 }), g3(6800, 8, -24, 10, { max: 36 }), g2(9200, 12, -30, { max: 40 })],
-    supplies: [weapon(2300, 240, 'auto', 12), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 8, 18), weapon(0, 326, 'heavy', 18), 'w1'), soldier(5500, 240, 9, 22), chain(7600, 340, 6, 12, 8), soldier(8400, 120, 8, 20), weapon(8400, 360, 'sniper', 14)],
+    supplies: [weapon(2300, 240, 'missile', 12, { hpWeapon: 'auto' }), ...pair(coverZFor, 3000, 3500, soldier(0, 120, 8, 18), weapon(0, 326, 'heavy', 18), 'w1'), soldier(5500, 240, 9, 22), chain(7600, 340, 6, 12, 8), soldier(8400, 120, 8, 20), weapon(8400, 360, 'sniper', 14)],
     walls: [wall(3000, 4200, { kind: 'soldier', n: 8 }, { kind: 'weapon', weapon: 'heavy' }), cover(190, 290, 1220), cover(293, 400, 6420)],
     spawns: [wave(2000, 'grunt', [120, 240, 360]), wave(4900, 'grunt', [95, 137, 179, 221], { corridorHw: 61, ...ARMOR }), wave(4900, 'shooter', [300, 370], MAGNET), mass(6000, 'grunt', 16, 2), wave(7200, 'rusher', [100, 200, 280, 380], JUMPER), wave(8000, 'grunt', [140, 340], CART), mass(9600, 'grunt', 18, 2), wave(9700, 'shooter', [120, 240, 360], POD)],
     arena: arena(10800, { hp: 4200, skin: 'B5_crownbreaker', speed: 140,
