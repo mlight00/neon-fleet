@@ -1,3 +1,15 @@
+# 스타포지 러시 v3 — 작업 상태 (2026-10-14 · 로켓런처 r4.36)
+
+라이브 https://mlight00.github.io/neon-fleet/rush3.html · 브랜치 `claude/starforge-v3` · 검사 571 · 32 통과
+
+- 10/14 이사님 실플레이 소감 "유도탄은 좀 무의미 … 중화기 보다 더 강력한 한방이 더 강한 대신 텀이 긴 로켓런처" → 로켓런처 안(`E:\workspace\claude\neon-fleet\review\20261014_weapons\로켓런처_안.html`) → 결정 '가'.
+- r4.36: 유도 미사일 → 로켓런처(내부 id missile · 자리 · 기록 칸 그대로). 간격 2.0 · 한 발 8 · 폭발 반경 40 · 폭발 피해 2 · 게이트 한 발 +2(무기 표 gateHit 칸이 이제 실제로 쓰인다) · 유도 코드 삭제 · 로켓 그림 · 폭발 고리 · 폭발음 rocketBoom.
+- 체력(지금 대비): 18판 보스 +12% · 5·23판 중간 보스 −12% · 현상금 −30~47%. 폭발 피해는 체력 계산 밖 — 이사님 실플레이 뒤 반경 · 피해부터 조정(BACKLOG 3-21).
+- 자료 `E:\workspace\claude\neon-fleet\review\20261014_weapons\`(로켓런처_안.html · rocket_pump_probe.mjs · rocket_hp.json · capture_rocket.py · _rocket.png).
+- 이 밖에 대기 중인 결정 6건(옛 5건 + 10/5 만료된 루프 예약 다시 걸기)은 그대로다.
+
+---
+
 # 스타포지 러시 v3 — 작업 상태 (2026-10-14 · 무기 늘리기 r4.35)
 
 라이브 https://mlight00.github.io/neon-fleet/rush3.html · 브랜치 `claude/starforge-v3` · 검사 571 · 32 통과
