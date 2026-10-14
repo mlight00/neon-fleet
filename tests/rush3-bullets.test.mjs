@@ -1,7 +1,7 @@
 // rush3-bullets — 발사체 그림(2026-09-20). 그림이 있으면 무기별 그림을 진행 방향으로 돌려 그리고, 없으면 종전 막대 폴백.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRenderer3, bulletAngle, BULLET_LEN } from '../rush3/render.js';
+import { createRenderer3, bulletAngle, BULLET_LEN, CODE_BULLETS } from '../rush3/render.js';
 import { SPRITE_KEYS3 } from '../rush3/sprites.js';
 import { WEAPONS } from '../rush3/weapons.js';
 import { buildStage } from '../rush3/stages.js';
@@ -29,14 +29,16 @@ function recCtx() {
 }
 const fxLike = () => ({ parts: [], floaters: [], pops: [], gateFlash: {}, gateOpen: {}, gateTip: {}, shakeT: 0, hurtT: 0, guideT: 0, eliteT: 0, shutterT: 0, shutterText: null, lotOpen: 0, lotSeen: false, lotSame: false });
 
-test('V3-BULLETS 각도: vx 없는 탄은 0, 오른쪽 vx 는 양수·왼쪽은 음수(대칭), 무기 6종 전부 그림 키·길이가 있다', () => {
+test('V3-BULLETS 각도: vx 없는 탄은 0, 오른쪽 vx 는 양수·왼쪽은 음수(대칭), 무기 8종 전부 길이가 있고 그림 파일로 그리는 6종은 그림 키가 있다(r4.35 유도 미사일·화염방사기는 게임이 그린다)', () => {
   assert.equal(bulletAngle({ vz: 700 }), 0);
   assert.equal(bulletAngle({ vz: 700, vx: 0 }), 0);
   const r = bulletAngle({ vz: 700, vx: 200 }), l = bulletAngle({ vz: 700, vx: -200 });
   assert.ok(r > 0 && l < 0 && Math.abs(r + l) < 1e-12);
   assert.ok(Math.abs(bulletAngle({ vz: 100, vx: 100 }) - Math.PI / 4) < 1e-12);
+  assert.deepEqual([...CODE_BULLETS], ['missile', 'flame']);
   for (const id of Object.keys(WEAPONS)) {
-    assert.equal(SPRITE_KEYS3['bullet_' + id], 'BULLET_' + id, id + ' 그림 키');
+    if (CODE_BULLETS.includes(id)) assert.equal(SPRITE_KEYS3['bullet_' + id], undefined, id + ' 는 그림 파일이 없다');
+    else assert.equal(SPRITE_KEYS3['bullet_' + id], 'BULLET_' + id, id + ' 그림 키');
     assert.ok(BULLET_LEN[id] > 0, id + ' 길이');
   }
   assert.ok(BULLET_LEN.sniper > BULLET_LEN.rifle, '저격 바늘이 소총 탄보다 길다');

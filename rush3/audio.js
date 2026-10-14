@@ -6,6 +6,9 @@ const SFX = {
   fire_rifle: ['nf_sfx_vulcan_1', 'nf_sfx_vulcan_2', 'nf_sfx_vulcan_3'],
   fire_auto:  ['nf_sfx_laser_1', 'nf_sfx_laser_2', 'nf_sfx_laser_3'],
   fire_heavy: ['nf_sfx_missile_1', 'nf_sfx_missile_2'],
+  //  r4.35 새 무기: 유도 미사일 = 중화기의 미사일 소리 · 화염방사기 = 소총 소리를 작게(전용 음은 없다 — 있는 소리 재사용)
+  fire_missile: ['nf_sfx_missile_1', 'nf_sfx_missile_2'],
+  fire_flame: ['nf_sfx_vulcan_1', 'nf_sfx_vulcan_2', 'nf_sfx_vulcan_3'],
   //  통 피격·파괴: hit(단타) / pickup(보상 팝)
   crateHit:   ['nf_sfx_hit_1', 'nf_sfx_hit_2', 'nf_sfx_hit_3'],
   crateBreak: ['nf_sfx_pickup_1', 'nf_sfx_pickup_2'],
@@ -39,7 +42,7 @@ const SFX = {
 //  이름별 스로틀(초). 기본 0.045, 아래는 예외
 const THROTTLE = { crateHit: 0.03, kill: 0.08, hurt: 0.25, gateTick: 0.03, gateClang: 0.09, trapHit: 0.09 };
 const THROTTLE_DEFAULT = 0.045;
-const VOL = { fire_rifle: 0.11, fire_auto: 0.11, fire_heavy: 0.14, crateHit: 0.35, crateBreak: 0.7, gateTick: 0.4, gateFlip: 0.6, gateOpen: 0.45,
+const VOL = { fire_rifle: 0.11, fire_auto: 0.11, fire_heavy: 0.14, fire_missile: 0.14, fire_flame: 0.08, crateHit: 0.35, crateBreak: 0.7, gateTick: 0.4, gateFlip: 0.6, gateOpen: 0.45,
               gateClang: 0.3, lotWarn: 0.55, trapHit: 0.4, bossCharge: 0.45, bossRage: 0.9,
               joinMany: 0.8, weaponSwap: 0.6, hurt: 0.55, kill: 0.4, elite: 0.8, win: 0.8, lose: 0.75, click: 0.5 };
 //  이름별 Audio 풀 크기(순환) · 전체 동시 재생 상한

@@ -106,3 +106,20 @@ test('WPN2-5: 화염방사기 — 한 발이 적 2마리까지(3번째는 무사
   assert.equal(f.hp, 1, '사거리 밖');
   assert.ok(far.bullets.every((x) => x.dead) || far.bullets.length === 0);
 });
+
+// ─────────────────────────────── 셸 그리기(그림 파일 없이 게임이 그린다) ───────────────────────────────
+import { bootApp } from './lib/rush3-shell.mjs';
+
+test('WPN2-6: 새 무기를 들고 판을 돌려도 그리기 오류가 없다 — 상단 칩 이름 · 미사일·불꽃 탄 그리기(원·경로) · 아이콘 폴백', async () => {
+  for (const [id, name] of [['missile', '유도 미사일'], ['flame', '화염방사기']]) {
+    const h = await bootApp({ search: '?dev=1&weapon=' + id, withOps: true });
+    h.app.startRun(1);
+    h.frames(150);
+    assert.equal(h.app.getRun().weapon, id);
+    assert.ok(h.app.getRun().bullets.some((b) => b.kind === id && !b.dead), id + ' 탄이 날고 있다');
+    const t = h.textNow();
+    assert.ok(t.some((x) => x.includes(name)), id + ' 상단 칩 이름: ' + JSON.stringify(t.slice(0, 12)));
+    const ops = h.ops.map((o) => o.op);
+    assert.ok(ops.includes(id === 'flame' ? 'arc' : 'closePath'), id + ' 탄 그리기');
+  }
+});
