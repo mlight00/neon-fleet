@@ -1,3 +1,14 @@
+# 스타포지 러시 v3 — 작업 상태 (2026-10-14 · 무기 늘리기 r4.35)
+
+라이브 https://mlight00.github.io/neon-fleet/rush3.html · 브랜치 `claude/starforge-v3` · 검사 571 · 32 통과
+
+- 10/14 직원 리뷰 2건 확인(난이도 딱 좋음 · 또 할래요 · 부대가 커지는 맛, "좀 더 다양한 무기가") → 이사님 결정: 무기 늘리기 '나' · 설계서 '가' · 체력 기준 '가'(높은 쪽).
+- r4.35: 유도 미사일 · 화염방사기(8종) · 16판 무기 통 교체(3·6·7·12판은 판 장치 때문에 그대로) · 바꾼 판 체력은 바꾸기 전 무기와 높은 쪽. 수치는 시작값 — 이사님 실플레이 뒤 조정(BACKLOG 3-21).
+- 자료 `E:\workspace\claude\neon-fleet\review\20261014_weapons\`(무기_늘리기_안.html · hp_compare.json · cap_compare.mjs · capture_weapons.py · _weapons.png).
+- 루프 예약 a68f11ea 는 10/5 에 끝났다(다시 걸지는 이사님 결정 대기 6건 중 하나).
+
+---
+
 # 스타포지 러시 v3 — 작업 상태 (2026-10-03 · 친구 테스트 리뷰 설문 r4.34)
 
 라이브 https://mlight00.github.io/neon-fleet/rush3.html · master = r4.34(cf12329) + 문서 · 브랜치 `claude/starforge-v3`
