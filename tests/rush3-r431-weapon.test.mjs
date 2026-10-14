@@ -20,9 +20,10 @@ function playRoute(id, xAt, untilZ) {
   return { run, evs };
 }
 
-test('WEAPON-1: 11번(게임 줄) — 관통탄 통을 먹은 뒤 기관총 통을 열면 기관총으로 바뀐다(Mk I) · "같은 무기"가 뜨지 않는다(이사님 실플레이 재현)', () => {
+//  r4.35(2026-10-14 무기 배치): 11번 오른쪽 통이 관통탄 → 전격포(등급 3 그대로)로 바뀌었다 — '높은 등급 무기를 든 채 기관총(2) 통' 재현은 그대로 성립한다
+test('WEAPON-1: 11번(게임 줄) — 등급 3 무기 통(r4.35 부터 전격포 · 종전 관통탄)을 먹은 뒤 기관총 통을 열면 기관총으로 바뀐다(Mk I) · "같은 무기"가 뜨지 않는다(이사님 실플레이 재현)', () => {
   const { run, evs } = playRoute(11, (z) => (z < 3000 ? 326 : 240), 7200);
-  assert.deepEqual(evs, [['weaponSwap', 'sniper'], ['weaponSwap', 'auto']]);
+  assert.deepEqual(evs, [['weaponSwap', 'arc'], ['weaponSwap', 'auto']]);
   assert.deepEqual([run.weapon, run.weaponMk], ['auto', 1]);
 });
 

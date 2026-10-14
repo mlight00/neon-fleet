@@ -185,10 +185,11 @@ function byRow(sp) {
   return [...rows.values()].map((xs) => xs.slice().sort((a, b) => a - b));
 }
 
-test('V3-STAGES STG-1: 세 스테이지 코스 버전 = 2(배치 개정 r3)', () => {
+test('V3-STAGES STG-1: 세 스테이지 코스 버전 = 2(배치 개정 r3) · 2번은 3(r4.35 무기 배치 — 기관총 → 화염방사기)', () => {
   for (const id of STAGE_IDS) {
-    assert.equal(stageVersion(id), 2, 'S' + id);
-    assert.equal(buildStage(id).version, 2);
+    const v = id === 2 ? 3 : 2;
+    assert.equal(stageVersion(id), v, 'S' + id);
+    assert.equal(buildStage(id).version, v);
   }
 });
 

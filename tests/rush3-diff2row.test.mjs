@@ -13,6 +13,8 @@ import { buildStage, ALL_STAGE_IDS, stageKindOf } from '../rush3/stages.js';
 import { createRun } from '../rush3/combat.js';
 import { BAL3 } from '../rush3/balance.js';
 import { crowdFFor } from '../rush3/firepower.js';
+//  r4.35 무기 배치(2026-10-14) 되돌리기 — 바꾼 통의 무기 · 갈림길 표지 · 2판 안내 글 · 코스 version(tests/lib/rush3-r435.mjs)
+import { undoR435Stage } from './lib/rush3-r435.mjs';
 
 const SNAP = JSON.parse(readFileSync(new URL('./fixtures/rush3-stages-pre-r4.2.json', import.meta.url), 'utf8'));
 //  스냅숏을 찍을 때와 같은 인코더(-0·비유한수는 문자열로 남겨 JSON 이 지우지 못하게)
@@ -112,9 +114,9 @@ test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 �
     assert.ok(st.crowdFloor && st.crowdFloor.rows.length > 0, `S${id} 무리 체력 바닥 내역(r4.29)`);
     assert.deepEqual([st.crowdFloor.fRegular, st.crowdFloor.fWave], [crowdFFor(id, BAL3.crowd.regular), crowdFFor(id, BAL3.crowd.wave)], `S${id} f 바닥`);
     assert.ok(st.spawns.filter((sp) => sp.horde).every((sp) => Number.isInteger(sp.waveBaseN) && sp.n > sp.waveBaseN), `S${id} 웨이브 겹 배수 전 적 수 칸`);
-    assert.equal(S(undoR410Stage(undoR47Stage(undoR429Stage(st)), id, row)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
+    assert.equal(S(undoR435Stage(undoR410Stage(undoR47Stage(undoR429Stage(st)), id, row), id)), S(SNAP.brutal[id]), `S${id} 기본 줄(옛 지옥) buildStage`);
     //  createRun 파생값(적 표·광장 보스 배수 등): 판 종류를 되돌린 판으로 만든 run(광장이 20 → 21 로 옮겨 가 광장 배수가 판을 따라간다)
-    const rp = runPart(createRun(undoR410Stage(undoR47Stage(undoR429Stage(buildStage(id, { difficulty: 'brutal' }))), id, row)));
+    const rp = runPart(createRun(undoR435Stage(undoR410Stage(undoR47Stage(undoR429Stage(buildStage(id, { difficulty: 'brutal' }))), id, row), id)));
     assert.equal(rp.enemyDefs.elite.shot.dmg, 1, `S${id} 보스 탄 1`);
     assert.equal(rp.enemyDefs.shooter.shot.dmg, 3, `S${id} 저격수 탄 3 그대로`);
     assert.equal(S(undoR47Run(rp, row)), S(SNAP.run_brutal[id]), `S${id} 기본 줄(옛 지옥) createRun`);
@@ -123,8 +125,8 @@ test("V3-DIFF2ROW 기본 줄: buildStage(id, { difficulty: 'brutal' }) 가 옛 �
 
 test("V3-DIFF2ROW 검사용 배수 1 줄: buildStage(id, { difficulty: 'normal' }) 와 인자 생략 buildStage(id) 가 옛 보통 판과 바이트 단위로 같다(1~24) — 규칙 모듈의 기본값은 여전히 배수 1 줄", () => {
   for (const id of ALL_STAGE_IDS) {
-    assert.equal(S(buildStage(id, { difficulty: 'normal' })), S(SNAP.normal[id]), `S${id} 배수 1 줄(옛 보통) buildStage`);
-    assert.equal(S(buildStage(id)), S(SNAP.normal[id]), `S${id} 인자 생략 = 배수 1 줄`);
-    assert.equal(S(runPart(createRun(buildStage(id)))), S(SNAP.run_normal[id]), `S${id} 배수 1 줄(옛 보통) createRun`);
+    assert.equal(S(undoR435Stage(buildStage(id, { difficulty: 'normal' }), id)), S(SNAP.normal[id]), `S${id} 배수 1 줄(옛 보통) buildStage`);
+    assert.equal(S(undoR435Stage(buildStage(id), id)), S(SNAP.normal[id]), `S${id} 인자 생략 = 배수 1 줄`);
+    assert.equal(S(runPart(createRun(undoR435Stage(buildStage(id), id)))), S(SNAP.run_normal[id]), `S${id} 배수 1 줄(옛 보통) createRun`);
   }
 });

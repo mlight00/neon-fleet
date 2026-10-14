@@ -215,7 +215,7 @@ test('V3-DIFFB DB-4: 획득 숫자 후처리 — gain(4) 0.5 → gain(24) 1.0 �
   const s4 = buildStage(4);
   assert.deepEqual(s4.gateRows.map((r) => r.cells.map((c) => [c.value, c.maxValue])),
                    [[[-4, 8], [2, 3], [-6, 8]], [[1, 2], [-8, 8], [3, 4]], [[-3, 10], [-10, 10], [2, 3]]]);
-  assert.deepEqual(s4.supplies.map((s) => s.payload.n ?? s.payload.weapon), [2, 'auto', 3]);
+  assert.deepEqual(s4.supplies.map((s) => s.payload.n ?? s.payload.weapon), [2, 'scatter', 3]);   // r4.35 무기 배치(기관총 → 산탄포)
   //  S24(gain 1.0): 정의 그대로(양수 칸 상한 value+2 만 적용)
   const s24 = buildStage(24);
   assert.deepEqual(s24.gateRows[0].cells.map((c) => [c.value, c.maxValue]), [[-6, 15], [6, 8], [-8, 15]]);

@@ -280,8 +280,9 @@ function makeSupplyDef(idx, s) {
 }
 
 //  r4.35 체력 기준(BAL3.weaponHpRule): 바꾼 무기 통의 무기를 바꾸기 전 무기(hpWeapon)로 되돌린 '기준 판'(체력 계산 전용 얕은 사본 — 규칙·그림은 쓰지 않는다).
-//   바꾼 통이 없거나 규칙이 'new' 면 null. combineHp = 두 계산의 결합('old' = 기준 판 값 · 'max' = 높은 쪽 · null = 올리지 않음)
-function hpRefStage(stage) {
+//   바꾼 통이 없거나 규칙이 'new' 면 null. combineHp = 두 계산의 결합('old' = 기준 판 값 · 'max' = 높은 쪽 · null = 올리지 않음).
+//   계산 내역(무리 행 · stage.bossFloor/midFloor · stage.bounties)은 실제로 쓴 쪽(기준 판이 이기면 그 계산 — ref: true)을 남긴다. 검사도 이 함수로 기대값을 만든다
+export function hpRefStage(stage) {
   if (BAL3.weaponHpRule === 'new' || !stage.supplies.some((s) => s.hpWeapon)) return null;
   return { ...stage, supplies: stage.supplies.map((s) => (s.hpWeapon ? { ...s, payload: { ...s.payload, weapon: s.hpWeapon } } : s)) };
 }
@@ -549,8 +550,16 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   if (mult.crowdFloor && stage.spawns.length) {
     const cf = crowdFloor(stage);
     const cr = hpRef ? crowdFloor(hpRef) : null;
-    stage.spawns.forEach((sp, i) => { const v = cr ? combineHp(cf.hp[i], cr.hp[i]) : cf.hp[i]; if (v != null) sp.hp = v; });
-    stage.crowdFloor = { fRegular: cf.fRegular, fWave: cf.fWave, rows: cf.rows };
+    const rows = cf.rows;
+    let k = 0;
+    stage.spawns.forEach((sp, i) => {
+      const v = cr ? combineHp(cf.hp[i], cr.hp[i]) : cf.hp[i];
+      if (v != null) sp.hp = v;
+      if (sp.kind === 'bounty') return;
+      if (cr && v !== cf.hp[i]) rows[k] = { ...cr.rows[k], ref: true };
+      k++;
+    });
+    stage.crowdFloor = { fRegular: cf.fRegular, fWave: cf.fWave, rows };
   }
   if (mult.bossFloor && stage.elites.length) {
     const mid = stage.elites.every((e) => e.mid);
@@ -558,7 +567,9 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
     const fr = hpRef ? bossFloor(hpRef, mid ? BAL3.midBossSec : BAL3.bossMinFightSec) : null;
     const hp = fr ? f.hp.map((h, i) => combineHp(h, fr.hp[i])) : f.hp;
     stage.elites.forEach((e, i) => { e.hp = hp[i]; });
-    stage[mid ? 'midFloor' : 'bossFloor'] = { sec: f.sec, units: f.units, weapon: f.weapon, mk: f.mk, dps: f.dps, base: f.base, hp, minSec: f.minSec };
+    //  내역 = 실제로 쓴 쪽(기준 판의 체력 합이 더 크면 그 계산 — 상한 화력이 클수록 모든 보스 체력이 함께 커지므로 쪽 하나로 정해진다)
+    const w = fr && fr.hp.reduce((a, b) => a + b, 0) > f.hp.reduce((a, b) => a + b, 0) ? fr : f;
+    stage[mid ? 'midFloor' : 'bossFloor'] = { sec: w.sec, units: w.units, weapon: w.weapon, mk: w.mk, dps: w.dps, base: w.base, hp, minSec: w.minSec, ...(w === f ? {} : { ref: true }) };
   }
   //  r4.7 현상금 적(이사님 지시 2026-09-26 "체력이 특수한 높은 일반 적을 배치해서 … 끝까지 쏴야 깰 수 있는 긴장감 … 대신 코인 같은 보상"):
   //   줄 표의 bounty 가 참인 줄(게임 화면 = brutal)에서만 판 정의의 bounties [{ z(발동 z), x }] 를 스폰 1체로 붙인다(물결·무리 수 배수 없음 — makeSpawn 을 거치지 않는다).
@@ -566,9 +577,11 @@ export function buildStage(id, { difficulty = DEFAULT_DIFFICULTY, lotterySeed } 
   if (mult.bounty && d.bounties && d.bounties.length) {
     stage.bounties = d.bounties.map((b) => {
       const f = bountyFloor(stage, b.z);
-      const hp = hpRef ? combineHp(f.hp, bountyFloor(hpRef, b.z).hp) : f.hp;
+      const fr = hpRef ? bountyFloor(hpRef, b.z) : null;
+      const hp = fr ? combineHp(f.hp, fr.hp) : f.hp;
+      const w = fr && hp !== f.hp ? fr : f;
       stage.spawns.push({ z: b.z, kind: 'bounty', n: 1, xs: [b.x], zs: [b.z + ENTER], corridorHw: null, hp });
-      return { z: b.z, x: b.x, hp, units: f.units, weapon: f.weapon, mk: f.mk, dmg: f.dmg, sec: f.sec };
+      return { z: b.z, x: b.x, hp, units: w.units, weapon: w.weapon, mk: w.mk, dmg: w.dmg, sec: w.sec, ...(w === f ? {} : { ref: true }) };
     });
   }
   stage.spawns.sort((a, b) => a.z - b.z);

@@ -11,6 +11,9 @@ import { STAGE_END } from '../rush3/courses.js';
 import { crowdFloor, crowdFFor, crowdDpsAt, approachSec, routeChoices } from '../rush3/firepower.js';
 import { scheduledEnemyCount, stageValue, createTally } from '../rush3/coins.js';
 import { crowdRow } from './lib/rush3-crowd.mjs';
+//  r4.35 체력 기준 'max'(이사님 결정 2026-10-14): 무기 배치를 바꾼 판은 바꾸기 전 무기(기준 판)로 잰 화력과 높은 쪽
+import { hpPair } from './lib/rush3-r435.mjs';
+const dpsMax = (st, z) => Math.max(...hpPair(st).filter(Boolean).map((x) => crowdDpsAt(x, z, routeChoices(x))));
 
 const C = BAL3.crowd;
 const B = (id) => buildStage(id, { difficulty: 'brutal' });
@@ -41,7 +44,7 @@ test('CROWD-2 일반 무리: 게임 줄 1~24 모든 일반 무리 — f ≥ 바�
       if (sp.kind === 'bounty' || sp.horde) continue;
       const r = crowdRow(st, sp);
       assert.ok(r, `S${id} z${sp.z} ${sp.kind} 내역`);
-      const need = f * crowdDpsAt(st, sp.z, routes) * approachSec(sp.kind);
+      const need = f * dpsMax(st, sp.z) * approachSec(sp.kind);
       assert.ok(sp.hp >= r.before, `S${id} z${sp.z} ${sp.kind}: 내리지 않는다 ${r.before} → ${sp.hp}`);
       assert.ok(sp.n * sp.hp >= need - 1e-9, `S${id} z${sp.z} ${sp.kind}: f ≥ 바닥 (${sp.n} × ${sp.hp} ≥ ${need.toFixed(1)})`);
       if (sp.n * r.before >= need) { assert.equal(sp.hp, r.before, `S${id} z${sp.z} ${sp.kind}: 이미 넘는 무리는 그대로`); kept++; }
@@ -78,7 +81,7 @@ test('CROWD-3 웨이브: 게임 줄 웨이브 판(1·4·7·…·22) — 겹마�
       const r = BAL3.enemies[sp.kind].r;
       assert.ok(sp.xs.every((x) => x >= ROAD.x0 + r - 0.01 && x <= ROAD.x1 - r + 0.01), `S${id} 겹 z+${p.z}: 도로 안`);
       const row = crowdRow(st, sp);
-      const dps = crowdDpsAt(st, sp.z, routes), W = approachSec(sp.kind);
+      const dps = dpsMax(st, sp.z), W = approachSec(sp.kind);
       const need = (fw / parts.length) * dps * W, old = baseN * row.before;
       assert.equal(sp.hp, Math.max(1, Math.ceil(Math.max(need, old) / sp.n)), `S${id} 겹 z+${p.z}: 체력`);
       assert.ok(sp.n * sp.hp >= old, `S${id} 겹 z+${p.z}: 웨이브 힘(적 수 × 체력)이 종전(${baseN} × ${row.before})보다 약해지지 않는다`);

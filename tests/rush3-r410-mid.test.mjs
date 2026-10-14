@@ -3,6 +3,7 @@
 //  **보스와 다르다**: 탄막·광분·고유 공격·페이즈·소환 없음. 행동은 한 가지 — 정지 거리에서 좌우로 움직이다 가끔 붉은 경보 줄(0.8초)을 띄운 뒤 그 줄로 돌진했다 제자리로
 //  (광역 경보 규칙 그대로, 피할 수 있음 보장 — bossatk.planCharge). 체력 = 상한 화력 × 12초(BAL3.midBossSec — firepower.js 재사용). 잡으면 승리 + 판 끝 목표 몫 코인.
 //  ⚠️난이도 판단이 아니다(이사님 지시 "난이도는 너의 봇테스트로 하지 말도록") — '피할 수 있음'의 기계적 증명·동작 확인이다.
+import { hpPair } from './lib/rush3-r435.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BAL3 } from '../rush3/balance.js';
@@ -58,7 +59,8 @@ test('MIDBOSS 체력·크기·그림: 체력 = 상한 화력 × 12초(BAL3.midBo
     const e = st.elites[0], f = st.midFloor;
     assert.ok(e.mid && st.elites.length === 1, `S${id} 중간 보스 1체`);
     //  체력: 원값 1(× 1.5 → 2)을 상한 화력 × 12초로 — 계산기 결과와 같다
-    const ub = bossUpperBound(st);
+    //  r4.35 체력 기준 'max': 무기 배치를 바꾼 판은 기준 판(바꾸기 전 무기)의 상한 화력과 높은 쪽
+    const ub = hpPair(st).filter(Boolean).map((x) => bossUpperBound(x)).reduce((a, b) => (b.dps > a.dps ? b : a));
     assert.equal(f.sec, 12); assert.ok(Math.abs(f.dps - ub.dps) < 1e-9, `S${id} 상한 화력`);
     assert.equal(e.hp, Math.ceil(12 * ub.dps), `S${id} 체력 = ceil(12 × ${ub.dps.toFixed(1)})`);
     assert.ok(e.hp / ub.dps >= 12 - 1e-9 && e.hp / ub.dps < 12 + 1 / ub.dps + 1e-9, `S${id} ${(e.hp / ub.dps).toFixed(2)}초`);

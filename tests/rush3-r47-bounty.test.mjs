@@ -2,6 +2,7 @@
 //  이사님 원문: "일반적: 체력이 특수한 높은 일반 적을 배치해서 내가 가진 최대의 무기로 끝까지 쏴야 깰 수 있는 긴장감을 주자. 대신 코인 같은 보상을 주자."
 //  현상금 적 체력은 봇 승패가 아니라 **상한 화력 계산**(rush3/firepower.js bountyFloor)으로 정한다(이사님 지시 "난이도는 너의 봇테스트로 하지 말도록").
 //  ⚠️여기서 도는 판은 모두 동작 확인이다(규칙이 명세대로 움직이는가 · 계산이 실제 stepRun 과 맞는가). 봇 승패는 잠그지 않는다.
+import { hpPair } from './lib/rush3-r435.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BAL3 } from '../rush3/balance.js';
@@ -70,8 +71,9 @@ test('BOUNTY-2: 체력 = 그 z 까지의 상한 부대(분리벽 한쪽·병력 
     for (const b of st.bounties || []) {
       //  독립 재계산: 모든 길 조합 × 무기 후보 중 bountyDamageFor 가 가장 큰 부대
       let best = null;
-      for (const route of routeChoices(st)) {
-        const lo = routeLoadout(st, route, b.z);
+      //  r4.35 체력 기준 'max': 무기 배치를 바꾼 판은 기준 판(바꾸기 전 무기)까지 함께 훑어 가장 큰 쪽
+      for (const sx of hpPair(st).filter(Boolean)) for (const route of routeChoices(sx)) {
+        const lo = routeLoadout(sx, route, b.z);
         for (const w of weaponOptions(st.startWeapon, lo.crates)) {
           const d = bountyDamageFor(lo.units, w.weapon, w.mk).dmg;
           if (!best || d > best.d + 1e-9) best = { d, units: lo.units, weapon: w.weapon, mk: w.mk };
