@@ -13,8 +13,8 @@ const synth = (o = {}) => ({ id: 9, version: 1, title: 't', startUnits: 1, start
 const play = (run, n) => { const ev = []; for (let i = 0; i < n; i++) { stepRun(run, NO, STEP); ev.push(...drainEvents(run)); } return ev; };
 const enemy = (run, id, x, z, hp = 1) => { const e = { id, kind: 'grunt', x, z, px: x, pz: z, vz: 0, hp, r: 14, dead: false, touched: false }; run.enemies.push(e); return e; };
 
-test('V3-WPN WPN-1: 무기 6종·순위·고유색이 표대로, Mk 표는 3단(I 기본, II·III 은 간격↓·폭↑, III 은 피해 +1)', () => {
-  assert.deepEqual(Object.keys(WEAPONS), ['rifle', 'auto', 'heavy', 'scatter', 'sniper', 'arc']);
+test('V3-WPN WPN-1: 무기 8종(r4.35 유도 미사일·화염방사기 — 수치는 rush3-weapons2)·순위·고유색이 표대로, Mk 표는 3단(I 기본, II·III 은 간격↓·폭↑, III 은 피해 +1)', () => {
+  assert.deepEqual(Object.keys(WEAPONS), ['rifle', 'auto', 'heavy', 'scatter', 'sniper', 'arc', 'missile', 'flame']);
   assert.deepEqual(['rifle', 'auto', 'heavy', 'scatter', 'sniper', 'arc'].map(weaponRank), [1, 2, 3, 2, 3, 3]);
   assert.deepEqual([WEAPONS.scatter.color, WEAPONS.sniper.color, WEAPONS.arc.color], ['#B6FF4A', '#DDEBFF', '#7F9BFF']);
   assert.equal(MK_MAX, 3);

@@ -65,6 +65,15 @@ export const BAL3 = deepFreeze({
     //  stunSec(r3.31, 이사 지시 2026-09-23 "전격무기는 맞은 적들이 잠시 동안 못 움직이도록"): 직격·연쇄로 맞은 **일반 적**은 그동안 멈춘다
     //   (이동·가속·저격 예고/발사 모두 정지). 정예·아레나 보스는 제외 — 보스를 묶으면 보스전이 사라진다
     arc:     { id: 'arc',     rank: 3, interval: 0.7,  dmg: 1, vz: 750, w: 5, color: '#7F9BFF', name: '전격포', gateHit: 1, chain: 2, chainR: 90, chainDmg: 1, stunSec: 0.8 },
+    //  r4.35(이사님 결정 2026-10-14 '나' — 설계서 docs/superpowers/specs/2026-10-14-weapon-variety-design.md) 새 무기 2종:
+    //   missile(유도 미사일): 반경 seekR 안에서 탄보다 앞쪽의 가장 가까운 적·정예·보스를 고르고 초당 turn 라디안까지 틀며 따라간다
+    //    (앞 속도 ≥ minFwd × 탄속 — 뒤로 돌지 않는다, combat.steerHoming). 맞으면 중화기처럼 작게 폭발(직격 적 제외).
+    //    탄속 650 = 중화기와 같다(판 배치 계산의 최저 탄속 stages.VZ_MIN 불변). 한 명당 초당 피해 3.3(기관총 4 아래 — 보스 체력 상한이 오르지 않게)
+    //   flame(화염방사기): 사거리 400(산탄포 420 아래 · 보스 정지 거리 360~420 에 앞줄이 닿는다) · 넓은 탄 22 · 관통 2(적 2마리까지 — 게이트·통·벽은 그대로 흡수) ·
+    //    초당 4발(기관총과 같은 게이트 효율). 처음 수치는 시작값 — 이사님 실플레이 뒤 간격·피해·관통만 고친다
+    missile: { id: 'missile', rank: 3, interval: 0.9,  dmg: 3, vz: 650, w: 6, color: '#E86BFF', name: '유도 미사일', gateHit: 1, blastR: 20, blastDmg: 1,
+               homing: Object.freeze({ turn: 3.5, seekR: 520, minFwd: 0.35 }) },
+    flame:   { id: 'flame',   rank: 2, interval: 0.25, dmg: 1, vz: 520, w: 22, color: '#FF4A2E', name: '화염방사기', gateHit: 1, range: 400, pierce: 2 },
   },
   //  무기 강화 Mk I~III(r3.10): 같은 무기 통을 다시 먹으면 한 단계. 같은 무기 안에서 발사 간격·탄 폭·피해가 한 단계씩(그림 3단계와 1:1)
   weaponMk: Object.freeze([

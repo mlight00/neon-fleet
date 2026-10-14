@@ -519,6 +519,8 @@ function moveBullets(run, ev, dt) {
   for (let i = 0; i < bullets.length; i++) {
     const b = bullets[i];
     if (b.dead) continue;
+    //  r4.35 유도 미사일: 움직이기 직전에 목표 쪽으로 방향을 튼다(속력 그대로)
+    if (b.homing) steerHoming(run, b, dt);
     b.pz = b.z;
     b.z += b.vz * dt;
     if (b.vx) b.x += b.vx * dt;
@@ -552,6 +554,38 @@ function moveBullets(run, ev, dt) {
     else if (kind === 3) hitEnemy(run, obj, b, ev);
     else if (kind === 4) hitBonusTarget(run, obj, b, ev);
   }
+}
+
+//  r4.35 유도 미사일 조향(설계서 2026-10-14). 목표 = 살아 있는 적·보스 중 탄보다 앞쪽(z > 탄 z − 10)이고 반경 seekR 안에서 가장 가까운 것.
+//   지금 목표(b.tid)가 살아 있고 조건 안이면 그대로 쓰고, 죽거나 뒤로 지나가거나 멀어지면 다시 고른다(없으면 곧게 — 방향을 바꾸지 않는다).
+//   진행 방향을 목표 쪽으로 이번 STEP 에 turn × dt 라디안까지만 틀고, 앞 속도(vz)는 늘 spd × minFwd 이상(각도 상한 acos(minFwd) — 뒤로 돌지 않는다).
+//   속력은 spd 그대로. 난수 없음 — 같은 입력이면 같은 길
+function homingOk(b, t, seekR) {
+  return !!t && !t.dead && t.z > b.z - 10 && Math.hypot(t.x - b.x, t.z - b.z) <= seekR;
+}
+export function steerHoming(run, b, dt) {
+  const H = b.homing;
+  let t = null;
+  if (b.tid != null) {
+    const cur = run.enemies.find((e) => e.id === b.tid) ?? run.bosses.find((bo) => bo.id === b.tid) ?? null;
+    if (homingOk(b, cur, H.seekR)) t = cur;
+    else b.tid = null;
+  }
+  if (!t) {
+    let bd = Infinity;
+    for (const e of run.enemies) if (homingOk(b, e, H.seekR)) { const d = Math.hypot(e.x - b.x, e.z - b.z); if (d < bd) { bd = d; t = e; } }
+    for (const bo of run.bosses) if (homingOk(b, bo, H.seekR)) { const d = Math.hypot(bo.x - b.x, bo.z - b.z); if (d < bd) { bd = d; t = bo; } }
+    if (!t) return;
+    b.tid = t.id;
+  }
+  const cur = Math.atan2(b.vx || 0, b.vz);
+  let d = Math.atan2(t.x - b.x, t.z - b.z) - cur;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  const step = H.turn * dt, lim = Math.acos(H.minFwd);
+  const a = Math.max(-lim, Math.min(lim, cur + Math.max(-step, Math.min(step, d))));
+  b.vx = b.spd * Math.sin(a);
+  b.vz = b.spd * Math.cos(a);
 }
 
 // 적·보스 직격. hp <= 0 즉시 dead(같은 STEP 이후 처리에서 제외). heavy 는 적 직격 시에만 폭발
