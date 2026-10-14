@@ -114,10 +114,11 @@ export function expectedGateHits(run, row) {
   const w = weaponStats(run.weapon, run.weaponMk || 1);
   const fan = w.fan ?? 1;
   const armSec = (row.armZ == null ? BAL3.enterZ : Math.min(row.armZ, Math.max(0, row.z - run.z))) / BAL3.scroll;
-  const base = run.units.length * fan * (armSec / w.interval) * GATE_HIT_FRAC;
+  //  r4.36 로켓런처: 탄 한 발이 게이트를 gateHit(2) 칸 올린다 — 나머지 무기는 × 1 이라 종전 값과 같다
+  const base = run.units.length * fan * (armSec / w.interval) * GATE_HIT_FRAC * w.gateHit;
   const hu = run.heroUp;
   if (!hu || hu.intervalMul === 1 || !run.units.some((u) => u.hero)) return base;
-  return base + fan * (armSec / w.interval) * (1 / hu.intervalMul - 1) * GATE_HIT_FRAC;
+  return base + fan * (armSec / w.interval) * (1 / hu.intervalMul - 1) * GATE_HIT_FRAC * w.gateHit;
 }
 export function botEvLead(run) {
   if (run.boss || run.phase === 'bonus' || run.phase === 'arena') return botPlanBoss(run);

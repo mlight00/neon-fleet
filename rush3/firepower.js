@@ -211,8 +211,6 @@ function bossTargets(stage) {
  *  r4.8: 게임 줄(stage.bossHw 가 있는 판)은 보스전 밀집 대형(반폭 상한 bossHw) 그대로 잰다 — 게임과 같은 대형 함수(squad.compressUnits)·같은 중심 범위 */
 export function bossDpsFor(stage, n, weaponId, mk) {
   const s = weaponStats(weaponId, mk);
-  //  r4.35 유도 미사일: 쏜 탄이 모두 보스를 따라가 맞는다고 본다(상한 — 광장 자동 조준과 같은 셈)
-  if (s.homing) { const hits = n * s.fan; return { dps: dpsOf(weaponId, mk, hits), hits, sx: null }; }
   const tg = bossTargets(stage);
   const cap = stage.bossHw ?? null;
   if (!tg) { const hits = n * s.fan; return { dps: dpsOf(weaponId, mk, hits), hits, sx: null }; }
@@ -349,8 +347,7 @@ export function bountyDamageFor(n, weaponId, mk, B = BT) {
     let dmg = 0;
     for (let d = dEnter; d > dc + 1e-9; d -= D_STEP) {
       const dd = Math.min(D_STEP, d - dc);
-      //  r4.35 유도 미사일: 목표 반경(seekR) 안으로 들어온 뒤로는 쏜 탄이 모두 맞는다고 본다(상한)
-      const h = s.homing && d <= s.homing.seekR ? offs.length * s.fan : roadHitsFrom(offs, weaponId, mk, [{ x: tx, z: d - dd / 2, r: B.r }], sx, tw);
+      const h = roadHitsFrom(offs, weaponId, mk, [{ x: tx, z: d - dd / 2, r: B.r }], sx, tw);
       dmg += h * per * (dd / B.vz);
     }
     sum += dmg; secSum += (dEnter - dc) / B.vz; cnt++;

@@ -41,7 +41,7 @@ export const BAL3 = deepFreeze({
     // 대형 그리기 상수(기존 값 이식)
     heroSize: 46, soldierSize: 22, ringGap: 19, ringStart: 26, unitSpacingX: 22, unitSpacingY: 18, drawCap: 130,
   },
-  // 무기 3종(3-4장). gateHit 는 모든 무기 1
+  // 무기 3종(3-4장). gateHit = 탄 한 발이 올리는 게이트 칸 수 — 모든 무기 1, r4.36 로켓런처만 2(weapons.makeBullet 이 이 값을 탄에 싣는다 · 로봇 다연발 추가 탄은 0)
   weapons: {
     rifle: { id: 'rifle', rank: 1, interval: 0.5,  dmg: 1, vz: 700, w: 4, color: '#F6C84A', name: '소총', gateHit: 1 },
     auto:  { id: 'auto',  rank: 2, interval: 0.25, dmg: 1, vz: 800, w: 5, color: '#35E5FF', name: '기관총', gateHit: 1 },
@@ -65,14 +65,16 @@ export const BAL3 = deepFreeze({
     //  stunSec(r3.31, 이사 지시 2026-09-23 "전격무기는 맞은 적들이 잠시 동안 못 움직이도록"): 직격·연쇄로 맞은 **일반 적**은 그동안 멈춘다
     //   (이동·가속·저격 예고/발사 모두 정지). 정예·아레나 보스는 제외 — 보스를 묶으면 보스전이 사라진다
     arc:     { id: 'arc',     rank: 3, interval: 0.7,  dmg: 1, vz: 750, w: 5, color: '#7F9BFF', name: '전격포', gateHit: 1, chain: 2, chainR: 90, chainDmg: 1, stunSec: 0.8 },
-    //  r4.35(이사님 결정 2026-10-14 '나' — 설계서 docs/superpowers/specs/2026-10-14-weapon-variety-design.md) 새 무기 2종:
-    //   missile(유도 미사일): 반경 seekR 안에서 탄보다 앞쪽의 가장 가까운 적·정예·보스를 고르고 초당 turn 라디안까지 틀며 따라간다
-    //    (앞 속도 ≥ minFwd × 탄속 — 뒤로 돌지 않는다, combat.steerHoming). 맞으면 중화기처럼 작게 폭발(직격 적 제외).
-    //    탄속 650 = 중화기와 같다(판 배치 계산의 최저 탄속 stages.VZ_MIN 불변). 한 명당 초당 피해 3.3(기관총 4 아래 — 보스 체력 상한이 오르지 않게)
-    //   flame(화염방사기): 사거리 400(산탄포 420 아래 · 보스 정지 거리 360~420 에 앞줄이 닿는다) · 넓은 탄 22 · 관통 2(적 2마리까지 — 게이트·통·벽은 그대로 흡수) ·
-    //    초당 4발(기관총과 같은 게이트 효율). 처음 수치는 시작값 — 이사님 실플레이 뒤 간격·피해·관통만 고친다
-    missile: { id: 'missile', rank: 3, interval: 0.9,  dmg: 3, vz: 650, w: 6, color: '#E86BFF', name: '유도 미사일', gateHit: 1, blastR: 20, blastDmg: 1,
-               homing: Object.freeze({ turn: 3.5, seekR: 520, minFwd: 0.35 }) },
+    //  r4.35(이사님 결정 2026-10-14 '나' — 설계서 docs/superpowers/specs/2026-10-14-weapon-variety-design.md) 새 무기 2종: missile · flame.
+    //  r4.36(이사님 결정 2026-10-14 '가' — 실플레이 소감 "유도탄은 좀 무의미 … 중화기 보다 더 강력한 한방이 더 강한 대신 텀이 긴 로켓런처"):
+    //   missile = 로켓런처(종전 유도 미사일 — 내부 id · 판 배치 · 기록 칸은 그대로, 화면 이름만 바꾼다. 관통탄 sniper 이름 바꾸기와 같은 방식).
+    //   유도 없이 곧게 날아가 맞은 적에 8, 맞은 자리 반경 40 안의 다른 적·보스에 2(중화기와 같은 폭발 — 직격 적 제외 · 벽 너머 제외).
+    //   2초에 한 발(중화기 0.8초) — 한 명당 초당 직격 피해 4.0(중화기 3.75). 탄 폭 8 · 탄속 650 = 중화기와 같다(판 배치 계산의 최저 탄속 stages.VZ_MIN 불변).
+    //   gateHit 2: 드물게 쏘는 무기라 1 이면 음수 칸을 올리지 못한다(18판 두 번째 게이트 −14 → 20, 병사 12명: +1 이면 1 · +2 면 16 = 관통탄과 같음 — 검사 WPN2-3).
+    //   폭발 피해는 체력 바닥 계산에 넣지 않는다(중화기와 같은 원칙) — 이사님 실플레이 뒤 반경·피해부터 조정한다
+    //  flame(화염방사기): 사거리 400(산탄포 420 아래 · 보스 정지 거리 360~420 에 앞줄이 닿는다) · 넓은 탄 22 · 관통 2(적 2마리까지 — 게이트·통·벽은 그대로 흡수) ·
+    //   초당 4발(기관총과 같은 게이트 효율). 처음 수치는 시작값 — 이사님 실플레이 뒤 간격·피해·관통만 고친다
+    missile: { id: 'missile', rank: 3, interval: 2.0,  dmg: 8, vz: 650, w: 8, color: '#E86BFF', name: '로켓런처', gateHit: 2, blastR: 40, blastDmg: 2 },
     flame:   { id: 'flame',   rank: 2, interval: 0.25, dmg: 1, vz: 520, w: 22, color: '#FF4A2E', name: '화염방사기', gateHit: 1, range: 400, pierce: 2 },
   },
   //  무기 강화 Mk I~III(r3.10): 같은 무기 통을 다시 먹으면 한 단계. 같은 무기 안에서 발사 간격·탄 폭·피해가 한 단계씩(그림 3단계와 1:1)
@@ -433,6 +435,8 @@ export const BAL3 = deepFreeze({
           scatter: { n: 6, r: 1.6, sp: 120, shape: 'dot',  color: '#B6FF4A' },
           sniper:  { n: 3, r: 1.2, sp: 260, shape: 'line', color: '#EEF4FF' },
           arc:     { n: 4, r: 2.0, sp: 160, shape: 'bolt', color: '#9E86FF' },
+          //  r4.36 로켓런처: 불꽃색 굵은 파편(폭발 고리 · 폭발음은 셸 blast 이벤트가 맡는다)
+          missile: { n: 5, r: 4.4, sp: 180, shape: 'dot', color: '#FFB04A' },
         },
         //  정예·아레나 보스 사망 = 다단 폭발(span 초에 걸쳐 n 번, 자리는 반지름 안에서 돌아가며)
         bossMultiBoom: { n: 4, span: 0.6 },

@@ -471,7 +471,7 @@ export function extraOffset(k, gap) {
   const m = Math.ceil(k / 2) * gap;
   return k % 2 ? m : -m;
 }
-//  로봇 한 발(부채꼴 각도 하나): 원래 탄(게이트 +1 그대로) + 추가 탄 extra 발. 추가 탄은 gateHit 0 + extra(이사님 결정 N3 —
+//  로봇 한 발(부채꼴 각도 하나): 원래 탄(게이트 +gateHit 그대로 — 로켓런처 2, 나머지 1) + 추가 탄 extra 발. 추가 탄은 gateHit 0 + extra(이사님 결정 N3 —
 //   게이트 수치·증원 설비 발판을 올리지 않고 닿으면 사라진다, 적·일반 보급 통에는 효과), 피해는 원래 탄과 같다.
 //   옆 자리: 도로 탄(angle null)은 x 로, 광장 조준탄은 조준 방향(base)에 수직으로 옮긴다(부채꼴은 같은 오프셋으로 통째 복제)
 //   vm(r4.7) = 원래 탄의 발 속도 배수 — 추가 탄도 같은 값(부채꼴을 속도까지 통째로 복제)
@@ -519,8 +519,6 @@ function moveBullets(run, ev, dt) {
   for (let i = 0; i < bullets.length; i++) {
     const b = bullets[i];
     if (b.dead) continue;
-    //  r4.35 유도 미사일: 움직이기 직전에 목표 쪽으로 방향을 튼다(속력 그대로)
-    if (b.homing) steerHoming(run, b, dt);
     b.pz = b.z;
     b.z += b.vz * dt;
     if (b.vx) b.x += b.vx * dt;
@@ -556,38 +554,6 @@ function moveBullets(run, ev, dt) {
   }
 }
 
-//  r4.35 유도 미사일 조향(설계서 2026-10-14). 목표 = 살아 있는 적·보스 중 탄보다 앞쪽(z > 탄 z − 10)이고 반경 seekR 안에서 가장 가까운 것.
-//   지금 목표(b.tid)가 살아 있고 조건 안이면 그대로 쓰고, 죽거나 뒤로 지나가거나 멀어지면 다시 고른다(없으면 곧게 — 방향을 바꾸지 않는다).
-//   진행 방향을 목표 쪽으로 이번 STEP 에 turn × dt 라디안까지만 틀고, 앞 속도(vz)는 늘 spd × minFwd 이상(각도 상한 acos(minFwd) — 뒤로 돌지 않는다).
-//   속력은 spd 그대로. 난수 없음 — 같은 입력이면 같은 길
-function homingOk(b, t, seekR) {
-  return !!t && !t.dead && t.z > b.z - 10 && Math.hypot(t.x - b.x, t.z - b.z) <= seekR;
-}
-export function steerHoming(run, b, dt) {
-  const H = b.homing;
-  let t = null;
-  if (b.tid != null) {
-    const cur = run.enemies.find((e) => e.id === b.tid) ?? run.bosses.find((bo) => bo.id === b.tid) ?? null;
-    if (homingOk(b, cur, H.seekR)) t = cur;
-    else b.tid = null;
-  }
-  if (!t) {
-    let bd = Infinity;
-    for (const e of run.enemies) if (homingOk(b, e, H.seekR)) { const d = Math.hypot(e.x - b.x, e.z - b.z); if (d < bd) { bd = d; t = e; } }
-    for (const bo of run.bosses) if (homingOk(b, bo, H.seekR)) { const d = Math.hypot(bo.x - b.x, bo.z - b.z); if (d < bd) { bd = d; t = bo; } }
-    if (!t) return;
-    b.tid = t.id;
-  }
-  const cur = Math.atan2(b.vx || 0, b.vz);
-  let d = Math.atan2(t.x - b.x, t.z - b.z) - cur;
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  const step = H.turn * dt, lim = Math.acos(H.minFwd);
-  const a = Math.max(-lim, Math.min(lim, cur + Math.max(-step, Math.min(step, d))));
-  b.vx = b.spd * Math.sin(a);
-  b.vz = b.spd * Math.cos(a);
-}
-
 // 적·보스 직격. hp <= 0 즉시 dead(같은 STEP 이후 처리에서 제외). heavy 는 적 직격 시에만 폭발
 //  보호막(r3.18): guard 인 아레나 보스에 닿은 탄은 관통탄이라도 흡수되고(hp 불변·폭발/연쇄 없음) 이벤트 bossGuard 만 낸다 — 셔터·차폐와 같은 '흡수' 계열
 function hitEnemy(run, e, b, ev) {
@@ -602,7 +568,7 @@ function hitEnemy(run, e, b, ev) {
   if (e.hp <= 0) e.dead = true;
   const w = WEAPONS[b.kind];
   if (w && w.stunSec) stun(e, w.stunSec, ev);
-  if (w && w.blastR) blast(run, e, w.blastR, w.blastDmg, ev);
+  if (w && w.blastR) blast(run, e, w.blastR, w.blastDmg, ev, b.kind);
   if (w && w.chain) chainArc(run, e, w.chain, w.chainR, w.chainDmg, ev, w.stunSec);
 }
 
@@ -653,9 +619,10 @@ function wallBetween(walls, ax, az, bx, bz) {
   return false;
 }
 
-// heavy 폭발: 직격 적은 제외, 반경 r 원과 적 원이 겹치는 !dead 적·보스에 dmg
-function blast(run, center, r, dmg, ev) {
-  ev.push({ type: 'blast', x: center.x, z: center.z, r });
+// 폭발(중화기 · r4.36 로켓런처): 직격 적은 제외, 반경 r 원과 적 원이 겹치는 !dead 적·보스에 dmg.
+//  weapon = 터진 탄의 무기 id — 이벤트 blast · enemyHit 에 싣는다(셸이 로켓런처 폭발 연출 · 폭발음을 고른다)
+function blast(run, center, r, dmg, ev, weapon = 'heavy') {
+  ev.push({ type: 'blast', x: center.x, z: center.z, r, weapon });
   const targets = run.enemies.concat(run.bosses);
   for (const t of targets) {
     if (t === center || t.dead || t.guard) continue;
@@ -664,7 +631,7 @@ function blast(run, center, r, dmg, ev) {
     if (wallBetween(run.walls.concat(run.covers), center.x, center.z, t.x, t.z)) continue;
     t.hp -= dmg;
     if (t.hp > 0 && t.hp <= HP_EPS) t.hp = 0;   // r4.4 소수 잔량
-    ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, blast: true, ...hitLook(t), dmg, weapon: 'heavy' });
+    ev.push({ type: 'enemyHit', id: t.id, kind: t.kind, hp: t.hp, x: t.x, z: t.z, blast: true, ...hitLook(t), dmg, weapon });
     if (t.hp <= 0) t.dead = true;
   }
 }

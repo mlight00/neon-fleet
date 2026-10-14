@@ -125,12 +125,12 @@ export const MK_LABEL = Object.freeze(['', '', ' Mk II', ' Mk III']);
 
 //  탄 그림의 화면 길이(px, Mk I 기준). 무기마다 실루엣이 달라 길이도 다르게: 저격 바늘이 가장 길고 산탄 펠릿 뭉치는 짧고 넓다
 //   r4.7: 산탄포는 그림(bullet_scatter)을 쓰지 않고 둥근 알갱이로 그린다(drawPellet) — scatter 값은 표를 무기 6종으로 채워 두는 몫만 남는다
-export const BULLET_LEN = Object.freeze({ rifle: 24, auto: 26, heavy: 34, scatter: 22, sniper: 48, arc: 34, missile: 30, flame: 24 });
-//  r4.35(이사님 결정 2026-10-14 — 설계서 docs/superpowers/specs/2026-10-14-weapon-variety-design.md) 그림 파일 없이 게임이 직접 그리는 탄(유도 미사일 · 화염방사기).
+export const BULLET_LEN = Object.freeze({ rifle: 24, auto: 26, heavy: 34, scatter: 22, sniper: 48, arc: 34, missile: 40, flame: 24 });
+//  r4.35(이사님 결정 2026-10-14 — 설계서 docs/superpowers/specs/2026-10-14-weapon-variety-design.md) 그림 파일 없이 게임이 직접 그리는 탄(r4.36 로켓런처 · 화염방사기).
 //   탄 그림 키가 없고, 아이콘 그림이 없으면 통 내용물·상단 무기 칩도 게임이 그린다(drawWeaponGlyph)
 export const CODE_BULLETS = Object.freeze(['missile', 'flame']);
-//  미사일 탄: 몸통 길이(트랙 px) · 흰 머리 · 꼬리 불꽃 색 / 불꽃 탄: 반지름 r0 → r1(사거리 끝으로 갈수록 커지고 옅어진다) · 안쪽 노랑 · 중간 주황
-export const MISSILE_LOOK = Object.freeze({ len: 18, nose: '#FFFFFF', fire: '#FFB04A' });
+//  로켓 탄(r4.36): 몸통 길이(트랙 px) · 흰 머리 · 꼬리 불꽃 색 · 불꽃 속 노랑 · 연기 색 / 불꽃 탄: 반지름 r0 → r1(사거리 끝으로 갈수록 커지고 옅어진다) · 안쪽 노랑 · 중간 주황
+export const MISSILE_LOOK = Object.freeze({ len: 26, nose: '#FFFFFF', fire: '#FFB04A', core: '#FFE36B', smoke: '#C9C4CF' });
 export const FLAME_LOOK = Object.freeze({ r0: 6, r1: 20, core: '#FFE36B', mid: '#FF8A2A' });
 //  탄의 진행 방향(라디안, 0 = 화면 위). vx 가 있는 탄(산탄 부채꼴·아레나 자동 조준)은 그 방향으로 그림을 돌린다
 //  체력 숫자를 생략하는 화면 위 띠: HUD 줄(제목·남은 거리·무기 칩) 아래 선.
@@ -1740,7 +1740,7 @@ export function createRenderer3(ctx, sprites, opts = {}) {
       const bw0 = b.w ?? w.w;        // Mk 로 탄 폭이 커진다(트랙 기준)
       //  r4.7 산탄포 = 둥근 알갱이(스프라이트 없이 — 그림이 있어도 쓰지 않는다)
       if (w.id === 'scatter') { drawPellet(b, q, k, bw0, tint, rim); continue; }
-      //  r4.35 유도 미사일 · 화염방사기 = 게임이 직접 그린다(그림 파일 없음)
+      //  r4.35 새 무기(r4.36 로켓런처 · 화염방사기) = 게임이 직접 그린다(그림 파일 없음)
       if (w.id === 'missile') { drawMissile(b, q, k, bw0, tint, rim); continue; }
       if (w.id === 'flame') { drawFlameBlob(b, q, k, bw0, tint); continue; }
       const bw = bw0 * k;
@@ -1784,22 +1784,33 @@ export function createRenderer3(ctx, sprites, opts = {}) {
     }
   }
 
-  //  r4.35 유도 미사일 한 발: 날아가는 방향으로 기울인 몸통(무기색) + 흰 머리 + 꼬리 불꽃. 크기는 Mk 탄 폭(6·7.5·9)에 비례
+  //  r4.36 로켓 한 발: 굵은 몸통(무기색) + 흰 머리 + 꼬리 날개 두 장 + 꼬리 불꽃 두 겹(주황 · 노랑) + 뒤로 옅어지는 연기 세 덩이.
+  //   탄은 곧게 날지만, 광장 조준탄처럼 vx 가 있으면 그 방향으로 기울인다. 크기는 Mk 탄 폭(8·10·12)에 비례.
+  //   연기는 탄마다 기록을 남기지 않고 몸통 뒤 고정 자리에 그린다(곧게 날아 같은 모양 — 병사 100명이 쏘는 장면에서도 가볍게)
   function drawMissile(b, q, k, bw0, tint, rim) {
-    const L = MISSILE_LOOK.len * k * (0.85 + bw0 / 20), hw = Math.max(1.5, bw0 * 0.45 * k);
+    const L = MISSILE_LOOK.len * k * (0.85 + bw0 / 20), hw = Math.max(2, bw0 * 0.5 * k);
     const ang = bulletAngle(b);
     ctx.save();
     ctx.translate(q.x, q.y);
     if (ang !== 0) ctx.rotate(ang);
-    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = MISSILE_LOOK.smoke;
+    for (let i = 0; i < 3; i++) {
+      ctx.globalAlpha = 0.34 - i * 0.1;
+      ctx.beginPath(); ctx.arc(0, L * (0.85 + i * 0.45), hw * (1.1 + i * 0.4), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 0.85;
     ctx.fillStyle = MISSILE_LOOK.fire;
-    ctx.beginPath(); ctx.moveTo(-hw, L * 0.15); ctx.lineTo(0, L * 0.75); ctx.lineTo(hw, L * 0.15); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-hw * 0.9, L * 0.15); ctx.lineTo(0, L * 0.8); ctx.lineTo(hw * 0.9, L * 0.15); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = MISSILE_LOOK.core;
+    ctx.beginPath(); ctx.moveTo(-hw * 0.45, L * 0.15); ctx.lineTo(0, L * 0.5); ctx.lineTo(hw * 0.45, L * 0.15); ctx.closePath(); ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = tint;
+    ctx.beginPath(); ctx.moveTo(-hw, -L * 0.05); ctx.lineTo(-hw * 1.9, L * 0.2); ctx.lineTo(-hw, L * 0.15); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(hw, -L * 0.05); ctx.lineTo(hw * 1.9, L * 0.2); ctx.lineTo(hw, L * 0.15); ctx.closePath(); ctx.fill();
     ctx.fillRect(-hw, -L * 0.45, hw * 2, L * 0.6);
     ctx.fillStyle = MISSILE_LOOK.nose;
-    ctx.beginPath(); ctx.moveTo(-hw, -L * 0.45); ctx.lineTo(0, -L * 0.75); ctx.lineTo(hw, -L * 0.45); ctx.closePath(); ctx.fill();
-    if (rim) { ctx.strokeStyle = HERO_BULLET_RIM; ctx.lineWidth = Math.max(1, 1.4 * k); ctx.strokeRect(-hw - 2 * k, -L * 0.8, hw * 2 + 4 * k, L * 1.6); }
+    ctx.beginPath(); ctx.moveTo(-hw, -L * 0.45); ctx.lineTo(0, -L * 0.8); ctx.lineTo(hw, -L * 0.45); ctx.closePath(); ctx.fill();
+    if (rim) { ctx.strokeStyle = HERO_BULLET_RIM; ctx.lineWidth = Math.max(1, 1.4 * k); ctx.strokeRect(-hw * 2 - 2 * k, -L * 0.85, hw * 4 + 4 * k, L * 1.7); }
     ctx.restore();
   }
   //  r4.35 화염방사기 한 발: 날아간 거리 ÷ 사거리(0 → 1)만큼 커지고(FLAME_LOOK.r0 → r1) 옅어지는 불꽃 세 겹(바깥 무기색 · 주황 · 노랑).
@@ -1820,7 +1831,7 @@ export function createRenderer3(ctx, sprites, opts = {}) {
     ctx.restore();
   }
   //  r4.35 아이콘 그림 파일이 없는 새 무기의 작은 그림(통 내용물 · 상단 무기 칩 — 그림 파일이 생기면 그쪽이 먼저). s = 크기 기준(px)
-  //   유도 미사일 = 옆으로 누운 로켓(무기색 몸통 · 흰 머리 · 꼬리 날개 · 꼬리 불꽃) · 화염방사기 = 물방울 모양 불꽃 두 겹(무기색 · 노랑)
+  //   로켓런처(r4.36 — 종전 유도 미사일 그림 그대로) = 옆으로 누운 로켓(무기색 몸통 · 흰 머리 · 꼬리 날개 · 꼬리 불꽃) · 화염방사기 = 물방울 모양 불꽃 두 겹(무기색 · 노랑)
   function drawWeaponGlyph(w, cx, cy, s) {
     ctx.save();
     if (w.id === 'missile') {

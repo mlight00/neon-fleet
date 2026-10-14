@@ -1,4 +1,4 @@
-// rush3/weapons.js — 무기 8종 정의·강화(Mk)·탄 생성(계약서 3-4장 + r3.10 + r4.35 유도 미사일·화염방사기). 순수, 난수 없음.
+// rush3/weapons.js — 무기 8종 정의·강화(Mk)·탄 생성(계약서 3-4장 + r3.10 + r4.35 새 무기 2종 · r4.36 로켓런처). 순수, 난수 없음.
 import { BAL3 } from './balance.js';
 
 // id → 무기 정의(동결). rank = 무기 등급(표시·검사용). r4.31 부터 다른 무기 통은 등급과 상관없이 언제나 교체(적용은 supply.applySupplyReward)
@@ -26,8 +26,8 @@ export function weaponStats(id, mk = 1) {
   return { id: w.id, interval: w.interval * k.intervalMul, dmg: w.dmg + k.dmgAdd, w: w.w * k.wMul, vz: w.vz,
            fan: w.fan ?? 1, spreadDeg: w.spreadDeg ?? 0, range: w.range ?? null, pierce: w.pierce ?? 0,
            chain: w.chain ?? 0, chainR: w.chainR ?? 0, chainDmg: w.chainDmg ?? 0, blastR: w.blastR ?? 0, blastDmg: w.blastDmg ?? 0,
-           //  r4.35 유도(유도 미사일만): { turn 초당 라디안, seekR 목표 반경, minFwd 앞 속도 하한 비율 } | null — Mk 를 타지 않는다
-           homing: w.homing ?? null };
+           //  r4.36 탄 한 발이 올리는 게이트 칸 수(무기 표 gateHit — 로켓런처 2, 나머지 1). Mk 를 타지 않는다
+           gateHit: w.gateHit ?? 1 };
 }
 
 // 부채꼴 발사 각도(라디안) 목록: fan 1 → [0], fan 3 → [-s, 0, +s], fan 6 → -s … +s 를 5등분(가운데 0 없음)
@@ -61,7 +61,7 @@ export function fanSpeeds(id) {
 export function makeBullet(weaponId, x, z, ownerId, mk = 1, vx = 0, angle = null, vzMul = 1) {
   const s = weaponStats(weaponId, mk);
   const sp = vzMul === 1 ? s.vz : s.vz * vzMul;
-  const b = { x, z, pz: z, vz: sp, dmg: s.dmg, w: s.w, kind: s.id, gateHit: 1, ownerId, dead: false };
+  const b = { x, z, pz: z, vz: sp, dmg: s.dmg, w: s.w, kind: s.id, gateHit: s.gateHit, ownerId, dead: false };
   if (angle !== null && angle !== undefined) {
     b.vz = sp * Math.cos(angle);
     b.vx = sp * Math.sin(angle);
@@ -70,7 +70,5 @@ export function makeBullet(weaponId, x, z, ownerId, mk = 1, vx = 0, angle = null
   } else if (vx) b.vx = vx;
   if (s.range) { b.range = s.range; b.z0 = z; }
   if (s.pierce) { b.pierce = s.pierce; b.hit = []; }
-  //  r4.35 유도탄: 조향 설정 · 속력(spd — 방향만 틀고 속력은 그대로) · 지금 목표 id(tid — 없으면 null). 조향은 combat.steerHoming
-  if (s.homing) { b.homing = s.homing; b.spd = sp; b.tid = null; }
   return b;
 }

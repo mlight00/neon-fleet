@@ -5,7 +5,7 @@
 //  순수: 시계·저장·화면 없음(익명 번호는 주입한 난수만 쓴다)
 
 //  게임 버전(설문 '기타 기록' 칸에 붙는다) — 릴리스마다 올린다(LOOP.md)
-export const REVIEW_GAME_VER = 'r4.35';
+export const REVIEW_GAME_VER = 'r4.36';
 export const REVIEW_BUTTON = '리뷰 남기기';
 
 const FORM_ID = '1FAIpQLSe8NL5_umooFEcX1pwT06DHApJsNBDkpgBBYsex02r69rZF_g';

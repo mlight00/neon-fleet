@@ -211,6 +211,8 @@ export { hitRole };
 const FXH = FX.hit;
 
 /** 파편 상한(BAL3.fx.partsCap): 넘치면 **오래된 것부터** 버린다(배열 앞이 오래된 것) */
+//  r4.36 로켓런처 폭발 연출 수치: 바깥 고리(폭발 반경 × ringMul, 주황) · 안쪽 고리(× innerMul, 노랑, innerDelay 초 늦게) · 파편 parts 개(속도 sp · 수명 partLife · 크기 partR)
+export const ROCKET_BLAST = Object.freeze({ ring: '#FFB04A', inner: '#FFE36B', ringMul: 1.15, innerMul: 0.7, innerDelay: 0.05, life: 0.34, parts: 8, sp: 190, partLife: 0.34, partR: 3.8 });
 export function trimParts(fx) {
   const cap = FX.partsCap;
   if (fx.parts.length > cap) fx.parts.splice(0, fx.parts.length - cap);
@@ -1380,8 +1382,20 @@ export function boot(canvas, deps = {}) {
           break;
         //  중화기 폭발(r3.24 재조정): 종전 흰 섬광 원(spawnBurst flash)이 맞는 적을 통째로 덮어 피격 반응이 안 보였다(S21 카트 캡처) —
         //   섬광 대신 폭발 반경의 주황 링 + 주황 파편 몇 개. 적 그림 위 번쩍임·스파크는 enemyHit 이 맡는다
+        //  r4.36 로켓런처 폭발(ev.weapon 'missile'): 주황 큰 고리 + 한 박자 늦은 노랑 안쪽 고리 + 불꽃색 파편 + 폭발음(rocketBoom — 소리 간격 제한은 audio).
+        //   중화기와 같은 이유로 덮는 섬광 원은 쓰지 않는다(맞은 적의 피격 반응이 보이게)
         case 'blast': {
           const q = sp(ev.x, ev.z);
+          if (ev.weapon === 'missile') {
+            const R = ROCKET_BLAST;
+            fx.shocks.push({ x: q.x, y: q.y, r: ev.r * R.ringMul * q.s, t: 0, life: R.life, color: R.ring });
+            fx.shocks.push({ x: q.x, y: q.y, r: ev.r * R.innerMul * q.s, t: -R.innerDelay, life: R.life, color: R.inner });
+            fx.burstSeed++;
+            for (let i = 0; i < R.parts; i++) { const a = (i / R.parts) * Math.PI * 2 + fx.burstSeed * 0.7; const v = R.sp * q.s; fx.parts.push({ x: q.x, y: q.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: R.partLife, r: R.partR * q.s, color: i % 2 ? R.inner : R.ring }); }
+            trimParts(fx);
+            fx.sfx.push(['rocketBoom']);
+            break;
+          }
           fx.shocks.push({ x: q.x, y: q.y, r: ev.r * q.s, t: 0, life: 0.22, color: C.bulletHeavy });
           fx.burstSeed++;
           for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2 + fx.burstSeed * 0.7; const v = 150 * q.s; fx.parts.push({ x: q.x, y: q.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.28, r: 3.4 * q.s, color: C.bulletHeavy }); }
